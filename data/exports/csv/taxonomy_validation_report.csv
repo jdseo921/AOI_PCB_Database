@@ -1,0 +1,5 @@
+﻿check,result,status
+Total label records,436,INFO
+Unique defect labels used,7,INFO
+Unapproved labels found,0,PASS
+Approved taxonomy labels not yet used,10,INFO

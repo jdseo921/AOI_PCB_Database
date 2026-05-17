@@ -1,0 +1,437 @@
+﻿label_id,image_id,defect_category,defect_type,severity,detection_method,component_id,roi_id,label_status,reviewer,notes
+1,PCB_20260510_163459_750820,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041000_temp.jpg
+2,PCB_20260510_163459_793959,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041001_temp.jpg
+3,PCB_20260510_163459_831203,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041002_temp.jpg
+4,PCB_20260510_163459_870680,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041003_temp.jpg
+5,PCB_20260510_163459_912504,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041004_temp.jpg
+6,PCB_20260510_163459_950083,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041005_temp.jpg
+7,PCB_20260510_163459_986309,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041006_temp.jpg
+8,PCB_20260510_163500_031218,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041007_temp.jpg
+9,PCB_20260510_163500_077408,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041008_temp.jpg
+10,PCB_20260510_163500_124654,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041009_temp.jpg
+11,PCB_20260510_163459_777344,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041000.txt
+12,PCB_20260510_163459_777344,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041000.txt
+13,PCB_20260510_163459_777344,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041000.txt
+14,PCB_20260510_163459_777344,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041000.txt
+15,PCB_20260510_163459_777344,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041000.txt
+16,PCB_20260510_163459_777344,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041000.txt
+17,PCB_20260510_163459_777344,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041000.txt
+18,PCB_20260510_163459_777344,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041000.txt
+19,PCB_20260510_163459_777344,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041000.txt
+20,PCB_20260510_163459_777344,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041000.txt
+21,PCB_20260510_163459_812473,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041001.txt
+22,PCB_20260510_163459_812473,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041001.txt
+23,PCB_20260510_163459_812473,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041001.txt
+24,PCB_20260510_163459_812473,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041001.txt
+25,PCB_20260510_163459_812473,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041001.txt
+26,PCB_20260510_163459_812473,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041001.txt
+27,PCB_20260510_163459_850936,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041002.txt
+28,PCB_20260510_163459_850936,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041002.txt
+29,PCB_20260510_163459_850936,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041002.txt
+30,PCB_20260510_163459_850936,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041002.txt
+31,PCB_20260510_163459_850936,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041002.txt
+32,PCB_20260510_163459_850936,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041002.txt
+33,PCB_20260510_163459_850936,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041002.txt
+34,PCB_20260510_163459_892819,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041003.txt
+35,PCB_20260510_163459_892819,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041003.txt
+36,PCB_20260510_163459_892819,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041003.txt
+37,PCB_20260510_163459_892819,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041003.txt
+38,PCB_20260510_163459_892819,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041003.txt
+39,PCB_20260510_163459_892819,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041003.txt
+40,PCB_20260510_163459_930760,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041004.txt
+41,PCB_20260510_163459_930760,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041004.txt
+42,PCB_20260510_163459_930760,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041004.txt
+43,PCB_20260510_163459_930760,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041004.txt
+44,PCB_20260510_163459_930760,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041004.txt
+45,PCB_20260510_163459_930760,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041004.txt
+46,PCB_20260510_163459_930760,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041004.txt
+47,PCB_20260510_163459_930760,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041004.txt
+48,PCB_20260510_163459_971385,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041005.txt
+49,PCB_20260510_163459_971385,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041005.txt
+50,PCB_20260510_163459_971385,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041005.txt
+51,PCB_20260510_163459_971385,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041005.txt
+52,PCB_20260510_163459_971385,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041005.txt
+53,PCB_20260510_163459_971385,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041005.txt
+54,PCB_20260510_163459_971385,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041005.txt
+55,PCB_20260510_163459_971385,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041005.txt
+56,PCB_20260510_163459_971385,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041005.txt
+57,PCB_20260510_163500_006214,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041006.txt
+58,PCB_20260510_163500_006214,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041006.txt
+59,PCB_20260510_163500_006214,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041006.txt
+60,PCB_20260510_163500_006214,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041006.txt
+61,PCB_20260510_163500_006214,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041006.txt
+62,PCB_20260510_163500_006214,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041006.txt
+63,PCB_20260510_163500_006214,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041006.txt
+64,PCB_20260510_163500_006214,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041006.txt
+65,PCB_20260510_163500_006214,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041006.txt
+66,PCB_20260510_163500_051400,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041007.txt
+67,PCB_20260510_163500_051400,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041007.txt
+68,PCB_20260510_163500_051400,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041007.txt
+69,PCB_20260510_163500_051400,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041007.txt
+70,PCB_20260510_163500_051400,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041007.txt
+71,PCB_20260510_163500_051400,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041007.txt
+72,PCB_20260510_163500_051400,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041007.txt
+73,PCB_20260510_163500_051400,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041007.txt
+74,PCB_20260510_163500_102271,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041008.txt
+75,PCB_20260510_163500_102271,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041008.txt
+76,PCB_20260510_163500_102271,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041008.txt
+77,PCB_20260510_163500_102271,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041008.txt
+78,PCB_20260510_163500_102271,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041008.txt
+79,PCB_20260510_163500_149031,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041009.txt
+80,PCB_20260510_163500_149031,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041009.txt
+81,PCB_20260510_163500_149031,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041009.txt
+82,PCB_20260510_163500_149031,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041009.txt
+83,PCB_20260510_163500_149031,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041009.txt
+84,PCB_20260510_163500_149031,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041009.txt
+85,PCB_20260517_175701_376880,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041010_temp.jpg
+86,PCB_20260517_175701_428526,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041011_temp.jpg
+87,PCB_20260517_175701_467682,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041012_temp.jpg
+88,PCB_20260517_175701_503787,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041013_temp.jpg
+89,PCB_20260517_175701_544497,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041014_temp.jpg
+90,PCB_20260517_175701_584223,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041015_temp.jpg
+91,PCB_20260517_175701_621680,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041016_temp.jpg
+92,PCB_20260517_175701_670362,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041017_temp.jpg
+93,PCB_20260517_175701_714022,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041018_temp.jpg
+94,PCB_20260517_175701_765418,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041019_temp.jpg
+95,PCB_20260517_175701_800298,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041020_temp.jpg
+96,PCB_20260517_175701_834030,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041021_temp.jpg
+97,PCB_20260517_175701_868763,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041022_temp.jpg
+98,PCB_20260517_175701_898393,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041023_temp.jpg
+99,PCB_20260517_175701_933421,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041024_temp.jpg
+100,PCB_20260517_175701_966619,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041025_temp.jpg
+101,PCB_20260517_175702_008838,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041026_temp.jpg
+102,PCB_20260517_175702_049292,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041027_temp.jpg
+103,PCB_20260517_175702_087526,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041028_temp.jpg
+104,PCB_20260517_175702_128332,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041029_temp.jpg
+105,PCB_20260517_175702_156082,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041030_temp.jpg
+106,PCB_20260517_175702_191653,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041031_temp.jpg
+107,PCB_20260517_175702_232737,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041032_temp.jpg
+108,PCB_20260517_175702_273490,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041033_temp.jpg
+109,PCB_20260517_175702_306238,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041034_temp.jpg
+110,PCB_20260517_175702_340316,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041035_temp.jpg
+111,PCB_20260517_175702_375449,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041036_temp.jpg
+112,PCB_20260517_175702_417544,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041037_temp.jpg
+113,PCB_20260517_175702_453669,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041038_temp.jpg
+114,PCB_20260517_175702_492302,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041039_temp.jpg
+115,PCB_20260517_175702_531740,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041040_temp.jpg
+116,PCB_20260517_175702_572558,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041041_temp.jpg
+117,PCB_20260517_175702_605798,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041042_temp.jpg
+118,PCB_20260517_175702_647100,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041043_temp.jpg
+119,PCB_20260517_175702_688548,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041044_temp.jpg
+120,PCB_20260517_175702_733866,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041045_temp.jpg
+121,PCB_20260517_175702_772064,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041046_temp.jpg
+122,PCB_20260517_175702_807349,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041047_temp.jpg
+123,PCB_20260517_175702_842055,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041048_temp.jpg
+124,PCB_20260517_175702_875643,Good / Normal,Good / Normal,None,Template comparison,N/A,full_image,pending,auto_import,Automatically labeled from DeepPCB template image filename: 00041049_temp.jpg
+125,PCB_20260517_175701_412301,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041010.txt
+126,PCB_20260517_175701_412301,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041010.txt
+127,PCB_20260517_175701_412301,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041010.txt
+128,PCB_20260517_175701_412301,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041010.txt
+129,PCB_20260517_175701_412301,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041010.txt
+130,PCB_20260517_175701_412301,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041010.txt
+131,PCB_20260517_175701_412301,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041010.txt
+132,PCB_20260517_175701_412301,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041010.txt
+133,PCB_20260517_175701_412301,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041010.txt
+134,PCB_20260517_175701_448274,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041011.txt
+135,PCB_20260517_175701_448274,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041011.txt
+136,PCB_20260517_175701_448274,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041011.txt
+137,PCB_20260517_175701_448274,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041011.txt
+138,PCB_20260517_175701_448274,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041011.txt
+139,PCB_20260517_175701_448274,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041011.txt
+140,PCB_20260517_175701_487592,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041012.txt
+141,PCB_20260517_175701_487592,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041012.txt
+142,PCB_20260517_175701_487592,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041012.txt
+143,PCB_20260517_175701_487592,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041012.txt
+144,PCB_20260517_175701_487592,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041012.txt
+145,PCB_20260517_175701_522307,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041013.txt
+146,PCB_20260517_175701_522307,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041013.txt
+147,PCB_20260517_175701_522307,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041013.txt
+148,PCB_20260517_175701_522307,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041013.txt
+149,PCB_20260517_175701_522307,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041013.txt
+150,PCB_20260517_175701_522307,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041013.txt
+151,PCB_20260517_175701_522307,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041013.txt
+152,PCB_20260517_175701_522307,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041013.txt
+153,PCB_20260517_175701_522307,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041013.txt
+154,PCB_20260517_175701_565069,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041014.txt
+155,PCB_20260517_175701_565069,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041014.txt
+156,PCB_20260517_175701_565069,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041014.txt
+157,PCB_20260517_175701_565069,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041014.txt
+158,PCB_20260517_175701_565069,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041014.txt
+159,PCB_20260517_175701_565069,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041014.txt
+160,PCB_20260517_175701_565069,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041014.txt
+161,PCB_20260517_175701_565069,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041014.txt
+162,PCB_20260517_175701_565069,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041014.txt
+163,PCB_20260517_175701_565069,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041014.txt
+164,PCB_20260517_175701_603569,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041015.txt
+165,PCB_20260517_175701_603569,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041015.txt
+166,PCB_20260517_175701_603569,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041015.txt
+167,PCB_20260517_175701_603569,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041015.txt
+168,PCB_20260517_175701_603569,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041015.txt
+169,PCB_20260517_175701_647877,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041016.txt
+170,PCB_20260517_175701_647877,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041016.txt
+171,PCB_20260517_175701_647877,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041016.txt
+172,PCB_20260517_175701_647877,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041016.txt
+173,PCB_20260517_175701_647877,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041016.txt
+174,PCB_20260517_175701_647877,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041016.txt
+175,PCB_20260517_175701_647877,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041016.txt
+176,PCB_20260517_175701_647877,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041016.txt
+177,PCB_20260517_175701_691463,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041017.txt
+178,PCB_20260517_175701_691463,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041017.txt
+179,PCB_20260517_175701_691463,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041017.txt
+180,PCB_20260517_175701_691463,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041017.txt
+181,PCB_20260517_175701_691463,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041017.txt
+182,PCB_20260517_175701_691463,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041017.txt
+183,PCB_20260517_175701_691463,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041017.txt
+184,PCB_20260517_175701_691463,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041017.txt
+185,PCB_20260517_175701_691463,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041017.txt
+186,PCB_20260517_175701_735907,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041018.txt
+187,PCB_20260517_175701_735907,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041018.txt
+188,PCB_20260517_175701_735907,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041018.txt
+189,PCB_20260517_175701_735907,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041018.txt
+190,PCB_20260517_175701_735907,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041018.txt
+191,PCB_20260517_175701_735907,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041018.txt
+192,PCB_20260517_175701_735907,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041018.txt
+193,PCB_20260517_175701_782662,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041019.txt
+194,PCB_20260517_175701_782662,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041019.txt
+195,PCB_20260517_175701_782662,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041019.txt
+196,PCB_20260517_175701_782662,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041019.txt
+197,PCB_20260517_175701_782662,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041019.txt
+198,PCB_20260517_175701_782662,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041019.txt
+199,PCB_20260517_175701_817461,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041020.txt
+200,PCB_20260517_175701_817461,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041020.txt
+201,PCB_20260517_175701_817461,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041020.txt
+202,PCB_20260517_175701_817461,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041020.txt
+203,PCB_20260517_175701_817461,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041020.txt
+204,PCB_20260517_175701_817461,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041020.txt
+205,PCB_20260517_175701_850266,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041021.txt
+206,PCB_20260517_175701_850266,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041021.txt
+207,PCB_20260517_175701_850266,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041021.txt
+208,PCB_20260517_175701_850266,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041021.txt
+209,PCB_20260517_175701_850266,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041021.txt
+210,PCB_20260517_175701_883073,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041022.txt
+211,PCB_20260517_175701_883073,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041022.txt
+212,PCB_20260517_175701_883073,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041022.txt
+213,PCB_20260517_175701_883073,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041022.txt
+214,PCB_20260517_175701_883073,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041022.txt
+215,PCB_20260517_175701_915580,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041023.txt
+216,PCB_20260517_175701_915580,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041023.txt
+217,PCB_20260517_175701_915580,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041023.txt
+218,PCB_20260517_175701_915580,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041023.txt
+219,PCB_20260517_175701_915580,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041023.txt
+220,PCB_20260517_175701_915580,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041023.txt
+221,PCB_20260517_175701_915580,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041023.txt
+222,PCB_20260517_175701_915580,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041023.txt
+223,PCB_20260517_175701_950991,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041024.txt
+224,PCB_20260517_175701_950991,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041024.txt
+225,PCB_20260517_175701_950991,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041024.txt
+226,PCB_20260517_175701_950991,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041024.txt
+227,PCB_20260517_175701_950991,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041024.txt
+228,PCB_20260517_175701_950991,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041024.txt
+229,PCB_20260517_175701_950991,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041024.txt
+230,PCB_20260517_175701_950991,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041024.txt
+231,PCB_20260517_175701_988351,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041025.txt
+232,PCB_20260517_175701_988351,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041025.txt
+233,PCB_20260517_175701_988351,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041025.txt
+234,PCB_20260517_175701_988351,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041025.txt
+235,PCB_20260517_175701_988351,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041025.txt
+236,PCB_20260517_175701_988351,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041025.txt
+237,PCB_20260517_175701_988351,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041025.txt
+238,PCB_20260517_175701_988351,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041025.txt
+239,PCB_20260517_175702_028974,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041026.txt
+240,PCB_20260517_175702_028974,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041026.txt
+241,PCB_20260517_175702_028974,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041026.txt
+242,PCB_20260517_175702_028974,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041026.txt
+243,PCB_20260517_175702_028974,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041026.txt
+244,PCB_20260517_175702_028974,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041026.txt
+245,PCB_20260517_175702_028974,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041026.txt
+246,PCB_20260517_175702_028974,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041026.txt
+247,PCB_20260517_175702_028974,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041026.txt
+248,PCB_20260517_175702_069307,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041027.txt
+249,PCB_20260517_175702_069307,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041027.txt
+250,PCB_20260517_175702_069307,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041027.txt
+251,PCB_20260517_175702_069307,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041027.txt
+252,PCB_20260517_175702_069307,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041027.txt
+253,PCB_20260517_175702_069307,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041027.txt
+254,PCB_20260517_175702_069307,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041027.txt
+255,PCB_20260517_175702_069307,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041027.txt
+256,PCB_20260517_175702_069307,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041027.txt
+257,PCB_20260517_175702_069307,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041027.txt
+258,PCB_20260517_175702_106686,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041028.txt
+259,PCB_20260517_175702_106686,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041028.txt
+260,PCB_20260517_175702_106686,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041028.txt
+261,PCB_20260517_175702_106686,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041028.txt
+262,PCB_20260517_175702_106686,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041028.txt
+263,PCB_20260517_175702_106686,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041028.txt
+264,PCB_20260517_175702_106686,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041028.txt
+265,PCB_20260517_175702_106686,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041028.txt
+266,PCB_20260517_175702_106686,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041028.txt
+267,PCB_20260517_175702_144114,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041029.txt
+268,PCB_20260517_175702_144114,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041029.txt
+269,PCB_20260517_175702_144114,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041029.txt
+270,PCB_20260517_175702_174554,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041030.txt
+271,PCB_20260517_175702_174554,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041030.txt
+272,PCB_20260517_175702_174554,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041030.txt
+273,PCB_20260517_175702_174554,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041030.txt
+274,PCB_20260517_175702_174554,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041030.txt
+275,PCB_20260517_175702_174554,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041030.txt
+276,PCB_20260517_175702_174554,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041030.txt
+277,PCB_20260517_175702_174554,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041030.txt
+278,PCB_20260517_175702_174554,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041030.txt
+279,PCB_20260517_175702_174554,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041030.txt
+280,PCB_20260517_175702_211249,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041031.txt
+281,PCB_20260517_175702_211249,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041031.txt
+282,PCB_20260517_175702_211249,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041031.txt
+283,PCB_20260517_175702_211249,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041031.txt
+284,PCB_20260517_175702_211249,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041031.txt
+285,PCB_20260517_175702_211249,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041031.txt
+286,PCB_20260517_175702_211249,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041031.txt
+287,PCB_20260517_175702_211249,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041031.txt
+288,PCB_20260517_175702_211249,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041031.txt
+289,PCB_20260517_175702_211249,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041031.txt
+290,PCB_20260517_175702_253865,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041032.txt
+291,PCB_20260517_175702_253865,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041032.txt
+292,PCB_20260517_175702_253865,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041032.txt
+293,PCB_20260517_175702_253865,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041032.txt
+294,PCB_20260517_175702_253865,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041032.txt
+295,PCB_20260517_175702_253865,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041032.txt
+296,PCB_20260517_175702_253865,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041032.txt
+297,PCB_20260517_175702_253865,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041032.txt
+298,PCB_20260517_175702_291857,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041033.txt
+299,PCB_20260517_175702_291857,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041033.txt
+300,PCB_20260517_175702_291857,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041033.txt
+301,PCB_20260517_175702_291857,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041033.txt
+302,PCB_20260517_175702_291857,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041033.txt
+303,PCB_20260517_175702_291857,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041033.txt
+304,PCB_20260517_175702_324212,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041034.txt
+305,PCB_20260517_175702_324212,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041034.txt
+306,PCB_20260517_175702_324212,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041034.txt
+307,PCB_20260517_175702_324212,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041034.txt
+308,PCB_20260517_175702_324212,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041034.txt
+309,PCB_20260517_175702_324212,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041034.txt
+310,PCB_20260517_175702_324212,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041034.txt
+311,PCB_20260517_175702_324212,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041034.txt
+312,PCB_20260517_175702_324212,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041034.txt
+313,PCB_20260517_175702_357910,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041035.txt
+314,PCB_20260517_175702_357910,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041035.txt
+315,PCB_20260517_175702_357910,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041035.txt
+316,PCB_20260517_175702_357910,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041035.txt
+317,PCB_20260517_175702_357910,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041035.txt
+318,PCB_20260517_175702_357910,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041035.txt
+319,PCB_20260517_175702_357910,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041035.txt
+320,PCB_20260517_175702_357910,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041035.txt
+321,PCB_20260517_175702_357910,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041035.txt
+322,PCB_20260517_175702_398475,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041036.txt
+323,PCB_20260517_175702_398475,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041036.txt
+324,PCB_20260517_175702_398475,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041036.txt
+325,PCB_20260517_175702_398475,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041036.txt
+326,PCB_20260517_175702_398475,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041036.txt
+327,PCB_20260517_175702_398475,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041036.txt
+328,PCB_20260517_175702_398475,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041036.txt
+329,PCB_20260517_175702_398475,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041036.txt
+330,PCB_20260517_175702_437083,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041037.txt
+331,PCB_20260517_175702_437083,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041037.txt
+332,PCB_20260517_175702_437083,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041037.txt
+333,PCB_20260517_175702_437083,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041037.txt
+334,PCB_20260517_175702_437083,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041037.txt
+335,PCB_20260517_175702_437083,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041037.txt
+336,PCB_20260517_175702_437083,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041037.txt
+337,PCB_20260517_175702_437083,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041037.txt
+338,PCB_20260517_175702_472970,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041038.txt
+339,PCB_20260517_175702_472970,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041038.txt
+340,PCB_20260517_175702_472970,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041038.txt
+341,PCB_20260517_175702_472970,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041038.txt
+342,PCB_20260517_175702_472970,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041038.txt
+343,PCB_20260517_175702_472970,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041038.txt
+344,PCB_20260517_175702_472970,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041038.txt
+345,PCB_20260517_175702_514721,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041039.txt
+346,PCB_20260517_175702_514721,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041039.txt
+347,PCB_20260517_175702_514721,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041039.txt
+348,PCB_20260517_175702_514721,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041039.txt
+349,PCB_20260517_175702_514721,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041039.txt
+350,PCB_20260517_175702_514721,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041039.txt
+351,PCB_20260517_175702_551950,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041040.txt
+352,PCB_20260517_175702_551950,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041040.txt
+353,PCB_20260517_175702_551950,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041040.txt
+354,PCB_20260517_175702_551950,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041040.txt
+355,PCB_20260517_175702_551950,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041040.txt
+356,PCB_20260517_175702_551950,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041040.txt
+357,PCB_20260517_175702_551950,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041040.txt
+358,PCB_20260517_175702_551950,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041040.txt
+359,PCB_20260517_175702_551950,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041040.txt
+360,PCB_20260517_175702_590237,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041041.txt
+361,PCB_20260517_175702_590237,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041041.txt
+362,PCB_20260517_175702_590237,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041041.txt
+363,PCB_20260517_175702_590237,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041041.txt
+364,PCB_20260517_175702_590237,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041041.txt
+365,PCB_20260517_175702_590237,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041041.txt
+366,PCB_20260517_175702_590237,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041041.txt
+367,PCB_20260517_175702_590237,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041041.txt
+368,PCB_20260517_175702_590237,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041041.txt
+369,PCB_20260517_175702_590237,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041041.txt
+370,PCB_20260517_175702_625072,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041042.txt
+371,PCB_20260517_175702_625072,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041042.txt
+372,PCB_20260517_175702_625072,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041042.txt
+373,PCB_20260517_175702_625072,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041042.txt
+374,PCB_20260517_175702_625072,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041042.txt
+375,PCB_20260517_175702_625072,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041042.txt
+376,PCB_20260517_175702_625072,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041042.txt
+377,PCB_20260517_175702_625072,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041042.txt
+378,PCB_20260517_175702_665393,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041043.txt
+379,PCB_20260517_175702_665393,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041043.txt
+380,PCB_20260517_175702_665393,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041043.txt
+381,PCB_20260517_175702_665393,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041043.txt
+382,PCB_20260517_175702_665393,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041043.txt
+383,PCB_20260517_175702_665393,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041043.txt
+384,PCB_20260517_175702_665393,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041043.txt
+385,PCB_20260517_175702_665393,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041043.txt
+386,PCB_20260517_175702_665393,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041043.txt
+387,PCB_20260517_175702_665393,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041043.txt
+388,PCB_20260517_175702_711242,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041044.txt
+389,PCB_20260517_175702_711242,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041044.txt
+390,PCB_20260517_175702_711242,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041044.txt
+391,PCB_20260517_175702_711242,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041044.txt
+392,PCB_20260517_175702_711242,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041044.txt
+393,PCB_20260517_175702_711242,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041044.txt
+394,PCB_20260517_175702_711242,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041044.txt
+395,PCB_20260517_175702_711242,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041044.txt
+396,PCB_20260517_175702_751109,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041045.txt
+397,PCB_20260517_175702_751109,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041045.txt
+398,PCB_20260517_175702_751109,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041045.txt
+399,PCB_20260517_175702_751109,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041045.txt
+400,PCB_20260517_175702_751109,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041045.txt
+401,PCB_20260517_175702_751109,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041045.txt
+402,PCB_20260517_175702_751109,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041045.txt
+403,PCB_20260517_175702_751109,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041045.txt
+404,PCB_20260517_175702_751109,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041045.txt
+405,PCB_20260517_175702_790192,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041046.txt
+406,PCB_20260517_175702_790192,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041046.txt
+407,PCB_20260517_175702_790192,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041046.txt
+408,PCB_20260517_175702_790192,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041046.txt
+409,PCB_20260517_175702_790192,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041046.txt
+410,PCB_20260517_175702_790192,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041046.txt
+411,PCB_20260517_175702_826434,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041047.txt
+412,PCB_20260517_175702_826434,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041047.txt
+413,PCB_20260517_175702_826434,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041047.txt
+414,PCB_20260517_175702_826434,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041047.txt
+415,PCB_20260517_175702_826434,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041047.txt
+416,PCB_20260517_175702_826434,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041047.txt
+417,PCB_20260517_175702_826434,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041047.txt
+418,PCB_20260517_175702_826434,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041047.txt
+419,PCB_20260517_175702_826434,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041047.txt
+420,PCB_20260517_175702_826434,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041047.txt
+421,PCB_20260517_175702_858728,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041048.txt
+422,PCB_20260517_175702_858728,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041048.txt
+423,PCB_20260517_175702_858728,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041048.txt
+424,PCB_20260517_175702_858728,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041048.txt
+425,PCB_20260517_175702_858728,PCB / Pad / Surface Defect,Spurious Copper,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041048.txt
+426,PCB_20260517_175702_858728,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041048.txt
+427,PCB_20260517_175702_858728,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041048.txt
+428,PCB_20260517_175702_858728,PCB / Pad / Surface Defect,Mouse Bite,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041048.txt
+429,PCB_20260517_175702_890527,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041049.txt
+430,PCB_20260517_175702_890527,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041049.txt
+431,PCB_20260517_175702_890527,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041049.txt
+432,PCB_20260517_175702_890527,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041049.txt
+433,PCB_20260517_175702_890527,PCB / Pad / Surface Defect,Pin Hole,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041049.txt
+434,PCB_20260517_175702_890527,Electrical / Circuit Defect,Open Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041049.txt
+435,PCB_20260517_175702_890527,Electrical / Circuit Defect,Short Circuit,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041049.txt
+436,PCB_20260517_175702_890527,PCB / Pad / Surface Defect,Spur,Unknown,AOI / Visual,unknown,bbox,pending,auto_import,Imported from DeepPCB annotation file: 00041049.txt

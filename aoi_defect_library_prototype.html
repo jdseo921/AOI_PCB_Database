@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AOI Defect Library Prototype v5</title>
+  <style>
+    :root {
+      --body-bg: #dfe7ee;
+      --window: #f8fafc;
+      --titlebar: #203142;
+      --sidebar: #eef3f7;
+      --panel: #ffffff;
+      --panel-2: #f6f8fb;
+      --ink: #17202a;
+      --muted: #647484;
+      --line: #d9e2ea;
+      --line-strong: #c7d3dd;
+      --brand: #1f6fa8;
+      --brand-2: #134b79;
+      --brand-soft: #e5f1fa;
+      --ok: #17885f;
+      --ok-soft: #e6f4ee;
+      --ng: #bd3039;
+      --ng-soft: #fde9eb;
+      --warn: #b77912;
+      --warn-soft: #fff3d7;
+      --info: #355fc3;
+      --info-soft: #e9efff;
+      --violet: #6550b8;
+      --violet-soft: #efecff;
+      --shadow: 0 18px 50px rgba(38, 58, 78, .16);
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(35, 61, 83, .08), transparent 42%),
+        radial-gradient(circle at 12% 8%, rgba(42, 122, 178, .17), transparent 29rem),
+        radial-gradient(circle at 92% 88%, rgba(20, 76, 121, .12), transparent 28rem),
+        var(--body-bg);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      overflow: hidden;
+      font-size: 15px;
+    }
+    body.font-compact { font-size: 14px; }
+    body.font-standard { font-size: 15px; }
+    body.font-large { font-size: 17px; }
+
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .app-window {
+      width: min(1540px, 96vw);
+      height: min(930px, 94vh);
+      min-height: 720px;
+      background: var(--window);
+      border: 1px solid rgba(31, 49, 66, .22);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 28px 95px rgba(17, 32, 46, .28);
+      display: grid;
+      grid-template-rows: 48px 1fr;
+    }
+
+    .titlebar {
+      background: var(--titlebar);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      gap: 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .titlebar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .win-controls { display: flex; gap: 8px; align-items: center; }
+    .win-dot { width: 11px; height: 11px; border-radius: 999px; background: #7e91a3; border: 1px solid rgba(255,255,255,.25); }
+    .win-dot.close { background: #e0676c; }
+    .win-dot.min { background: #dfb450; }
+    .win-dot.max { background: #59ba87; }
+    .app-title { display: flex; flex-direction: column; line-height: 1.05; }
+    .app-title strong { font-size: .9rem; letter-spacing: .01em; }
+    .app-title span { color: #b9c6d0; font-size: .72rem; margin-top: 3px; }
+    .titlebar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .status-pill {
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.08);
+      color: #dfeaf2;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: .72rem;
+      white-space: nowrap;
+    }
+    .status-pill.ok { color: #b9f2d2; }
+    .status-pill.warn { color: #ffe0a2; }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 272px minmax(0, 1fr);
+      min-height: 0;
+      background: #edf3f7;
+    }
+
+    .sidebar {
+      background: var(--sidebar);
+      border-right: 1px solid var(--line-strong);
+      padding: 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .brand-card {
+      background: linear-gradient(135deg, #ffffff, #f4f8fb);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 10px 24px rgba(36, 63, 84, .08);
+    }
+    .brand-row { display: flex; align-items: center; gap: 10px; }
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 11px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: white;
+      font-weight: 850;
+      letter-spacing: -.05em;
+    }
+    .brand-card h1 { margin: 0; font-size: .96rem; line-height: 1.15; }
+    .brand-card p { margin: 7px 0 0; color: var(--muted); font-size: .76rem; line-height: 1.4; }
+    .nav-section-label {
+      margin: 12px 8px 4px;
+      font-size: .68rem;
+      font-weight: 850;
+      letter-spacing: .1em;
+      color: #647686;
+      text-transform: uppercase;
+    }
+    .nav-btn {
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #32495c;
+      border-radius: 11px;
+      padding: 10px 10px;
+      text-align: left;
+      display: grid;
+      grid-template-columns: 27px 1fr auto;
+      align-items: center;
+      gap: 9px;
+      transition: .15s ease;
+    }
+    .nav-btn:hover { background: #e3ecf3; border-color: #d5e0e8; }
+    .nav-btn.active { background: #ffffff; border-color: #bfd1df; box-shadow: 0 8px 22px rgba(34, 61, 83, .11); color: #0f3859; }
+    .nav-index {
+      width: 26px; height: 26px;
+      display: grid; place-items: center;
+      border-radius: 8px;
+      background: #dce9f2;
+      color: var(--brand-2);
+      font-size: .7rem;
+      font-weight: 850;
+    }
+    .nav-btn.active .nav-index { background: var(--brand); color: #fff; }
+    .nav-text strong { display: block; font-size: .86rem; line-height: 1.05; }
+    .nav-text small { display: block; color: var(--muted); font-size: .68rem; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nav-arrow { color: #8ba0b2; }
+    .sidebar-footer {
+      margin-top: auto;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .sidebar-footer strong { display: block; font-size: .78rem; }
+    .sidebar-footer p { margin: 6px 0 10px; color: var(--muted); line-height: 1.35; font-size: .72rem; }
+
+    .workspace {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+    }
+    .top-strip {
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      padding: 12px 18px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+    }
+    .page-kicker { color: var(--muted); font-size: .72rem; font-weight: 780; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+    .page-title h2 { margin: 0; font-size: 1.28rem; letter-spacing: -.025em; }
+    .page-title p { margin: 4px 0 0; color: var(--muted); line-height: 1.35; font-size: .86rem; }
+    .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+    .workflow-bar {
+      padding: 10px 18px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      background: #f5f8fb;
+      border-bottom: 1px solid var(--line);
+    }
+    .workflow-label { color: var(--muted); font-size: .74rem; font-weight: 850; margin-right: 3px; }
+    .quick-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: #304b61;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+    .quick-btn:hover, .quick-btn.active { border-color: #97bdd7; background: var(--brand-soft); color: var(--brand-2); }
+
+    .content {
+      overflow: auto;
+      min-height: 0;
+      padding: 18px;
+      background: linear-gradient(180deg, #f7fafc 0%, #eef4f8 100%);
+    }
+    .view { display: none; }
+    .view.active { display: block; animation: fadeIn .18s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: translateY(0);} }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .grid-main { display: grid; grid-template-columns: minmax(0, 1.25fr) 390px; gap: 14px; align-items: start; }
+    .review-grid { display: grid; grid-template-columns: 330px minmax(0, 1fr) 315px; gap: 14px; align-items: start; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 12px 30px rgba(34, 57, 78, .08);
+      overflow: hidden;
+    }
+    .card.pad { padding: 16px; }
+    .card-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: linear-gradient(180deg, #ffffff, #f7fafc);
+    }
+    .card-title h3 { margin: 0; font-size: .98rem; letter-spacing: -.015em; }
+    .card-title p { margin: 4px 0 0; color: var(--muted); line-height: 1.35; font-size: .78rem; }
+    .card-body { padding: 16px; }
+
+    .metric {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 13px;
+      min-height: 108px;
+    }
+    .metric small { display: block; color: var(--muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+    .metric strong { display: block; font-size: 1.55rem; margin-top: 8px; letter-spacing: -.04em; }
+    .metric span { display: block; color: var(--muted); margin-top: 6px; font-size: .78rem; line-height: 1.32; }
+    .metric.ok strong { color: var(--ok); }
+    .metric.ng strong { color: var(--ng); }
+    .metric.warn strong { color: var(--warn); }
+    .metric.info strong { color: var(--brand); }
+
+    .btn {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: #263d52;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-weight: 760;
+      font-size: .78rem;
+      transition: .15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+    .btn:hover { border-color: #94b7d0; background: #f2f8fc; }
+    .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .btn.primary:hover { background: var(--brand-2); }
+    .btn.danger { background: var(--ng); color: #fff; border-color: var(--ng); }
+    .btn.good { background: var(--ok); color: #fff; border-color: var(--ok); }
+    .btn.warning { background: var(--warn); color: #fff; border-color: var(--warn); }
+    .btn.block { width: 100%; }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: .7rem;
+      font-weight: 840;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .chip.ok { color: var(--ok); background: var(--ok-soft); border-color: #bfe3d3; }
+    .chip.ng { color: var(--ng); background: var(--ng-soft); border-color: #f3c8cc; }
+    .chip.warn { color: #8a5a07; background: var(--warn-soft); border-color: #ecd193; }
+    .chip.info { color: var(--brand-2); background: var(--brand-soft); border-color: #b9d7ea; }
+    .chip.violet { color: var(--violet); background: var(--violet-soft); border-color: #cfc6ff; }
+    .chip.gray { color: #536371; background: #edf2f6; border-color: var(--line); }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 11px; border-bottom: 1px solid var(--line); vertical-align: middle; text-align: left; font-size: .8rem; }
+    th { color: #5f7080; font-size: .68rem; text-transform: uppercase; letter-spacing: .055em; background: #f7fafc; font-weight: 850; }
+    tr:hover td { background: #fafcff; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: .76rem; }
+    .muted { color: var(--muted); }
+
+    .split-row { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: center; }
+    .split-row:last-child { border-bottom: 0; }
+    .split-row span { color: var(--muted); font-size: .78rem; }
+    .split-row strong { font-size: .82rem; text-align: right; }
+
+    .bar-list { display: grid; gap: 10px; }
+    .bar-row { display: grid; gap: 6px; }
+    .bar-row-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: .78rem; }
+    .bar-track { height: 9px; background: #e8eef3; border-radius: 999px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; background: var(--brand); width: var(--w, 50%); }
+    .bar-fill.ok { background: var(--ok); }
+    .bar-fill.ng { background: var(--ng); }
+    .bar-fill.warn { background: var(--warn); }
+    .bar-fill.violet { background: var(--violet); }
+
+    .guide-steps { display: grid; gap: 12px; }
+    .guide-step {
+      display: grid;
+      grid-template-columns: 42px minmax(0,1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 13px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+    .step-badge { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-2); font-weight: 900; }
+    .guide-step h4 { margin: 0; font-size: .92rem; }
+    .guide-step p { margin: 4px 0 0; color: var(--muted); font-size: .78rem; line-height: 1.38; }
+
+    .priority-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+    .priority-btn {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      padding: 12px;
+      text-align: left;
+      color: var(--ink);
+    }
+    .priority-btn.active { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand), 0 10px 24px rgba(31,111,168,.12); background: #f4faff; }
+    .priority-btn strong { display: block; font-size: .84rem; }
+    .priority-btn span { display: block; color: var(--muted); font-size: .72rem; line-height: 1.35; margin-top: 5px; }
+
+    .queue-list { display: grid; gap: 8px; }
+    .queue-item {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 12px;
+      padding: 11px;
+      cursor: pointer;
+    }
+    .queue-item.selected { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); background: #f4faff; }
+    .queue-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 7px; }
+    .queue-item strong { font-size: .85rem; }
+    .queue-item p { margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.35; }
+
+    .pcb-viewer {
+      position: relative;
+      height: 330px;
+      border-radius: 15px;
+      border: 1px solid #b8c7d2;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(135deg, #365a46, #1f3c32);
+      background-size: 34px 34px, 34px 34px, auto;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+    }
+    .pcb-label { position: absolute; left: 14px; top: 12px; padding: 5px 8px; border-radius: 7px; color: #d9f2e7; background: rgba(0,0,0,.22); font-size: .72rem; }
+    .component { position: absolute; border-radius: 6px; background: #aeb8b5; border: 1px solid rgba(255,255,255,.38); box-shadow: 0 3px 7px rgba(0,0,0,.24); }
+    .component.ic { width: 84px; height: 58px; background: #222a31; }
+    .component.chip { width: 44px; height: 22px; background: #d3d6ce; }
+    .component.cap { width: 34px; height: 34px; border-radius: 999px; background: #566169; }
+    .defect-box {
+      position: absolute;
+      border: 3px solid var(--ng);
+      border-radius: 8px;
+      box-shadow: 0 0 0 4px rgba(189,48,57,.18);
+      background: rgba(189,48,57,.06);
+    }
+    .roi-box {
+      position: absolute;
+      border: 2px dashed #ffcc4d;
+      border-radius: 8px;
+      background: rgba(255,204,77,.08);
+    }
+    .viewer-toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 11px;
+    }
+    .similar-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    .similar-card { border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden; }
+    .similar-thumb { height: 74px; background: linear-gradient(135deg,#335844,#1f3930); position: relative; }
+    .similar-thumb::before { content: ""; position: absolute; width: 42px; height: 24px; border-radius: 5px; background: #222a31; left: 18px; top: 22px; box-shadow: 62px 12px 0 #c9cec8; }
+    .similar-thumb::after { content: ""; position: absolute; width: 34px; height: 22px; border-radius: 7px; border: 2px solid var(--ng); right: 18px; top: 25px; }
+    .similar-info { padding: 9px; }
+    .similar-info strong { display: block; font-size: .78rem; }
+    .similar-info span { display: block; margin-top: 4px; color: var(--muted); font-size: .7rem; }
+
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+    label { display: block; font-size: .72rem; color: #5d6f7f; font-weight: 850; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .045em; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      background: #fff;
+      padding: 9px 10px;
+      color: var(--ink);
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #77acd1; box-shadow: 0 0 0 3px rgba(31,111,168,.12); }
+    textarea { resize: vertical; min-height: 84px; }
+    .dropzone {
+      border: 2px dashed #a9bfce;
+      background: #f7fbfe;
+      border-radius: 16px;
+      padding: 22px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .dropzone strong { display: block; color: var(--ink); font-size: 1rem; margin-bottom: 5px; }
+
+    .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+    .switch-list { display: grid; gap: 10px; }
+    .switch-item { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+    .switch-item strong { font-size: .8rem; display: block; }
+    .switch-item span { font-size: .72rem; color: var(--muted); display: block; margin-top: 3px; }
+    .switch { width: 40px; height: 22px; border-radius: 999px; background: var(--brand); position: relative; flex: none; }
+    .switch::after { content: ""; position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 999px; background: #fff; }
+    .switch.off { background: #bcc9d3; }
+    .switch.off::after { right: 21px; }
+
+    .toast {
+      position: fixed;
+      right: 26px;
+      bottom: 24px;
+      background: #17202a;
+      color: white;
+      padding: 12px 14px;
+      border-radius: 12px;
+      box-shadow: 0 14px 35px rgba(0,0,0,.24);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: .2s ease;
+      font-size: .85rem;
+      z-index: 20;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 1250px) {
+      .review-grid, .grid-main { grid-template-columns: 1fr; }
+      .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 900px) {
+      body { overflow: auto; padding: 0; }
+      .app-window { width: 100vw; height: 100vh; border-radius: 0; min-height: 0; }
+      .shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .top-strip { grid-template-columns: 1fr; }
+      .grid-2, .grid-3, .grid-4, .form-grid, .settings-grid, .priority-grid { grid-template-columns: 1fr; }
+      .titlebar-right { display: none; }
+    }
+
+
+    /* v5 cleanup: stricter alignment, spacing, and workstation geometry */
+    :root {
+      --gap-xs: 6px;
+      --gap-sm: 10px;
+      --gap-md: 16px;
+      --gap-lg: 20px;
+      --card-radius: 14px;
+      --control-h: 38px;
+      --header-h: 72px;
+    }
+
+    .app-window {
+      width: min(1500px, 96vw);
+      height: min(900px, 94vh);
+      border-radius: 18px;
+      grid-template-rows: 46px 1fr;
+    }
+
+    .titlebar { padding: 0 16px; gap: 12px; }
+    .titlebar-left { flex: 0 0 auto; min-width: 315px; max-width: 430px; }
+    .titlebar-right {
+      min-width: 0;
+      gap: 8px;
+      overflow: hidden;
+      flex-wrap: nowrap;
+    }
+    .status-pill {
+      max-width: 168px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 4px 9px;
+      line-height: 1.2;
+    }
+
+    .shell { grid-template-columns: 286px minmax(0, 1fr); }
+    .sidebar { padding: 16px 12px; gap: 10px; }
+    .brand-card { border-radius: var(--card-radius); padding: 13px; }
+    .brand-mark { width: 40px; height: 40px; border-radius: 10px; }
+    .brand-card h1 { font-size: .92rem; }
+    .brand-card p { font-size: .73rem; }
+    .nav-section-label { margin: 10px 8px 3px; }
+    .nav-btn {
+      min-height: 52px;
+      padding: 9px 10px;
+      border-radius: 10px;
+      grid-template-columns: 28px minmax(0, 1fr) 12px;
+    }
+    .nav-index { width: 28px; height: 28px; border-radius: 8px; }
+    .nav-text strong { font-size: .84rem; line-height: 1.15; }
+    .nav-text small { font-size: .67rem; }
+    .sidebar-footer { border-radius: var(--card-radius); padding: 12px; }
+
+    .workspace { background: #f5f8fb; }
+    .top-strip {
+      padding: 13px 18px;
+      grid-template-columns: minmax(0, 1fr) minmax(430px, auto);
+      gap: var(--gap-md);
+    }
+    .page-title h2 { font-size: 1.22rem; line-height: 1.2; }
+    .page-title p { max-width: 900px; }
+    .header-actions {
+      display: grid;
+      grid-template-columns: minmax(250px, 330px) auto auto;
+      align-items: center;
+      gap: 8px;
+    }
+    #globalSearch { width: 100%; }
+
+    .workflow-bar {
+      padding: 9px 18px;
+      gap: 7px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    .quick-btn {
+      flex: 0 0 auto;
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .content { padding: 18px; }
+    .grid-2, .grid-3, .grid-4, .grid-main, .review-grid, .form-grid, .settings-grid { gap: var(--gap-md); }
+    .grid-4 { grid-template-columns: repeat(4, minmax(170px, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(230px, 1fr)); }
+    .grid-main { grid-template-columns: minmax(0, 1fr) 360px; align-items: stretch; }
+    .review-grid { grid-template-columns: 300px minmax(0, 1fr) 300px; align-items: stretch; }
+    .settings-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+
+    .card {
+      border-radius: var(--card-radius);
+      box-shadow: 0 10px 26px rgba(34, 57, 78, .07);
+    }
+    .card.pad { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .card.pad h3 { line-height: 1.22; }
+    .card.pad p { line-height: 1.45; }
+    .card.pad .btn { margin-top: auto !important; }
+    .card-header {
+      min-height: var(--header-h);
+      padding: 12px 14px;
+      align-items: flex-start;
+    }
+    .card-header > .btn, .card-header > .chip { flex: 0 0 auto; margin-top: 1px; }
+    .card-title { min-width: 0; }
+    .card-title h3 { font-size: .95rem; line-height: 1.22; }
+    .card-title p { font-size: .76rem; line-height: 1.36; max-width: 820px; }
+    .card-body { padding: 14px; overflow-x: auto; }
+
+    .metric {
+      min-height: 114px;
+      padding: 14px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .metric small { line-height: 1.25; }
+    .metric strong { margin-top: 4px; line-height: 1.05; }
+    .metric span { line-height: 1.32; }
+
+    .btn, input, select {
+      min-height: var(--control-h);
+      border-radius: 9px;
+    }
+    .btn { padding: 8px 12px; line-height: 1.2; }
+    input, select, textarea { padding: 8px 10px; }
+    textarea { line-height: 1.38; }
+    .chip { min-height: 26px; align-items: center; }
+
+    table { min-width: 680px; table-layout: auto; }
+    th, td { padding: 9px 10px; line-height: 1.32; }
+    th { height: 36px; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .mono { white-space: nowrap; }
+
+    .split-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) auto;
+      min-height: 36px;
+      align-items: center;
+      padding: 8px 0;
+    }
+    .split-row strong { justify-self: end; max-width: 180px; overflow-wrap: anywhere; }
+
+    .bar-list { gap: 12px; }
+    .bar-row-top { line-height: 1.25; }
+    .bar-track { height: 8px; }
+
+    .priority-grid { gap: 12px; }
+    .priority-btn { min-height: 92px; border-radius: 12px; }
+    .priority-btn strong { line-height: 1.25; }
+
+    .queue-list { gap: 10px; }
+    .queue-item { border-radius: 11px; padding: 11px; }
+    .queue-top { margin-bottom: 6px; }
+
+    .pcb-viewer { height: 320px; border-radius: 13px; }
+    .viewer-toolbar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .viewer-toolbar .btn { width: 100%; }
+    .similar-grid { gap: 10px; }
+    .similar-card { border-radius: 11px; }
+    .similar-thumb { height: 72px; }
+
+    .form-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+    label { line-height: 1.2; }
+    .dropzone { padding: 24px; border-radius: var(--card-radius); }
+
+    .settings-grid .card { min-height: 230px; }
+    .switch-item { min-height: 62px; align-items: center; }
+
+    @media (max-width: 1320px) {
+      .titlebar-right .status-pill:nth-child(n+4) { display: none; }
+      .review-grid, .grid-main { grid-template-columns: 1fr; }
+      .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 900px) {
+      .app-window { width: 100vw; height: 100vh; border-radius: 0; min-height: 0; }
+      .shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .top-strip { grid-template-columns: 1fr; }
+      .header-actions { grid-template-columns: 1fr; justify-items: stretch; }
+      .grid-2, .grid-3, .grid-4, .form-grid, .settings-grid, .priority-grid { grid-template-columns: 1fr; }
+      .titlebar-right { display: none; }
+    }
+
+  </style>
+</head>
+<body class="font-standard">
+  <div class="app-window">
+    <header class="titlebar">
+      <div class="titlebar-left">
+        <div class="win-controls" aria-hidden="true"><span class="win-dot close"></span><span class="win-dot min"></span><span class="win-dot max"></span></div>
+        <div class="app-title">
+          <strong>AOI Defect Sample Library Manager</strong>
+          <span>Image-based PoC · SMT / PCBA inspection review workspace</span>
+        </div>
+      </div>
+      <div class="titlebar-right">
+        <span class="status-pill ok">Station: ST-AOI-01 Online</span>
+        <span class="status-pill">Recipe: TBOX_TOP_V1.2</span>
+        <span class="status-pill">AI Model: AOI_AI_0.8.1</span>
+        <span class="status-pill warn">Mode: Escape Control</span>
+        <span class="status-pill ok">DB: Indexed 09:20</span>
+      </div>
+    </header>
+
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand-card">
+          <div class="brand-row">
+            <div class="brand-mark">AOI</div>
+            <div>
+              <h1>Defect Library<br/>Control Center</h1>
+            </div>
+          </div>
+          <p>Prototype focused on sample access, review disposition, similarity matching, traceability, SPC preview, and export evidence.</p>
+        </div>
+
+        <div class="nav-section-label">Start</div>
+        <button class="nav-btn active" data-target="dashboard"><span class="nav-index">1</span><span class="nav-text"><strong>Line Overview</strong><small>KPIs, queue, program status</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="guide"><span class="nav-index">?</span><span class="nav-text"><strong>Workflow Guide</strong><small>How to navigate</small></span><span class="nav-arrow">›</span></button>
+
+        <div class="nav-section-label">Daily Review</div>
+        <button class="nav-btn" data-target="review"><span class="nav-index">2</span><span class="nav-text"><strong>Inspection Review</strong><small>Escapes, false calls, disposition</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="library"><span class="nav-index">3</span><span class="nav-text"><strong>Defect Library</strong><small>Search samples and references</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="program"><span class="nav-index">4</span><span class="nav-text"><strong>Inspection Program</strong><small>Recipe, ROIs, thresholds</small></span><span class="nav-arrow">›</span></button>
+
+        <div class="nav-section-label">Quality Data</div>
+        <button class="nav-btn" data-target="spc"><span class="nav-index">5</span><span class="nav-text"><strong>SPC & Database</strong><small>Yield, traceability, data health</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="import"><span class="nav-index">6</span><span class="nav-text"><strong>Import & Label</strong><small>Upload images and metadata</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="export"><span class="nav-index">7</span><span class="nav-text"><strong>Reports & Utilities</strong><small>CSV, overlays, backup</small></span><span class="nav-arrow">›</span></button>
+
+        <div class="nav-section-label">System</div>
+        <button class="nav-btn" data-target="settings"><span class="nav-index">8</span><span class="nav-text"><strong>Settings</strong><small>Display, language, access</small></span><span class="nav-arrow">›</span></button>
+
+        <div class="sidebar-footer">
+          <strong>Default review rule</strong>
+          <p>Show possible escapes / false negatives first, then critical false calls, then unlabeled samples.</p>
+          <button class="btn primary block" data-target-shortcut="review">Open Review Queue</button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <div class="top-strip">
+          <div class="page-title">
+            <div class="page-kicker" id="breadcrumb">AOI PoC / Start</div>
+            <h2 id="pageTitle">Line Overview</h2>
+            <p id="pageSubtitle">Production-style entry page with review queue, sample-library health, current recipe, and detection-performance preview.</p>
+          </div>
+          <div class="header-actions">
+            <input id="globalSearch" placeholder="Search Sample ID, RefDes, defect, lot..." />
+            <button class="btn" data-target-shortcut="guide">Guide</button>
+            <button class="btn primary" data-target-shortcut="import">Import Samples</button>
+          </div>
+        </div>
+
+        <div class="workflow-bar">
+          <span class="workflow-label">Quick workflow:</span>
+          <button class="quick-btn active" data-target-shortcut="dashboard">1 Overview</button>
+          <button class="quick-btn" data-target-shortcut="review">2 Review NG / Escapes</button>
+          <button class="quick-btn" data-target-shortcut="library">3 Search Library</button>
+          <button class="quick-btn" data-target-shortcut="program">4 Check Recipe</button>
+          <button class="quick-btn" data-target-shortcut="spc">5 SPC / DB Health</button>
+          <button class="quick-btn" data-target-shortcut="export">6 Export Evidence</button>
+        </div>
+
+        <div class="content">
+          <section id="dashboard" class="view active">
+            <div class="grid-4" style="margin-bottom:14px;">
+              <div class="metric info"><small>Total sample records</small><strong>2,184</strong><span>Images indexed across OK, NG, border cases, and golden references.</span></div>
+              <div class="metric ng"><small>Possible escapes</small><strong>18</strong><span>Default priority: AI judged OK but label/history suggests NG risk.</span></div>
+              <div class="metric warn"><small>False-call candidates</small><strong>47</strong><span>Suspected over-rejections requiring human disposition.</span></div>
+              <div class="metric ok"><small>Annotation coverage</small><strong>86%</strong><span>Samples with ROI, component reference, defect label, and review decision.</span></div>
+            </div>
+
+            <div class="grid-main">
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Review Attention Queue</h3><p>Industrial-style triage: review possible escapes first, then high false-call components and unlabeled samples.</p></div><button class="btn primary" data-target-shortcut="review">Start Review</button></div>
+                <div class="card-body">
+                  <table>
+                    <thead><tr><th>Priority</th><th>Sample / Lot</th><th>Risk Type</th><th>Defect / RefDes</th><th>Action</th></tr></thead>
+                    <tbody>
+                      <tr><td><span class="chip ng">P1</span></td><td><strong>IMG_0241</strong><br><span class="muted mono">LOT-TB-0426-A</span></td><td>Possible escape / FN</td><td>Solder Bridge · U107</td><td><button class="btn" data-target-shortcut="review">Review</button></td></tr>
+                      <tr><td><span class="chip ng">P1</span></td><td><strong>IMG_0258</strong><br><span class="muted mono">LOT-TB-0426-B</span></td><td>Possible escape / FN</td><td>Polarity Error · D12</td><td><button class="btn" data-target-shortcut="review">Review</button></td></tr>
+                      <tr><td><span class="chip warn">P2</span></td><td><strong>IMG_0199</strong><br><span class="muted mono">LOT-TB-0425-C</span></td><td>Likely false call</td><td>Excess Solder · C684</td><td><button class="btn" data-target-shortcut="review">Check</button></td></tr>
+                      <tr><td><span class="chip info">P3</span></td><td><strong>Folder Import</strong><br><span class="muted mono">38 new images</span></td><td>Metadata incomplete</td><td>Missing RefDes / severity</td><td><button class="btn" data-target-shortcut="import">Label</button></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Current Program Snapshot</h3><p>Quick readout of recipe/model/database status.</p></div><span class="chip ok">Ready</span></div>
+                <div class="card-body">
+                  <div class="split-row"><span>Inspection Program</span><strong>TBOX_TOP_V1.2</strong></div>
+                  <div class="split-row"><span>Target Board</span><strong>Telematics T-Box</strong></div>
+                  <div class="split-row"><span>View Type</span><strong>Top + Side Reference</strong></div>
+                  <div class="split-row"><span>Default Priority</span><strong id="currentModeText">Escape Control</strong></div>
+                  <div class="split-row"><span>Confidence Threshold</span><strong id="thresholdText">0.42</strong></div>
+                  <div class="split-row"><span>Golden References</span><strong>312 verified</strong></div>
+                  <div class="split-row"><span>Last DB Backup</span><strong>Today 09:10</strong></div>
+                  <button class="btn block" style="margin-top:12px;" data-target-shortcut="program">Open Program Details</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid-2" style="margin-top:14px;">
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Detection Performance Preview</h3><p>Shown as engineering preview values for UI demonstration.</p></div><span class="chip gray">Validation Set</span></div>
+                <div class="card-body bar-list">
+                  <div class="bar-row"><div class="bar-row-top"><strong>Recall / defect capture</strong><span>96.8%</span></div><div class="bar-track"><div class="bar-fill ok" style="--w:96.8%"></div></div></div>
+                  <div class="bar-row"><div class="bar-row-top"><strong>Precision / false-call control</strong><span>91.4%</span></div><div class="bar-track"><div class="bar-fill" style="--w:91.4%"></div></div></div>
+                  <div class="bar-row"><div class="bar-row-top"><strong>False call rate</strong><span>4.7%</span></div><div class="bar-track"><div class="bar-fill warn" style="--w:28%"></div></div></div>
+                  <div class="bar-row"><div class="bar-row-top"><strong>Escape-risk queue cleared</strong><span>72%</span></div><div class="bar-track"><div class="bar-fill ng" style="--w:72%"></div></div></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Defect Library Balance</h3><p>Flags weak categories before model tuning or customer review.</p></div><button class="btn" data-target-shortcut="spc">View DB</button></div>
+                <div class="card-body bar-list">
+                  <div class="bar-row"><div class="bar-row-top"><strong>Solder-related</strong><span>748</span></div><div class="bar-track"><div class="bar-fill" style="--w:86%"></div></div></div>
+                  <div class="bar-row"><div class="bar-row-top"><strong>Component placement</strong><span>502</span></div><div class="bar-track"><div class="bar-fill ok" style="--w:64%"></div></div></div>
+                  <div class="bar-row"><div class="bar-row-top"><strong>Connector / mechanical</strong><span>219</span></div><div class="bar-track"><div class="bar-fill warn" style="--w:42%"></div></div></div>
+                  <div class="bar-row"><div class="bar-row-top"><strong>Electrical / circuit</strong><span>113</span></div><div class="bar-track"><div class="bar-fill ng" style="--w:24%"></div></div></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="guide" class="view">
+            <div class="card pad" style="margin-bottom:14px;">
+              <h3 style="margin:0 0 8px;">Recommended Navigation Route</h3>
+              <p class="muted" style="margin:0; line-height:1.55; max-width:920px;">This prototype is organized like a compact AOI review station: start from the queue, disposition defects, search reference samples, check recipe thresholds, review SPC/database health, then export customer or engineering evidence.</p>
+            </div>
+            <div class="guide-steps">
+              <div class="guide-step"><span class="step-badge">1</span><div><h4>Line Overview</h4><p>Use this as the operator landing page. It summarizes possible escapes, false calls, annotation coverage, database status, and current inspection program.</p></div><button class="btn" data-target-shortcut="dashboard">Open</button></div>
+              <div class="guide-step"><span class="step-badge">2</span><div><h4>Inspection Review</h4><p>Review AI/ground-truth mismatches, compare top similar samples, and record final dispositions such as Verified NG, Verified OK, False Call, or Possible Escape.</p></div><button class="btn" data-target-shortcut="review">Open</button></div>
+              <div class="guide-step"><span class="step-badge">3</span><div><h4>Defect Library</h4><p>Search by Sample ID, defect code, RefDes, lot, severity, review status, and model version. Use this when users need evidence or reference cases.</p></div><button class="btn" data-target-shortcut="library">Open</button></div>
+              <div class="guide-step"><span class="step-badge">4</span><div><h4>Inspection Program</h4><p>Check recipe identity, ROI rules, component-level inspection items, and threshold settings before explaining why a sample was judged OK or NG.</p></div><button class="btn" data-target-shortcut="program">Open</button></div>
+              <div class="guide-step"><span class="step-badge">5</span><div><h4>SPC & Database</h4><p>Use data-health and SPC previews to identify false-call components, weak defect classes, broken image references, and traceability gaps.</p></div><button class="btn" data-target-shortcut="spc">Open</button></div>
+              <div class="guide-step"><span class="step-badge">6</span><div><h4>Reports & Utilities</h4><p>Export CSVs, annotated images, review evidence, and database backups for customer validation or internal QC documentation.</p></div><button class="btn" data-target-shortcut="export">Open</button></div>
+            </div>
+          </section>
+
+          <section id="review" class="view">
+            <div class="card" style="margin-bottom:14px;">
+              <div class="card-header"><div class="card-title"><h3>Inspection Priority</h3><p>Default selection prioritizes possible escapes / false negatives. Users can switch to false-call reduction when tuning over-rejection.</p></div><span class="chip ng" id="modeBadge">Escape Control</span></div>
+              <div class="card-body priority-grid">
+                <button class="priority-btn active" data-mode="Escape Control" data-threshold="0.42"><strong>Escape Control</strong><span>False negatives first. Lower threshold; more review items, fewer missed defects.</span></button>
+                <button class="priority-btn" data-mode="Balanced Review" data-threshold="0.55"><strong>Balanced Review</strong><span>Middle threshold for normal customer validation and library cleanup.</span></button>
+                <button class="priority-btn" data-mode="False Call Reduction" data-threshold="0.68"><strong>False Call Reduction</strong><span>False positives first. Higher threshold; fewer over-rejections.</span></button>
+              </div>
+            </div>
+
+            <div class="review-grid">
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Disposition Queue</h3><p>Click one sample to update the viewer.</p></div><span class="chip ng">18 P1</span></div>
+                <div class="card-body queue-list">
+                  <div class="queue-item selected" data-sample="IMG_0241" data-defect="Solder Bridge" data-refdes="U107" data-risk="Possible Escape / FN" data-score="0.38" data-match="96%" data-lot="LOT-TB-0426-A"><div class="queue-top"><strong>IMG_0241</strong><span class="chip ng">P1</span></div><p>Possible Escape / FN · U107 · Solder Bridge · Similarity 96%</p></div>
+                  <div class="queue-item" data-sample="IMG_0258" data-defect="Polarity Error" data-refdes="D12" data-risk="Possible Escape / FN" data-score="0.41" data-match="93%" data-lot="LOT-TB-0426-B"><div class="queue-top"><strong>IMG_0258</strong><span class="chip ng">P1</span></div><p>Possible Escape / FN · D12 · Polarity Error · Similarity 93%</p></div>
+                  <div class="queue-item" data-sample="IMG_0199" data-defect="Excess Solder" data-refdes="C684" data-risk="Likely False Call" data-score="0.72" data-match="89%" data-lot="LOT-TB-0425-C"><div class="queue-top"><strong>IMG_0199</strong><span class="chip warn">P2</span></div><p>Likely False Call · C684 · Excess Solder · Similarity 89%</p></div>
+                  <div class="queue-item" data-sample="IMG_0312" data-defect="Connector Pin Height" data-refdes="J3" data-risk="Borderline NG" data-score="0.57" data-match="86%" data-lot="LOT-TB-0427-A"><div class="queue-top"><strong>IMG_0312</strong><span class="chip warn">P2</span></div><p>Borderline NG · J3 · Pin Height · Similarity 86%</p></div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3 id="selectedTitle">IMG_0241 · Solder Bridge</h3><p id="selectedSubtitle">LOT-TB-0426-A · U107 · AI OK / Label NG · Similarity 96%</p></div><span class="chip ng" id="selectedRisk">Possible Escape / FN</span></div>
+                <div class="card-body">
+                  <div class="pcb-viewer">
+                    <span class="pcb-label">Top View · FOV-03 · 8.0 μm/px</span>
+                    <span class="component ic" style="left:45%; top:39%;"></span>
+                    <span class="component chip" style="left:31%; top:28%;"></span>
+                    <span class="component chip" style="left:64%; top:31%;"></span>
+                    <span class="component chip" style="left:24%; top:62%;"></span>
+                    <span class="component cap" style="left:72%; top:63%;"></span>
+                    <span class="roi-box" style="left:42%; top:34%; width:145px; height:92px;"></span>
+                    <span class="defect-box" style="left:53%; top:47%; width:78px; height:48px;"></span>
+                  </div>
+                  <div class="viewer-toolbar">
+                    <button class="btn">Overlay: AI + Ground Truth</button>
+                    <button class="btn">Zoom ROI</button>
+                    <button class="btn">Show Golden Reference</button>
+                    <button class="btn">Open Image Folder</button>
+                  </div>
+                  <div class="grid-4" style="margin-top:14px;">
+                    <div class="metric ng"><small>AI score</small><strong id="sampleScore">0.38</strong><span>Below current NG threshold.</span></div>
+                    <div class="metric info"><small>Similarity</small><strong id="sampleMatch">96%</strong><span>ROI-crop match to verified NG.</span></div>
+                    <div class="metric warn"><small>Review state</small><strong>Open</strong><span>Human disposition required.</span></div>
+                    <div class="metric ok"><small>Severity</small><strong>Critical</strong><span>Mandatory AOI class.</span></div>
+                  </div>
+                  <div class="viewer-toolbar">
+                    <button class="btn good action-btn">Verify NG</button>
+                    <button class="btn action-btn">Verify OK</button>
+                    <button class="btn danger action-btn">Mark Possible Escape</button>
+                    <button class="btn warning action-btn">Mark False Call</button>
+                    <button class="btn action-btn">Send to Training Set</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Top Similar Samples</h3><p>Default: verified NG / prior escape cases.</p></div><span class="chip info">ROI first</span></div>
+                <div class="card-body similar-grid">
+                  <div class="similar-card"><div class="similar-thumb"></div><div class="similar-info"><strong>IMG_0128 · 96%</strong><span>Verified NG · Solder Bridge · U107</span></div></div>
+                  <div class="similar-card"><div class="similar-thumb"></div><div class="similar-info"><strong>IMG_0084 · 94%</strong><span>Prior escape · Bridge · U105</span></div></div>
+                  <div class="similar-card"><div class="similar-thumb"></div><div class="similar-info"><strong>IMG_0187 · 91%</strong><span>Verified NG · Excess solder · U107</span></div></div>
+                  <div class="similar-card"><div class="similar-thumb"></div><div class="similar-info"><strong>IMG_0033 · 88%</strong><span>Golden OK · same RefDes</span></div></div>
+                </div>
+                <div class="card-body" style="border-top:1px solid var(--line);">
+                  <div class="split-row"><span>Selected sample</span><strong id="infoSample">IMG_0241</strong></div>
+                  <div class="split-row"><span>RefDes</span><strong id="infoRefdes">U107</strong></div>
+                  <div class="split-row"><span>Defect code</span><strong id="infoDefect">Solder Bridge</strong></div>
+                  <div class="split-row"><span>Lot ID</span><strong id="infoLot">LOT-TB-0426-A</strong></div>
+                  <div class="split-row"><span>Model version</span><strong>AOI_AI_0.8.1</strong></div>
+                  <div class="split-row"><span>Recipe version</span><strong>TBOX_TOP_V1.2</strong></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="library" class="view">
+            <div class="card">
+              <div class="card-header"><div class="card-title"><h3>Master Defect Library</h3><p>Searchable sample library using AOI-relevant terms: RefDes, FOV, defect code, severity, disposition, model version.</p></div><span class="chip ok">2,184 indexed</span></div>
+              <div class="card-body">
+                <div class="form-grid" style="margin-bottom:12px;">
+                  <div><label>Search</label><input id="tableSearch" placeholder="Sample ID, defect, RefDes, lot, model..." /></div>
+                  <div><label>Risk / disposition filter</label><select id="riskFilter"><option value="all">All records</option><option value="fn">Possible escapes / false negatives</option><option value="fp">False calls / false positives</option><option value="verified-ng">Verified NG</option><option value="verified-ok">Verified OK</option><option value="unlabeled">Unlabeled</option></select></div>
+                </div>
+                <table id="sampleTable">
+                  <thead><tr><th>Sample</th><th>Defect / Category</th><th>RefDes / FOV</th><th>Severity</th><th>AI vs Label</th><th>Disposition</th><th>Model</th></tr></thead>
+                  <tbody>
+                    <tr data-status="fn"><td><strong>IMG_0241</strong><br><span class="mono muted">LOT-TB-0426-A</span></td><td>Solder Bridge<br><span class="muted">Solder-related</span></td><td>U107 · FOV-03</td><td><span class="chip ng">Critical</span></td><td>AI OK / Label NG</td><td><span class="chip ng">Possible Escape</span></td><td>0.8.1</td></tr>
+                    <tr data-status="fn"><td><strong>IMG_0258</strong><br><span class="mono muted">LOT-TB-0426-B</span></td><td>Polarity Error<br><span class="muted">Component placement</span></td><td>D12 · FOV-02</td><td><span class="chip ng">Critical</span></td><td>AI OK / Label NG</td><td><span class="chip ng">Possible Escape</span></td><td>0.8.1</td></tr>
+                    <tr data-status="fp"><td><strong>IMG_0199</strong><br><span class="mono muted">LOT-TB-0425-C</span></td><td>Excess Solder<br><span class="muted">Solder-related</span></td><td>C684 · FOV-06</td><td><span class="chip warn">Major</span></td><td>AI NG / Label OK</td><td><span class="chip warn">Likely False Call</span></td><td>0.8.1</td></tr>
+                    <tr data-status="verified-ng"><td><strong>IMG_0128</strong><br><span class="mono muted">LOT-TB-0409-A</span></td><td>Solder Bridge<br><span class="muted">Solder-related</span></td><td>U107 · FOV-03</td><td><span class="chip ng">Critical</span></td><td>AI NG / Label NG</td><td><span class="chip ok">Verified NG</span></td><td>0.7.9</td></tr>
+                    <tr data-status="verified-ok"><td><strong>IMG_0033</strong><br><span class="mono muted">GOLDEN-TBOX-A</span></td><td>No defect<br><span class="muted">Golden reference</span></td><td>U107 · FOV-03</td><td><span class="chip ok">OK</span></td><td>AI OK / Label OK</td><td><span class="chip ok">Verified OK</span></td><td>0.8.1</td></tr>
+                    <tr data-status="unlabeled"><td><strong>IMG_0337</strong><br><span class="mono muted">NEW-IMPORT-05</span></td><td>Pending<br><span class="muted">Needs taxonomy</span></td><td>Unknown · FOV-?</td><td><span class="chip gray">Pending</span></td><td>Not tested</td><td><span class="chip info">Unlabeled</span></td><td>-</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="program" class="view">
+            <div class="grid-main">
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Inspection Program / Recipe</h3><p>Commercial AOI systems commonly separate the inspection program from review data. This page shows the program identity, ROI rules, and thresholds.</p></div><button class="btn primary action-btn">Save Revision</button></div>
+                <div class="card-body">
+                  <div class="grid-3">
+                    <div class="metric info"><small>Program ID</small><strong>TBOX_TOP_V1.2</strong><span>Telematics T-Box top-view inspection.</span></div>
+                    <div class="metric ok"><small>Active ROIs</small><strong>146</strong><span>Presence, polarity, solder, connector, anomaly.</span></div>
+                    <div class="metric warn"><small>Pending tuning</small><strong>7</strong><span>Components with high false-call ratio.</span></div>
+                  </div>
+                  <table style="margin-top:14px;">
+                    <thead><tr><th>Inspection Item</th><th>ROI Type</th><th>Applies To</th><th>Threshold</th><th>Review Rule</th></tr></thead>
+                    <tbody>
+                      <tr><td>Presence / missing component</td><td>Component ROI</td><td>R, C, U, D</td><td>Score ≥ 0.55</td><td>Critical NG</td></tr>
+                      <tr><td>Polarity / rotation</td><td>Orientation ROI</td><td>D, IC, connector</td><td>Score ≥ 0.60</td><td>Critical NG</td></tr>
+                      <tr><td>Solder bridge</td><td>Lead / pad ROI</td><td>U-series, J-series</td><td id="programThreshold">Score ≥ 0.42</td><td>Escape-control priority</td></tr>
+                      <tr><td>Connector pin height</td><td>Height / side-view ROI</td><td>J1-J6</td><td>ΔH ≤ 0.15 mm</td><td>Major/Critical by connector</td></tr>
+                      <tr><td>Surface contamination</td><td>Anomaly ROI</td><td>Board area</td><td>Area ≥ 12 px</td><td>Engineer review</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Revision Control</h3><p>Traceable changes for customer validation.</p></div><span class="chip info">Audit</span></div>
+                <div class="card-body">
+                  <div class="split-row"><span>Current revision</span><strong>V1.2</strong></div>
+                  <div class="split-row"><span>Author</span><strong>Engineer01</strong></div>
+                  <div class="split-row"><span>Last edit</span><strong>2026-05-20 09:20</strong></div>
+                  <div class="split-row"><span>Reason</span><strong>Lowered bridge threshold after FN review</strong></div>
+                  <div class="split-row"><span>Approval</span><strong>Pending QA</strong></div>
+                  <label style="margin-top:12px;">Change note</label>
+                  <textarea>Adjusted solder-bridge detection to prioritize possible escapes during Stage 1 image validation.</textarea>
+                  <button class="btn block action-btn" style="margin-top:10px;">Record Change Note</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="spc" class="view">
+            <div class="grid-4" style="margin-bottom:14px;">
+              <div class="metric ok"><small>First-pass yield preview</small><strong>97.2%</strong><span>Based on verified records in validation set.</span></div>
+              <div class="metric warn"><small>False-call rate</small><strong>4.7%</strong><span>Highest contributors: C684, U107, J3.</span></div>
+              <div class="metric ng"><small>Escape risk</small><strong>0.8%</strong><span>Default focus until cleared by reviewer.</span></div>
+              <div class="metric info"><small>DB completeness</small><strong>91%</strong><span>Required metadata filled for most records.</span></div>
+            </div>
+            <div class="grid-main">
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>SPC / Quality Trend Preview</h3><p>Preview of common quality-review data: defect mix, false-call contributors, and traceability completeness.</p></div><span class="chip gray">Mock data</span></div>
+                <div class="card-body bar-list">
+                  <div class="bar-row"><div class="bar-row-top"><strong>U107 Solder Bridge false-call ratio</strong><span>11.2%</span></div><div class="bar-track"><div class="bar-fill warn" style="--w:62%"></div></div></div>
+                  <div class="bar-row"><div class="bar-row-top"><strong>C684 Excess Solder false-call ratio</strong><span>9.8%</span></div><div class="bar-track"><div class="bar-fill warn" style="--w:55%"></div></div></div>
+                  <div class="bar-row"><div class="bar-row-top"><strong>D12 polarity escape-risk count</strong><span>5</span></div><div class="bar-track"><div class="bar-fill ng" style="--w:38%"></div></div></div>
+                  <div class="bar-row"><div class="bar-row-top"><strong>Connector pin-height review pass rate</strong><span>94.4%</span></div><div class="bar-track"><div class="bar-fill ok" style="--w:94%"></div></div></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Database Transparency</h3><p>Information users need to trust the library and exported results.</p></div><span class="chip ok">Healthy</span></div>
+                <div class="card-body">
+                  <div class="split-row"><span>Database mode</span><strong>Local SQLite preview</strong></div>
+                  <div class="split-row"><span>Image root</span><strong class="mono">C:/AOI_PoC/library/images</strong></div>
+                  <div class="split-row"><span>Annotation root</span><strong class="mono">C:/AOI_PoC/library/annotations</strong></div>
+                  <div class="split-row"><span>Broken image refs</span><strong>3</strong></div>
+                  <div class="split-row"><span>Duplicate candidates</span><strong>12</strong></div>
+                  <div class="split-row"><span>Records missing RefDes</span><strong>38</strong></div>
+                  <div class="split-row"><span>Records missing model version</span><strong>21</strong></div>
+                  <div class="split-row"><span>Last backup</span><strong>Today 09:10</strong></div>
+                  <button class="btn block" style="margin-top:12px;" data-target-shortcut="export">Export DB Health CSV</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="import" class="view">
+            <div class="grid-main">
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Import Images & Minimum Required Metadata</h3><p>Designed to keep uploads simple while enforcing fields needed for traceable review and future model training.</p></div><button class="btn primary action-btn">Start Import</button></div>
+                <div class="card-body">
+                  <div class="dropzone"><strong>Drop PCB images or select folder</strong><span>PNG/JPG/TIFF preview · optional CSV metadata · automatic Sample ID generation</span><br><button class="btn" style="margin-top:12px;" id="mockUpload">Select Folder</button></div>
+                  <div class="form-grid" style="margin-top:14px;">
+                    <div><label>Board model</label><input value="Telematics T-Box" /></div>
+                    <div><label>Lot / batch ID</label><input value="LOT-TB-0427-A" /></div>
+                    <div><label>View / camera</label><select><option>Top view</option><option>Side view</option><option>Bottom view</option><option>3D height map — planned</option></select></div>
+                    <div><label>Defect category</label><select><option>Solder-related</option><option>Component placement</option><option>Connector / mechanical</option><option>PCB / pad / surface</option><option>Electrical / circuit</option></select></div>
+                    <div><label>Defect type</label><select><option>Solder Bridge</option><option>Missing Component</option><option>Misalignment</option><option>Polarity Error</option><option>Tombstone</option><option>Connector Pin Height</option></select></div>
+                    <div><label>Component RefDes</label><input placeholder="e.g., U107, C684, J3" /></div>
+                    <div><label>Severity</label><select><option>Critical</option><option>Major</option><option>Minor</option><option>OK / Golden Reference</option></select></div>
+                    <div><label>Initial disposition</label><select><option>Needs Review</option><option>Verified NG</option><option>Verified OK</option><option>Training Candidate</option></select></div>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><div class="card-title"><h3>Labeling Utilities</h3><p>Minimal tools needed for the sample-library PoC.</p></div><span class="chip info">Stage 1</span></div>
+                <div class="card-body">
+                  <div class="split-row"><span>Auto Sample ID</span><strong>Enabled</strong></div>
+                  <div class="split-row"><span>Duplicate detection</span><strong>Hash + similarity</strong></div>
+                  <div class="split-row"><span>Annotation format</span><strong>JSON / YOLO export ready</strong></div>
+                  <div class="split-row"><span>Required fields</span><strong>Board, RefDes, defect, severity</strong></div>
+                  <div class="split-row"><span>Reviewer handoff</span><strong>Needs Review queue</strong></div>
+                  <div class="viewer-toolbar" style="margin-top:12px;"><button class="btn block action-btn">Draw ROI / Bounding Box</button><button class="btn block action-btn">Validate Metadata</button><button class="btn block action-btn">Add to Review Queue</button></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="export" class="view">
+            <div class="grid-3">
+              <div class="card pad"><h3 style="margin:0 0 8px;">Customer Validation Package</h3><p class="muted">Exports sample list, AI result, ground truth, confidence, disposition, and image overlay evidence.</p><button class="btn primary block action-btn" style="margin-top:12px;">Generate Validation Report</button></div>
+              <div class="card pad"><h3 style="margin:0 0 8px;">Engineering CSV Export</h3><p class="muted">Exports false calls, possible escapes, component-wise ranking, and threshold-tuning candidates.</p><button class="btn block action-btn" style="margin-top:12px;">Export CSV Bundle</button></div>
+              <div class="card pad"><h3 style="margin:0 0 8px;">Database Backup</h3><p class="muted">Creates a local backup of records, image references, annotations, and recipe revision data.</p><button class="btn block action-btn" style="margin-top:12px;">Create Backup</button></div>
+            </div>
+            <div class="card" style="margin-top:14px;">
+              <div class="card-header"><div class="card-title"><h3>Available Export Items</h3><p>Preview of report utilities expected by QC, engineering, and customer validation users.</p></div><span class="chip ok">Ready</span></div>
+              <div class="card-body">
+                <table><thead><tr><th>Export</th><th>Contents</th><th>Audience</th><th>Status</th></tr></thead><tbody>
+                  <tr><td>Sample library CSV</td><td>All metadata, labels, statuses, model versions</td><td>Engineering / QA</td><td><span class="chip ok">Available</span></td></tr>
+                  <tr><td>False-call report</td><td>AI NG / Label OK cases by component and defect</td><td>Process engineer</td><td><span class="chip ok">Available</span></td></tr>
+                  <tr><td>Possible escape report</td><td>AI OK / Label NG or low-confidence NG risk cases</td><td>QA / customer</td><td><span class="chip ok">Available</span></td></tr>
+                  <tr><td>Annotated image package</td><td>PNG overlays + JSON annotation files</td><td>Customer validation</td><td><span class="chip warn">Partial</span></td></tr>
+                  <tr><td>SPC summary PDF</td><td>Yield preview, defect mix, false-call ranking</td><td>Manager / QA</td><td><span class="chip info">Prototype</span></td></tr>
+                </tbody></table>
+              </div>
+            </div>
+          </section>
+
+          <section id="settings" class="view">
+            <div class="settings-grid">
+              <div class="card"><div class="card-header"><div class="card-title"><h3>Display</h3><p>No dark mode in this prototype; focus is on stable industrial readability.</p></div></div><div class="card-body"><label>Font size</label><select id="fontSizeSelect"><option value="font-compact">Compact</option><option value="font-standard" selected>Standard</option><option value="font-large">Large operator mode</option></select><label style="margin-top:12px;">Screen density</label><select><option>Balanced review workstation</option><option>Compact table-first mode</option><option>Large touch-panel mode</option></select><button class="btn block action-btn" style="margin-top:12px;">Save Display Setting</button></div></div>
+              <div class="card"><div class="card-header"><div class="card-title"><h3>Language & Localization</h3><p>Options shown for final-product readiness; this HTML mockup remains English-only.</p></div></div><div class="card-body"><label>Language</label><select id="languageSelect"><option>English</option><option>Korean — planned</option><option>Japanese — planned</option><option>Chinese — planned</option></select><label style="margin-top:12px;">Measurement unit</label><select><option>Pixels + RefDes</option><option>Millimeters after calibration — planned</option></select><button class="btn block action-btn" style="margin-top:12px;">Save Localization Setting</button></div></div>
+              <div class="card"><div class="card-header"><div class="card-title"><h3>User Role & Access</h3><p>Reflects common separation between operator, engineer, and admin functions.</p></div></div><div class="card-body"><label>Current role</label><select><option>Engineer</option><option>Operator</option><option>QA Manager</option><option>Admin</option></select><div class="split-row"><span>Can edit labels</span><strong>Yes</strong></div><div class="split-row"><span>Can modify recipe</span><strong>Engineer+</strong></div><div class="split-row"><span>Can export reports</span><strong>QA/Admin</strong></div></div></div>
+              <div class="card"><div class="card-header"><div class="card-title"><h3>Review Defaults</h3><p>Default view controls how review queues are sorted when the software opens.</p></div></div><div class="card-body"><label>Default priority</label><select><option>Escape Control / false negatives first</option><option>Balanced Review</option><option>False Call Reduction / false positives first</option></select><label style="margin-top:12px;">Default threshold</label><input value="0.42" /><button class="btn block action-btn" style="margin-top:12px;">Save Review Defaults</button></div></div>
+              <div class="card"><div class="card-header"><div class="card-title"><h3>Transparency Options</h3><p>Make database and model status visible enough for users to trust exported results.</p></div></div><div class="card-body switch-list"><div class="switch-item"><div><strong>Show broken image references</strong><span>Warn if linked image/annotation file is missing.</span></div><span class="switch"></span></div><div class="switch-item"><div><strong>Show model and recipe version</strong><span>Display versions on sample cards and reports.</span></div><span class="switch"></span></div><div class="switch-item"><div><strong>Show class imbalance warning</strong><span>Highlight weak defect categories.</span></div><span class="switch"></span></div></div></div>
+              <div class="card"><div class="card-header"><div class="card-title"><h3>System Paths</h3><p>Preview fields for final local installation.</p></div></div><div class="card-body"><label>Image library path</label><input value="C:/AOI_PoC/library/images/" /><label style="margin-top:12px;">Annotation path</label><input value="C:/AOI_PoC/library/annotations/" /><label style="margin-top:12px;">Export path</label><input value="C:/AOI_PoC/exports/" /><button class="btn block action-btn" style="margin-top:12px;">Validate Paths</button></div></div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Action recorded.</div>
+
+  <script>
+    const pageInfo = {
+      dashboard: ["AOI PoC / Start", "Line Overview", "Production-style entry page with review queue, sample-library health, current recipe, and detection-performance preview."],
+      guide: ["AOI PoC / Help", "Workflow Guide", "Recommended route through review, library search, recipe check, SPC/database health, and export utilities."],
+      review: ["AOI PoC / Daily Review", "Inspection Review", "Prioritize possible escapes by default, compare similar samples, and record review disposition."],
+      library: ["AOI PoC / Samples", "Defect Library", "Search and filter defect samples by AOI terminology: RefDes, FOV, defect code, severity, disposition, and model version."],
+      program: ["AOI PoC / Engineering", "Inspection Program", "Review recipe identity, ROI rules, component-level inspection items, and threshold settings."],
+      spc: ["AOI PoC / Quality Data", "SPC & Database", "Preview yield, false-call trends, escape risk, traceability, and database health."],
+      import: ["AOI PoC / Data Entry", "Import & Label", "Upload images, attach minimum required metadata, and send samples into the review queue."],
+      export: ["AOI PoC / Reports", "Reports & Utilities", "Export validation evidence, engineering CSVs, annotated image packages, and database backups."],
+      settings: ["AOI PoC / System", "Settings", "Adjust display size, language placeholder, user role, review defaults, transparency options, and paths."]
+    };
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function navigate(target) {
+      if (!pageInfo[target]) return;
+      document.querySelectorAll('.view').forEach(view => view.classList.toggle('active', view.id === target));
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.target === target));
+      document.querySelectorAll('.quick-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.targetShortcut === target));
+      document.getElementById('breadcrumb').textContent = pageInfo[target][0];
+      document.getElementById('pageTitle').textContent = pageInfo[target][1];
+      document.getElementById('pageSubtitle').textContent = pageInfo[target][2];
+      document.querySelector('.content').scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => navigate(btn.dataset.target)));
+    document.querySelectorAll('[data-target-shortcut]').forEach(btn => btn.addEventListener('click', () => navigate(btn.dataset.targetShortcut)));
+
+    document.querySelectorAll('.priority-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('modeBadge').textContent = btn.dataset.mode;
+        document.getElementById('currentModeText').textContent = btn.dataset.mode;
+        document.getElementById('thresholdText').textContent = btn.dataset.threshold;
+        document.getElementById('programThreshold').textContent = `Score ≥ ${btn.dataset.threshold}`;
+        showToast(`${btn.dataset.mode} selected. Threshold set to ${btn.dataset.threshold}.`);
+      });
+    });
+
+    document.querySelectorAll('.queue-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.queue-item').forEach(i => i.classList.remove('selected'));
+        item.classList.add('selected');
+        document.getElementById('selectedTitle').textContent = `${item.dataset.sample} · ${item.dataset.defect}`;
+        document.getElementById('selectedSubtitle').textContent = `${item.dataset.lot} · ${item.dataset.refdes} · AI review case · Similarity ${item.dataset.match}`;
+        document.getElementById('selectedRisk').textContent = item.dataset.risk;
+        document.getElementById('sampleScore').textContent = item.dataset.score;
+        document.getElementById('sampleMatch').textContent = item.dataset.match;
+        document.getElementById('infoSample').textContent = item.dataset.sample;
+        document.getElementById('infoRefdes').textContent = item.dataset.refdes;
+        document.getElementById('infoDefect').textContent = item.dataset.defect;
+        document.getElementById('infoLot').textContent = item.dataset.lot;
+      });
+    });
+
+    document.querySelectorAll('.action-btn').forEach(btn => btn.addEventListener('click', () => showToast(`${btn.textContent.trim()} recorded for prototype review.`)));
+    document.getElementById('mockUpload').addEventListener('click', () => showToast('Mock folder selector opened. Final product would import PNG/JPG/TIFF images.'));
+
+    const tableSearch = document.getElementById('tableSearch');
+    const riskFilter = document.getElementById('riskFilter');
+    function filterTable() {
+      const query = (tableSearch.value || '').toLowerCase();
+      const risk = riskFilter.value;
+      document.querySelectorAll('#sampleTable tbody tr').forEach(row => {
+        const visible = row.textContent.toLowerCase().includes(query) && (risk === 'all' || row.dataset.status === risk);
+        row.style.display = visible ? '' : 'none';
+      });
+    }
+    tableSearch.addEventListener('input', filterTable);
+    riskFilter.addEventListener('change', filterTable);
+
+    document.getElementById('globalSearch').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        navigate('library');
+        tableSearch.value = event.target.value;
+        filterTable();
+      }
+    });
+
+    const fontSizeSelect = document.getElementById('fontSizeSelect');
+    fontSizeSelect.addEventListener('change', (event) => {
+      document.body.classList.remove('font-compact', 'font-standard', 'font-large');
+      document.body.classList.add(event.target.value);
+      showToast(`Font size changed to ${event.target.options[event.target.selectedIndex].text}.`);
+    });
+
+    document.getElementById('languageSelect').addEventListener('change', (event) => showToast(`${event.target.value} selected as a planned localization option.`));
+    document.querySelectorAll('.switch').forEach(sw => sw.addEventListener('click', () => { sw.classList.toggle('off'); showToast(sw.classList.contains('off') ? 'Transparency option disabled.' : 'Transparency option enabled.'); }));
+  </script>
+</body>
+</html>

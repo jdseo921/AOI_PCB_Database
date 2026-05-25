@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AOI Defect Library Prototype v5</title>
+  <title>AOI Defect Image Library Prototype v8</title>
   <style>
     :root {
       --body-bg: #dfe7ee;
@@ -690,6 +690,783 @@
       .titlebar-right { display: none; }
     }
 
+
+
+    /* v6 readability pass: quieter workstation styling, more breathing room */
+    :root {
+      --body-bg: #e7ecef;
+      --window: #f8fafb;
+      --titlebar: #35424d;
+      --sidebar: #f1f4f6;
+      --panel: #ffffff;
+      --panel-2: #f7f9fa;
+      --ink: #1c2730;
+      --muted: #687783;
+      --line: #dce3e8;
+      --line-strong: #cbd5dc;
+      --brand: #3d6684;
+      --brand-2: #2f5069;
+      --brand-soft: #edf4f8;
+      --ok: #2d7257;
+      --ok-soft: #eef7f2;
+      --ng: #a9444c;
+      --ng-soft: #fbf0f1;
+      --warn: #9a7427;
+      --warn-soft: #fbf5e8;
+      --info: #46688e;
+      --info-soft: #eef3f8;
+      --violet: #635a83;
+      --violet-soft: #f2f0f7;
+      --gap-md: 20px;
+      --gap-lg: 24px;
+      --card-radius: 12px;
+      --header-h: 76px;
+      --control-h: 40px;
+    }
+
+    body {
+      background: var(--body-bg);
+      padding: 28px;
+      font-size: 15.5px;
+    }
+
+    .app-window {
+      width: min(1460px, 95vw);
+      height: min(880px, 92vh);
+      border-radius: 14px;
+      border-color: #b9c5ce;
+      box-shadow: 0 18px 48px rgba(30, 43, 54, .18);
+      background: var(--window);
+    }
+
+    .titlebar {
+      background: var(--titlebar);
+      border-bottom-color: rgba(255,255,255,.08);
+    }
+    .app-title span { color: #cad3da; }
+    .win-dot, .win-dot.close, .win-dot.min, .win-dot.max {
+      background: #95a3ad;
+      border-color: rgba(255,255,255,.2);
+    }
+    .status-pill {
+      background: rgba(255,255,255,.06);
+      border-color: rgba(255,255,255,.14);
+      color: #e0e7ec;
+      font-weight: 650;
+    }
+    .status-pill.ok { color: #d3eee0; }
+    .status-pill.warn { color: #f4dfad; }
+
+    .shell {
+      grid-template-columns: 270px minmax(0, 1fr);
+      background: #eef2f5;
+    }
+
+    .sidebar {
+      background: var(--sidebar);
+      padding: 18px 14px;
+      gap: 12px;
+    }
+    .brand-card {
+      background: #fff;
+      box-shadow: none;
+      border-color: var(--line-strong);
+      padding: 14px;
+    }
+    .brand-mark {
+      background: var(--brand-2);
+      box-shadow: none;
+      font-weight: 800;
+    }
+    .brand-card p { line-height: 1.5; }
+    .nav-section-label {
+      color: #75838f;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+    .nav-btn {
+      min-height: 54px;
+      border-radius: 8px;
+      color: #374856;
+    }
+    .nav-btn:hover { background: #e8edf1; border-color: var(--line-strong); }
+    .nav-btn.active {
+      background: #fff;
+      border-color: #aebdc8;
+      box-shadow: none;
+      color: #243b4d;
+    }
+    .nav-index {
+      background: #e3e9ee;
+      color: #40586b;
+      border-radius: 7px;
+      font-weight: 800;
+    }
+    .nav-btn.active .nav-index {
+      background: var(--brand-2);
+      color: #fff;
+    }
+    .sidebar-footer {
+      box-shadow: none;
+      background: #fff;
+      border-color: var(--line-strong);
+    }
+
+    .workspace { background: #f5f7f8; }
+    .top-strip {
+      padding: 16px 22px;
+      background: #fff;
+      border-bottom-color: var(--line-strong);
+      gap: 18px;
+    }
+    .page-kicker {
+      color: #71808c;
+      font-weight: 800;
+      letter-spacing: .05em;
+    }
+    .page-title h2 {
+      font-size: 1.2rem;
+      letter-spacing: -.01em;
+    }
+    .page-title p {
+      font-size: .86rem;
+      max-width: 980px;
+      line-height: 1.45;
+    }
+    .header-actions { gap: 10px; }
+
+    .workflow-bar {
+      padding: 12px 22px;
+      background: #f8fafb;
+      border-bottom-color: var(--line);
+      gap: 9px;
+    }
+    .workflow-label { color: #71808c; }
+    .quick-btn {
+      background: #fff;
+      border-color: var(--line-strong);
+      color: #405161;
+      border-radius: 7px;
+      padding: 7px 11px;
+      font-weight: 700;
+    }
+    .quick-btn:hover, .quick-btn.active {
+      background: #edf3f7;
+      border-color: #b5c5d0;
+      color: #2f5069;
+    }
+
+    .content {
+      padding: 24px;
+      background: #f4f6f8;
+    }
+    .view.active { animation: none; }
+
+    .grid-2, .grid-3, .grid-4, .grid-main, .review-grid, .form-grid, .settings-grid {
+      gap: 20px;
+    }
+    .grid-4 { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .grid-main { grid-template-columns: minmax(0, 1fr) 360px; }
+    .review-grid { grid-template-columns: 295px minmax(0, 1fr) 310px; }
+    .settings-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+    .card {
+      border-radius: 12px;
+      border-color: var(--line-strong);
+      box-shadow: none;
+      background: #fff;
+    }
+    .card.pad { padding: 18px; gap: 10px; }
+    .card-header {
+      padding: 15px 18px;
+      background: #fff;
+      border-bottom-color: var(--line);
+      min-height: 78px;
+    }
+    .card-title h3 {
+      font-size: .96rem;
+      letter-spacing: 0;
+      font-weight: 780;
+    }
+    .card-title p {
+      font-size: .78rem;
+      line-height: 1.45;
+      color: #71808c;
+    }
+    .card-body { padding: 18px; }
+
+    .metric {
+      min-height: 128px;
+      padding: 17px;
+      border-color: var(--line-strong);
+      border-radius: 10px;
+      background: #fff;
+    }
+    .metric small {
+      font-size: .7rem;
+      letter-spacing: .045em;
+      color: #72808b;
+    }
+    .metric strong {
+      font-size: 1.42rem;
+      margin-top: 6px;
+      color: #24303a;
+    }
+    .metric span {
+      font-size: .79rem;
+      line-height: 1.42;
+    }
+
+    .btn, input, select, textarea {
+      border-radius: 7px;
+    }
+    .btn {
+      padding: 8px 12px;
+      font-weight: 720;
+      border-color: #c4ced6;
+      color: #334554;
+      background: #fff;
+    }
+    .btn:hover { background: #f5f8fa; border-color: #aebdc8; }
+    .btn.primary {
+      background: #3d6684;
+      border-color: #3d6684;
+      color: #fff;
+    }
+    .btn.primary:hover { background: #2f5069; }
+    .btn.good { background: #2d7257; border-color: #2d7257; }
+    .btn.danger { background: #a9444c; border-color: #a9444c; }
+    .btn.warning { background: #9a7427; border-color: #9a7427; }
+
+    .chip {
+      border-radius: 7px;
+      font-size: .68rem;
+      font-weight: 760;
+      padding: 5px 8px;
+    }
+    .chip.ok { color: #2d7257; background: #eef7f2; border-color: #cfe6d9; }
+    .chip.ng { color: #944047; background: #fbf0f1; border-color: #ebd1d4; }
+    .chip.warn { color: #7b5b1c; background: #fbf5e8; border-color: #eadbb9; }
+    .chip.info { color: #365d78; background: #edf4f8; border-color: #ccdce6; }
+    .chip.violet { color: #5f5776; background: #f2f0f7; border-color: #ded9eb; }
+    .chip.gray { color: #586775; background: #f2f5f7; border-color: #d8e0e6; }
+
+    table { min-width: 760px; }
+    th, td {
+      padding: 12px 12px;
+      font-size: .81rem;
+      border-bottom-color: #e3e8ec;
+    }
+    th {
+      background: #f5f7f8;
+      color: #667684;
+      font-size: .67rem;
+      letter-spacing: .045em;
+    }
+    tr:hover td { background: #f8fafb; }
+
+    .split-row {
+      min-height: 42px;
+      padding: 10px 0;
+    }
+    .split-row span { font-size: .8rem; }
+    .split-row strong { font-size: .82rem; }
+
+    .bar-list { gap: 14px; }
+    .bar-track { height: 7px; background: #e5ebef; }
+    .bar-fill { background: #65839b; }
+    .bar-fill.ok { background: #5a8b75; }
+    .bar-fill.ng { background: #b06469; }
+    .bar-fill.warn { background: #b59658; }
+    .bar-fill.violet { background: #82799c; }
+
+    .guide-steps { gap: 14px; }
+    .guide-step {
+      padding: 16px;
+      border-radius: 10px;
+      box-shadow: none;
+      background: #fff;
+    }
+    .step-badge {
+      border-radius: 9px;
+      background: #edf4f8;
+      color: #365d78;
+    }
+
+    .priority-grid { gap: 14px; }
+    .priority-btn {
+      border-radius: 10px;
+      padding: 14px;
+      min-height: 104px;
+    }
+    .priority-btn.active {
+      border-color: #8daabe;
+      box-shadow: none;
+      background: #f3f7fa;
+    }
+    .priority-btn span { line-height: 1.45; }
+
+    .queue-list { gap: 12px; }
+    .queue-item {
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .queue-item.selected {
+      border-color: #8daabe;
+      box-shadow: none;
+      background: #f3f7fa;
+    }
+    .queue-item p { line-height: 1.45; }
+
+    .pcb-viewer {
+      height: 320px;
+      border-radius: 10px;
+      border-color: #9eadb8;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px),
+        linear-gradient(rgba(255,255,255,.055) 1px, transparent 1px),
+        linear-gradient(135deg, #526c5d, #354e43);
+      background-size: 38px 38px, 38px 38px, auto;
+      box-shadow: none;
+    }
+    .pcb-label { background: rgba(20, 30, 35, .34); color: #edf5ef; }
+    .component { box-shadow: none; }
+    .defect-box {
+      border-width: 2px;
+      box-shadow: 0 0 0 3px rgba(169, 68, 76, .13);
+      background: rgba(169, 68, 76, .045);
+    }
+    .roi-box {
+      border-color: #d3aa3e;
+      background: rgba(211, 170, 62, .06);
+    }
+    .viewer-toolbar { gap: 10px; }
+
+    .similar-grid { gap: 12px; }
+    .similar-card { border-radius: 10px; border-color: var(--line-strong); }
+    .similar-thumb {
+      height: 68px;
+      background: linear-gradient(135deg, #536b5d, #384f45);
+    }
+    .similar-info { padding: 11px; }
+    .similar-info span { line-height: 1.35; }
+
+    .form-grid { gap: 16px; }
+    label { color: #526270; font-weight: 760; }
+    input, select, textarea {
+      border-color: #c6d0d8;
+      background: #fff;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: #8daabe;
+      box-shadow: 0 0 0 3px rgba(61, 102, 132, .10);
+    }
+    .dropzone {
+      border-color: #b7c5ce;
+      background: #f8fafb;
+      border-radius: 10px;
+      padding: 30px;
+    }
+
+    .switch-item {
+      border-radius: 10px;
+      padding: 13px;
+      min-height: 70px;
+    }
+    .switch { background: #65839b; }
+    .switch.off { background: #bac5cc; }
+
+    .toast {
+      border-radius: 9px;
+      box-shadow: 0 12px 28px rgba(0,0,0,.18);
+    }
+
+    @media (max-width: 1320px) {
+      .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .review-grid, .grid-main { grid-template-columns: 1fr; }
+    }
+
+
+    /* v7 industry-alignment pass: closer to AOI/library-manager workstation norms */
+    :root {
+      --body-bg: #cdd5dc;
+      --window: #f4f6f7;
+      --titlebar: #2e3842;
+      --sidebar: #eceff2;
+      --panel: #ffffff;
+      --panel-2: #f2f4f6;
+      --ink: #18222b;
+      --muted: #5d6974;
+      --line: #d3d9de;
+      --line-strong: #b6c1c9;
+      --brand: #315f83;
+      --brand-2: #264a66;
+      --brand-soft: #e9f0f5;
+      --ok: #23724f;
+      --ok-soft: #edf6f1;
+      --ng: #b13f45;
+      --ng-soft: #fbeeee;
+      --warn: #9b741e;
+      --warn-soft: #faf4e4;
+      --info: #315f83;
+      --info-soft: #eef3f7;
+      --violet: #5c5c76;
+      --violet-soft: #f1f1f6;
+      --card-radius: 6px;
+      --control-h: 34px;
+      --font: "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: #cdd5dc;
+      padding: 22px;
+      font-size: 14px;
+    }
+
+    .app-window {
+      width: min(1500px, 96vw);
+      height: min(900px, 93vh);
+      min-height: 730px;
+      border-radius: 6px;
+      border: 1px solid #909ca6;
+      box-shadow: 0 14px 38px rgba(22, 32, 42, .22);
+      grid-template-rows: 46px 34px 1fr;
+      background: var(--window);
+    }
+
+    .titlebar {
+      height: 46px;
+      padding: 0 14px;
+      background: var(--titlebar);
+      color: #f4f7f9;
+    }
+    .app-title strong { font-size: .86rem; font-weight: 700; }
+    .app-title span { font-size: .68rem; color: #c2cbd3; }
+    .win-controls { gap: 6px; }
+    .win-dot { width: 9px; height: 9px; border-radius: 2px; }
+    .status-pill {
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: .68rem;
+      color: #e6ecef;
+      background: rgba(255,255,255,.055);
+    }
+
+    .menu-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 0 14px;
+      background: #e6eaee;
+      border-bottom: 1px solid #aeb8c0;
+      color: #2f3b45;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .menu-left, .toolbar-actions { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .menu-left button {
+      border: 0;
+      background: transparent;
+      color: #2f3b45;
+      height: 26px;
+      padding: 0 10px;
+      border-radius: 3px;
+      font-size: .75rem;
+      font-weight: 650;
+    }
+    .menu-left button:hover { background: #d9dfe4; }
+    .toolbar-actions { margin-left: auto; gap: 10px; overflow: hidden; }
+    .toolbar-actions span {
+      font-size: .72rem;
+      color: #485661;
+      border-left: 1px solid #c2cad1;
+      padding-left: 10px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .shell { grid-template-columns: 252px minmax(0, 1fr); background: #edf1f4; }
+    .sidebar { padding: 14px 10px; gap: 8px; border-right-color: #aeb8c0; }
+    .brand-card {
+      border-radius: 5px;
+      padding: 12px;
+      background: #f9fbfc;
+      border-color: #bcc6ce;
+    }
+    .brand-mark {
+      width: 38px; height: 38px;
+      border-radius: 4px;
+      background: #2e536d;
+      font-size: .85rem;
+      letter-spacing: .02em;
+    }
+    .brand-card h1 { font-size: .9rem; font-weight: 700; line-height: 1.2; }
+    .brand-card p { font-size: .71rem; line-height: 1.45; }
+    .nav-section-label { margin: 11px 8px 4px; font-size: .64rem; letter-spacing: .08em; }
+    .nav-btn {
+      min-height: 46px;
+      grid-template-columns: 24px 1fr 12px;
+      gap: 8px;
+      padding: 7px 8px;
+      border-radius: 4px;
+      border-color: transparent;
+      color: #35434f;
+    }
+    .nav-btn:hover { background: #e1e7eb; border-color: #c8d1d8; }
+    .nav-btn.active {
+      color: #17364c;
+      background: #fff;
+      border-color: #aeb8c0;
+      border-left: 4px solid var(--brand);
+      padding-left: 5px;
+    }
+    .nav-index { width: 22px; height: 22px; border-radius: 3px; font-size: .65rem; background: #dfe6eb; color: #405260; }
+    .nav-text strong { font-size: .8rem; font-weight: 700; }
+    .nav-text small { font-size: .64rem; margin-top: 2px; }
+    .sidebar-footer { border-radius: 5px; padding: 11px; }
+
+    .workspace { grid-template-rows: auto auto 1fr 27px; background: #f4f6f7; }
+    .top-strip {
+      padding: 12px 18px;
+      background: #fbfcfd;
+      border-bottom-color: #c6d0d7;
+    }
+    .page-kicker { font-size: .66rem; color: #62707b; }
+    .page-title h2 { font-size: 1.08rem; font-weight: 700; }
+    .page-title p { font-size: .79rem; line-height: 1.38; }
+    #globalSearch { width: 310px; }
+
+    .workflow-bar {
+      padding: 8px 18px;
+      background: #f0f3f5;
+      border-bottom-color: #cdd5dc;
+    }
+    .workflow-label { font-size: .7rem; }
+    .quick-btn {
+      min-height: 28px;
+      border-radius: 4px;
+      padding: 5px 9px;
+      font-size: .7rem;
+      background: #fff;
+    }
+    .quick-btn.active { background: #e4edf3; border-color: #9fb5c5; color: #244b65; }
+
+    .content {
+      padding: 18px;
+      background: #eef2f5;
+    }
+    .grid-2, .grid-3, .grid-4, .grid-main, .review-grid, .form-grid, .settings-grid { gap: 14px; }
+    .grid-4 { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+    .grid-main { grid-template-columns: minmax(0, 1fr) 348px; }
+    .review-grid { grid-template-columns: 285px minmax(0, 1fr) 305px; }
+
+    .production-strip {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0;
+      margin-bottom: 14px;
+      background: #fff;
+      border: 1px solid #b9c4cc;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .production-strip div {
+      padding: 10px 12px;
+      border-right: 1px solid #d7dde2;
+      min-width: 0;
+    }
+    .production-strip div:last-child { border-right: 0; }
+    .production-strip span {
+      display: block;
+      color: #687783;
+      font-size: .64rem;
+      text-transform: uppercase;
+      letter-spacing: .045em;
+      font-weight: 750;
+      margin-bottom: 4px;
+    }
+    .production-strip strong {
+      display: block;
+      font-size: .78rem;
+      color: #24303a;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .card { border-radius: 5px; border-color: #bdc7cf; background: #fff; }
+    .card.pad { padding: 15px; }
+    .card-header {
+      padding: 11px 14px;
+      min-height: 64px;
+      background: #f6f8f9;
+      border-bottom-color: #d0d8de;
+    }
+    .card-title h3 { font-size: .9rem; font-weight: 700; color: #1f2b34; }
+    .card-title p { font-size: .72rem; color: #64727e; line-height: 1.36; }
+    .card-body { padding: 14px; }
+
+    .metric {
+      min-height: 110px;
+      border-radius: 5px;
+      padding: 13px;
+      border-color: #c4cdd4;
+      background: #fff;
+    }
+    .metric small { font-size: .64rem; letter-spacing: .04em; }
+    .metric strong { font-size: 1.28rem; font-weight: 720; font-variant-numeric: tabular-nums; }
+    .metric span { font-size: .72rem; line-height: 1.36; }
+    .metric.ok, .metric.ng, .metric.warn, .metric.info { border-left: 4px solid #8398a7; }
+    .metric.ok { border-left-color: var(--ok); }
+    .metric.ng { border-left-color: var(--ng); }
+    .metric.warn { border-left-color: var(--warn); }
+    .metric.info { border-left-color: var(--brand); }
+
+    .btn, input, select, textarea {
+      border-radius: 4px;
+      min-height: 34px;
+    }
+    .btn {
+      padding: 7px 10px;
+      font-size: .72rem;
+      font-weight: 650;
+      border-color: #aeb8c0;
+      background: #fdfefe;
+    }
+    .btn.primary { background: #315f83; border-color: #315f83; }
+    .btn.good, .btn.danger, .btn.warning { color: #fff; }
+    input, select, textarea { font-size: .78rem; border-color: #bbc6ce; }
+
+    .chip {
+      border-radius: 3px;
+      padding: 4px 7px;
+      min-height: 22px;
+      font-size: .64rem;
+      font-weight: 700;
+      letter-spacing: .005em;
+    }
+
+    table {
+      min-width: 780px;
+      border: 1px solid #cbd4db;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: #fff;
+    }
+    th, td {
+      padding: 10px 11px;
+      border-bottom: 1px solid #dfe5e9;
+      border-right: 1px solid #e5eaed;
+      font-size: .76rem;
+      line-height: 1.34;
+    }
+    th:last-child, td:last-child { border-right: 0; }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #e9eef2;
+      color: #4e5e6a;
+      font-size: .62rem;
+      letter-spacing: .045em;
+      font-weight: 780;
+    }
+    tr:hover td { background: #f7fafc; }
+    .mono { font-size: .72rem; font-variant-numeric: tabular-nums; }
+    .split-row { min-height: 36px; padding: 8px 0; }
+    .split-row span { font-size: .75rem; }
+    .split-row strong { font-size: .77rem; }
+
+    .library-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 0 0 12px;
+      padding: 9px 10px;
+      background: #f4f6f8;
+      border: 1px solid #cdd6dd;
+      border-radius: 4px;
+    }
+    .toolbar-label {
+      font-size: .66rem;
+      font-weight: 780;
+      text-transform: uppercase;
+      color: #62707b;
+      letter-spacing: .045em;
+      margin-right: 2px;
+    }
+    .toolbar-note {
+      color: #687783;
+      font-size: .7rem;
+      margin-left: auto;
+    }
+
+    .priority-btn, .queue-item, .similar-card, .guide-step, .switch-item, .dropzone {
+      border-radius: 5px;
+    }
+    .priority-btn { min-height: 88px; padding: 12px; }
+    .priority-btn.active, .queue-item.selected { background: #edf4f8; border-color: #8fa8ba; }
+    .queue-item { padding: 11px; }
+    .queue-item strong { font-size: .8rem; }
+    .queue-item p { font-size: .68rem; }
+
+    .pcb-viewer {
+      border-radius: 4px;
+      height: 306px;
+      border-color: #798994;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px),
+        linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+        #405a4b;
+      background-size: 36px 36px, 36px 36px, auto;
+    }
+    .pcb-label { border-radius: 3px; font-size: .66rem; }
+    .defect-box { border-width: 2px; border-radius: 4px; }
+    .roi-box { border-radius: 4px; }
+    .viewer-toolbar { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+
+    .similar-thumb { height: 64px; background: #465e51; }
+    .similar-info strong { font-size: .72rem; }
+    .similar-info span { font-size: .66rem; }
+
+    label { font-size: .69rem; letter-spacing: .02em; color: #4e5d69; }
+    .dropzone { padding: 24px; background: #f7f9fa; }
+
+    .app-statusbar {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      background: #e6eaee;
+      border-top: 1px solid #b6c1c9;
+      color: #42505b;
+      min-height: 27px;
+      overflow: hidden;
+    }
+    .app-statusbar span {
+      padding: 0 10px;
+      border-right: 1px solid #c4ccd3;
+      font-size: .68rem;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 1320px) {
+      .production-strip { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .production-strip div { border-bottom: 1px solid #d7dde2; }
+      .toolbar-note { flex-basis: 100%; margin-left: 0; }
+    }
+
+    @media (max-width: 900px) {
+      .menu-bar, .app-statusbar { display: none; }
+      .app-window { grid-template-rows: 46px 1fr; }
+      .production-strip { grid-template-columns: 1fr; }
+      #globalSearch { width: 100%; }
+    }
+
   </style>
 </head>
 <body class="font-standard">
@@ -711,31 +1488,50 @@
       </div>
     </header>
 
+    <nav class="menu-bar" aria-label="Application menu and station toolbar">
+      <div class="menu-left">
+        <button>File</button>
+        <button>Library</button>
+        <button>Inspection</button>
+        <button>Recipe</button>
+        <button>SPC</button>
+        <button>Reports</button>
+        <button>Admin</button>
+        <button>Help</button>
+      </div>
+      <div class="toolbar-actions">
+        <span>DB: AOI_POC_DB</span>
+        <span>Side: Top</span>
+        <span>Shift: A</span>
+        <span>User: Engineer01</span>
+      </div>
+    </nav>
+
     <div class="shell">
       <aside class="sidebar">
         <div class="brand-card">
           <div class="brand-row">
             <div class="brand-mark">AOI</div>
             <div>
-              <h1>Defect Library<br/>Control Center</h1>
+              <h1>Defect Image Library<br/>Control Center</h1>
             </div>
           </div>
           <p>Prototype focused on sample access, review disposition, similarity matching, traceability, SPC preview, and export evidence.</p>
         </div>
 
         <div class="nav-section-label">Start</div>
-        <button class="nav-btn active" data-target="dashboard"><span class="nav-index">1</span><span class="nav-text"><strong>Line Overview</strong><small>KPIs, queue, program status</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn active" data-target="dashboard"><span class="nav-index">1</span><span class="nav-text"><strong>Production Overview</strong><small>KPIs, queue, program status</small></span><span class="nav-arrow">›</span></button>
         <button class="nav-btn" data-target="guide"><span class="nav-index">?</span><span class="nav-text"><strong>Workflow Guide</strong><small>How to navigate</small></span><span class="nav-arrow">›</span></button>
 
         <div class="nav-section-label">Daily Review</div>
-        <button class="nav-btn" data-target="review"><span class="nav-index">2</span><span class="nav-text"><strong>Inspection Review</strong><small>Escapes, false calls, disposition</small></span><span class="nav-arrow">›</span></button>
-        <button class="nav-btn" data-target="library"><span class="nav-index">3</span><span class="nav-text"><strong>Defect Library</strong><small>Search samples and references</small></span><span class="nav-arrow">›</span></button>
-        <button class="nav-btn" data-target="program"><span class="nav-index">4</span><span class="nav-text"><strong>Inspection Program</strong><small>Recipe, ROIs, thresholds</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="review"><span class="nav-index">2</span><span class="nav-text"><strong>Review / Disposition</strong><small>Escapes, false calls, disposition</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="library"><span class="nav-index">3</span><span class="nav-text"><strong>Defect Image Library</strong><small>Search samples and references</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="program"><span class="nav-index">4</span><span class="nav-text"><strong>Inspection Recipe</strong><small>Recipe, ROIs, thresholds</small></span><span class="nav-arrow">›</span></button>
 
         <div class="nav-section-label">Quality Data</div>
-        <button class="nav-btn" data-target="spc"><span class="nav-index">5</span><span class="nav-text"><strong>SPC & Database</strong><small>Yield, traceability, data health</small></span><span class="nav-arrow">›</span></button>
-        <button class="nav-btn" data-target="import"><span class="nav-index">6</span><span class="nav-text"><strong>Import & Label</strong><small>Upload images and metadata</small></span><span class="nav-arrow">›</span></button>
-        <button class="nav-btn" data-target="export"><span class="nav-index">7</span><span class="nav-text"><strong>Reports & Utilities</strong><small>CSV, overlays, backup</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="spc"><span class="nav-index">5</span><span class="nav-text"><strong>SPC / Traceability</strong><small>Yield, traceability, data health</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="import"><span class="nav-index">6</span><span class="nav-text"><strong>Image Import / Labeling</strong><small>Upload images and metadata</small></span><span class="nav-arrow">›</span></button>
+        <button class="nav-btn" data-target="export"><span class="nav-index">7</span><span class="nav-text"><strong>Reports / Utilities</strong><small>CSV, overlays, backup</small></span><span class="nav-arrow">›</span></button>
 
         <div class="nav-section-label">System</div>
         <button class="nav-btn" data-target="settings"><span class="nav-index">8</span><span class="nav-text"><strong>Settings</strong><small>Display, language, access</small></span><span class="nav-arrow">›</span></button>
@@ -751,8 +1547,8 @@
         <div class="top-strip">
           <div class="page-title">
             <div class="page-kicker" id="breadcrumb">AOI PoC / Start</div>
-            <h2 id="pageTitle">Line Overview</h2>
-            <p id="pageSubtitle">Production-style entry page with review queue, sample-library health, current recipe, and detection-performance preview.</p>
+            <h2 id="pageTitle">Production Overview</h2>
+            <p id="pageSubtitle">AOI workstation entry page with review queue, sample-library health, current recipe, and detection-performance preview.</p>
           </div>
           <div class="header-actions">
             <input id="globalSearch" placeholder="Search Sample ID, RefDes, defect, lot..." />
@@ -773,7 +1569,14 @@
 
         <div class="content">
           <section id="dashboard" class="view active">
-            <div class="grid-4" style="margin-bottom:14px;">
+            <div class="production-strip" aria-label="Inspection context summary">
+              <div><span>Board / Program</span><strong>TBOX_TOP_V1.2</strong></div>
+              <div><span>Lot / Product</span><strong>LOT-TB-0426 · Telematics T-Box</strong></div>
+              <div><span>Library Mode</span><strong>Golden + NG + Borderline</strong></div>
+              <div><span>Review Policy</span><strong>Escape Control First</strong></div>
+              <div><span>Data Source</span><strong>Local SQLite · Image Folder Linked</strong></div>
+            </div>
+            <div class="grid-4" style="margin-bottom:18px;">
               <div class="metric info"><small>Total sample records</small><strong>2,184</strong><span>Images indexed across OK, NG, border cases, and golden references.</span></div>
               <div class="metric ng"><small>Possible escapes</small><strong>18</strong><span>Default priority: AI judged OK but label/history suggests NG risk.</span></div>
               <div class="metric warn"><small>False-call candidates</small><strong>47</strong><span>Suspected over-rejections requiring human disposition.</span></div>
@@ -782,7 +1585,7 @@
 
             <div class="grid-main">
               <div class="card">
-                <div class="card-header"><div class="card-title"><h3>Review Attention Queue</h3><p>Industrial-style triage: review possible escapes first, then high false-call components and unlabeled samples.</p></div><button class="btn primary" data-target-shortcut="review">Start Review</button></div>
+                <div class="card-header"><div class="card-title"><h3>Disposition Attention Queue</h3><p>Industrial-style triage: review possible escapes first, then high false-call components and unlabeled samples.</p></div><button class="btn primary" data-target-shortcut="review">Start Review</button></div>
                 <div class="card-body">
                   <table>
                     <thead><tr><th>Priority</th><th>Sample / Lot</th><th>Risk Type</th><th>Defect / RefDes</th><th>Action</th></tr></thead>
@@ -797,16 +1600,16 @@
               </div>
 
               <div class="card">
-                <div class="card-header"><div class="card-title"><h3>Current Program Snapshot</h3><p>Quick readout of recipe/model/database status.</p></div><span class="chip ok">Ready</span></div>
+                <div class="card-header"><div class="card-title"><h3>Current Recipe Snapshot</h3><p>Quick readout of recipe/model/database status.</p></div><span class="chip ok">Ready</span></div>
                 <div class="card-body">
-                  <div class="split-row"><span>Inspection Program</span><strong>TBOX_TOP_V1.2</strong></div>
+                  <div class="split-row"><span>Inspection Recipe</span><strong>TBOX_TOP_V1.2</strong></div>
                   <div class="split-row"><span>Target Board</span><strong>Telematics T-Box</strong></div>
                   <div class="split-row"><span>View Type</span><strong>Top + Side Reference</strong></div>
                   <div class="split-row"><span>Default Priority</span><strong id="currentModeText">Escape Control</strong></div>
                   <div class="split-row"><span>Confidence Threshold</span><strong id="thresholdText">0.42</strong></div>
                   <div class="split-row"><span>Golden References</span><strong>312 verified</strong></div>
                   <div class="split-row"><span>Last DB Backup</span><strong>Today 09:10</strong></div>
-                  <button class="btn block" style="margin-top:12px;" data-target-shortcut="program">Open Program Details</button>
+                  <button class="btn block" style="margin-top:12px;" data-target-shortcut="program">Open Recipe Details</button>
                 </div>
               </div>
             </div>
@@ -822,7 +1625,7 @@
                 </div>
               </div>
               <div class="card">
-                <div class="card-header"><div class="card-title"><h3>Defect Library Balance</h3><p>Flags weak categories before model tuning or customer review.</p></div><button class="btn" data-target-shortcut="spc">View DB</button></div>
+                <div class="card-header"><div class="card-title"><h3>Defect Image Library Balance</h3><p>Flags weak categories before model tuning or customer review.</p></div><button class="btn" data-target-shortcut="spc">View DB</button></div>
                 <div class="card-body bar-list">
                   <div class="bar-row"><div class="bar-row-top"><strong>Solder-related</strong><span>748</span></div><div class="bar-track"><div class="bar-fill" style="--w:86%"></div></div></div>
                   <div class="bar-row"><div class="bar-row-top"><strong>Component placement</strong><span>502</span></div><div class="bar-track"><div class="bar-fill ok" style="--w:64%"></div></div></div>
@@ -839,12 +1642,12 @@
               <p class="muted" style="margin:0; line-height:1.55; max-width:920px;">This prototype is organized like a compact AOI review station: start from the queue, disposition defects, search reference samples, check recipe thresholds, review SPC/database health, then export customer or engineering evidence.</p>
             </div>
             <div class="guide-steps">
-              <div class="guide-step"><span class="step-badge">1</span><div><h4>Line Overview</h4><p>Use this as the operator landing page. It summarizes possible escapes, false calls, annotation coverage, database status, and current inspection program.</p></div><button class="btn" data-target-shortcut="dashboard">Open</button></div>
-              <div class="guide-step"><span class="step-badge">2</span><div><h4>Inspection Review</h4><p>Review AI/ground-truth mismatches, compare top similar samples, and record final dispositions such as Verified NG, Verified OK, False Call, or Possible Escape.</p></div><button class="btn" data-target-shortcut="review">Open</button></div>
-              <div class="guide-step"><span class="step-badge">3</span><div><h4>Defect Library</h4><p>Search by Sample ID, defect code, RefDes, lot, severity, review status, and model version. Use this when users need evidence or reference cases.</p></div><button class="btn" data-target-shortcut="library">Open</button></div>
-              <div class="guide-step"><span class="step-badge">4</span><div><h4>Inspection Program</h4><p>Check recipe identity, ROI rules, component-level inspection items, and threshold settings before explaining why a sample was judged OK or NG.</p></div><button class="btn" data-target-shortcut="program">Open</button></div>
-              <div class="guide-step"><span class="step-badge">5</span><div><h4>SPC & Database</h4><p>Use data-health and SPC previews to identify false-call components, weak defect classes, broken image references, and traceability gaps.</p></div><button class="btn" data-target-shortcut="spc">Open</button></div>
-              <div class="guide-step"><span class="step-badge">6</span><div><h4>Reports & Utilities</h4><p>Export CSVs, annotated images, review evidence, and database backups for customer validation or internal QC documentation.</p></div><button class="btn" data-target-shortcut="export">Open</button></div>
+              <div class="guide-step"><span class="step-badge">1</span><div><h4>Production Overview</h4><p>Use this as the operator landing page. It summarizes possible escapes, false calls, annotation coverage, database status, and current inspection program.</p></div><button class="btn" data-target-shortcut="dashboard">Open</button></div>
+              <div class="guide-step"><span class="step-badge">2</span><div><h4>Review / Disposition</h4><p>Review AI/ground-truth mismatches, compare top similar samples, and record final dispositions such as Verified NG, Verified OK, False Call, or Possible Escape.</p></div><button class="btn" data-target-shortcut="review">Open</button></div>
+              <div class="guide-step"><span class="step-badge">3</span><div><h4>Defect Image Library</h4><p>Search by Sample ID, defect code, RefDes, lot, severity, review status, and model version. Use this when users need evidence or reference cases.</p></div><button class="btn" data-target-shortcut="library">Open</button></div>
+              <div class="guide-step"><span class="step-badge">4</span><div><h4>Inspection Recipe</h4><p>Check recipe identity, ROI rules, component-level inspection items, and threshold settings before explaining why a sample was judged OK or NG.</p></div><button class="btn" data-target-shortcut="program">Open</button></div>
+              <div class="guide-step"><span class="step-badge">5</span><div><h4>SPC / Traceability</h4><p>Use data-health and SPC previews to identify false-call components, weak defect classes, broken image references, and traceability gaps.</p></div><button class="btn" data-target-shortcut="spc">Open</button></div>
+              <div class="guide-step"><span class="step-badge">6</span><div><h4>Reports / Utilities</h4><p>Export CSVs, annotated images, review evidence, and database backups for customer validation or internal QC documentation.</p></div><button class="btn" data-target-shortcut="export">Open</button></div>
             </div>
           </section>
 
@@ -926,11 +1729,19 @@
 
           <section id="library" class="view">
             <div class="card">
-              <div class="card-header"><div class="card-title"><h3>Master Defect Library</h3><p>Searchable sample library using AOI-relevant terms: RefDes, FOV, defect code, severity, disposition, model version.</p></div><span class="chip ok">2,184 indexed</span></div>
+              <div class="card-header"><div class="card-title"><h3>Master Defect Image Library</h3><p>Searchable sample library using AOI-relevant terms: RefDes, FOV, defect code, severity, disposition, model version.</p></div><span class="chip ok">2,184 indexed</span></div>
               <div class="card-body">
                 <div class="form-grid" style="margin-bottom:12px;">
                   <div><label>Search</label><input id="tableSearch" placeholder="Sample ID, defect, RefDes, lot, model..." /></div>
                   <div><label>Risk / disposition filter</label><select id="riskFilter"><option value="all">All records</option><option value="fn">Possible escapes / false negatives</option><option value="fp">False calls / false positives</option><option value="verified-ng">Verified NG</option><option value="verified-ok">Verified OK</option><option value="unlabeled">Unlabeled</option></select></div>
+                </div>
+                <div class="library-toolbar">
+                  <span class="toolbar-label">Library actions</span>
+                  <button class="btn">Open Record</button>
+                  <button class="btn">Compare Golden</button>
+                  <button class="btn">Add to Training Set</button>
+                  <button class="btn">Export Selected</button>
+                  <span class="toolbar-note">Selection-based actions mirror common AOI review/library-manager workflows.</span>
                 </div>
                 <table id="sampleTable">
                   <thead><tr><th>Sample</th><th>Defect / Category</th><th>RefDes / FOV</th><th>Severity</th><th>AI vs Label</th><th>Disposition</th><th>Model</th></tr></thead>
@@ -950,10 +1761,10 @@
           <section id="program" class="view">
             <div class="grid-main">
               <div class="card">
-                <div class="card-header"><div class="card-title"><h3>Inspection Program / Recipe</h3><p>Commercial AOI systems commonly separate the inspection program from review data. This page shows the program identity, ROI rules, and thresholds.</p></div><button class="btn primary action-btn">Save Revision</button></div>
+                <div class="card-header"><div class="card-title"><h3>Inspection Recipe / Recipe</h3><p>Commercial AOI systems commonly separate the inspection program from review data. This page shows the program identity, ROI rules, and thresholds.</p></div><button class="btn primary action-btn">Save Revision</button></div>
                 <div class="card-body">
                   <div class="grid-3">
-                    <div class="metric info"><small>Program ID</small><strong>TBOX_TOP_V1.2</strong><span>Telematics T-Box top-view inspection.</span></div>
+                    <div class="metric info"><small>Recipe ID</small><strong>TBOX_TOP_V1.2</strong><span>Telematics T-Box top-view inspection.</span></div>
                     <div class="metric ok"><small>Active ROIs</small><strong>146</strong><span>Presence, polarity, solder, connector, anomaly.</span></div>
                     <div class="metric warn"><small>Pending tuning</small><strong>7</strong><span>Components with high false-call ratio.</span></div>
                   </div>
@@ -1074,7 +1885,7 @@
           <section id="settings" class="view">
             <div class="settings-grid">
               <div class="card"><div class="card-header"><div class="card-title"><h3>Display</h3><p>No dark mode in this prototype; focus is on stable industrial readability.</p></div></div><div class="card-body"><label>Font size</label><select id="fontSizeSelect"><option value="font-compact">Compact</option><option value="font-standard" selected>Standard</option><option value="font-large">Large operator mode</option></select><label style="margin-top:12px;">Screen density</label><select><option>Balanced review workstation</option><option>Compact table-first mode</option><option>Large touch-panel mode</option></select><button class="btn block action-btn" style="margin-top:12px;">Save Display Setting</button></div></div>
-              <div class="card"><div class="card-header"><div class="card-title"><h3>Language & Localization</h3><p>Options shown for final-product readiness; this HTML mockup remains English-only.</p></div></div><div class="card-body"><label>Language</label><select id="languageSelect"><option>English</option><option>Korean — planned</option><option>Japanese — planned</option><option>Chinese — planned</option></select><label style="margin-top:12px;">Measurement unit</label><select><option>Pixels + RefDes</option><option>Millimeters after calibration — planned</option></select><button class="btn block action-btn" style="margin-top:12px;">Save Localization Setting</button></div></div>
+              <div class="card"><div class="card-header"><div class="card-title"><h3>Language & Localization</h3><p>Switch between English and Korean in this prototype. Additional languages can be added in the final product.</p></div></div><div class="card-body"><label>Language</label><select id="languageSelect"><option value="en" selected>English</option><option value="ko">Korean</option></select><label style="margin-top:12px;">Measurement unit</label><select><option>Pixels + RefDes</option><option>Millimeters after calibration — planned</option></select><button class="btn block action-btn" style="margin-top:12px;">Save Localization Setting</button></div></div>
               <div class="card"><div class="card-header"><div class="card-title"><h3>User Role & Access</h3><p>Reflects common separation between operator, engineer, and admin functions.</p></div></div><div class="card-body"><label>Current role</label><select><option>Engineer</option><option>Operator</option><option>QA Manager</option><option>Admin</option></select><div class="split-row"><span>Can edit labels</span><strong>Yes</strong></div><div class="split-row"><span>Can modify recipe</span><strong>Engineer+</strong></div><div class="split-row"><span>Can export reports</span><strong>QA/Admin</strong></div></div></div>
               <div class="card"><div class="card-header"><div class="card-title"><h3>Review Defaults</h3><p>Default view controls how review queues are sorted when the software opens.</p></div></div><div class="card-body"><label>Default priority</label><select><option>Escape Control / false negatives first</option><option>Balanced Review</option><option>False Call Reduction / false positives first</option></select><label style="margin-top:12px;">Default threshold</label><input value="0.42" /><button class="btn block action-btn" style="margin-top:12px;">Save Review Defaults</button></div></div>
               <div class="card"><div class="card-header"><div class="card-title"><h3>Transparency Options</h3><p>Make database and model status visible enough for users to trust exported results.</p></div></div><div class="card-body switch-list"><div class="switch-item"><div><strong>Show broken image references</strong><span>Warn if linked image/annotation file is missing.</span></div><span class="switch"></span></div><div class="switch-item"><div><strong>Show model and recipe version</strong><span>Display versions on sample cards and reports.</span></div><span class="switch"></span></div><div class="switch-item"><div><strong>Show class imbalance warning</strong><span>Highlight weak defect categories.</span></div><span class="switch"></span></div></div></div>
@@ -1082,6 +1893,13 @@
             </div>
           </section>
         </div>
+        <footer class="app-statusbar">
+          <span>Ready</span>
+          <span>Records: 2,184</span>
+          <span>Filtered: All</span>
+          <span>Images: 2,181 linked</span>
+          <span>Last action: none</span>
+        </footer>
       </main>
     </div>
   </div>
@@ -1090,14 +1908,14 @@
 
   <script>
     const pageInfo = {
-      dashboard: ["AOI PoC / Start", "Line Overview", "Production-style entry page with review queue, sample-library health, current recipe, and detection-performance preview."],
+      dashboard: ["AOI PoC / Start", "Production Overview", "AOI workstation entry page with review queue, sample-library health, current recipe, and detection-performance preview."],
       guide: ["AOI PoC / Help", "Workflow Guide", "Recommended route through review, library search, recipe check, SPC/database health, and export utilities."],
-      review: ["AOI PoC / Daily Review", "Inspection Review", "Prioritize possible escapes by default, compare similar samples, and record review disposition."],
-      library: ["AOI PoC / Samples", "Defect Library", "Search and filter defect samples by AOI terminology: RefDes, FOV, defect code, severity, disposition, and model version."],
-      program: ["AOI PoC / Engineering", "Inspection Program", "Review recipe identity, ROI rules, component-level inspection items, and threshold settings."],
-      spc: ["AOI PoC / Quality Data", "SPC & Database", "Preview yield, false-call trends, escape risk, traceability, and database health."],
-      import: ["AOI PoC / Data Entry", "Import & Label", "Upload images, attach minimum required metadata, and send samples into the review queue."],
-      export: ["AOI PoC / Reports", "Reports & Utilities", "Export validation evidence, engineering CSVs, annotated image packages, and database backups."],
+      review: ["AOI PoC / Daily Review", "Review / Disposition", "Prioritize possible escapes by default, compare similar samples, and record review disposition."],
+      library: ["AOI PoC / Samples", "Defect Image Library", "Search and filter defect samples by AOI terminology: RefDes, FOV, defect code, severity, disposition, and model version."],
+      program: ["AOI PoC / Engineering", "Inspection Recipe", "Review recipe identity, ROI rules, component-level inspection items, and threshold settings."],
+      spc: ["AOI PoC / Quality Data", "SPC / Traceability", "Preview yield, false-call trends, escape risk, traceability, and database health."],
+      import: ["AOI PoC / Data Entry", "Image Import / Labeling", "Upload images, attach minimum required metadata, and send samples into the review queue."],
+      export: ["AOI PoC / Reports", "Reports / Utilities", "Export validation evidence, engineering CSVs, annotated image packages, and database backups."],
       settings: ["AOI PoC / System", "Settings", "Adjust display size, language placeholder, user role, review defaults, transparency options, and paths."]
     };
 
@@ -1182,8 +2000,621 @@
       showToast(`Font size changed to ${event.target.options[event.target.selectedIndex].text}.`);
     });
 
-    document.getElementById('languageSelect').addEventListener('change', (event) => showToast(`${event.target.value} selected as a planned localization option.`));
+    // Language listener is installed by the localization layer below.
     document.querySelectorAll('.switch').forEach(sw => sw.addEventListener('click', () => { sw.classList.toggle('off'); showToast(sw.classList.contains('off') ? 'Transparency option disabled.' : 'Transparency option enabled.'); }));
   </script>
+
+  <script>
+    (function() {
+      const KO = {
+        "html": "html",
+        "AOI Defect Sample Library Manager": "AOI 불량 샘플 라이브러리 관리자",
+        "Image-based PoC · SMT / PCBA inspection review workspace": "이미지 기반 PoC · SMT / PCBA 검사 리뷰 작업공간",
+        "Station: ST-AOI-01 Online": "스테이션: ST-AOI-01 온라인",
+        "Recipe: TBOX_TOP_V1.2": "레시피: TBOX_TOP_V1.2",
+        "AI Model: AOI_AI_0.8.1": "AI 모델: AOI_AI_0.8.1",
+        "Mode: Escape Control": "모드: 유출 관리",
+        "DB: Indexed 09:20": "DB: 09:20 인덱싱 완료",
+        "File": "파일",
+        "Library": "라이브러리",
+        "Inspection": "검사",
+        "Recipe": "레시피",
+        "SPC": "SPC",
+        "Reports": "보고서",
+        "Admin": "관리자",
+        "Help": "도움말",
+        "DB: AOI_POC_DB": "DB: AOI_POC_DB",
+        "Side: Top": "면: 상면",
+        "Shift: A": "교대: A",
+        "User: Engineer01": "사용자: Engineer01",
+        "AOI": "AOI",
+        "Defect Image Library": "불량 이미지 라이브러리",
+        "Control Center": "관리 센터",
+        "Prototype focused on sample access, review disposition, similarity matching, traceability, SPC preview, and export evidence.": "샘플 접근, 리뷰 판정, 유사 이미지 매칭, 추적성, SPC 미리보기, 증거 내보내기에 초점을 둔 프로토타입입니다.",
+        "Start": "시작",
+        "Production Overview": "생산 개요",
+        "KPIs, queue, program status": "KPI, 대기열, 프로그램 상태",
+        "Workflow Guide": "워크플로우 가이드",
+        "How to navigate": "탐색 방법",
+        "Daily Review": "일일 리뷰",
+        "Review / Disposition": "리뷰 / 판정",
+        "Escapes, false calls, disposition": "유출, 오검출, 판정",
+        "Search samples and references": "샘플 및 기준 이미지 검색",
+        "Inspection Recipe": "검사 레시피",
+        "Recipe, ROIs, thresholds": "레시피, ROI, 임계값",
+        "Quality Data": "품질 데이터",
+        "SPC / Traceability": "SPC / 추적성",
+        "Yield, traceability, data health": "수율, 추적성, 데이터 상태",
+        "Image Import / Labeling": "이미지 가져오기 / 라벨링",
+        "Upload images and metadata": "이미지 및 메타데이터 업로드",
+        "Reports / Utilities": "보고서 / 유틸리티",
+        "CSV, overlays, backup": "CSV, 오버레이, 백업",
+        "System": "시스템",
+        "Settings": "설정",
+        "Display, language, access": "표시, 언어, 접근 권한",
+        "Default review rule": "기본 리뷰 규칙",
+        "Show possible escapes / false negatives first, then critical false calls, then unlabeled samples.": "가능한 유출 / 미검출을 먼저 표시하고, 이후 중요 오검출과 미라벨 샘플을 표시합니다.",
+        "Open Review Queue": "리뷰 대기열 열기",
+        "AOI PoC / Start": "AOI PoC / 시작",
+        "AOI workstation entry page with review queue, sample-library health, current recipe, and detection-performance preview.": "리뷰 대기열, 샘플 라이브러리 상태, 현재 레시피, 검출 성능 미리보기를 보여주는 AOI 작업공간 시작 화면입니다.",
+        "Guide": "가이드",
+        "Import Samples": "샘플 가져오기",
+        "Quick workflow:": "빠른 워크플로우:",
+        "1 Overview": "1 개요",
+        "2 Review NG / Escapes": "2 NG / 유출 리뷰",
+        "3 Search Library": "3 라이브러리 검색",
+        "4 Check Recipe": "4 레시피 확인",
+        "5 SPC / DB Health": "5 SPC / DB 상태",
+        "6 Export Evidence": "6 증거 내보내기",
+        "Board / Program": "보드 / 프로그램",
+        "Lot / Product": "로트 / 제품",
+        "LOT-TB-0426 · Telematics T-Box": "LOT-TB-0426 · 텔레매틱스 T-Box",
+        "Library Mode": "라이브러리 모드",
+        "Golden + NG + Borderline": "골든 + NG + 경계 사례",
+        "Review Policy": "리뷰 정책",
+        "Escape Control First": "유출 관리 우선",
+        "Data Source": "데이터 소스",
+        "Local SQLite · Image Folder Linked": "로컬 SQLite · 이미지 폴더 연결됨",
+        "Total sample records": "전체 샘플 레코드",
+        "Images indexed across OK, NG, border cases, and golden references.": "OK, NG, 경계 사례, 골든 기준 이미지가 인덱싱되었습니다.",
+        "Possible escapes": "가능한 유출",
+        "Default priority: AI judged OK but label/history suggests NG risk.": "기본 우선순위: AI는 OK로 판단했지만 라벨/이력이 NG 위험을 시사합니다.",
+        "False-call candidates": "오검출 후보",
+        "Suspected over-rejections requiring human disposition.": "사람의 판정이 필요한 과검출 의심 사례입니다.",
+        "Annotation coverage": "어노테이션 적용률",
+        "Samples with ROI, component reference, defect label, and review decision.": "ROI, 부품 참조, 불량 라벨, 리뷰 판정이 포함된 샘플입니다.",
+        "Disposition Attention Queue": "판정 우선 대기열",
+        "Industrial-style triage: review possible escapes first, then high false-call components and unlabeled samples.": "산업용 triage 방식: 가능한 유출을 먼저 리뷰하고, 이후 오검출 빈도가 높은 부품과 미라벨 샘플을 확인합니다.",
+        "Start Review": "리뷰 시작",
+        "Priority": "우선순위",
+        "Sample / Lot": "샘플 / 로트",
+        "Risk Type": "위험 유형",
+        "Defect / RefDes": "불량 / RefDes",
+        "Action": "작업",
+        "Possible escape / FN": "가능한 유출 / FN",
+        "Solder Bridge · U107": "솔더 브리지 · U107",
+        "Review": "리뷰",
+        "Polarity Error · D12": "극성 오류 · D12",
+        "Likely false call": "오검출 가능성",
+        "Excess Solder · C684": "과다 납땜 · C684",
+        "Check": "확인",
+        "Folder Import": "폴더 가져오기",
+        "38 new images": "새 이미지 38개",
+        "Metadata incomplete": "메타데이터 미완성",
+        "Missing RefDes / severity": "RefDes / 심각도 누락",
+        "Label": "라벨링",
+        "Current Recipe Snapshot": "현재 레시피 스냅샷",
+        "Quick readout of recipe/model/database status.": "레시피/모델/데이터베이스 상태 요약입니다.",
+        "Ready": "준비 완료",
+        "Target Board": "대상 보드",
+        "Telematics T-Box": "텔레매틱스 T-Box",
+        "View Type": "뷰 유형",
+        "Top + Side Reference": "상면 + 측면 기준",
+        "Default Priority": "기본 우선순위",
+        "Escape Control": "유출 관리",
+        "Confidence Threshold": "신뢰도 임계값",
+        "Golden References": "골든 기준 이미지",
+        "312 verified": "312개 검증됨",
+        "Last DB Backup": "마지막 DB 백업",
+        "Today 09:10": "오늘 09:10",
+        "Open Recipe Details": "레시피 상세 열기",
+        "Detection Performance Preview": "검출 성능 미리보기",
+        "Shown as engineering preview values for UI demonstration.": "UI 시연을 위한 엔지니어링 미리보기 값입니다.",
+        "Validation Set": "검증 세트",
+        "Recall / defect capture": "재현율 / 불량 포착",
+        "Precision / false-call control": "정밀도 / 오검출 관리",
+        "False call rate": "오검출률",
+        "Escape-risk queue cleared": "유출 위험 대기열 처리율",
+        "Defect Image Library Balance": "불량 이미지 라이브러리 구성",
+        "Flags weak categories before model tuning or customer review.": "모델 튜닝 또는 고객 리뷰 전에 취약한 카테고리를 표시합니다.",
+        "View DB": "DB 보기",
+        "Solder-related": "납땜 관련",
+        "Component placement": "부품 실장",
+        "Connector / mechanical": "커넥터 / 기계적",
+        "Electrical / circuit": "전기 / 회로",
+        "Recommended Navigation Route": "권장 탐색 경로",
+        "This prototype is organized like a compact AOI review station: start from the queue, disposition defects, search reference samples, check recipe thresholds, review SPC/database health, then export customer or engineering evidence.": "이 프로토타입은 소형 AOI 리뷰 스테이션처럼 구성되어 있습니다. 대기열에서 시작해 불량을 판정하고, 기준 샘플을 검색하며, 레시피 임계값을 확인하고, SPC/DB 상태를 검토한 뒤 고객 또는 엔지니어링 증거를 내보냅니다.",
+        "Use this as the operator landing page. It summarizes possible escapes, false calls, annotation coverage, database status, and current inspection program.": "작업자 시작 화면으로 사용합니다. 가능한 유출, 오검출, 어노테이션 적용률, DB 상태, 현재 검사 프로그램을 요약합니다.",
+        "Open": "열기",
+        "Review AI/ground-truth mismatches, compare top similar samples, and record final dispositions such as Verified NG, Verified OK, False Call, or Possible Escape.": "AI와 기준 라벨의 불일치를 검토하고, 가장 유사한 샘플을 비교하며, 검증된 NG, 검증된 OK, 오검출, 가능한 유출 등의 최종 판정을 기록합니다.",
+        "Search by Sample ID, defect code, RefDes, lot, severity, review status, and model version. Use this when users need evidence or reference cases.": "샘플 ID, 불량 코드, RefDes, 로트, 심각도, 리뷰 상태, 모델 버전으로 검색합니다. 증거 또는 참고 사례가 필요할 때 사용합니다.",
+        "Check recipe identity, ROI rules, component-level inspection items, and threshold settings before explaining why a sample was judged OK or NG.": "샘플이 OK 또는 NG로 판단된 이유를 설명하기 전에 레시피 식별자, ROI 규칙, 부품별 검사 항목, 임계값 설정을 확인합니다.",
+        "Use data-health and SPC previews to identify false-call components, weak defect classes, broken image references, and traceability gaps.": "데이터 상태와 SPC 미리보기를 사용해 오검출 부품, 취약 불량 클래스, 깨진 이미지 참조, 추적성 공백을 식별합니다.",
+        "Export CSVs, annotated images, review evidence, and database backups for customer validation or internal QC documentation.": "고객 검증 또는 내부 QC 문서화를 위해 CSV, 어노테이션 이미지, 리뷰 증거, DB 백업을 내보냅니다.",
+        "Inspection Priority": "검사 우선순위",
+        "Default selection prioritizes possible escapes / false negatives. Users can switch to false-call reduction when tuning over-rejection.": "기본 선택은 가능한 유출 / 미검출을 우선합니다. 과검출을 조정할 때 오검출 감소 모드로 전환할 수 있습니다.",
+        "False negatives first. Lower threshold; more review items, fewer missed defects.": "미검출 우선. 임계값을 낮춰 리뷰 항목은 늘지만 놓치는 불량을 줄입니다.",
+        "Balanced Review": "균형 리뷰",
+        "Middle threshold for normal customer validation and library cleanup.": "일반 고객 검증과 라이브러리 정리에 적합한 중간 임계값입니다.",
+        "False Call Reduction": "오검출 감소",
+        "False positives first. Higher threshold; fewer over-rejections.": "오검출 우선. 임계값을 높여 과검출을 줄입니다.",
+        "Disposition Queue": "판정 대기열",
+        "Click one sample to update the viewer.": "샘플을 클릭하면 뷰어가 업데이트됩니다.",
+        "18 P1": "18 P1",
+        "Possible Escape / FN · U107 · Solder Bridge · Similarity 96%": "가능한 유출 / FN · U107 · 솔더 브리지 · 유사도 96%",
+        "Possible Escape / FN · D12 · Polarity Error · Similarity 93%": "가능한 유출 / FN · D12 · 극성 오류 · 유사도 93%",
+        "Likely False Call · C684 · Excess Solder · Similarity 89%": "오검출 가능성 · C684 · 과다 납땜 · 유사도 89%",
+        "Borderline NG · J3 · Pin Height · Similarity 86%": "경계 NG · J3 · 핀 높이 · 유사도 86%",
+        "IMG_0241 · Solder Bridge": "IMG_0241 · 솔더 브리지",
+        "LOT-TB-0426-A · U107 · AI OK / Label NG · Similarity 96%": "LOT-TB-0426-A · U107 · AI OK / 라벨 NG · 유사도 96%",
+        "Possible Escape / FN": "가능한 유출 / FN",
+        "Top View · FOV-03 · 8.0 μm/px": "상면 뷰 · FOV-03 · 8.0 μm/px",
+        "Overlay: AI + Ground Truth": "오버레이: AI + 기준 라벨",
+        "Zoom ROI": "ROI 확대",
+        "Show Golden Reference": "골든 기준 보기",
+        "Open Image Folder": "이미지 폴더 열기",
+        "AI score": "AI 점수",
+        "Below current NG threshold.": "현재 NG 임계값 미만입니다.",
+        "Similarity": "유사도",
+        "ROI-crop match to verified NG.": "검증된 NG와 ROI 크롭이 일치합니다.",
+        "Review state": "리뷰 상태",
+        "Human disposition required.": "사람의 판정이 필요합니다.",
+        "Severity": "심각도",
+        "Critical": "치명",
+        "Mandatory AOI class.": "필수 AOI 클래스입니다.",
+        "Verify NG": "NG 확인",
+        "Verify OK": "OK 확인",
+        "Mark Possible Escape": "가능한 유출로 표시",
+        "Mark False Call": "오검출로 표시",
+        "Send to Training Set": "학습 세트로 보내기",
+        "Top Similar Samples": "상위 유사 샘플",
+        "Default: verified NG / prior escape cases.": "기본값: 검증된 NG / 이전 유출 사례",
+        "ROI first": "ROI 우선",
+        "Verified NG · Solder Bridge · U107": "검증된 NG · 솔더 브리지 · U107",
+        "Prior escape · Bridge · U105": "이전 유출 · 브리지 · U105",
+        "Verified NG · Excess solder · U107": "검증된 NG · 과다 납땜 · U107",
+        "Golden OK · same RefDes": "골든 OK · 동일 RefDes",
+        "Selected sample": "선택된 샘플",
+        "RefDes": "RefDes",
+        "Defect code": "불량 코드",
+        "Solder Bridge": "솔더 브리지",
+        "Lot ID": "로트 ID",
+        "Model version": "모델 버전",
+        "Recipe version": "레시피 버전",
+        "Master Defect Image Library": "마스터 불량 이미지 라이브러리",
+        "Searchable sample library using AOI-relevant terms: RefDes, FOV, defect code, severity, disposition, model version.": "RefDes, FOV, 불량 코드, 심각도, 판정, 모델 버전 등 AOI 관련 용어로 검색 가능한 샘플 라이브러리입니다.",
+        "2,184 indexed": "2,184개 인덱싱됨",
+        "Search": "검색",
+        "Risk / disposition filter": "위험 / 판정 필터",
+        "All records": "전체 레코드",
+        "Possible escapes / false negatives": "가능한 유출 / 미검출",
+        "False calls / false positives": "오검출 / 허위 양성",
+        "Verified NG": "검증된 NG",
+        "Verified OK": "검증된 OK",
+        "Unlabeled": "미라벨",
+        "Library actions": "라이브러리 작업",
+        "Open Record": "레코드 열기",
+        "Compare Golden": "골든 기준 비교",
+        "Add to Training Set": "학습 세트에 추가",
+        "Export Selected": "선택 항목 내보내기",
+        "Selection-based actions mirror common AOI review/library-manager workflows.": "선택 기반 작업은 일반 AOI 리뷰/라이브러리 관리 워크플로우를 반영합니다.",
+        "Sample": "샘플",
+        "Defect / Category": "불량 / 카테고리",
+        "RefDes / FOV": "RefDes / FOV",
+        "AI vs Label": "AI 대 라벨",
+        "Disposition": "판정",
+        "Model": "모델",
+        "U107 · FOV-03": "U107 · FOV-03",
+        "AI OK / Label NG": "AI OK / 라벨 NG",
+        "Possible Escape": "가능한 유출",
+        "Polarity Error": "극성 오류",
+        "D12 · FOV-02": "D12 · FOV-02",
+        "Excess Solder": "과다 납땜",
+        "C684 · FOV-06": "C684 · FOV-06",
+        "Major": "중대",
+        "AI NG / Label OK": "AI NG / 라벨 OK",
+        "Likely False Call": "오검출 가능성",
+        "AI NG / Label NG": "AI NG / 라벨 NG",
+        "No defect": "불량 없음",
+        "Golden reference": "골든 기준",
+        "OK": "OK",
+        "AI OK / Label OK": "AI OK / 라벨 OK",
+        "Pending": "대기 중",
+        "Needs taxonomy": "분류 필요",
+        "Unknown · FOV-?": "알 수 없음 · FOV-?",
+        "Not tested": "미테스트",
+        "Inspection Recipe / Recipe": "검사 레시피 / 레시피",
+        "Commercial AOI systems commonly separate the inspection program from review data. This page shows the program identity, ROI rules, and thresholds.": "상용 AOI 시스템은 일반적으로 검사 프로그램과 리뷰 데이터를 분리합니다. 이 페이지는 프로그램 식별자, ROI 규칙, 임계값을 보여줍니다.",
+        "Save Revision": "개정 저장",
+        "Recipe ID": "레시피 ID",
+        "Telematics T-Box top-view inspection.": "텔레매틱스 T-Box 상면 검사입니다.",
+        "Active ROIs": "활성 ROI",
+        "Presence, polarity, solder, connector, anomaly.": "존재, 극성, 납땜, 커넥터, 이상 항목입니다.",
+        "Pending tuning": "튜닝 대기",
+        "Components with high false-call ratio.": "오검출 비율이 높은 부품입니다.",
+        "Inspection Item": "검사 항목",
+        "ROI Type": "ROI 유형",
+        "Applies To": "적용 대상",
+        "Threshold": "임계값",
+        "Review Rule": "리뷰 규칙",
+        "Presence / missing component": "존재 / 부품 누락",
+        "Component ROI": "부품 ROI",
+        "R, C, U, D": "R, C, U, D",
+        "Score ≥ 0.55": "점수 ≥ 0.55",
+        "Critical NG": "치명 NG",
+        "Polarity / rotation": "극성 / 회전",
+        "Orientation ROI": "방향 ROI",
+        "D, IC, connector": "D, IC, 커넥터",
+        "Score ≥ 0.60": "점수 ≥ 0.60",
+        "Solder bridge": "솔더 브리지",
+        "Lead / pad ROI": "리드 / 패드 ROI",
+        "U-series, J-series": "U 시리즈, J 시리즈",
+        "Score ≥ 0.42": "점수 ≥ 0.42",
+        "Escape-control priority": "유출 관리 우선",
+        "Connector pin height": "커넥터 핀 높이",
+        "Height / side-view ROI": "높이 / 측면 ROI",
+        "Major/Critical by connector": "커넥터별 중대/치명",
+        "Surface contamination": "표면 오염",
+        "Anomaly ROI": "이상 ROI",
+        "Board area": "보드 영역",
+        "Area ≥ 12 px": "면적 ≥ 12 px",
+        "Engineer review": "엔지니어 리뷰",
+        "Revision Control": "개정 관리",
+        "Traceable changes for customer validation.": "고객 검증을 위한 추적 가능한 변경 사항입니다.",
+        "Audit": "감사",
+        "Current revision": "현재 개정",
+        "Author": "작성자",
+        "Last edit": "마지막 수정",
+        "Reason": "사유",
+        "Lowered bridge threshold after FN review": "FN 리뷰 후 브리지 임계값 하향",
+        "Approval": "승인",
+        "Pending QA": "QA 대기",
+        "Change note": "변경 메모",
+        "Adjusted solder-bridge detection to prioritize possible escapes during Stage 1 image validation.": "Stage 1 이미지 검증 중 가능한 유출을 우선하기 위해 솔더 브리지 검출을 조정했습니다.",
+        "Record Change Note": "변경 메모 기록",
+        "First-pass yield preview": "초기 통과 수율 미리보기",
+        "Based on verified records in validation set.": "검증 세트의 검증된 레코드 기준입니다.",
+        "Highest contributors: C684, U107, J3.": "주요 기여 항목: C684, U107, J3.",
+        "Escape risk": "유출 위험",
+        "Default focus until cleared by reviewer.": "리뷰어가 처리할 때까지 기본 초점입니다.",
+        "DB completeness": "DB 완성도",
+        "Required metadata filled for most records.": "대부분의 레코드에 필수 메타데이터가 입력되었습니다.",
+        "SPC / Quality Trend Preview": "SPC / 품질 추세 미리보기",
+        "Preview of common quality-review data: defect mix, false-call contributors, and traceability completeness.": "불량 구성, 오검출 기여 항목, 추적성 완성도 등 일반적인 품질 리뷰 데이터를 미리봅니다.",
+        "Mock data": "모의 데이터",
+        "U107 Solder Bridge false-call ratio": "U107 솔더 브리지 오검출 비율",
+        "C684 Excess Solder false-call ratio": "C684 과다 납땜 오검출 비율",
+        "D12 polarity escape-risk count": "D12 극성 유출 위험 건수",
+        "Connector pin-height review pass rate": "커넥터 핀 높이 리뷰 통과율",
+        "Database Transparency": "데이터베이스 투명성",
+        "Information users need to trust the library and exported results.": "사용자가 라이브러리와 내보낸 결과를 신뢰하는 데 필요한 정보입니다.",
+        "Healthy": "정상",
+        "Database mode": "데이터베이스 모드",
+        "Local SQLite preview": "로컬 SQLite 미리보기",
+        "Image root": "이미지 루트",
+        "Annotation root": "어노테이션 루트",
+        "Broken image refs": "깨진 이미지 참조",
+        "Duplicate candidates": "중복 후보",
+        "Records missing RefDes": "RefDes 누락 레코드",
+        "Records missing model version": "모델 버전 누락 레코드",
+        "Last backup": "마지막 백업",
+        "Export DB Health CSV": "DB 상태 CSV 내보내기",
+        "Import Images & Minimum Required Metadata": "이미지 및 최소 필수 메타데이터 가져오기",
+        "Designed to keep uploads simple while enforcing fields needed for traceable review and future model training.": "업로드는 단순하게 유지하면서 추적 가능한 리뷰와 향후 모델 학습에 필요한 필드를 강제하도록 설계되었습니다.",
+        "Start Import": "가져오기 시작",
+        "Drop PCB images or select folder": "PCB 이미지를 놓거나 폴더 선택",
+        "PNG/JPG/TIFF preview · optional CSV metadata · automatic Sample ID generation": "PNG/JPG/TIFF 미리보기 · 선택적 CSV 메타데이터 · 자동 샘플 ID 생성",
+        "Select Folder": "폴더 선택",
+        "Board model": "보드 모델",
+        "Lot / batch ID": "로트 / 배치 ID",
+        "View / camera": "뷰 / 카메라",
+        "Top view": "상면 뷰",
+        "Side view": "측면 뷰",
+        "Bottom view": "하면 뷰",
+        "3D height map — planned": "3D 높이 맵 — 예정",
+        "Defect category": "불량 카테고리",
+        "PCB / pad / surface": "PCB / 패드 / 표면",
+        "Defect type": "불량 유형",
+        "Missing Component": "부품 누락",
+        "Misalignment": "위치 틀어짐",
+        "Tombstone": "툼스톤",
+        "Connector Pin Height": "커넥터 핀 높이",
+        "Component RefDes": "부품 RefDes",
+        "Minor": "경미",
+        "OK / Golden Reference": "OK / 골든 기준",
+        "Initial disposition": "초기 판정",
+        "Needs Review": "리뷰 필요",
+        "Training Candidate": "학습 후보",
+        "Labeling Utilities": "라벨링 유틸리티",
+        "Minimal tools needed for the sample-library PoC.": "샘플 라이브러리 PoC에 필요한 최소 도구입니다.",
+        "Stage 1": "1단계",
+        "Auto Sample ID": "자동 샘플 ID",
+        "Enabled": "활성화",
+        "Duplicate detection": "중복 감지",
+        "Hash + similarity": "해시 + 유사도",
+        "Annotation format": "어노테이션 형식",
+        "JSON / YOLO export ready": "JSON / YOLO 내보내기 준비됨",
+        "Required fields": "필수 필드",
+        "Board, RefDes, defect, severity": "보드, RefDes, 불량, 심각도",
+        "Reviewer handoff": "리뷰어 전달",
+        "Needs Review queue": "리뷰 필요 대기열",
+        "Draw ROI / Bounding Box": "ROI / 바운딩 박스 그리기",
+        "Validate Metadata": "메타데이터 검증",
+        "Add to Review Queue": "리뷰 대기열에 추가",
+        "Customer Validation Package": "고객 검증 패키지",
+        "Exports sample list, AI result, ground truth, confidence, disposition, and image overlay evidence.": "샘플 목록, AI 결과, 기준 라벨, 신뢰도, 판정, 이미지 오버레이 증거를 내보냅니다.",
+        "Generate Validation Report": "검증 보고서 생성",
+        "Engineering CSV Export": "엔지니어링 CSV 내보내기",
+        "Exports false calls, possible escapes, component-wise ranking, and threshold-tuning candidates.": "오검출, 가능한 유출, 부품별 순위, 임계값 튜닝 후보를 내보냅니다.",
+        "Export CSV Bundle": "CSV 번들 내보내기",
+        "Database Backup": "데이터베이스 백업",
+        "Creates a local backup of records, image references, annotations, and recipe revision data.": "레코드, 이미지 참조, 어노테이션, 레시피 개정 데이터의 로컬 백업을 생성합니다.",
+        "Create Backup": "백업 생성",
+        "Available Export Items": "사용 가능한 내보내기 항목",
+        "Preview of report utilities expected by QC, engineering, and customer validation users.": "QC, 엔지니어링, 고객 검증 사용자가 기대하는 보고서 유틸리티 미리보기입니다.",
+        "Export": "내보내기",
+        "Contents": "내용",
+        "Audience": "대상",
+        "Status": "상태",
+        "Sample library CSV": "샘플 라이브러리 CSV",
+        "All metadata, labels, statuses, model versions": "모든 메타데이터, 라벨, 상태, 모델 버전",
+        "Engineering / QA": "엔지니어링 / QA",
+        "Available": "사용 가능",
+        "False-call report": "오검출 보고서",
+        "AI NG / Label OK cases by component and defect": "부품 및 불량별 AI NG / 라벨 OK 사례",
+        "Process engineer": "공정 엔지니어",
+        "Possible escape report": "가능한 유출 보고서",
+        "AI OK / Label NG or low-confidence NG risk cases": "AI OK / 라벨 NG 또는 낮은 신뢰도의 NG 위험 사례",
+        "QA / customer": "QA / 고객",
+        "Annotated image package": "어노테이션 이미지 패키지",
+        "PNG overlays + JSON annotation files": "PNG 오버레이 + JSON 어노테이션 파일",
+        "Customer validation": "고객 검증",
+        "Partial": "부분 지원",
+        "SPC summary PDF": "SPC 요약 PDF",
+        "Yield preview, defect mix, false-call ranking": "수율 미리보기, 불량 구성, 오검출 순위",
+        "Manager / QA": "관리자 / QA",
+        "Prototype": "프로토타입",
+        "Display": "표시",
+        "No dark mode in this prototype; focus is on stable industrial readability.": "이 프로토타입에는 다크 모드가 없습니다. 안정적인 산업용 가독성에 초점을 둡니다.",
+        "Font size": "글자 크기",
+        "Compact": "컴팩트",
+        "Standard": "표준",
+        "Large operator mode": "대형 작업자 모드",
+        "Screen density": "화면 밀도",
+        "Balanced review workstation": "균형 리뷰 작업공간",
+        "Compact table-first mode": "컴팩트 테이블 우선 모드",
+        "Large touch-panel mode": "대형 터치 패널 모드",
+        "Save Display Setting": "표시 설정 저장",
+        "Language & Localization": "언어 및 현지화",
+        "Switch between English and Korean in this prototype. Additional languages can be added in the final product.": "이 프로토타입에서는 영어와 한국어를 전환할 수 있습니다. 최종 제품에서는 추가 언어를 더할 수 있습니다.",
+        "Language": "언어",
+        "English": "English",
+        "Korean": "한국어",
+        "Korean — planned": "한국어 — 예정",
+        "Japanese — planned": "일본어 — 예정",
+        "Chinese — planned": "중국어 — 예정",
+        "Measurement unit": "측정 단위",
+        "Pixels + RefDes": "픽셀 + RefDes",
+        "Millimeters after calibration — planned": "보정 후 밀리미터 — 예정",
+        "Save Localization Setting": "현지화 설정 저장",
+        "User Role & Access": "사용자 역할 및 접근 권한",
+        "Reflects common separation between operator, engineer, and admin functions.": "작업자, 엔지니어, 관리자 기능을 분리하는 일반적인 구조를 반영합니다.",
+        "Current role": "현재 역할",
+        "Engineer": "엔지니어",
+        "Operator": "작업자",
+        "QA Manager": "QA 관리자",
+        "Can edit labels": "라벨 수정 가능",
+        "Yes": "예",
+        "Can modify recipe": "레시피 수정 가능",
+        "Engineer+": "엔지니어 이상",
+        "Can export reports": "보고서 내보내기 가능",
+        "QA/Admin": "QA/관리자",
+        "Review Defaults": "리뷰 기본값",
+        "Default view controls how review queues are sorted when the software opens.": "기본 보기는 소프트웨어가 열릴 때 리뷰 대기열이 정렬되는 방식을 제어합니다.",
+        "Default priority": "기본 우선순위",
+        "Escape Control / false negatives first": "유출 관리 / 미검출 우선",
+        "False Call Reduction / false positives first": "오검출 감소 / 허위 양성 우선",
+        "Default threshold": "기본 임계값",
+        "Save Review Defaults": "리뷰 기본값 저장",
+        "Transparency Options": "투명성 옵션",
+        "Make database and model status visible enough for users to trust exported results.": "사용자가 내보낸 결과를 신뢰할 수 있도록 데이터베이스와 모델 상태를 충분히 표시합니다.",
+        "Show broken image references": "깨진 이미지 참조 표시",
+        "Warn if linked image/annotation file is missing.": "연결된 이미지/어노테이션 파일이 없으면 경고합니다.",
+        "Show model and recipe version": "모델 및 레시피 버전 표시",
+        "Display versions on sample cards and reports.": "샘플 카드와 보고서에 버전을 표시합니다.",
+        "Show class imbalance warning": "클래스 불균형 경고 표시",
+        "Highlight weak defect categories.": "취약한 불량 카테고리를 강조합니다.",
+        "System Paths": "시스템 경로",
+        "Preview fields for final local installation.": "최종 로컬 설치를 위한 미리보기 필드입니다.",
+        "Image library path": "이미지 라이브러리 경로",
+        "Annotation path": "어노테이션 경로",
+        "Export path": "내보내기 경로",
+        "Validate Paths": "경로 검증",
+        "Records: 2,184": "레코드: 2,184",
+        "Filtered: All": "필터: 전체",
+        "Images: 2,181 linked": "이미지: 2,181개 연결됨",
+        "Last action: none": "마지막 작업: 없음",
+        "Action recorded.": "작업이 기록되었습니다.",
+        "Search Sample ID, RefDes, defect, lot...": "샘플 ID, RefDes, 불량, 로트 검색...",
+        "AOI PoC / Help": "AOI PoC / 도움말",
+        "Recommended route through review, library search, recipe check, SPC/database health, and export utilities.": "리뷰, 라이브러리 검색, 레시피 확인, SPC/DB 상태, 내보내기 유틸리티까지의 권장 경로입니다.",
+        "AOI PoC / Daily Review": "AOI PoC / 일일 리뷰",
+        "Prioritize possible escapes by default, compare similar samples, and record review disposition.": "기본적으로 가능한 유출을 우선하고, 유사 샘플을 비교하며, 리뷰 판정을 기록합니다.",
+        "AOI PoC / Samples": "AOI PoC / 샘플",
+        "Search and filter defect samples by AOI terminology: RefDes, FOV, defect code, severity, disposition, and model version.": "RefDes, FOV, 불량 코드, 심각도, 판정, 모델 버전 등 AOI 용어로 불량 샘플을 검색하고 필터링합니다.",
+        "AOI PoC / Engineering": "AOI PoC / 엔지니어링",
+        "Review recipe identity, ROI rules, component-level inspection items, and threshold settings.": "레시피 식별자, ROI 규칙, 부품별 검사 항목, 임계값 설정을 검토합니다.",
+        "AOI PoC / Quality Data": "AOI PoC / 품질 데이터",
+        "Preview yield, false-call trends, escape risk, traceability, and database health.": "수율, 오검출 추세, 유출 위험, 추적성, 데이터베이스 상태를 미리봅니다.",
+        "AOI PoC / Data Entry": "AOI PoC / 데이터 입력",
+        "Upload images, attach minimum required metadata, and send samples into the review queue.": "이미지를 업로드하고 최소 필수 메타데이터를 첨부한 뒤 샘플을 리뷰 대기열로 보냅니다.",
+        "AOI PoC / Reports": "AOI PoC / 보고서",
+        "Export validation evidence, engineering CSVs, annotated image packages, and database backups.": "검증 증거, 엔지니어링 CSV, 어노테이션 이미지 패키지, 데이터베이스 백업을 내보냅니다.",
+        "AOI PoC / System": "AOI PoC / 시스템",
+        "Adjust display size, language placeholder, user role, review defaults, transparency options, and paths.": "표시 크기, 언어, 사용자 역할, 리뷰 기본값, 투명성 옵션, 경로를 조정합니다.",
+        "Borderline NG": "경계 NG",
+        "Pin Height": "핀 높이",
+        "AI review case": "AI 리뷰 사례"
+};
+      const originalText = new WeakMap();
+      const originalAttr = new WeakMap();
+      let currentLanguage = 'en';
+      let suppressObserver = false;
+
+      function isSkippableText(text) {
+        const t = text.trim();
+        if (!t) return true;
+        if (/^[0-9.,:%·\-_/+≥≤?() ]+$/.test(t)) return true;
+        if (/^(IMG_|LOT-|GOLDEN-|NEW-|TBOX_|AOI_AI_|C:\/|V\d|0\.\d|FOV-|U\d|C\d|D\d|J\d|R, C, U, D|J1-J6|P\d|\d+ P\d|AOI_POC_DB|ST-AOI-01)$/i.test(t)) return true;
+        return false;
+      }
+
+      function translateExact(text) {
+        if (KO[text] !== undefined) return KO[text];
+        return fallbackTranslate(text);
+      }
+
+      function fallbackTranslate(text) {
+        let out = text;
+        const replacements = [
+          ['False negatives', '미검출'], ['false negatives', '미검출'], ['False positives', '오검출'], ['false positives', '오검출'],
+          ['Possible Escape', '가능한 유출'], ['possible escapes', '가능한 유출'], ['Possible escape', '가능한 유출'],
+          ['False Call', '오검출'], ['false-call', '오검출'], ['false call', '오검출'], ['False-call', '오검출'],
+          ['Solder Bridge', '솔더 브리지'], ['solder bridge', '솔더 브리지'], ['Excess Solder', '과다 납땜'], ['Polarity Error', '극성 오류'],
+          ['Missing Component', '부품 누락'], ['Misalignment', '위치 틀어짐'], ['Tombstone', '툼스톤'], ['Connector Pin Height', '커넥터 핀 높이'],
+          ['Review', '리뷰'], ['Disposition', '판정'], ['Library', '라이브러리'], ['Recipe', '레시피'], ['Report', '보고서'], ['Reports', '보고서'],
+          ['Settings', '설정'], ['Search', '검색'], ['Export', '내보내기'], ['Import', '가져오기'], ['Upload', '업로드'], ['Guide', '가이드'],
+          ['Dashboard', '대시보드'], ['Overview', '개요'], ['Sample', '샘플'], ['Samples', '샘플'], ['Defect', '불량'], ['defect', '불량'],
+          ['Threshold', '임계값'], ['Confidence', '신뢰도'], ['Severity', '심각도'], ['Status', '상태'], ['Priority', '우선순위'],
+          ['Ready', '준비 완료'], ['Online', '온라인'], ['Balanced', '균형'], ['Standard', '표준'], ['Compact', '컴팩트'],
+          ['Open', '열기'], ['Save', '저장'], ['Validate', '검증'], ['Create', '생성'], ['Generate', '생성'], ['Select', '선택'],
+          ['Folder', '폴더'], ['Image', '이미지'], ['Images', '이미지'], ['Database', '데이터베이스'], ['DB', 'DB'], ['Records', '레코드'],
+          ['Filtered', '필터'], ['Last action', '마지막 작업'], ['none', '없음'], ['User', '사용자'], ['Station', '스테이션'],
+          ['Model', '모델'], ['Mode', '모드'], ['Side', '면'], ['Top', '상면'], ['Shift', '교대'], ['Language', '언어'],
+          ['Font size', '글자 크기'], ['Operator', '작업자'], ['Engineer', '엔지니어'], ['Admin', '관리자'], ['Help', '도움말']
+        ];
+        replacements.forEach(([a,b]) => { out = out.replaceAll(a,b); });
+        return out;
+      }
+
+      function textNodes(root) {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+          acceptNode(node) {
+            const p = node.parentElement;
+            if (!p || ['SCRIPT','STYLE','NOSCRIPT'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
+            if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        });
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        return nodes;
+      }
+
+      function translateNode(node) {
+        if (!originalText.has(node)) originalText.set(node, node.nodeValue);
+        const raw = originalText.get(node);
+        const trimmed = raw.trim();
+        if (currentLanguage === 'en') { node.nodeValue = raw; return; }
+        if (isSkippableText(trimmed) && !KO[trimmed]) { node.nodeValue = raw; return; }
+        const translated = translateExact(trimmed);
+        node.nodeValue = raw.replace(trimmed, translated);
+      }
+
+      function trackAttr(el, attr) {
+        const key = attr;
+        let record = originalAttr.get(el);
+        if (!record) { record = {}; originalAttr.set(el, record); }
+        if (record[key] === undefined) record[key] = el.getAttribute(attr);
+        const original = record[key];
+        if (currentLanguage === 'en') { el.setAttribute(attr, original); return; }
+        const translated = translateExact(original);
+        el.setAttribute(attr, translated);
+      }
+
+      function applyLanguage(lang) {
+        currentLanguage = lang || currentLanguage;
+        document.documentElement.lang = currentLanguage === 'ko' ? 'ko' : 'en';
+        suppressObserver = true;
+        textNodes(document.body).forEach(translateNode);
+        document.querySelectorAll('[placeholder]').forEach(el => trackAttr(el, 'placeholder'));
+        document.querySelectorAll('[aria-label]').forEach(el => trackAttr(el, 'aria-label'));
+        const languageSelect = document.getElementById('languageSelect');
+        if (languageSelect) languageSelect.value = currentLanguage;
+        setTimeout(() => { suppressObserver = false; }, 0);
+      }
+
+      const observer = new MutationObserver((mutations) => {
+        if (suppressObserver || currentLanguage !== 'ko') return;
+        suppressObserver = true;
+        for (const mutation of mutations) {
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim()) translateNode(node);
+            if (node.nodeType === Node.ELEMENT_NODE) textNodes(node).forEach(translateNode);
+          });
+          if (mutation.type === 'characterData' && mutation.target.nodeValue.trim()) {
+            const node = mutation.target;
+            const t = node.nodeValue.trim();
+            if (/[A-Za-z]/.test(t)) originalText.set(node, node.nodeValue);
+            translateNode(node);
+          }
+        }
+        setTimeout(() => { suppressObserver = false; }, 0);
+      });
+
+      function installLanguageSelect() {
+        const oldSelect = document.getElementById('languageSelect');
+        if (!oldSelect) return;
+        const select = oldSelect.cloneNode(true);
+        oldSelect.replaceWith(select);
+        select.value = currentLanguage;
+        select.addEventListener('change', (event) => {
+          applyLanguage(event.target.value);
+          const message = event.target.value === 'ko' ? '언어가 한국어로 변경되었습니다.' : 'Language changed to English.';
+          showToast(message);
+        });
+      }
+
+      const baseShowToast = window.showToast;
+      window.showToast = showToast = function(message) {
+        const toast = document.getElementById('toast');
+        if (!toast) return;
+        let text = message || 'Action recorded.';
+        if (currentLanguage === 'ko') {
+          if (text.includes('Font size changed to')) text = '글자 크기 설정이 변경되었습니다.';
+          else if (text.includes('selected. Threshold set to')) text = '리뷰 우선순위와 임계값이 변경되었습니다.';
+          else if (text.includes('recorded for prototype review')) text = '프로토타입 리뷰용 작업이 기록되었습니다.';
+          else if (text.includes('Mock folder selector opened')) text = '모의 폴더 선택기가 열렸습니다. 최종 제품에서는 PNG/JPG/TIFF 이미지를 가져옵니다.';
+          else if (text.includes('Transparency option disabled')) text = '투명성 옵션이 비활성화되었습니다.';
+          else if (text.includes('Transparency option enabled')) text = '투명성 옵션이 활성화되었습니다.';
+          else text = translateExact(text);
+        }
+        toast.textContent = text;
+        toast.classList.add('show');
+        clearTimeout(window.__toastTimer);
+        window.__toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+      };
+
+      document.addEventListener('DOMContentLoaded', () => {
+        installLanguageSelect();
+        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+        applyLanguage('en');
+      });
+
+      window.__applyLanguage = applyLanguage;
+      window.__translationMap = KO;
+    })();
+  </script>
+
 </body>
 </html>

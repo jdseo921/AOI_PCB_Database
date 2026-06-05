@@ -1,0 +1,54 @@
+<UserControl x:Class="AOI_Monitor.Views.ReportsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0B0E10">
+  <Grid Margin="8">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*"/>
+      <ColumnDefinition Width="8"/>
+      <ColumnDefinition Width="340"/>
+    </Grid.ColumnDefinitions>
+
+    <!-- Export packages -->
+    <Border Grid.Column="0" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <TextBlock Text="Export Packages" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+        </Border>
+        <DataGrid Grid.Row="1" x:Name="PackagesGrid">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Package"  Binding="{Binding Package}"  Width="*"/>
+            <DataGridTextColumn Header="Format"   Binding="{Binding Format}"   Width="75"/>
+            <DataGridTextColumn Header="Status"   Binding="{Binding Status}"   Width="60"/>
+            <DataGridTemplateColumn Header="Action" Width="80">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <Button Style="{StaticResource MiniBtnGreen}" Content="Export" Margin="4,2" Click="OnPackageExportClick"/>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Grid>
+    </Border>
+
+    <!-- Maintenance utilities -->
+    <Border Grid.Column="2" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <TextBlock Text="Maintenance Utilities" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+        </Border>
+        <UniformGrid Grid.Row="1" Columns="2" Margin="8" Rows="3">
+          <Button Style="{StaticResource ActionBtn}" Content="Rebuild Image Index" Margin="0,0,5,6" Click="OnRebuildImageIndexClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Verify Image Paths" Margin="0,0,0,6" Click="OnVerifyImagePathsClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Archive Reviewed Samples" Margin="0,0,5,6" Click="OnArchiveReviewedSamplesClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Run DB Integrity Check" Margin="0,0,0,6" Click="OnRunDbIntegrityCheckClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Export Audit Trail" Margin="0,0,5,0" Click="OnExportAuditTrailClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Active Recipe" Margin="0" Click="OnLockActiveRecipeClick"/>
+        </UniformGrid>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

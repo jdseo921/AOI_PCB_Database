@@ -1,6 +1,0 @@
-check,result,status
-Total image records,100,INFO
-Broken image file paths,0,PASS
-Duplicate file hashes,0,PASS
-Missing image dimensions,0,PASS
-Images without defect labels,0,PASS

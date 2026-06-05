@@ -1,0 +1,150 @@
+<UserControl x:Class="AOI_Monitor.Views.LibraryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0B0E10">
+  <UserControl.Resources>
+    <Style x:Key="LibraryRiskChipBorder" TargetType="Border" BasedOn="{StaticResource Chip}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Risk}" Value="Possible Escape">
+          <Setter Property="Background" Value="#35191B"/>
+          <Setter Property="BorderBrush" Value="#9A393E"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Risk}" Value="False Call">
+          <Setter Property="Background" Value="#372914"/>
+          <Setter Property="BorderBrush" Value="#8C6C35"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Risk}" Value="Verified NG">
+          <Setter Property="Background" Value="#14311D"/>
+          <Setter Property="BorderBrush" Value="#377849"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="LibraryRiskChipText" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="#DCE5EB"/>
+      <Setter Property="FontSize" Value="9.5"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Risk}" Value="Possible Escape">
+          <Setter Property="Foreground" Value="#FFBFC1"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Risk}" Value="False Call">
+          <Setter Property="Foreground" Value="#FFE0A7"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Risk}" Value="Verified NG">
+          <Setter Property="Foreground" Value="#C6FFD0"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </UserControl.Resources>
+  <Grid Margin="8">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- Filters + toolbar -->
+    <Border Grid.Row="0" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <TextBlock Text="Database Filter Console" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+        </Border>
+        <StackPanel Grid.Row="1" Margin="8">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/>
+              <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/>
+              <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/>
+              <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/>
+              <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+              <TextBlock Text="Board Model" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <ComboBox SelectedIndex="0"><ComboBoxItem>TBOX-MAIN</ComboBoxItem></ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+              <TextBlock Text="Defect Type" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <ComboBox SelectedIndex="0"><ComboBoxItem>All defect types</ComboBoxItem></ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Column="4">
+              <TextBlock Text="Risk Class" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <ComboBox SelectedIndex="0"><ComboBoxItem>Possible Escape first</ComboBoxItem></ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Column="6">
+              <TextBlock Text="Review Status" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <ComboBox SelectedIndex="0"><ComboBoxItem>Pending / Verified</ComboBoxItem></ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Column="8">
+              <TextBlock Text="Recipe Version" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <ComboBox SelectedIndex="0"><ComboBoxItem>TBOX_TOP_V1.2</ComboBoxItem></ComboBox>
+            </StackPanel>
+            <StackPanel Grid.Column="10">
+              <TextBlock Text="Image Link State" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <ComboBox SelectedIndex="0"><ComboBoxItem>Linked only</ComboBoxItem></ComboBox>
+            </StackPanel>
+          </Grid>
+          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <Button Style="{StaticResource ActionBtn}" Content="Open Record" Margin="0,0,6,0" Click="OnOpenRecordClick"/>
+            <Button Style="{StaticResource ActionBtn}" Content="Compare Golden" Margin="0,0,6,0" Click="OnCompareGoldenClick"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Add to Training" Margin="0,0,6,0" Click="OnAddToTrainingClick"/>
+            <Button Style="{StaticResource ActionBtnAmber}" Content="Batch Relabel" Margin="0,0,6,0" Click="OnBatchRelabelClick"/>
+            <Button Style="{StaticResource ActionBtnGreen}" Content="Export Selected" Click="OnExportSelectedClick"/>
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Records table -->
+    <Border Grid.Row="2" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <TextBlock Text="Inspection Records" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+        </Border>
+        <DataGrid Grid.Row="1" x:Name="RecordsGrid">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Sample"   Binding="{Binding Sample}"      Width="80"/>
+            <DataGridTextColumn Header="Board"    Binding="{Binding Board}"       Width="80"/>
+            <DataGridTextColumn Header="RefDes"   Binding="{Binding RefDes}"      Width="55"/>
+            <DataGridTextColumn Header="Defect"   Binding="{Binding Defect}"      Width="110"/>
+            <DataGridTextColumn Header="Severity" Binding="{Binding Severity}"    Width="65"/>
+            <DataGridTextColumn Header="AI"       Binding="{Binding AiResult}"    Width="36"/>
+            <DataGridTextColumn Header="GT"       Binding="{Binding GroundTruth}" Width="36"/>
+            <DataGridTemplateColumn Header="Risk" Width="110">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <Border Style="{StaticResource LibraryRiskChipBorder}" HorizontalAlignment="Left" Margin="0,1,0,1">
+                    <TextBlock Text="{Binding Risk}" Style="{StaticResource LibraryRiskChipText}"/>
+                  </Border>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="Image"    Binding="{Binding ImageLink}"   Width="48"/>
+            <DataGridTextColumn Header="Updated"  Binding="{Binding Date}"        Width="*"/>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Grid>
+    </Border>
+
+    <!-- Schema -->
+    <Border Grid.Row="4" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <TextBlock Text="Database Transparency" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+        </Border>
+        <DataGrid Grid.Row="1" x:Name="SchemaGrid" MaxHeight="120">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Table"   Binding="{Binding Table}"   Width="130"/>
+            <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" Width="*"/>
+            <DataGridTextColumn Header="Status"  Binding="{Binding Status}"  Width="60"/>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

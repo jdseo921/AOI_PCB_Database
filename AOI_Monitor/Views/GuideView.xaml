@@ -1,0 +1,55 @@
+<UserControl x:Class="AOI_Monitor.Views.GuideView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0B0E10">
+  <StackPanel Margin="8">
+
+    <!-- Steps -->
+    <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <TextBlock Text="Mandatory Review Sequence" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+        </Border>
+        <DataGrid Grid.Row="1" x:Name="StepsGrid" MaxHeight="280">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="#"           Binding="{Binding Num}"      Width="38"/>
+            <DataGridTextColumn Header="Step"        Binding="{Binding Step}"     Width="*"/>
+            <DataGridTextColumn Header="Priority"    Binding="{Binding Priority}" Width="80"/>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Grid>
+    </Border>
+
+    <!-- Header info -->
+    <Border Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <TextBlock Text="Guide Header" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+        </Border>
+        <UniformGrid Grid.Row="1" Columns="3" Margin="8" Rows="1">
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+            <StackPanel>
+              <TextBlock Text="Default Policy" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/>
+              <TextBlock Text="Minimize False Positives" FontWeight="Bold" FontSize="12"/>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+            <StackPanel>
+              <TextBlock Text="Primary Evidence" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/>
+              <TextBlock Text="Image + ROI + GT + AI Result" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}">
+            <StackPanel>
+              <TextBlock Text="Commissioning Mode" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/>
+              <TextBlock Text="Local DB / No MES Writeback" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Border>
+        </UniformGrid>
+      </Grid>
+    </Border>
+
+  </StackPanel>
+</UserControl>

@@ -1,0 +1,8 @@
+C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net8.0-windows\Controls\CircularGauge.baml
+C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net8.0-windows\Controls\LineChart.baml
+C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net8.0-windows\Views\ReportsView.baml
+C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net8.0-windows\Controls\CircularGauge.g.cs
+C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net8.0-windows\Controls\LineChart.g.cs
+C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net8.0-windows\Views\ReportsView.g.cs
+C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs
+C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net8.0-windows\AOI_Monitor_MarkupCompile.cache

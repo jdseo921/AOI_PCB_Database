@@ -1,0 +1,249 @@
+<UserControl x:Class="AOI_Monitor.Views.CompareView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0B0E10">
+  <UserControl.Resources>
+    <Style x:Key="CompareResultChipBorder" TargetType="Border" BasedOn="{StaticResource Chip}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Judgement}" Value="NG">
+          <Setter Property="Background" Value="#35191B"/>
+          <Setter Property="BorderBrush" Value="#9A393E"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Judgement}" Value="Review">
+          <Setter Property="Background" Value="#372914"/>
+          <Setter Property="BorderBrush" Value="#8C6C35"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Judgement}" Value="OK">
+          <Setter Property="Background" Value="#14311D"/>
+          <Setter Property="BorderBrush" Value="#377849"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="CompareResultChipText" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="#DCE5EB"/>
+      <Setter Property="FontSize" Value="9.5"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Judgement}" Value="NG">
+          <Setter Property="Foreground" Value="#FFBFC1"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Judgement}" Value="Review">
+          <Setter Property="Foreground" Value="#FFE0A7"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Judgement}" Value="OK">
+          <Setter Property="Foreground" Value="#C6FFD0"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </UserControl.Resources>
+  <Grid Margin="8" MinHeight="665">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*"/>
+      <ColumnDefinition Width="8"/>
+      <ColumnDefinition Width="260"/>
+      <ColumnDefinition Width="8"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <!-- ══ LEFT: Defect PCBA ══ -->
+    <Border Grid.Column="0" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="34"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="110"/>
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#151B1F" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="7,5">
+          <DockPanel>
+            <TextBlock x:Name="DefectSubtitleText" DockPanel.Dock="Right" Text="IMG_0241 / AI OK / GT NG" Foreground="#85919A" FontSize="11" VerticalAlignment="Center"/>
+            <TextBlock Text="Defect Sample" FontWeight="ExtraBold" Foreground="#E8EDF2" FontSize="13" VerticalAlignment="Center"/>
+          </DockPanel>
+        </Border>
+        <!-- Defect PCB view -->
+        <Border Grid.Row="1" Margin="8" BorderBrush="#59636B" BorderThickness="1" Background="#0E1214" ClipToBounds="True">
+          <Viewbox x:Name="DefectCanvasViewbox" Stretch="Uniform">
+          <Viewbox.LayoutTransform>
+            <ScaleTransform x:Name="DefectZoomTransform" ScaleX="1" ScaleY="1"/>
+          </Viewbox.LayoutTransform>
+          <Canvas Width="500" Height="380">
+            <Border Canvas.Left="40" Canvas.Top="34" Width="390" Height="280" BorderBrush="#5A8C59" BorderThickness="2">
+              <Border.Background>
+                <DrawingBrush TileMode="Tile" Viewport="0,0,34,34" ViewportUnits="Absolute" Stretch="None">
+                  <DrawingBrush.Drawing><DrawingGroup>
+                    <GeometryDrawing Brush="#164321"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,34,34"/></GeometryDrawing.Geometry></GeometryDrawing>
+                    <GeometryDrawing><GeometryDrawing.Pen><Pen Brush="#1B5A28" Thickness="1"/></GeometryDrawing.Pen>
+                      <GeometryDrawing.Geometry><GeometryGroup><LineGeometry StartPoint="33.5,0" EndPoint="33.5,34"/><LineGeometry StartPoint="0,33.5" EndPoint="34,33.5"/></GeometryGroup></GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                  </DrawingGroup></DrawingBrush.Drawing>
+                </DrawingBrush>
+              </Border.Background>
+            </Border>
+            <Border Canvas.Left="87"  Canvas.Top="68"  Width="120" Height="70" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="U101" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#CAD4DA"/></Border>
+            <Border Canvas.Left="280" Canvas.Top="68"  Width="92"  Height="58" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="CN8" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#CAD4DA"/></Border>
+            <Border Canvas.Left="165" Canvas.Top="142" Width="168" Height="82" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="U107" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#CAD4DA"/></Border>
+            <Border Canvas.Left="220" Canvas.Top="180" Width="142" Height="64" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="SH1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#CAD4DA"/></Border>
+            <Border Canvas.Left="95"  Canvas.Top="185" Width="88"  Height="52" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="D12" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#CAD4DA"/></Border>
+            <!-- ROI -->
+            <Rectangle Canvas.Left="153" Canvas.Top="133" Width="202" Height="108" Stroke="#E1A334" StrokeThickness="1.5" Fill="Transparent" StrokeDashArray="4 3"/>
+            <!-- Defect box -->
+            <Canvas Canvas.Left="232" Canvas.Top="153" Width="62" Height="46">
+              <Rectangle Width="62" Height="46" Stroke="#F13B3F" StrokeThickness="2" Fill="Transparent"/>
+              <Border Canvas.Left="-2" Canvas.Top="-21" Background="#F13B3F" Padding="5,2">
+                <TextBlock Text="U107 BRIDGE" Foreground="White" FontSize="9" FontWeight="ExtraBold"/>
+              </Border>
+            </Canvas>
+            <!-- Diff box -->
+            <Canvas Canvas.Left="222" Canvas.Top="148" Width="76" Height="58">
+              <Rectangle Width="76" Height="58" Stroke="#E1A334" StrokeThickness="2" Fill="Transparent"/>
+              <Border Canvas.Left="-2" Canvas.Top="-21" Background="#E1A334" Padding="5,2">
+                <TextBlock Text="DIFF" Foreground="#111111" FontSize="9" FontWeight="ExtraBold"/>
+              </Border>
+            </Canvas>
+            <Line X1="0" Y1="173" X2="500" Y2="173" Stroke="#3C6480" StrokeThickness="1" Opacity="0.5"/>
+            <Line X1="290" Y1="0" X2="290" Y2="380" Stroke="#3C6480" StrokeThickness="1" Opacity="0.5"/>
+          </Canvas>
+          </Viewbox>
+        </Border>
+        <!-- Footer fields -->
+        <UniformGrid Grid.Row="2" Columns="3" Margin="8" Rows="2">
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5"><StackPanel><TextBlock Text="Sample" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="IMG_0241" FontWeight="Bold" FontSize="11"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5"><StackPanel><TextBlock Text="RefDes" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="U107" FontWeight="Bold" FontSize="11"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5"><StackPanel><TextBlock Text="FOV" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="TOP-03" FontWeight="Bold" FontSize="11"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0"><StackPanel><TextBlock Text="Risk" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="Possible Escape" FontWeight="Bold" Foreground="#F13B3F" FontSize="11"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0"><StackPanel><TextBlock Text="Defect" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="Solder Bridge" FontWeight="Bold" FontSize="11"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0"><StackPanel><TextBlock Text="Shift" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="A" FontWeight="Bold" FontSize="11"/></StackPanel></Border>
+        </UniformGrid>
+      </Grid>
+    </Border>
+
+    <!-- ══ CENTER: Controls + Findings ══ -->
+    <Grid Grid.Column="2">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="8"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+
+      <!-- Sync / controls -->
+      <Border Grid.Row="0" Style="{StaticResource Panel}">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+            <TextBlock Text="Alignment / Difference Control" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11"/>
+          </Border>
+          <StackPanel Grid.Row="1" Margin="8">
+            <!-- Toolbar -->
+            <WrapPanel Margin="0,0,0,5">
+              <Button Style="{StaticResource MiniBtn}" Content="Sync Zoom" Margin="0,0,5,5" Click="OnSyncZoomClick"/>
+              <Button Style="{StaticResource MiniBtn}" Content="Sync Pan" Margin="0,0,5,5" Click="OnSyncPanClick"/>
+              <Button Style="{StaticResource MiniBtnAmber}" Content="Show Difference" Margin="0,0,5,5" Click="OnShowDifferenceClick"/>
+              <Button Style="{StaticResource MiniBtn}" Content="AI Overlay" Margin="0,0,5,5" Click="OnAiOverlayClick"/>
+              <Button Style="{StaticResource MiniBtn}" Content="GT Overlay" Margin="0,0,5,5" Click="OnGtOverlayClick"/>
+              <Button Style="{StaticResource MiniBtnGreen}" Content="Export Pair" Click="OnExportPairClick"/>
+            </WrapPanel>
+            <!-- Score -->
+            <Border Background="#13191D" BorderBrush="#4B5660" BorderThickness="1" MinHeight="90" Padding="8" Margin="0,0,0,6">
+              <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" TextBlock.TextAlignment="Center">
+                <TextBlock x:Name="DiffScoreText" Text="87%" FontSize="32" FontWeight="ExtraBold" Foreground="#F5F9FB" TextAlignment="Center"/>
+                <TextBlock Text="Difference Score" Foreground="#9AA6AF" FontSize="11" TextAlignment="Center"/>
+                <TextBlock x:Name="DiffSummaryText" Text="ROI mismatch vs golden" Foreground="#9AA6AF" FontSize="10" TextAlignment="Center"/>
+              </StackPanel>
+            </Border>
+            <!-- Sync controls -->
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5"><StackPanel><TextBlock Text="01" Foreground="#7F8C95" FontSize="9.5"/><TextBlock Text="Lock board orientation" FontWeight="Bold" FontSize="11" TextWrapping="Wrap"/></StackPanel></Border>
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5"><StackPanel><TextBlock Text="02" Foreground="#7F8C95" FontSize="9.5"/><TextBlock Text="Equalize brightness" FontWeight="Bold" FontSize="11" TextWrapping="Wrap"/></StackPanel></Border>
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5"><StackPanel><TextBlock Text="03" Foreground="#7F8C95" FontSize="9.5"/><TextBlock Text="Normalize ROI scale" FontWeight="Bold" FontSize="11" TextWrapping="Wrap"/></StackPanel></Border>
+            <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="04" Foreground="#7F8C95" FontSize="9.5"/><TextBlock Text="Highlight unmatched solder area" FontWeight="Bold" FontSize="11" TextWrapping="Wrap"/></StackPanel></Border>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- Findings -->
+      <Border Grid.Row="2" Style="{StaticResource Panel}">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+            <TextBlock Text="Comparison Findings" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          </Border>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <DataGrid x:Name="FindingsGrid" BorderThickness="0">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Region"  Binding="{Binding Region}"   Width="*"    ElementStyle="{StaticResource {x:Type TextBlock}}"/>
+                <DataGridTextColumn Header="Defect"  Binding="{Binding Defect}"   Width="*"/>
+                <DataGridTextColumn Header="Golden"  Binding="{Binding Golden}"   Width="*"/>
+                <DataGridTemplateColumn Header="Result" Width="70">
+                  <DataGridTemplateColumn.CellTemplate>
+                    <DataTemplate>
+                      <Border Style="{StaticResource CompareResultChipBorder}" HorizontalAlignment="Left" Margin="0,1,0,1">
+                        <TextBlock Text="{Binding Judgement}" Style="{StaticResource CompareResultChipText}"/>
+                      </Border>
+                    </DataTemplate>
+                  </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+              </DataGrid.Columns>
+            </DataGrid>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- ══ RIGHT: Golden PCBA ══ -->
+    <Border Grid.Column="4" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="34"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="110"/>
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#151B1F" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="7,5">
+          <DockPanel>
+            <TextBlock x:Name="GoldenSubtitleText" DockPanel.Dock="Right" Text="IMG_GOLD_0241 / verified OK" Foreground="#85919A" FontSize="11" VerticalAlignment="Center"/>
+            <TextBlock Text="Golden Reference" FontWeight="ExtraBold" Foreground="#E8EDF2" FontSize="13" VerticalAlignment="Center"/>
+          </DockPanel>
+        </Border>
+        <!-- Golden PCB view (slightly desaturated) -->
+        <Border Grid.Row="1" Margin="8" BorderBrush="#59636B" BorderThickness="1" Background="#0E1214" ClipToBounds="True" Opacity="0.88">
+          <Viewbox x:Name="GoldenCanvasViewbox" Stretch="Uniform">
+          <Viewbox.LayoutTransform>
+            <ScaleTransform x:Name="GoldenZoomTransform" ScaleX="1" ScaleY="1"/>
+          </Viewbox.LayoutTransform>
+          <Canvas Width="500" Height="380">
+            <Border Canvas.Left="40" Canvas.Top="34" Width="390" Height="280" BorderBrush="#5A8C59" BorderThickness="2">
+              <Border.Background>
+                <DrawingBrush TileMode="Tile" Viewport="0,0,34,34" ViewportUnits="Absolute" Stretch="None">
+                  <DrawingBrush.Drawing><DrawingGroup>
+                    <GeometryDrawing Brush="#164321"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,34,34"/></GeometryDrawing.Geometry></GeometryDrawing>
+                    <GeometryDrawing><GeometryDrawing.Pen><Pen Brush="#1B5A28" Thickness="1"/></GeometryDrawing.Pen>
+                      <GeometryDrawing.Geometry><GeometryGroup><LineGeometry StartPoint="33.5,0" EndPoint="33.5,34"/><LineGeometry StartPoint="0,33.5" EndPoint="34,33.5"/></GeometryGroup></GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                  </DrawingGroup></DrawingBrush.Drawing>
+                </DrawingBrush>
+              </Border.Background>
+            </Border>
+            <Border Canvas.Left="87"  Canvas.Top="68"  Width="120" Height="70" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="U101" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#CAD4DA"/></Border>
+            <Border Canvas.Left="280" Canvas.Top="68"  Width="92"  Height="58" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="CN8" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#CAD4DA"/></Border>
+            <Border Canvas.Left="165" Canvas.Top="142" Width="168" Height="82" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="U107" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#CAD4DA"/></Border>
+            <Border Canvas.Left="220" Canvas.Top="180" Width="142" Height="64" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="SH1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#CAD4DA"/></Border>
+            <Border Canvas.Left="95"  Canvas.Top="185" Width="88"  Height="52" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="D12" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" Foreground="#CAD4DA"/></Border>
+            <!-- Golden ROI (dashed green) -->
+            <Rectangle Canvas.Left="153" Canvas.Top="133" Width="202" Height="108" Stroke="#50F56E" StrokeThickness="1.5" Fill="#0A50F56E" StrokeDashArray="4 3"/>
+            <Rectangle Canvas.Left="232" Canvas.Top="153" Width="62"  Height="46"  Stroke="#50F56E" StrokeThickness="1.5" Fill="#0A50F56E" StrokeDashArray="4 3"/>
+            <Line X1="0" Y1="173" X2="500" Y2="173" Stroke="#3C6480" StrokeThickness="1" Opacity="0.5"/>
+            <Line X1="290" Y1="0" X2="290" Y2="380" Stroke="#3C6480" StrokeThickness="1" Opacity="0.5"/>
+          </Canvas>
+          </Viewbox>
+        </Border>
+        <!-- Footer fields -->
+        <UniformGrid Grid.Row="2" Columns="3" Margin="8" Rows="2">
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5"><StackPanel><TextBlock Text="Sample" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="IMG_GOLD_0241" FontWeight="Bold" FontSize="10.5"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5"><StackPanel><TextBlock Text="RefDes" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="U107" FontWeight="Bold" FontSize="11"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5"><StackPanel><TextBlock Text="FOV" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="TOP-03" FontWeight="Bold" FontSize="11"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0"><StackPanel><TextBlock Text="Status" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="Verified OK" FontWeight="Bold" Foreground="#50F56E" FontSize="11"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0"><StackPanel><TextBlock Text="Program" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="TBOX_TOP_V1.2" FontWeight="Bold" FontSize="11"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0"><StackPanel><TextBlock Text="Captured" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="Baseline" FontWeight="Bold" FontSize="11"/></StackPanel></Border>
+        </UniformGrid>
+      </Grid>
+    </Border>
+
+  </Grid>
+</UserControl>

@@ -1,0 +1,105 @@
+<UserControl x:Class="AOI_Monitor.Views.SpcView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:AOI_Monitor.Controls"
+             Background="#0B0E10">
+  <UserControl.Resources>
+    <Style x:Key="DbStatusChipBorder" TargetType="Border" BasedOn="{StaticResource Chip}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Status}" Value="NG">
+          <Setter Property="Background" Value="#35191B"/>
+          <Setter Property="BorderBrush" Value="#9A393E"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Status}" Value="WARN">
+          <Setter Property="Background" Value="#372914"/>
+          <Setter Property="BorderBrush" Value="#8C6C35"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Status}" Value="OK">
+          <Setter Property="Background" Value="#14311D"/>
+          <Setter Property="BorderBrush" Value="#377849"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="DbStatusChipText" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="#DCE5EB"/>
+      <Setter Property="FontSize" Value="9.5"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Status}" Value="NG">
+          <Setter Property="Foreground" Value="#FFBFC1"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Status}" Value="WARN">
+          <Setter Property="Foreground" Value="#FFE0A7"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Status}" Value="OK">
+          <Setter Property="Foreground" Value="#C6FFD0"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </UserControl.Resources>
+  <StackPanel Margin="8">
+    <Grid Margin="0,0,0,8">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="340"/>
+      </Grid.ColumnDefinitions>
+
+      <!-- SPC Chart + stats -->
+      <Border Grid.Column="0" Style="{StaticResource Panel}">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+            <TextBlock Text="SPC Preview" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          </Border>
+          <StackPanel Grid.Row="1" Margin="8">
+            <c:LineChart/>
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+              <StackPanel Orientation="Horizontal" Margin="0,0,12,0"><Rectangle Width="10" Height="3" Fill="#5CA0D3" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBlock Text="Yield" Foreground="#89959D" FontSize="10.5"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,0,12,0"><Rectangle Width="10" Height="3" Fill="#E1A334" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBlock Text="False Calls" Foreground="#89959D" FontSize="10.5"/></StackPanel>
+              <StackPanel Orientation="Horizontal"><Rectangle Width="10" Height="3" Fill="#F13B3F" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBlock Text="Escapes" Foreground="#89959D" FontSize="10.5"/></StackPanel>
+            </StackPanel>
+            <!-- Stats grid -->
+            <UniformGrid Columns="3" Margin="0,10,0,0" Rows="2">
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,6"><StackPanel><TextBlock Text="First Pass Yield"     Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="94.8%" FontWeight="Bold" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,6"><StackPanel><TextBlock Text="False Call Ratio"     Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="2.7%"  FontWeight="Bold" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="Escape-Risk Rate"     Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="0.42%" FontWeight="Bold" Foreground="#F13B3F" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Annotation Coverage"  Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="91.6%" FontWeight="Bold" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Broken Image Links"   Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="17"    FontWeight="Bold" Foreground="#F13B3F" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0"><StackPanel><TextBlock Text="Missing RefDes"        Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="84"    FontWeight="Bold" FontSize="13"/></StackPanel></Border>
+            </UniformGrid>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- DB health -->
+      <Border Grid.Column="2" Style="{StaticResource Panel}">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+            <TextBlock Text="Database Health" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          </Border>
+          <DataGrid Grid.Row="1" x:Name="DbHealthGrid">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Table / Index" Binding="{Binding Table}"  Width="*"/>
+              <DataGridTextColumn Header="Count"         Binding="{Binding Count}"  Width="65"/>
+              <DataGridTemplateColumn Header="Status" Width="55">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Border Style="{StaticResource DbStatusChipBorder}" HorizontalAlignment="Left" Margin="0,1,0,1">
+                      <TextBlock Text="{Binding Status}" Style="{StaticResource DbStatusChipText}"/>
+                    </Border>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- Bottom alarm -->
+    <Border Background="#14080A" BorderBrush="#4B2325" BorderThickness="1" Padding="7,10">
+      <TextBlock Text="Database warning: 36 unresolved AI/GT conflicts require disposition before customer export."
+                 Foreground="#F27777" FontWeight="ExtraBold" TextAlignment="Center" FontSize="12"/>
+    </Border>
+  </StackPanel>
+</UserControl>

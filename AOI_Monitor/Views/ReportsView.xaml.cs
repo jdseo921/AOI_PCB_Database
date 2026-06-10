@@ -1,25 +1,19 @@
-using System.Text;
+﻿using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.IO;
-<<<<<<< HEAD
 using System.Linq;
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 using AOI_Monitor.Services;
 
 namespace AOI_Monitor.Views;
 
 public partial class ReportsView : UserControl
 {
-<<<<<<< HEAD
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff",
     };
 
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     private static readonly object[] Packages =
     {
         new { Package = "Customer validation package",    Format = "CSV/PDF", Status = "OK"    },
@@ -54,7 +48,6 @@ public partial class ReportsView : UserControl
         MessageBox.Show($"Exported:\n{path}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-<<<<<<< HEAD
     private void OnVerifyImagePathsClick(object sender, RoutedEventArgs e)
     {
         var exportsDir = EnsureExportsDir();
@@ -243,12 +236,6 @@ public partial class ReportsView : UserControl
             MessageBoxButton.OK,
             MessageBoxImage.Information);
     }
-=======
-    private void OnRebuildImageIndexClick(object sender, RoutedEventArgs e) => RunUtility("Rebuild image index", "Image index rebuild completed.");
-    private void OnVerifyImagePathsClick(object sender, RoutedEventArgs e) => RunUtility("Verify image paths", "Image path verification completed. Broken links: 0 in current run.");
-    private void OnArchiveReviewedSamplesClick(object sender, RoutedEventArgs e) => RunUtility("Archive reviewed samples", "Reviewed samples archived.");
-    private void OnRunDbIntegrityCheckClick(object sender, RoutedEventArgs e) => RunUtility("Run DB integrity check", "DB integrity check finished with no critical errors.");
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 
     private void OnExportAuditTrailClick(object sender, RoutedEventArgs e)
     {
@@ -274,7 +261,6 @@ public partial class ReportsView : UserControl
         MessageBox.Show(state.IsRecipeLocked ? "Active recipe locked." : "Active recipe unlocked.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-<<<<<<< HEAD
     private static string EnsureExportsDir()
     {
         var dir = Path.Combine(AppContext.BaseDirectory, "exports");
@@ -310,11 +296,5 @@ public partial class ReportsView : UserControl
             inaccessible++;
             sb.AppendLine($"[MISSING] {label} image not found: {path}");
         }
-=======
-    private void RunUtility(string name, string message)
-    {
-        WorkflowState.Instance.AddEvent("UTILITY", name);
-        MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     }
 }

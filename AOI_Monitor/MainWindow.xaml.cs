@@ -1,13 +1,9 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-<<<<<<< HEAD
 using System.Windows.Media.Animation;
 using System.IO;
 using System.Diagnostics;
-=======
-using System.IO;
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
 using AOI_Monitor.Views;
@@ -78,7 +74,6 @@ public partial class MainWindow : Window
 
         PageContent.Content = page;
         PageTitleText.Text  = PageTitles.TryGetValue(key, out var t) ? t : key.ToUpperInvariant();
-<<<<<<< HEAD
         PlayNavigationTransition();
     }
 
@@ -104,8 +99,6 @@ public partial class MainWindow : Window
 
         PageContent.BeginAnimation(OpacityProperty, fade);
         translate.BeginAnimation(TranslateTransform.YProperty, slide);
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     }
 
     private void OnRefreshClick(object sender, RoutedEventArgs e)
@@ -126,7 +119,6 @@ public partial class MainWindow : Window
         MessageBox.Show("View refreshed.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-<<<<<<< HEAD
     private void OnMenuFileClick(object sender, RoutedEventArgs e)
     {
         var exportDir = Path.Combine(AppContext.BaseDirectory, "exports");
@@ -138,8 +130,6 @@ public partial class MainWindow : Window
         });
     }
 
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     private void OnLockRecipeClick(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;

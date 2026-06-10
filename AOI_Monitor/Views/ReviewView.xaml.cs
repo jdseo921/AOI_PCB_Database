@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -68,11 +68,7 @@ public partial class ReviewView : UserControl
             return;
         }
 
-<<<<<<< HEAD
         var bmp = LoadBitmapOnLoad(sample!);
-=======
-        var bmp = new BitmapImage(new Uri(sample!, UriKind.Absolute));
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
         int x = (int)(bmp.PixelWidth * 0.35);
         int y = (int)(bmp.PixelHeight * 0.35);
         int w = (int)(bmp.PixelWidth * 0.3);
@@ -97,7 +93,6 @@ public partial class ReviewView : UserControl
         MessageBox.Show("ROI crop saved.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-<<<<<<< HEAD
     private static BitmapImage LoadBitmapOnLoad(string path)
     {
         var bmp = new BitmapImage();
@@ -109,8 +104,6 @@ public partial class ReviewView : UserControl
         return bmp;
     }
 
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     private void OnHistoryClick(object sender, RoutedEventArgs e)
     {
         var history = WorkflowState.Instance.History;
@@ -149,7 +142,6 @@ public partial class ReviewView : UserControl
 
     private void LogDisposition(string action)
     {
-<<<<<<< HEAD
         var state = WorkflowState.Instance;
         var analysis = state.LastAnalysis;
         if (analysis is null)
@@ -179,16 +171,12 @@ public partial class ReviewView : UserControl
         }
 
         state.AddDisposition(action);
-=======
-        WorkflowState.Instance.AddDisposition(action);
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 
         var logDir = Path.Combine(AppContext.BaseDirectory, "exports");
         Directory.CreateDirectory(logDir);
         var file = Path.Combine(logDir, "review_disposition_log.csv");
 
         if (!File.Exists(file))
-<<<<<<< HEAD
         {
             File.WriteAllText(
                 file,
@@ -224,11 +212,4 @@ public partial class ReviewView : UserControl
 
     private static string EscapeCsv(string value)
         => $"\"{value.Replace("\"", "\"\"")}\"";
-=======
-            File.WriteAllText(file, "Timestamp,Action\n");
-
-        File.AppendAllText(file, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss},{action}\n");
-        MessageBox.Show($"Disposition recorded: {action}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
-    }
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 }

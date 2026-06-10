@@ -1,8 +1,5 @@
-using System.IO;
-<<<<<<< HEAD
+﻿using System.IO;
 using System.Buffers;
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -27,7 +24,6 @@ public static class ImageAnalysisService
             SuggestedDefect = "Solder Bridge",
             Verdict = "REVIEW",
             DifferenceScore = 0,
-<<<<<<< HEAD
             ReviewThreshold = 0,
             NgThreshold = 0,
             Confidence = 0.55,
@@ -40,9 +36,6 @@ public static class ImageAnalysisService
                 "No golden image was supplied; decision remains REVIEW by policy.",
                 "Run comparison against a verified golden image for actionable classification.",
             },
-=======
-            Hotspot = new Rect(0.45, 0.4, 0.14, 0.12),
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
         };
 
         if (string.IsNullOrWhiteSpace(goldenPath))
@@ -61,37 +54,27 @@ public static class ImageAnalysisService
         result.Hotspot = hotspot;
 
         var (ngThreshold, reviewThreshold) = GetThresholds(priority);
-<<<<<<< HEAD
         result.NgThreshold = ngThreshold;
         result.ReviewThreshold = reviewThreshold;
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 
         if (diff >= ngThreshold)
         {
             result.Verdict = "NG";
             result.SuggestedDefect = "Possible Solder Bridge";
-<<<<<<< HEAD
             result.DecisionMargin = diff - ngThreshold;
             result.DecisionReason = "Difference score exceeds NG threshold under current policy.";
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
         }
         else if (diff >= reviewThreshold)
         {
             result.Verdict = "REVIEW";
             result.SuggestedDefect = "Alignment / Reflection Difference";
-<<<<<<< HEAD
             result.DecisionMargin = Math.Min(diff - reviewThreshold, ngThreshold - diff);
             result.DecisionReason = "Difference score is in the review band; human confirmation required.";
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
         }
         else
         {
             result.Verdict = "OK";
             result.SuggestedDefect = "No Significant Difference";
-<<<<<<< HEAD
             result.DecisionMargin = reviewThreshold - diff;
             result.DecisionReason = "Difference score is below review threshold for this policy.";
         }
@@ -142,13 +125,6 @@ public static class ImageAnalysisService
         };
     }
 
-=======
-        }
-
-        return result;
-    }
-
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     private static (double ngThreshold, double reviewThreshold) GetThresholds(DetectionPriority priority)
     {
         // Conservative mode raises thresholds to reduce false positives.
@@ -200,7 +176,6 @@ public static class ImageAnalysisService
     private static double CalculateBrightness(BitmapSource src)
     {
         var stride = src.PixelWidth * 4;
-<<<<<<< HEAD
         var count = stride * src.PixelHeight;
         var pool = ArrayPool<byte>.Shared;
         var pixels = pool.Rent(count);
@@ -223,20 +198,6 @@ public static class ImageAnalysisService
         {
             pool.Return(pixels);
         }
-=======
-        var pixels = new byte[stride * src.PixelHeight];
-        src.CopyPixels(pixels, stride, 0);
-
-        double sum = 0;
-        for (int i = 0; i < pixels.Length; i += 4)
-        {
-            // BGR to luma approximation.
-            sum += 0.114 * pixels[i] + 0.587 * pixels[i + 1] + 0.299 * pixels[i + 2];
-        }
-
-        var n = pixels.Length / 4.0;
-        return n == 0 ? 0 : sum / n;
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     }
 
     private static double Compare(BitmapSource a, BitmapSource b, out Rect hotspot)
@@ -245,7 +206,6 @@ public static class ImageAnalysisService
         var h = Math.Min(a.PixelHeight, b.PixelHeight);
 
         var stride = w * 4;
-<<<<<<< HEAD
         var count = stride * h;
         var pool = ArrayPool<byte>.Shared;
         var pa = pool.Rent(count);
@@ -311,62 +271,5 @@ public static class ImageAnalysisService
             pool.Return(pa);
             pool.Return(pb);
         }
-=======
-        var pa = new byte[stride * h];
-        var pb = new byte[stride * h];
-
-        var ra = new CroppedBitmap(a, new Int32Rect(0, 0, w, h));
-        var rb = new CroppedBitmap(b, new Int32Rect(0, 0, w, h));
-        ra.CopyPixels(pa, stride, 0);
-        rb.CopyPixels(pb, stride, 0);
-
-        double total = 0;
-        const int gridX = 8;
-        const int gridY = 8;
-        var bins = new double[gridX * gridY];
-        int cw = Math.Max(1, w / gridX);
-        int ch = Math.Max(1, h / gridY);
-
-        for (int y = 0; y < h; y++)
-        {
-            int gy = Math.Min(gridY - 1, y / ch);
-            int row = y * stride;
-            for (int x = 0; x < w; x++)
-            {
-                int gx = Math.Min(gridX - 1, x / cw);
-                int i = row + x * 4;
-
-                double dr = Math.Abs(pa[i + 2] - pb[i + 2]);
-                double dg = Math.Abs(pa[i + 1] - pb[i + 1]);
-                double db = Math.Abs(pa[i] - pb[i]);
-                double d = (dr + dg + db) / 3.0;
-
-                total += d;
-                bins[gy * gridX + gx] += d;
-            }
-        }
-
-        int idx = 0;
-        double best = double.MinValue;
-        for (int i = 0; i < bins.Length; i++)
-        {
-            if (bins[i] > best)
-            {
-                best = bins[i];
-                idx = i;
-            }
-        }
-
-        int bx = idx % gridX;
-        int by = idx / gridX;
-        hotspot = new Rect(
-            bx / (double)gridX,
-            by / (double)gridY,
-            1.0 / gridX,
-            1.0 / gridY);
-
-        var mad = total / (w * h);
-        return Math.Min(100.0, mad / 255.0 * 100.0);
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     }
 }

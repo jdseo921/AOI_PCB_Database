@@ -1,13 +1,10 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.IO;
 using Microsoft.Win32;
-<<<<<<< HEAD
 using AOI_Monitor.Models;
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 using AOI_Monitor.Services;
 
 namespace AOI_Monitor.Views;
@@ -47,7 +44,6 @@ public partial class CompareView : UserControl
         if (state.LastAnalysis is { } a)
         {
             DiffScoreText.Text = $"{a.DifferenceScore:F0}%";
-<<<<<<< HEAD
             DiffSummaryText.Text = $"{a.Verdict} - {a.SuggestedDefect} | confidence {a.Confidence:P0}";
 
             var judgement = ToChipVerdict(a.Verdict);
@@ -61,19 +57,10 @@ public partial class CompareView : UserControl
                 new { Region = "Evidence 1", Defect = topEvidence.Length > 0 ? topEvidence[0] : "-", Golden = "", Judgement = judgement },
                 new { Region = "Evidence 2", Defect = topEvidence.Length > 1 ? topEvidence[1] : "-", Golden = "", Judgement = judgement },
                 new { Region = "Evidence 3", Defect = topEvidence.Length > 2 ? topEvidence[2] : "-", Golden = "", Judgement = judgement },
-=======
-            DiffSummaryText.Text = $"{a.Verdict} - {a.SuggestedDefect}";
-
-            FindingsGrid.ItemsSource = new[]
-            {
-                new { Region = "Hotspot ROI", Defect = "Highest pixel delta region", Golden = "Reference mismatch", Judgement = a.Verdict },
-                new { Region = "Mean brightness", Defect = $"{a.MeanBrightness:F1}", Golden = "calculated", Judgement = a.DifferenceScore > 8 ? "Review" : "OK" },
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
             };
         }
     }
 
-<<<<<<< HEAD
     private static string ToChipVerdict(string verdict)
     {
         return verdict.ToUpperInvariant() switch
@@ -84,8 +71,6 @@ public partial class CompareView : UserControl
         };
     }
 
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     public void ExportPair()
     {
         OnExportPairClick(this, new RoutedEventArgs());

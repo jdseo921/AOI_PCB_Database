@@ -1,13 +1,10 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Diagnostics;
 using System.IO;
-<<<<<<< HEAD
 using System.Globalization;
 using System.Windows.Markup;
 using System.Windows.Media;
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
 
@@ -30,11 +27,8 @@ public partial class SettingsView : UserControl
     {
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         RefreshWorkflowUi();
-<<<<<<< HEAD
         ApplyLanguageVisuals();
         ApplyFontPreset();
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -47,7 +41,6 @@ public partial class SettingsView : UserControl
     private void OnApply(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
-<<<<<<< HEAD
         ApplyLanguageVisuals();
         ApplyFontPreset();
 
@@ -59,10 +52,6 @@ public partial class SettingsView : UserControl
         }
 
         MessageBox.Show($"Display settings applied.\n{message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
-=======
-        state.SetDetectionPriority(ComboToPriority(DetectionPriorityCombo.SelectedIndex));
-        MessageBox.Show("Settings applied.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     }
 
     private void OnReset(object sender, RoutedEventArgs e)
@@ -70,7 +59,6 @@ public partial class SettingsView : UserControl
         LangCombo.SelectedIndex = 0;
         FontCombo.SelectedIndex = 1;
         DetectionPriorityCombo.SelectedIndex = 0;
-<<<<<<< HEAD
 
         ApplyLanguageVisuals();
         ApplyFontPreset();
@@ -83,9 +71,6 @@ public partial class SettingsView : UserControl
             return;
         }
 
-=======
-        WorkflowState.Instance.SetDetectionPriority(Models.DetectionPriority.MinimizeFalsePositives);
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
         MessageBox.Show("Settings reset to defaults.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -168,7 +153,6 @@ public partial class SettingsView : UserControl
             : $"{state.Training.LastValidationScore:F1}%";
     }
 
-<<<<<<< HEAD
     private void ApplyLanguageVisuals()
     {
         bool isKorean = LangCombo.SelectedIndex == 1;
@@ -183,27 +167,27 @@ public partial class SettingsView : UserControl
             mainWindow.FontFamily = isKorean ? new FontFamily("Malgun Gothic") : new FontFamily("Segoe UI");
         }
 
-        DisplayLanguageHeaderText.Text = isKorean ? "화면 / 언어" : "Display / Language";
-        LanguageLabelText.Text = isKorean ? "언어" : "Language";
-        FontSizeLabelText.Text = isKorean ? "글자 크기" : "Font Size";
-        StoragePathLabelText.Text = isKorean ? "저장 경로" : "Storage Path";
-        ReviewDefaultLabelText.Text = isKorean ? "검토 기본값" : "Review Default";
-        DetectionPriorityLabelText.Text = isKorean ? "검출 우선순위" : "Detection Priority";
-        ApplyBtn.Content = isKorean ? "적용" : "Apply";
-        ResetBtn.Content = isKorean ? "초기화" : "Reset";
+        DisplayLanguageHeaderText.Text = isKorean ? "í™”ë©´ / ì–¸ì–´" : "Display / Language";
+        LanguageLabelText.Text = isKorean ? "ì–¸ì–´" : "Language";
+        FontSizeLabelText.Text = isKorean ? "ê¸€ìž í¬ê¸°" : "Font Size";
+        StoragePathLabelText.Text = isKorean ? "ì €ìž¥ ê²½ë¡œ" : "Storage Path";
+        ReviewDefaultLabelText.Text = isKorean ? "ê²€í†  ê¸°ë³¸ê°’" : "Review Default";
+        DetectionPriorityLabelText.Text = isKorean ? "ê²€ì¶œ ìš°ì„ ìˆœìœ„" : "Detection Priority";
+        ApplyBtn.Content = isKorean ? "ì ìš©" : "Apply";
+        ResetBtn.Content = isKorean ? "ì´ˆê¸°í™”" : "Reset";
 
         SetComboItemText(LangCombo, 0, "English");
         SetComboItemText(LangCombo, 1, "Korean");
 
         if (isKorean)
         {
-            SetComboItemText(FontCombo, 0, "작게");
-            SetComboItemText(FontCombo, 1, "기본");
-            SetComboItemText(FontCombo, 2, "크게");
+            SetComboItemText(FontCombo, 0, "ìž‘ê²Œ");
+            SetComboItemText(FontCombo, 1, "ê¸°ë³¸");
+            SetComboItemText(FontCombo, 2, "í¬ê²Œ");
 
-            SetComboItemText(DetectionPriorityCombo, 0, "오검출 최소화");
-            SetComboItemText(DetectionPriorityCombo, 1, "균형");
-            SetComboItemText(DetectionPriorityCombo, 2, "결함 검출 최대화");
+            SetComboItemText(DetectionPriorityCombo, 0, "ì˜¤ê²€ì¶œ ìµœì†Œí™”");
+            SetComboItemText(DetectionPriorityCombo, 1, "ê· í˜•");
+            SetComboItemText(DetectionPriorityCombo, 2, "ê²°í•¨ ê²€ì¶œ ìµœëŒ€í™”");
         }
         else
         {
@@ -249,8 +233,6 @@ public partial class SettingsView : UserControl
             item.Content = text;
     }
 
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     private static Models.DetectionPriority ComboToPriority(int selectedIndex) => selectedIndex switch
     {
         0 => Models.DetectionPriority.MinimizeFalsePositives,

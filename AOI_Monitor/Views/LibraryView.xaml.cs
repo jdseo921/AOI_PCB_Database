@@ -1,11 +1,8 @@
-using System.Text;
+﻿using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.IO;
-<<<<<<< HEAD
 using System.Windows.Media.Imaging;
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 using Microsoft.Win32;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
@@ -157,18 +154,11 @@ public partial class LibraryView : UserControl
 
     private void ShowImagePreview(string path, string title)
     {
-<<<<<<< HEAD
         var previewBitmap = LoadPreviewBitmap(path, 1400);
         var image = new System.Windows.Controls.Image
         {
             Stretch = System.Windows.Media.Stretch.Uniform,
             Source = previewBitmap,
-=======
-        var image = new System.Windows.Controls.Image
-        {
-            Stretch = System.Windows.Media.Stretch.Uniform,
-            Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(path, UriKind.Absolute)),
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
         };
 
         var win = new Window
@@ -186,7 +176,6 @@ public partial class LibraryView : UserControl
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
 
-<<<<<<< HEAD
         win.Closed += (_, _) => image.Source = null;
 
         win.Show();
@@ -203,8 +192,4 @@ public partial class LibraryView : UserControl
         bmp.Freeze();
         return bmp;
     }
-=======
-        win.Show();
-    }
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 }

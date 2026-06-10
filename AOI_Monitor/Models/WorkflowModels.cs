@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 
 namespace AOI_Monitor.Models;
 
@@ -15,7 +15,6 @@ public class AnalysisResult
     public string? GoldenPath { get; set; }
     public double DifferenceScore { get; set; }
     public double MeanBrightness { get; set; }
-<<<<<<< HEAD
     public double ReviewThreshold { get; set; }
     public double NgThreshold { get; set; }
     public double Confidence { get; set; }
@@ -24,8 +23,6 @@ public class AnalysisResult
     public string ModelVersion { get; set; } = "AOI_AI_0.8.1";
     public string PolicyName { get; set; } = "Minimize False Positives";
     public List<string> Evidence { get; set; } = new();
-=======
->>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     public string Verdict { get; set; } = "REVIEW";
     public string SuggestedDefect { get; set; } = "Unknown";
     public Rect Hotspot { get; set; }

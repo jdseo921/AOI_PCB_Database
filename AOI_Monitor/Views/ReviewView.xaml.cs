@@ -68,7 +68,11 @@ public partial class ReviewView : UserControl
             return;
         }
 
+<<<<<<< HEAD
+        var bmp = LoadBitmapOnLoad(sample!);
+=======
         var bmp = new BitmapImage(new Uri(sample!, UriKind.Absolute));
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
         int x = (int)(bmp.PixelWidth * 0.35);
         int y = (int)(bmp.PixelHeight * 0.35);
         int w = (int)(bmp.PixelWidth * 0.3);
@@ -93,6 +97,20 @@ public partial class ReviewView : UserControl
         MessageBox.Show("ROI crop saved.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
+<<<<<<< HEAD
+    private static BitmapImage LoadBitmapOnLoad(string path)
+    {
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.UriSource = new Uri(path, UriKind.Absolute);
+        bmp.EndInit();
+        bmp.Freeze();
+        return bmp;
+    }
+
+=======
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     private void OnHistoryClick(object sender, RoutedEventArgs e)
     {
         var history = WorkflowState.Instance.History;
@@ -131,16 +149,86 @@ public partial class ReviewView : UserControl
 
     private void LogDisposition(string action)
     {
+<<<<<<< HEAD
+        var state = WorkflowState.Instance;
+        var analysis = state.LastAnalysis;
+        if (analysis is null)
+        {
+            MessageBox.Show("Run image comparison before recording disposition.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (action == "Confirm NG" && analysis.Confidence < 0.70)
+        {
+            MessageBox.Show(
+                "NG confirmation blocked because confidence is below 70%. Use Hold for 2nd Review or gather more evidence.",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        if (action == "Mark False Call" && analysis.Confidence >= 0.85 && analysis.Verdict == "NG")
+        {
+            MessageBox.Show(
+                "False-call override blocked for high-confidence NG. Escalate as Hold for 2nd Review.",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        state.AddDisposition(action);
+=======
         WorkflowState.Instance.AddDisposition(action);
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 
         var logDir = Path.Combine(AppContext.BaseDirectory, "exports");
         Directory.CreateDirectory(logDir);
         var file = Path.Combine(logDir, "review_disposition_log.csv");
 
         if (!File.Exists(file))
+<<<<<<< HEAD
+        {
+            File.WriteAllText(
+                file,
+                "TimestampUtc,StationId,OperatorId,Sample,Golden,Verdict,Confidence,Policy,ModelVersion,DecisionReason,Action\n");
+        }
+
+        File.AppendAllText(
+            file,
+            string.Join(",",
+                DateTime.UtcNow.ToString("O"),
+                EscapeCsv(state.StationId),
+                EscapeCsv(state.OperatorId),
+                EscapeCsv(Path.GetFileName(analysis.SamplePath)),
+                EscapeCsv(analysis.GoldenPath is null ? "none" : Path.GetFileName(analysis.GoldenPath)),
+                EscapeCsv(analysis.Verdict),
+                analysis.Confidence.ToString("F4"),
+                EscapeCsv(analysis.PolicyName),
+                EscapeCsv(analysis.ModelVersion),
+                EscapeCsv(analysis.DecisionReason),
+                EscapeCsv(action)) + Environment.NewLine);
+
+        try
+        {
+            RobotIntegrationService.ExportDispositionEvent(action, analysis);
+        }
+        catch (Exception ex)
+        {
+            state.AddEvent("INTEGRATION", $"Disposition export failed: {ex.Message}");
+        }
+
+        MessageBox.Show($"Disposition recorded: {action}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private static string EscapeCsv(string value)
+        => $"\"{value.Replace("\"", "\"\"")}\"";
+=======
             File.WriteAllText(file, "Timestamp,Action\n");
 
         File.AppendAllText(file, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss},{action}\n");
         MessageBox.Show($"Disposition recorded: {action}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 }

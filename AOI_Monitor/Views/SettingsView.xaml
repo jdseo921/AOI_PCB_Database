@@ -2,6 +2,91 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#0B0E10">
+<<<<<<< HEAD
+  <UserControl.Resources>
+    <Style x:Key="SettingsCombo" TargetType="ComboBox">
+      <Setter Property="Background" Value="#0F1316"/>
+      <Setter Property="Foreground" Value="#E7EDF2"/>
+      <Setter Property="BorderBrush" Value="#4A535C"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="Padding" Value="6,3"/>
+      <Setter Property="FontFamily" Value="Segoe UI"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBox">
+            <Grid>
+              <ToggleButton x:Name="ToggleButton"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Foreground="{TemplateBinding Foreground}"
+                            IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                            Focusable="False" ClickMode="Press">
+                <ToggleButton.Template>
+                  <ControlTemplate TargetType="ToggleButton">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*"/>
+                          <ColumnDefinition Width="20"/>
+                        </Grid.ColumnDefinitions>
+                        <Path Grid.Column="1" Data="M 0 0 L 4 4 L 8 0 Z"
+                              Fill="#9AA6AF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      </Grid>
+                    </Border>
+                  </ControlTemplate>
+                </ToggleButton.Template>
+              </ToggleButton>
+              <ContentPresenter x:Name="ContentSite"
+                                IsHitTestVisible="False"
+                                Content="{TemplateBinding SelectionBoxItem}"
+                                ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                Margin="8,3,24,3"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Left"
+                                TextBlock.Foreground="#E7EDF2"/>
+              <Popup x:Name="Popup" Placement="Bottom"
+                     IsOpen="{TemplateBinding IsDropDownOpen}"
+                     AllowsTransparency="True" Focusable="False"
+                     PopupAnimation="Slide">
+                <Grid x:Name="DropDown" SnapsToDevicePixels="True"
+                      MinWidth="{TemplateBinding ActualWidth}"
+                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                  <Border Background="#0F1316" BorderBrush="#4A535C" BorderThickness="1">
+                    <ScrollViewer SnapsToDevicePixels="True">
+                      <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                    </ScrollViewer>
+                  </Border>
+                </Grid>
+              </Popup>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="SettingsComboItem" TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+      <Setter Property="Background" Value="#101417"/>
+      <Setter Property="Foreground" Value="#E7EDF2"/>
+      <Style.Triggers>
+        <Trigger Property="IsHighlighted" Value="True">
+          <Setter Property="Background" Value="#2E5E80"/>
+          <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Trigger>
+        <Trigger Property="IsSelected" Value="True">
+          <Setter Property="Background" Value="#1E4966"/>
+          <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+  </UserControl.Resources>
+=======
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
   <Grid Margin="8">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/>
@@ -12,38 +97,77 @@
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+<<<<<<< HEAD
+          <TextBlock x:Name="DisplayLanguageHeaderText" Text="Display / Language" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+=======
           <TextBlock Text="Display / Language" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
         </Border>
         <StackPanel Grid.Row="1" Margin="12">
           <Grid Margin="0,0,0,10">
             <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+<<<<<<< HEAD
+            <TextBlock x:Name="LanguageLabelText" Text="Language" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+            <ComboBox Grid.Column="1" x:Name="LangCombo" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}">English</ComboBoxItem>
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}">Korean</ComboBoxItem>
+=======
             <TextBlock Text="Language" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
             <ComboBox Grid.Column="1" x:Name="LangCombo" SelectedIndex="0">
               <ComboBoxItem>English</ComboBoxItem>
               <ComboBoxItem>Korean</ComboBoxItem>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
             </ComboBox>
           </Grid>
           <Grid Margin="0,0,0,10">
             <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+<<<<<<< HEAD
+            <TextBlock x:Name="FontSizeLabelText" Text="Font Size" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+            <ComboBox Grid.Column="1" x:Name="FontCombo" SelectedIndex="1" Style="{StaticResource SettingsCombo}">
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}">Compact</ComboBoxItem>
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}">Standard</ComboBoxItem>
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}">Large</ComboBoxItem>
+=======
             <TextBlock Text="Font Size" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
             <ComboBox Grid.Column="1" x:Name="FontCombo" SelectedIndex="1">
               <ComboBoxItem>Compact</ComboBoxItem>
               <ComboBoxItem>Standard</ComboBoxItem>
               <ComboBoxItem>Large</ComboBoxItem>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
             </ComboBox>
           </Grid>
           <Grid Margin="0,0,0,10">
             <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+<<<<<<< HEAD
+            <TextBlock x:Name="StoragePathLabelText" Text="Storage Path" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+=======
             <TextBlock Text="Storage Path" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
             <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="D:/AOI_DB/TBOX_MAIN/image_vault/"/>
           </Grid>
           <Grid>
             <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+<<<<<<< HEAD
+            <TextBlock x:Name="ReviewDefaultLabelText" Text="Review Default" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+=======
             <TextBlock Text="Review Default" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
             <TextBox x:Name="ReviewDefaultText" Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="Minimize False Positives"/>
           </Grid>
           <Grid Margin="0,10,0,0">
             <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+<<<<<<< HEAD
+            <TextBlock x:Name="DetectionPriorityLabelText" Text="Detection Priority" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+            <ComboBox x:Name="DetectionPriorityCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Minimize False Positives"/>
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Balanced"/>
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Maximize Defect Recall"/>
+            </ComboBox>
+          </Grid>
+          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <Button x:Name="ApplyBtn" Style="{StaticResource ActionBtnGreen}" Content="Apply" Click="OnApply" Margin="0,0,8,0"/>
+            <Button x:Name="ResetBtn" Style="{StaticResource ActionBtn}"      Content="Reset" Click="OnReset"/>
+=======
             <TextBlock Text="Detection Priority" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
             <ComboBox x:Name="DetectionPriorityCombo" Grid.Column="1" SelectedIndex="0">
               <ComboBoxItem Content="Minimize False Positives"/>
@@ -54,6 +178,7 @@
           <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
             <Button Style="{StaticResource ActionBtnGreen}" Content="Apply" Click="OnApply" Margin="0,0,8,0"/>
             <Button Style="{StaticResource ActionBtn}"      Content="Reset" Click="OnReset"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
           </StackPanel>
         </StackPanel>
       </Grid>

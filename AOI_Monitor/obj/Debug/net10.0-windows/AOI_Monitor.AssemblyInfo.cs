@@ -13,7 +13,11 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AOI_Monitor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+<<<<<<< HEAD
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+67117d637c0ef2a7f4698c2245b5001171a02ca2")]
+=======
 [assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1b00b6c967b2122a2204991b19f3b45b6edc9007")]
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 [assembly: System.Reflection.AssemblyProductAttribute("AOI_Monitor")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AOI_Monitor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

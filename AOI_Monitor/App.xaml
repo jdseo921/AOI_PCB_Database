@@ -159,21 +159,43 @@
 
     <!-- ═══ COMBOBOX ═══ -->
     <Style TargetType="ComboBox">
+<<<<<<< HEAD
+      <Setter Property="Background"    Value="#E3E7EC"/>
+      <Setter Property="BorderBrush"   Value="#8F9CA8"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Foreground"    Value="#101418"/>
+=======
       <Setter Property="Background"    Value="#0F1316"/>
       <Setter Property="BorderBrush"   Value="#4A535C"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="Foreground"    Value="#E7EDF2"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
       <Setter Property="MinHeight"     Value="28"/>
       <Setter Property="Padding"       Value="6,3"/>
       <Setter Property="FontFamily"    Value="Segoe UI"/>
       <Setter Property="FontSize"      Value="13"/>
     </Style>
     <Style TargetType="ComboBoxItem">
+<<<<<<< HEAD
+      <Setter Property="Background" Value="#E3E7EC"/>
+      <Setter Property="Foreground" Value="#101418"/>
+      <Setter Property="Padding" Value="8,4"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Style.Triggers>
+        <Trigger Property="IsSelected" Value="True">
+          <Setter Property="Background" Value="#214A63"/>
+          <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Trigger>
+        <Trigger Property="IsHighlighted" Value="True">
+          <Setter Property="Background" Value="#2C5C7A"/>
+          <Setter Property="Foreground" Value="#FFFFFF"/>
+=======
       <Setter Property="Background" Value="#0F1316"/>
       <Setter Property="Foreground" Value="#E7EDF2"/>
       <Style.Triggers>
         <Trigger Property="IsHighlighted" Value="True">
           <Setter Property="Background" Value="#1D2830"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
         </Trigger>
       </Style.Triggers>
     </Style>

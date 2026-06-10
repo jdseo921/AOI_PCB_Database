@@ -19,7 +19,11 @@
       <Grid.RowDefinitions>
         <RowDefinition Height="30"/>  <!-- top clock bar -->
         <RowDefinition Height="36"/>  <!-- menu bar -->
+<<<<<<< HEAD
+        <RowDefinition Height="Auto"/>  <!-- status strip -->
+=======
         <RowDefinition Height="42"/>  <!-- status strip -->
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
         <RowDefinition Height="*"/>   <!-- content -->
         <RowDefinition Height="26"/>  <!-- footer -->
       </Grid.RowDefinitions>
@@ -88,6 +92,9 @@
         <Border BorderBrush="#343C43" BorderThickness="0,0,0,1">
           <DockPanel>
             <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+<<<<<<< HEAD
+              <Button Style="{StaticResource MiniBtn}" Width="64" Margin="4,4,0,4" Content="File" Click="OnMenuFileClick"/>
+=======
               <Border Width="88" BorderBrush="#2D343A" BorderThickness="0,0,1,0">
                 <TextBlock Text="File" Foreground="#BDC7CE" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Border>
@@ -112,10 +119,55 @@
               <Border Width="72">
                 <TextBlock Text="Help" Foreground="#BDC7CE" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Border>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
             </StackPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
               <Border BorderBrush="#2D343A" BorderThickness="1,0,0,0">
                 <StackPanel Orientation="Horizontal">
+<<<<<<< HEAD
+                  <Border Width="182" BorderBrush="#2D343A" BorderThickness="0,0,1,0" Padding="10,0">
+                    <Grid VerticalAlignment="Center">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="62"/>
+                        <ColumnDefinition Width="*"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="Operator" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
+                      <TextBlock Grid.Column="1" Text="Engineer01" FontWeight="SemiBold" Foreground="#E7ECEF" FontSize="11.5"
+                                 TextTrimming="CharacterEllipsis" ToolTip="Engineer01" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </Grid>
+                  </Border>
+                  <Border Width="100" BorderBrush="#2D343A" BorderThickness="0,0,1,0" Padding="10,0">
+                    <Grid VerticalAlignment="Center">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="44"/>
+                        <ColumnDefinition Width="*"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="Shift" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
+                      <TextBlock Grid.Column="1" Text="A" FontWeight="SemiBold" Foreground="#E7ECEF" FontSize="11.5" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </Grid>
+                  </Border>
+                  <Border Width="162" BorderBrush="#2D343A" BorderThickness="0,0,1,0" Padding="10,0">
+                    <Grid VerticalAlignment="Center">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="66"/>
+                        <ColumnDefinition Width="*"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="Authority" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
+                      <TextBlock Grid.Column="1" Text="Review" FontWeight="SemiBold" Foreground="#E7ECEF" FontSize="11.5"
+                                 TextTrimming="CharacterEllipsis" ToolTip="Review" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </Grid>
+                  </Border>
+                  <Border Width="212" Padding="10,0">
+                    <Grid VerticalAlignment="Center">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="46"/>
+                        <ColumnDefinition Width="*"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="Mode" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
+                      <TextBlock Grid.Column="1" Text="Background Service" FontWeight="SemiBold" Foreground="#E7ECEF" FontSize="11.5"
+                                 TextTrimming="CharacterEllipsis" ToolTip="Background Service" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </Grid>
+=======
                   <Border Width="110" BorderBrush="#2D343A" BorderThickness="0,0,1,0" Padding="12,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                       <TextBlock Text="Operator" Foreground="#AAB4BB" FontSize="11.5"/>
@@ -139,6 +191,7 @@
                       <TextBlock Text="Mode" Foreground="#AAB4BB" FontSize="11.5"/>
                       <TextBlock Text="Background Service" FontWeight="SemiBold" Foreground="#E7ECEF" FontSize="11.5" Margin="6,0,0,0"/>
                     </StackPanel>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
                   </Border>
                 </StackPanel>
               </Border>
@@ -148,6 +201,15 @@
       </Grid>
 
       <!-- ══ ROW 2: Status strip ══ -->
+<<<<<<< HEAD
+      <Grid Grid.Row="2" Background="#1B2024" MinHeight="106">
+        <Border BorderBrush="#3C444B" BorderThickness="0,0,0,1">
+          <UniformGrid Columns="3" Rows="2">
+            <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
+              <StackPanel>
+                <TextBlock Text="Install Target" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+                <TextBlock Text="Factory Station PC" Foreground="#F0F5F8" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+=======
       <Grid Grid.Row="2" Background="#1B2024">
         <Border BorderBrush="#3C444B" BorderThickness="0,0,0,1">
           <UniformGrid Columns="6">
@@ -155,36 +217,57 @@
               <StackPanel>
                 <TextBlock Text="Install Target" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
                 <TextBlock Text="Factory Station PC" Foreground="#F0F5F8" FontWeight="Bold" FontSize="13"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
               </StackPanel>
             </Border>
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
               <StackPanel>
                 <TextBlock Text="Runtime Model" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+<<<<<<< HEAD
+                <TextBlock Text="Background Svc + GUI Mon." Foreground="#F0F5F8" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
+=======
                 <TextBlock Text="Background Svc + GUI Mon." Foreground="#F0F5F8" FontWeight="Bold" FontSize="12"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
               </StackPanel>
             </Border>
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
               <StackPanel>
                 <TextBlock Text="Board / Program" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+<<<<<<< HEAD
+                <TextBlock Text="TBOX-MAIN / TBOX_TOP_V1.2" Foreground="#50F56E" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
+=======
                 <TextBlock Text="TBOX-MAIN / TBOX_TOP_V1.2" Foreground="#50F56E" FontWeight="Bold" FontSize="12"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
               </StackPanel>
             </Border>
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
               <StackPanel>
                 <TextBlock Text="Review Policy" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+<<<<<<< HEAD
+                <TextBlock x:Name="ReviewPolicyText" Text="Minimize False Positives" Foreground="#E1A334" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+=======
                 <TextBlock x:Name="ReviewPolicyText" Text="Minimize False Positives" Foreground="#E1A334" FontWeight="Bold" FontSize="13"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
               </StackPanel>
             </Border>
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
               <StackPanel>
                 <TextBlock Text="AI Model" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+<<<<<<< HEAD
+                <TextBlock Text="AOI_AI_0.8.1" Foreground="#F0F5F8" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+=======
                 <TextBlock Text="AOI_AI_0.8.1" Foreground="#F0F5F8" FontWeight="Bold" FontSize="13"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
               </StackPanel>
             </Border>
             <Border Padding="10,6">
               <StackPanel>
                 <TextBlock Text="Storage" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+<<<<<<< HEAD
+                <TextBlock Text="Local SQLite + Image Vault" Foreground="#F0F5F8" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
+=======
                 <TextBlock Text="Local SQLite + Image Vault" Foreground="#F0F5F8" FontWeight="Bold" FontSize="12"/>
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
               </StackPanel>
             </Border>
           </UniformGrid>

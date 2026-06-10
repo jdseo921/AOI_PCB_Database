@@ -1,5 +1,9 @@
 ﻿AOI_Monitor
+<<<<<<< HEAD
+1.0.0.0
+=======
 
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 
 winexe
 C#
@@ -12,9 +16,17 @@ TRACE;DEBUG;NET;NET10_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_O
 C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\App.xaml
 13-1573526451
 
+<<<<<<< HEAD
+262014646441
+2061815282281
+Controls\CircularGauge.xaml;Controls\LineChart.xaml;MainWindow.xaml;Views\CompareView.xaml;Views\GuideView.xaml;Views\InstallView.xaml;Views\LibraryView.xaml;Views\MonitorView.xaml;Views\RecipeView.xaml;Views\ReportsView.xaml;Views\ReviewView.xaml;Views\SettingsView.xaml;Views\SpcView.xaml;
+
+True
+=======
 22-610977727
 2061815282281
 Controls\CircularGauge.xaml;Controls\LineChart.xaml;MainWindow.xaml;Views\CompareView.xaml;Views\GuideView.xaml;Views\InstallView.xaml;Views\LibraryView.xaml;Views\MonitorView.xaml;Views\RecipeView.xaml;Views\ReportsView.xaml;Views\ReviewView.xaml;Views\SettingsView.xaml;Views\SpcView.xaml;
 
 False
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 

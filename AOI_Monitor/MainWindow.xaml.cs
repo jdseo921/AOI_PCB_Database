@@ -1,7 +1,13 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+<<<<<<< HEAD
+using System.Windows.Media.Animation;
 using System.IO;
+using System.Diagnostics;
+=======
+using System.IO;
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
 using AOI_Monitor.Views;
@@ -72,6 +78,34 @@ public partial class MainWindow : Window
 
         PageContent.Content = page;
         PageTitleText.Text  = PageTitles.TryGetValue(key, out var t) ? t : key.ToUpperInvariant();
+<<<<<<< HEAD
+        PlayNavigationTransition();
+    }
+
+    private void PlayNavigationTransition()
+    {
+        // Subtle transition to reduce abrupt page swaps.
+        PageContent.Opacity = 0;
+        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+        };
+
+        if (PageContent.RenderTransform is not TranslateTransform translate)
+        {
+            translate = new TranslateTransform();
+            PageContent.RenderTransform = translate;
+        }
+
+        var slide = new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+        };
+
+        PageContent.BeginAnimation(OpacityProperty, fade);
+        translate.BeginAnimation(TranslateTransform.YProperty, slide);
+=======
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     }
 
     private void OnRefreshClick(object sender, RoutedEventArgs e)
@@ -92,6 +126,20 @@ public partial class MainWindow : Window
         MessageBox.Show("View refreshed.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
+<<<<<<< HEAD
+    private void OnMenuFileClick(object sender, RoutedEventArgs e)
+    {
+        var exportDir = Path.Combine(AppContext.BaseDirectory, "exports");
+        Directory.CreateDirectory(exportDir);
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = exportDir,
+            UseShellExecute = true,
+        });
+    }
+
+=======
+>>>>>>> 67117d637c0ef2a7f4698c2245b5001171a02ca2
     private void OnLockRecipeClick(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;

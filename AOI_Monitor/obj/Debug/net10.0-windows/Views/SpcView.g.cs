@@ -60,7 +60,7 @@ namespace AOI_Monitor.Views {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/AOI_Monitor;component/views/spcview.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/AOI_Monitor;V1.0.0.0;component/views/spcview.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\Views\SpcView.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

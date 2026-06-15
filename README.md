@@ -20,6 +20,19 @@ For the detailed feature inventory, see [IMPLEMENTED_FEATURES.md](IMPLEMENTED_FE
 - `SampleData/` - instructions for placing small local demo images.
 - `AOI_Monitor/bin/` and `AOI_Monitor/obj/` - local build outputs.
 
+## Repository Hygiene
+
+This repository should contain source code, XAML, docs, and small non-confidential instructions only. Do not commit:
+
+- `bin/` or `obj/` build outputs.
+- `.vs/` and generated `.user` IDE files.
+- Local SQLite database files or WAL/SHM sidecars.
+- Image vault folders or training-set export folders.
+- Generated export packages, CSV files, overlays, or machine-interface JSON files.
+- Customer images, production images, or large sample datasets.
+
+Local runtime data is generated automatically when the app starts or when imports/exports are run. Place small demo-image instructions in `SampleData/`; keep large or private datasets outside the repository.
+
 ## Run
 
 Requirements:

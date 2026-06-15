@@ -85,6 +85,10 @@ public record BatchTestResultRecord(
     double RoiY,
     double RoiWidth,
     double RoiHeight,
+    string Side,
+    string RefDes,
+    string LotId,
+    string BoardModel,
     DateTime CreatedAtUtc);
 
 public sealed class LogFilter

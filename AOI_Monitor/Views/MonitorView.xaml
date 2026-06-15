@@ -1,282 +1,192 @@
 <UserControl x:Class="AOI_Monitor.Views.MonitorView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:c="clr-namespace:AOI_Monitor.Controls"
              Background="#0B0E10">
-  <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="8">
+  <Grid Margin="8">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="150"/>
+    </Grid.RowDefinitions>
 
-      <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
-        <Grid Margin="8">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="430"/>
-          </Grid.ColumnDefinitions>
-          <StackPanel>
-            <TextBlock Text="Main Inspection" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-            <TextBlock Text="Operator review workspace. Station dashboard data is prototype/local only; use the shortcuts for detailed review, compare, and image records."
-                       Foreground="#8B969E" FontSize="10.5" TextWrapping="Wrap" Margin="0,3,0,0"/>
-          </StackPanel>
-          <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
-            <Button Style="{StaticResource ActionBtnGreen}" Content="Disposition" Margin="0,0,6,0" Click="OnOpenDispositionClick"/>
-            <Button Style="{StaticResource ActionBtnBlue}" Content="Golden Compare" Margin="0,0,6,0" Click="OnOpenCompareClick"/>
-            <Button Style="{StaticResource ActionBtn}" Content="Image Library" Click="OnOpenLibraryClick"/>
-          </WrapPanel>
+    <Border Grid.Row="0" Style="{StaticResource Panel}">
+      <Grid Margin="8">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock Text="Main Inspection" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <TextBlock Text="Operator inspection flow using imported or folder-simulated images. Camera, lighting, robot, and MES remain planned integrations."
+                     Foreground="#8B969E" FontSize="10.5" TextWrapping="Wrap" Margin="0,3,0,0"/>
+        </StackPanel>
+        <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Disposition" Margin="0,0,6,0" Click="OnOpenDispositionClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Golden Compare" Margin="0,0,6,0" Click="OnOpenCompareClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Image Library" Click="OnOpenLibraryClick"/>
+        </WrapPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="1.65*"/>
+        <ColumnDefinition Width="8"/>
+        <ColumnDefinition Width="1*"/>
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0" Style="{StaticResource Panel}">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="25"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+            <DockPanel>
+              <TextBlock x:Name="ImageStatusText" DockPanel.Dock="Right" Text="No image loaded" Foreground="#9AA6AF" FontSize="11"/>
+              <TextBlock Text="Image / Simulated Live Feed" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            </DockPanel>
+          </Border>
+
+          <Grid Grid.Row="1" Margin="8">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="8"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="8"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="View" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,6,0"/>
+              <ComboBox x:Name="ViewSelector" Width="110" SelectedIndex="0" SelectionChanged="OnViewSelectionChanged">
+                <ComboBoxItem Content="Top"/>
+                <ComboBoxItem Content="Side"/>
+                <ComboBoxItem Content="Bottom"/>
+              </ComboBox>
+            </StackPanel>
+            <CheckBox Grid.Column="2" x:Name="OverlayCheck" Content="Defect overlay layer" IsChecked="True"
+                      VerticalAlignment="Center" Foreground="#DCE5EB" Checked="OnOverlayChanged" Unchecked="OnOverlayChanged"/>
+            <StackPanel Grid.Column="4" Orientation="Horizontal">
+              <Button Style="{StaticResource MiniBtn}" Content="Select Folder" Margin="0,0,6,0" Click="OnSelectFolderClick"/>
+              <CheckBox x:Name="AutoSaveCheck" Content="Auto-save" Foreground="#DCE5EB" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Grid>
+
+          <Border Grid.Row="2" Margin="8,0,8,8" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
+            <Grid ClipToBounds="True">
+              <TextBlock x:Name="EmptyImageText" Text="Select a folder or load an image from Image Library, then press Start / Next Board."
+                         Foreground="#68757D" FontSize="13" TextWrapping="Wrap" TextAlignment="Center"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"/>
+              <Viewbox Stretch="Uniform">
+                <Grid x:Name="ImageOverlayRoot" Width="1000" Height="700">
+                  <Image x:Name="InspectionImage" Stretch="Uniform"/>
+                  <Canvas x:Name="DefectOverlayCanvas" Width="1000" Height="700" IsHitTestVisible="False"/>
+                </Grid>
+              </Viewbox>
+            </Grid>
+          </Border>
+
+          <UniformGrid Grid.Row="3" Columns="4" Margin="8,0,8,8">
+            <Button Style="{StaticResource ActionBtnGreen}" Content="Start" Margin="0,0,6,0" Click="OnStartClick"/>
+            <Button Style="{StaticResource ActionBtnRed}" Content="Stop" Margin="0,0,6,0" Click="OnStopClick"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Next Board" Margin="0,0,6,0" Click="OnNextBoardClick"/>
+            <Button Style="{StaticResource ActionBtnAmber}" Content="Save Result" Click="OnSaveResultClick"/>
+          </UniformGrid>
         </Grid>
       </Border>
 
-      <!-- ══ KPI STRIP (6 cards) ══ -->
-      <UniformGrid Columns="6">
+      <Grid Grid.Column="2">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="8"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-        <!-- KPI 1 Total Library -->
-        <Border Style="{StaticResource Panel}" Margin="0,0,8,0" MinHeight="104">
+        <Border Grid.Row="0" Style="{StaticResource Panel}">
           <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="24"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="25"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Total Library" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+              <TextBlock Text="Board / Status" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
             </Border>
-            <Grid Grid.Row="1" Margin="7">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock Text="23,932" FontSize="22" FontWeight="ExtraBold" Foreground="#F2F7FA"/>
-                <TextBlock Text="all indexed samples" Foreground="#9FA9B1" FontSize="10" Margin="0,4,0,0"/>
-                <TextBlock Text="monitor: 37.1%" Foreground="#68757D" FontSize="9.5" Margin="0,3,0,0"/>
-              </StackPanel>
-              <c:CircularGauge Grid.Column="1" Value="37.1"
-                GaugeColor="#50F56E" Width="72" Height="72" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <Grid Grid.Row="1" Margin="8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="110"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="40"/>
+              </Grid.RowDefinitions>
+              <TextBlock Text="Board / Model" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="1" x:Name="BoardModelText" Text="TBOX-MAIN" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="1" Text="Lot ID" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="1" Grid.Column="1" x:Name="LotText" Text="POC-LOT" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="2" Text="Operator" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="2" Grid.Column="1" x:Name="OperatorText" Text="Engineer01" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="3" Text="Engine" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="3" Grid.Column="1" x:Name="EngineText" Text="Pixel Difference" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+              <TextBlock Grid.Row="4" Text="Status" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <Border Grid.Row="4" Grid.Column="1" x:Name="ResultStatusBorder" Style="{StaticResource ChipAmber}" HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock x:Name="ResultStatusText" Text="WARNING" FontWeight="Bold" FontSize="11"/>
+              </Border>
             </Grid>
           </Grid>
         </Border>
 
-        <!-- KPI 2 NG Records -->
-        <Border Style="{StaticResource Panel}" Margin="0,0,8,0" MinHeight="104">
+        <Border Grid.Row="2" Style="{StaticResource Panel}">
           <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="24"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="25"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="NG Records" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+              <TextBlock Text="Defect List" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
             </Border>
-            <Grid Grid.Row="1" Margin="7">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock Text="8,809" FontSize="22" FontWeight="ExtraBold" Foreground="#F2F7FA"/>
-                <TextBlock Text="verified defect samples" Foreground="#9FA9B1" FontSize="10" Margin="0,4,0,0"/>
-                <TextBlock Text="monitor: 84.6%" Foreground="#68757D" FontSize="9.5" Margin="0,3,0,0"/>
-              </StackPanel>
-              <c:CircularGauge Grid.Column="1" Value="84.6"
-                GaugeColor="#50F56E" Width="72" Height="72" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-            </Grid>
-          </Grid>
-        </Border>
-
-        <!-- KPI 3 Pending Review -->
-        <Border Style="{StaticResource Panel}" Margin="0,0,8,0" MinHeight="104">
-          <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="24"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Pending Review" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-            </Border>
-            <Grid Grid.Row="1" Margin="7">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock Text="462" FontSize="22" FontWeight="ExtraBold" Foreground="#F2F7FA"/>
-                <TextBlock Text="operator disposition queue" Foreground="#9FA9B1" FontSize="10" Margin="0,4,0,0"/>
-                <TextBlock Text="monitor: 66.7%" Foreground="#68757D" FontSize="9.5" Margin="0,3,0,0"/>
-              </StackPanel>
-              <c:CircularGauge Grid.Column="1" Value="66.7"
-                GaugeColor="#50F56E" Width="72" Height="72" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-            </Grid>
-          </Grid>
-        </Border>
-
-        <!-- KPI 4 Possible Escapes (RED) -->
-        <Border Style="{StaticResource Panel}" Margin="0,0,8,0" MinHeight="104">
-          <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="24"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Possible Escapes" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-            </Border>
-            <Grid Grid.Row="1" Margin="7">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock Text="36" FontSize="22" FontWeight="ExtraBold" Foreground="#F13B3F"/>
-                <TextBlock Text="AI OK / GT NG cases" Foreground="#9FA9B1" FontSize="10" Margin="0,4,0,0"/>
-                <TextBlock Text="monitor: 18.9%" Foreground="#68757D" FontSize="9.5" Margin="0,3,0,0"/>
-              </StackPanel>
-              <c:CircularGauge Grid.Column="1" Value="18.9"
-                GaugeColor="#F13B3F" Width="72" Height="72" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-            </Grid>
-          </Grid>
-        </Border>
-
-        <!-- KPI 5 False Calls (AMBER) -->
-        <Border Style="{StaticResource Panel}" Margin="0,0,8,0" MinHeight="104">
-          <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="24"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="False Calls" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-            </Border>
-            <Grid Grid.Row="1" Margin="7">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock Text="211" FontSize="22" FontWeight="ExtraBold" Foreground="#E1A334"/>
-                <TextBlock Text="AI NG / GT OK cases" Foreground="#9FA9B1" FontSize="10" Margin="0,4,0,0"/>
-                <TextBlock Text="monitor: 42.4%" Foreground="#68757D" FontSize="9.5" Margin="0,3,0,0"/>
-              </StackPanel>
-              <c:CircularGauge Grid.Column="1" Value="42.4"
-                GaugeColor="#E1A334" Width="72" Height="72" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-            </Grid>
-          </Grid>
-        </Border>
-
-        <!-- KPI 6 Linked Images -->
-        <Border Style="{StaticResource Panel}" MinHeight="104">
-          <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="24"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Linked Images" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-            </Border>
-            <Grid Grid.Row="1" Margin="7">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="80"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock Text="99.1%" FontSize="22" FontWeight="ExtraBold" Foreground="#F2F7FA"/>
-                <TextBlock Text="image vault integrity" Foreground="#9FA9B1" FontSize="10" Margin="0,4,0,0"/>
-                <TextBlock Text="monitor: 99.1%" Foreground="#68757D" FontSize="9.5" Margin="0,3,0,0"/>
-              </StackPanel>
-              <c:CircularGauge Grid.Column="1" Value="99.1"
-                GaugeColor="#50F56E" Width="72" Height="72" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-            </Grid>
-          </Grid>
-        </Border>
-      </UniformGrid>
-
-      <!-- ══ PRODUCTION GRID ══ -->
-      <Grid Margin="0,8,0,0">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="1.15*"/>
-          <ColumnDefinition Width="8"/>
-          <ColumnDefinition Width="1.25*"/>
-          <ColumnDefinition Width="8"/>
-          <ColumnDefinition Width="1.45*"/>
-        </Grid.ColumnDefinitions>
-
-        <!-- Defect Mix -->
-        <Border Grid.Column="0" Style="{StaticResource Panel}">
-          <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Defect Mix by Category" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-            </Border>
-            <StackPanel Grid.Row="1" Margin="8">
-              <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="80"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Solder" FontSize="11" Foreground="#8C98A1"/>
-                <ProgressBar Grid.Column="1" Style="{StaticResource BarTrack}" Value="48" Maximum="100" Margin="5,0" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="3,128" FontSize="11" Foreground="#8C98A1" TextAlignment="Right"/>
-              </Grid>
-              <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="80"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Component" FontSize="11" Foreground="#8C98A1"/>
-                <ProgressBar Grid.Column="1" Style="{StaticResource BarTrack}" Value="27" Maximum="100" Margin="5,0" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="2,144" FontSize="11" Foreground="#8C98A1" TextAlignment="Right"/>
-              </Grid>
-              <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="80"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Connector" FontSize="11" Foreground="#8C98A1"/>
-                <ProgressBar Grid.Column="1" Style="{StaticResource BarTrack}" Value="12" Maximum="100" Margin="5,0" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="1,048" FontSize="11" Foreground="#8C98A1" TextAlignment="Right"/>
-              </Grid>
-              <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="80"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Surface" FontSize="11" Foreground="#8C98A1"/>
-                <ProgressBar Grid.Column="1" Style="{StaticResource BarTrack}" Value="8" Maximum="100" Margin="5,0" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="966" FontSize="11" Foreground="#8C98A1" TextAlignment="Right"/>
-              </Grid>
-              <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="80"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Electrical" FontSize="11" Foreground="#8C98A1"/>
-                <ProgressBar Grid.Column="1" Style="{StaticResource BarTrack}" Value="5" Maximum="100" Margin="5,0" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="421" FontSize="11" Foreground="#8C98A1" TextAlignment="Right"/>
-              </Grid>
-            </StackPanel>
-          </Grid>
-        </Border>
-
-        <!-- Hourly Trend Chart -->
-        <Border Grid.Column="2" Style="{StaticResource Panel}">
-          <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Hourly Review Trend" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-            </Border>
-            <StackPanel Grid.Row="1" Margin="8">
-              <c:LineChart/>
-              <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
-                  <Rectangle Width="10" Height="3" Fill="#5CA0D3" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                  <TextBlock Text="Yield" Foreground="#89959D" FontSize="10.5"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,12,0">
-                  <Rectangle Width="10" Height="3" Fill="#E1A334" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                  <TextBlock Text="False Calls" Foreground="#89959D" FontSize="10.5"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                  <Rectangle Width="10" Height="3" Fill="#F13B3F" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                  <TextBlock Text="Escapes" Foreground="#89959D" FontSize="10.5"/>
-                </StackPanel>
-              </StackPanel>
-            </StackPanel>
-          </Grid>
-        </Border>
-
-        <!-- Recipe Status -->
-        <Border Grid.Column="4" Style="{StaticResource Panel}">
-          <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Recipe / Engine Status" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-            </Border>
-            <StackPanel Grid.Row="1" Margin="8">
-              <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Recipe ID" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="TBOX_TOP_V1.2" FontSize="11.5"/>
-              </Grid>
-              <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Board Program" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="TBOX-MAIN" FontSize="11.5"/>
-              </Grid>
-              <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="View Set" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="TOP/SIDE/BOTTOM (camera planned)" FontSize="11.5"/>
-              </Grid>
-              <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Engine Version" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference 0.1" FontSize="11.5"/>
-              </Grid>
-              <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Revision Lock" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="LOCKED" Foreground="#C1FFCB" FontSize="11.5"/>
-              </Grid>
-              <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Owner" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="ProcessEng01" FontSize="11.5"/>
-              </Grid>
-            </StackPanel>
+            <DataGrid Grid.Row="1" x:Name="DefectGrid" ItemsSource="{Binding}" AutoGenerateColumns="False">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="No" Binding="{Binding No}" Width="44"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="*"/>
+                <DataGridTextColumn Header="Score" Binding="{Binding ScoreDisplay}" Width="70"/>
+                <DataGridTextColumn Header="Side" Binding="{Binding Side}" Width="70"/>
+                <DataGridTextColumn Header="X" Binding="{Binding XDisplay}" Width="58"/>
+                <DataGridTextColumn Header="Y" Binding="{Binding YDisplay}" Width="58"/>
+              </DataGrid.Columns>
+            </DataGrid>
           </Grid>
         </Border>
       </Grid>
+    </Grid>
 
-      <!-- ══ FOV STATION GRID ══ -->
-      <Border Style="{StaticResource Panel}" Margin="0,8,0,0">
-        <Grid>
-          <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-            <TextBlock Text="FOV / Component Review Cells" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-          </Border>
-          <UniformGrid Grid.Row="1" Columns="4" Margin="8" x:Name="StationsPanel"/>
-        </Grid>
-      </Border>
-
-      <!-- Bottom alarm -->
-      <Border Margin="0,8,0,0" Background="#14080A" BorderBrush="#4B2325" BorderThickness="1" Padding="7,10">
-        <TextBlock Text="FOV05 simulated review alert: possible escape review required -> 3 samples queued"
-                   Foreground="#F27777" FontWeight="ExtraBold" TextAlignment="Center" FontSize="12"/>
-      </Border>
-
-    </StackPanel>
-  </ScrollViewer>
+    <Border Grid.Row="4" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="25"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <DockPanel>
+            <TextBlock x:Name="ModeText" DockPanel.Dock="Right" Text="STOPPED" Foreground="#E1A334" FontWeight="Bold" FontSize="11"/>
+            <TextBlock Text="Alarm / Event Log" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          </DockPanel>
+        </Border>
+        <DataGrid Grid.Row="1" x:Name="AlarmGrid" AutoGenerateColumns="False">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="90"/>
+            <DataGridTextColumn Header="Event" Binding="{Binding Event}" Width="140"/>
+            <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Grid>
+    </Border>
+  </Grid>
 </UserControl>

@@ -5,6 +5,8 @@ using System.IO;
 using System.Globalization;
 using System.Windows.Markup;
 using System.Windows.Media;
+using Microsoft.Win32;
+using AOI_Monitor.Models;
 using AOI_Monitor.Data;
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
@@ -27,6 +29,7 @@ public partial class SettingsView : UserControl
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
+        InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
         RefreshWorkflowUi();
         ApplyLanguageVisuals();
         ApplyFontPreset();
@@ -35,15 +38,18 @@ public partial class SettingsView : UserControl
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
+        InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
     }
 
     private void OnWorkflowStateChanged() => Dispatcher.Invoke(RefreshWorkflowUi);
+    private void OnInspectionConfigurationChanged() => Dispatcher.Invoke(RefreshInspectionConfigurationUi);
 
     private void OnApply(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
         ApplyLanguageVisuals();
         ApplyFontPreset();
+        SaveInspectionConfiguration();
 
         if (!state.TrySetDetectionPriority(ComboToPriority(DetectionPriorityCombo.SelectedIndex), out var message))
         {
@@ -60,6 +66,10 @@ public partial class SettingsView : UserControl
         LangCombo.SelectedIndex = 0;
         FontCombo.SelectedIndex = 1;
         DetectionPriorityCombo.SelectedIndex = 0;
+        InspectionEngineCombo.SelectedIndex = 0;
+        ModelPathText.Text = string.Empty;
+        ConfidenceThresholdText.Text = "0.65";
+        InspectionModelConfigurationService.Save(new InspectionModelConfiguration());
 
         ApplyLanguageVisuals();
         ApplyFontPreset();
@@ -121,6 +131,22 @@ public partial class SettingsView : UserControl
         state.StopTraining();
     }
 
+    private void OnBrowseModelClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select offline ONNX model",
+            Filter = "ONNX model|*.onnx|All files|*.*",
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        ModelPathText.Text = dialog.FileName;
+        InspectionEngineCombo.SelectedIndex = 1;
+        RefreshInspectionConfigurationUi(BuildConfigurationFromUi());
+    }
+
     private void OnOpenTrainingFolderClick(object sender, RoutedEventArgs e)
     {
         var trainingDir = AoiDatabase.TrainingVaultPath;
@@ -152,6 +178,94 @@ public partial class SettingsView : UserControl
         TrainingValidationText.Text = state.Training.LastCompletedAt is null
             ? "--"
             : $"{state.Training.LastValidationScore:F1}%";
+
+        RefreshInspectionConfigurationUi();
+    }
+
+    private void RefreshInspectionConfigurationUi()
+        => RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
+
+    private void RefreshInspectionConfigurationUi(InspectionModelConfiguration configuration)
+    {
+        InspectionEngineCombo.SelectedIndex = configuration.IsOnnxSelected ? 1 : 0;
+        ModelPathText.Text = configuration.ModelFilePath;
+        ConfidenceThresholdText.Text = configuration.ConfidenceThreshold.ToString("0.###", CultureInfo.InvariantCulture);
+
+        var status = GetStatus(configuration);
+        EngineRuntimeStatusText.Text = status switch
+        {
+            InspectionEngineStatus.MlModelConfigured => "ML Model Configured",
+            InspectionEngineStatus.MlModelMissing => "ML Model Missing",
+            InspectionEngineStatus.MlRuntimeError => "ML Runtime Error",
+            _ => "Prototype Engine",
+        };
+        EngineRuntimeStatusText.Foreground = StatusBrush(status);
+        EngineVersionText.Text = configuration.IsOnnxSelected
+            ? configuration.EffectiveModelVersion
+            : "PIXEL_DIFF_0.1";
+    }
+
+    private void SaveInspectionConfiguration()
+    {
+        var configuration = BuildConfigurationFromUi();
+        InspectionModelConfigurationService.Save(configuration);
+
+        var state = WorkflowState.Instance;
+        state.AddEvent(
+            "ENGINE_CONFIG",
+            configuration.IsOnnxSelected
+                ? $"Inspection engine set to ONNX ML Model; status {EngineRuntimeStatusText.Text}; version {configuration.EffectiveModelVersion}."
+                : "Inspection engine set to Pixel Difference / Prototype Engine.");
+    }
+
+    private InspectionModelConfiguration BuildConfigurationFromUi()
+    {
+        var modelPath = ModelPathText.Text.Trim();
+        var version = string.IsNullOrWhiteSpace(modelPath)
+            ? "UNCONFIGURED"
+            : Path.GetFileNameWithoutExtension(modelPath);
+
+        return new InspectionModelConfiguration
+        {
+            SelectedEngineKey = InspectionEngineCombo.SelectedIndex == 1
+                ? InspectionEngineFactory.OnnxEngineKey
+                : InspectionEngineFactory.DefaultEngineKey,
+            ModelFilePath = modelPath,
+            ModelVersion = version,
+            ConfidenceThreshold = double.TryParse(
+                ConfidenceThresholdText.Text,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var threshold)
+                ? Math.Clamp(threshold, 0.0, 1.0)
+                : 0.65,
+        };
+    }
+
+    private static InspectionEngineStatus GetStatus(InspectionModelConfiguration configuration)
+    {
+        if (!configuration.IsOnnxSelected)
+            return InspectionEngineStatus.PrototypeEngine;
+
+        if (!configuration.HasModelFile)
+            return InspectionEngineStatus.MlModelMissing;
+
+        return OnnxInspectionEngine.RuntimeAvailable
+            ? InspectionEngineStatus.MlModelConfigured
+            : InspectionEngineStatus.MlRuntimeError;
+    }
+
+    private static Brush StatusBrush(InspectionEngineStatus status)
+    {
+        var color = status switch
+        {
+            InspectionEngineStatus.MlModelConfigured => "#50F56E",
+            InspectionEngineStatus.MlModelMissing => "#E1A334",
+            InspectionEngineStatus.MlRuntimeError => "#F27777",
+            _ => "#E1A334",
+        };
+
+        return new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
     }
 
     private void ApplyLanguageVisuals()

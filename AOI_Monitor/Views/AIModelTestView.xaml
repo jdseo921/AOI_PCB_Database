@@ -81,39 +81,51 @@
 
           <StackPanel Grid.Column="4">
             <TextBlock Text="Engine" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
-            <TextBox Style="{StaticResource ReadonlyInput}" Text="Pixel Difference / Prototype Engine"/>
+            <TextBox x:Name="EngineText" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference / Prototype Engine"/>
             <Button Style="{StaticResource ActionBtnGreen}" Content="Run Batch Inspection" Margin="0,8,0,0" Click="OnRunBatchClick"/>
           </StackPanel>
         </Grid>
       </Grid>
     </Border>
 
-    <UniformGrid Grid.Row="2" Columns="4">
-      <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
-        <StackPanel>
-          <TextBlock Text="Accuracy" Foreground="#7F8C95" FontSize="10"/>
-          <TextBlock x:Name="AccuracyText" Text="--" FontWeight="Bold" FontSize="18"/>
-        </StackPanel>
-      </Border>
-      <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
-        <StackPanel>
-          <TextBlock Text="Precision" Foreground="#7F8C95" FontSize="10"/>
-          <TextBlock x:Name="PrecisionText" Text="--" FontWeight="Bold" FontSize="18"/>
-        </StackPanel>
-      </Border>
-      <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
-        <StackPanel>
-          <TextBlock Text="Recall" Foreground="#7F8C95" FontSize="10"/>
-          <TextBlock x:Name="RecallText" Text="--" FontWeight="Bold" FontSize="18"/>
-        </StackPanel>
-      </Border>
-      <Border Style="{StaticResource FieldBox}">
-        <StackPanel>
-          <TextBlock Text="False Call Rate" Foreground="#7F8C95" FontSize="10"/>
-          <TextBlock x:Name="FalseCallRateText" Text="--" FontWeight="Bold" FontSize="18"/>
-        </StackPanel>
-      </Border>
-    </UniformGrid>
+    <StackPanel Grid.Row="2">
+      <UniformGrid Columns="4">
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+          <StackPanel>
+            <TextBlock Text="Accuracy" Foreground="#7F8C95" FontSize="10"/>
+            <TextBlock x:Name="AccuracyText" Text="--" FontWeight="Bold" FontSize="18"/>
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+          <StackPanel>
+            <TextBlock Text="Precision" Foreground="#7F8C95" FontSize="10"/>
+            <TextBlock x:Name="PrecisionText" Text="--" FontWeight="Bold" FontSize="18"/>
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+          <StackPanel>
+            <TextBlock Text="Recall" Foreground="#7F8C95" FontSize="10"/>
+            <TextBlock x:Name="RecallText" Text="--" FontWeight="Bold" FontSize="18"/>
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource FieldBox}">
+          <StackPanel>
+            <TextBlock Text="False Call Rate" Foreground="#7F8C95" FontSize="10"/>
+            <TextBlock x:Name="FalseCallRateText" Text="--" FontWeight="Bold" FontSize="18"/>
+          </StackPanel>
+        </Border>
+      </UniformGrid>
+      <UniformGrid Columns="8" Margin="0,6,0,0">
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TP" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="TpText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TN" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="TnText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FP" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="FpText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FN" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="FnText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="False Call" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="FalseCallText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Possible Escape" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="PossibleEscapeText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Verified NG" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="VerifiedNgText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Unknown" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="UnknownText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+      </UniformGrid>
+    </StackPanel>
 
     <Border Grid.Row="4" Style="{StaticResource Panel}">
       <Grid>
@@ -139,7 +151,11 @@
                 </DataTemplate>
               </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Defect / Hotspot" Binding="{Binding DefectType}" Width="150"/>
+            <DataGridTextColumn Header="Defect / Hotspot" Binding="{Binding DefectType}" Width="140"/>
+            <DataGridTextColumn Header="Side" Binding="{Binding Side}" Width="70"/>
+            <DataGridTextColumn Header="RefDes" Binding="{Binding RefDes}" Width="90"/>
+            <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100"/>
+            <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="110"/>
           </DataGrid.Columns>
         </DataGrid>
       </Grid>
@@ -151,7 +167,8 @@
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
           <Button Style="{StaticResource ActionBtn}" Content="Preview Selected" Margin="0,0,6,0" Click="OnPreviewSelectedClick"/>
           <Button Style="{StaticResource ActionBtnGreen}" Content="Export CSV" Margin="0,0,6,0" Click="OnExportCsvClick"/>
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Export Annotated Images" Click="OnExportAnnotatedImagesClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Export Annotated Images" Margin="0,0,6,0" Click="OnExportAnnotatedImagesClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Generate Customer Validation Report" Click="OnGenerateReportClick"/>
         </StackPanel>
       </DockPanel>
     </Border>

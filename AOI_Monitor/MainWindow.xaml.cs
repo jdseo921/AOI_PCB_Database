@@ -60,7 +60,9 @@ public partial class MainWindow : Window
         };
 
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
+        InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
         Closed += (_, _) => WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
+        Closed += (_, _) => InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
 
         SwitchPage("monitor");
         UpdateWorkflowPanel();
@@ -204,6 +206,11 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(UpdateWorkflowPanel);
     }
 
+    private void OnInspectionConfigurationChanged()
+    {
+        Dispatcher.Invoke(() => UpdateInspectionEngineStatus());
+    }
+
     private void UpdateWorkflowPanel()
     {
         var state = WorkflowState.Instance;
@@ -257,8 +264,7 @@ public partial class MainWindow : Window
         ImageVaultStatusText.Text = vaultAvailable ? "Available" : "Not Available";
         ImageVaultStatusText.Foreground = StatusBrush(vaultAvailable);
 
-        InspectionEngineStatusText.Text = "Prototype";
-        InspectionEngineStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"));
+        UpdateInspectionEngineStatus();
 
         CameraStatusText.Text = "Simulated / Not Connected";
         CameraStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"));
@@ -272,4 +278,18 @@ public partial class MainWindow : Window
 
     private static Brush StatusBrush(bool ok)
         => new SolidColorBrush((Color)ColorConverter.ConvertFromString(ok ? "#50F56E" : "#F27777"));
+
+    private void UpdateInspectionEngineStatus()
+    {
+        var status = InspectionModelConfigurationService.GetStatus();
+        var statusText = InspectionModelConfigurationService.GetStatusText();
+        InspectionEngineStatusText.Text = statusText;
+        HeaderEngineText.Text = statusText;
+        InspectionEngineStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
+        {
+            Models.InspectionEngineStatus.MlModelConfigured => "#50F56E",
+            Models.InspectionEngineStatus.MlRuntimeError => "#F27777",
+            _ => "#E1A334",
+        }));
+    }
 }

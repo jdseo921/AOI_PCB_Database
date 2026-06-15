@@ -1,7 +1,0 @@
-C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor_Release\AOI_Monitor.pdb
-C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor_Release\D3DCompiler_47_cor3.dll
-C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor_Release\PenImc_cor3.dll
-C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor_Release\PresentationNative_cor3.dll
-C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor_Release\vcruntime140_cor3.dll
-C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor_Release\wpfgfx_cor3.dll
-C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor_Release\AOI_Monitor.exe

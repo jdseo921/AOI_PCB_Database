@@ -133,6 +133,36 @@
               <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Maximize Defect Recall"/>
             </ComboBox>
           </Grid>
+          <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+            <StackPanel>
+              <TextBlock Text="Inspection Engine Configuration" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Selected Engine" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <ComboBox x:Name="InspectionEngineCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pixel Difference / Prototype Engine"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="ONNX ML Model"/>
+                </ComboBox>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Model Path" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="ModelPathText" Grid.Column="1" MinHeight="28"/>
+                <Button Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseModelClick"/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Confidence" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="ConfidenceThresholdText" Grid.Column="1" MinHeight="28" Text="0.65"/>
+              </Grid>
+              <UniformGrid Columns="2">
+                <TextBlock Text="Runtime status" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock x:Name="EngineRuntimeStatusText" Text="Prototype Engine" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
+                <TextBlock Text="Saved version" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock x:Name="EngineVersionText" Text="PIXEL_DIFF_0.1" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
+              </UniformGrid>
+            </StackPanel>
+          </Border>
           <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
             <Button x:Name="ApplyBtn" Style="{StaticResource ActionBtnGreen}" Content="Apply" Click="OnApply" Margin="0,0,8,0"/>
             <Button x:Name="ResetBtn" Style="{StaticResource ActionBtn}"      Content="Reset" Click="OnReset"/>

@@ -42,22 +42,33 @@ public sealed class WorkflowState
     }
 
     public void SetAnalysis(AnalysisResult result)
+        => SetAnalysis(result, persist: true);
+
+    public void SetAnalysis(AnalysisResult result, bool persist)
     {
         result.BoardProgram = BoardProgram;
         result.OperatorId = OperatorId;
         LastAnalysis = result;
-        AoiDatabase.RecordInspectionResult(result);
-        AddEvent("ANALYSIS", $"Compared images -> score {result.DifferenceScore:F1}% ({result.Verdict})");
+        if (persist)
+        {
+            AoiDatabase.RecordInspectionResult(result);
 
-        try
-        {
-            var path = MachineInterfaceExportService.ExportInspectionDecision(result);
-            AddEvent("INTEGRATION", $"Machine interface JSON exported: {Path.GetFileName(path)}");
+            try
+            {
+                var path = MachineInterfaceExportService.ExportInspectionDecision(result);
+                AddEvent("INTEGRATION", $"Machine interface JSON exported: {Path.GetFileName(path)}");
+            }
+            catch (Exception ex)
+            {
+                AddEvent("INTEGRATION", $"Contract export failed: {ex.Message}");
+            }
         }
-        catch (Exception ex)
-        {
-            AddEvent("INTEGRATION", $"Contract export failed: {ex.Message}");
-        }
+
+        AddEvent(
+            "ANALYSIS",
+            persist
+                ? $"Inspection saved -> score {result.DifferenceScore:F1}% ({result.Verdict})"
+                : $"Inspection complete -> score {result.DifferenceScore:F1}% ({result.Verdict})");
 
         Notify();
     }

@@ -77,7 +77,7 @@
               <Ellipse Width="8" Height="8" Margin="0,0,6,0">
                 <Ellipse.Fill><SolidColorBrush Color="#50F56E"/></Ellipse.Fill>
               </Ellipse>
-              <TextBlock Text="Pixel Engine" Foreground="#A8B2B9" FontSize="11.5"/>
+              <TextBlock x:Name="HeaderEngineText" Text="Prototype Engine" Foreground="#A8B2B9" FontSize="11.5"/>
             </StackPanel>
           </StackPanel>
         </Border>

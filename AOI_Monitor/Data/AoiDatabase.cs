@@ -285,10 +285,10 @@ public static class AoiDatabase
                 """
                 INSERT INTO BatchTestResults
                     (RunId, ImagePath, ImageName, GroundTruth, EngineResult, Score, PassFail,
-                     DefectType, RoiX, RoiY, RoiWidth, RoiHeight, CreatedAtUtc)
+                     DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel, CreatedAtUtc)
                 VALUES
                     ($runId, $imagePath, $imageName, $groundTruth, $engineResult, $score, $passFail,
-                     $defectType, $roiX, $roiY, $roiWidth, $roiHeight, $createdAtUtc);
+                     $defectType, $roiX, $roiY, $roiWidth, $roiHeight, $side, $refDes, $lotId, $boardModel, $createdAtUtc);
                 """;
 
             resultCommand.Parameters.AddWithValue("$runId", runId);
@@ -303,6 +303,10 @@ public static class AoiDatabase
             resultCommand.Parameters.AddWithValue("$roiY", result.RoiY);
             resultCommand.Parameters.AddWithValue("$roiWidth", result.RoiWidth);
             resultCommand.Parameters.AddWithValue("$roiHeight", result.RoiHeight);
+            resultCommand.Parameters.AddWithValue("$side", result.Side);
+            resultCommand.Parameters.AddWithValue("$refDes", result.RefDes);
+            resultCommand.Parameters.AddWithValue("$lotId", result.LotId);
+            resultCommand.Parameters.AddWithValue("$boardModel", result.BoardModel);
             resultCommand.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
             resultCommand.ExecuteNonQuery();
         }
@@ -340,7 +344,7 @@ public static class AoiDatabase
         command.CommandText =
             """
             SELECT Id, RunId, ImagePath, ImageName, GroundTruth, EngineResult, Score, PassFail,
-                   DefectType, RoiX, RoiY, RoiWidth, RoiHeight, CreatedAtUtc
+                   DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel, CreatedAtUtc
             FROM BatchTestResults
             WHERE RunId = $runId
             ORDER BY Id ASC;
@@ -689,7 +693,11 @@ public static class AoiDatabase
             reader.GetDouble(10),
             reader.GetDouble(11),
             reader.GetDouble(12),
-            ParseDateTime(reader.GetString(13)));
+            reader.IsDBNull(13) ? string.Empty : reader.GetString(13),
+            reader.IsDBNull(14) ? string.Empty : reader.GetString(14),
+            reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
+            reader.IsDBNull(16) ? string.Empty : reader.GetString(16),
+            ParseDateTime(reader.GetString(17)));
     }
 
     private static InspectionHistoryRecord ReadInspectionHistory(SqliteDataReader reader)
@@ -850,6 +858,10 @@ public static class AoiDatabase
         AddColumnIfMissing(connection, "RecipeRevisions", "OperatorId", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
         AddColumnIfMissing(connection, "RecipeRevisions", "BackgroundImagePath", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "RecipeRevisions", "RecipeJson", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, "BatchTestResults", "Side", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, "BatchTestResults", "RefDes", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, "BatchTestResults", "LotId", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, "BatchTestResults", "BoardModel", "TEXT NOT NULL DEFAULT ''");
     }
 
     private static void AutoArchiveOldLogs(SqliteConnection connection)
@@ -1077,6 +1089,10 @@ public static class AoiDatabase
             RoiY REAL NOT NULL,
             RoiWidth REAL NOT NULL,
             RoiHeight REAL NOT NULL,
+            Side TEXT NOT NULL DEFAULT '',
+            RefDes TEXT NOT NULL DEFAULT '',
+            LotId TEXT NOT NULL DEFAULT '',
+            BoardModel TEXT NOT NULL DEFAULT '',
             CreatedAtUtc TEXT NOT NULL,
             FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
         );

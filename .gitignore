@@ -1,0 +1,71 @@
+# Build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+
+# Visual Studio / Rider / editor state
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.rsuser
+*.DotSettings.user
+
+# .NET / NuGet generated files
+project.assets.json
+project.nuget.cache
+*.nupkg
+*.snupkg
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Local SQLite databases and sidecar files
+*.sqlite
+*.sqlite3
+*.db
+*.db3
+*.sqlite-shm
+*.sqlite-wal
+*.db-shm
+*.db-wal
+
+# AOI local runtime data
+exports/
+**/exports/
+image_vault/
+**/image_vault/
+training/
+**/image_vault/training/
+data/
+AOI_Monitor/data/
+
+# Sample/customer image data
+# Keep README/instructions in SampleData, but do not commit image payloads by default.
+SampleData/**/*.png
+SampleData/**/*.jpg
+SampleData/**/*.jpeg
+SampleData/**/*.bmp
+SampleData/**/*.tif
+SampleData/**/*.tiff
+SampleData/**/*.webp
+SampleData/**/*.zip
+SampleData/**/*.7z
+SampleData/**/*.rar
+SampleData/**/*.tar
+SampleData/**/*.gz
+CustomerData/
+customer_data/
+customer_images/
+*.heic
+*.raw
+
+# OS noise
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store

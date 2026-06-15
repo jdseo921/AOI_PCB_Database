@@ -234,6 +234,125 @@ public static class AoiDatabase
         transaction.Commit();
     }
 
+    public static long RecordBatchTestRun(
+        string imageFolder,
+        string? groundTruthCsvPath,
+        string engineName,
+        double accuracy,
+        double precision,
+        double recall,
+        double falseCallRate,
+        IReadOnlyList<BatchTestResultRecord> results)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO BatchTestRuns
+                (ImageFolder, GroundTruthCsvPath, EngineName, Accuracy, Precision, Recall,
+                 FalseCallRate, TotalImages, FailedCount, CreatedAtUtc)
+            VALUES
+                ($imageFolder, $groundTruthCsvPath, $engineName, $accuracy, $precision, $recall,
+                 $falseCallRate, $totalImages, $failedCount, $createdAtUtc);
+            SELECT last_insert_rowid();
+            """;
+
+        command.Parameters.AddWithValue("$imageFolder", imageFolder);
+        command.Parameters.AddWithValue("$groundTruthCsvPath", (object?)groundTruthCsvPath ?? DBNull.Value);
+        command.Parameters.AddWithValue("$engineName", engineName);
+        command.Parameters.AddWithValue("$accuracy", accuracy);
+        command.Parameters.AddWithValue("$precision", precision);
+        command.Parameters.AddWithValue("$recall", recall);
+        command.Parameters.AddWithValue("$falseCallRate", falseCallRate);
+        command.Parameters.AddWithValue("$totalImages", results.Count);
+        command.Parameters.AddWithValue("$failedCount", results.Count(r => r.PassFail == "FAIL"));
+        command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+
+        var runId = (long)(command.ExecuteScalar() ?? 0L);
+
+        foreach (var result in results)
+        {
+            using var resultCommand = connection.CreateCommand();
+            resultCommand.Transaction = transaction;
+            resultCommand.CommandText =
+                """
+                INSERT INTO BatchTestResults
+                    (RunId, ImagePath, ImageName, GroundTruth, EngineResult, Score, PassFail,
+                     DefectType, RoiX, RoiY, RoiWidth, RoiHeight, CreatedAtUtc)
+                VALUES
+                    ($runId, $imagePath, $imageName, $groundTruth, $engineResult, $score, $passFail,
+                     $defectType, $roiX, $roiY, $roiWidth, $roiHeight, $createdAtUtc);
+                """;
+
+            resultCommand.Parameters.AddWithValue("$runId", runId);
+            resultCommand.Parameters.AddWithValue("$imagePath", result.ImagePath);
+            resultCommand.Parameters.AddWithValue("$imageName", result.ImageName);
+            resultCommand.Parameters.AddWithValue("$groundTruth", result.GroundTruth);
+            resultCommand.Parameters.AddWithValue("$engineResult", result.EngineResult);
+            resultCommand.Parameters.AddWithValue("$score", result.Score);
+            resultCommand.Parameters.AddWithValue("$passFail", result.PassFail);
+            resultCommand.Parameters.AddWithValue("$defectType", result.DefectType);
+            resultCommand.Parameters.AddWithValue("$roiX", result.RoiX);
+            resultCommand.Parameters.AddWithValue("$roiY", result.RoiY);
+            resultCommand.Parameters.AddWithValue("$roiWidth", result.RoiWidth);
+            resultCommand.Parameters.AddWithValue("$roiHeight", result.RoiHeight);
+            resultCommand.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            resultCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return runId;
+    }
+
+    public static BatchTestRunRecord? GetLatestBatchTestRun()
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ImageFolder, GroundTruthCsvPath, EngineName, CreatedAtUtc, Accuracy, Precision,
+                   Recall, FalseCallRate, TotalImages, FailedCount
+            FROM BatchTestRuns
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadBatchTestRun(reader) : null;
+    }
+
+    public static IReadOnlyList<BatchTestResultRecord> GetBatchTestResults(long runId)
+    {
+        EnsureInitialized();
+
+        var results = new List<BatchTestResultRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, RunId, ImagePath, ImageName, GroundTruth, EngineResult, Score, PassFail,
+                   DefectType, RoiX, RoiY, RoiWidth, RoiHeight, CreatedAtUtc
+            FROM BatchTestResults
+            WHERE RunId = $runId
+            ORDER BY Id ASC;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            results.Add(ReadBatchTestResult(reader));
+        }
+
+        return results;
+    }
+
     public static void RecordWorkflowEvent(string category, string message, DateTime timestamp)
     {
         EnsureInitialized();
@@ -380,6 +499,52 @@ public static class AoiDatabase
             reader.GetString(6),
             importedAt,
             reader.GetString(8));
+    }
+
+    private static BatchTestRunRecord ReadBatchTestRun(SqliteDataReader reader)
+    {
+        return new BatchTestRunRecord(
+            reader.GetInt64(0),
+            reader.GetString(1),
+            reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.GetString(3),
+            ParseDateTime(reader.GetString(4)),
+            reader.GetDouble(5),
+            reader.GetDouble(6),
+            reader.GetDouble(7),
+            reader.GetDouble(8),
+            reader.GetInt32(9),
+            reader.GetInt32(10));
+    }
+
+    private static BatchTestResultRecord ReadBatchTestResult(SqliteDataReader reader)
+    {
+        return new BatchTestResultRecord(
+            reader.GetInt64(0),
+            reader.GetInt64(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetDouble(6),
+            reader.GetString(7),
+            reader.GetString(8),
+            reader.GetDouble(9),
+            reader.GetDouble(10),
+            reader.GetDouble(11),
+            reader.GetDouble(12),
+            ParseDateTime(reader.GetString(13)));
+    }
+
+    private static DateTime ParseDateTime(string text)
+    {
+        return DateTime.TryParse(
+            text,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed
+            : DateTime.MinValue;
     }
 
     private static void EnsureSchemaCompatibility(SqliteConnection connection)
@@ -530,6 +695,40 @@ public static class AoiDatabase
             CreatedAtUtc TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS BatchTestRuns
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ImageFolder TEXT NOT NULL,
+            GroundTruthCsvPath TEXT NULL,
+            EngineName TEXT NOT NULL,
+            Accuracy REAL NOT NULL,
+            Precision REAL NOT NULL,
+            Recall REAL NOT NULL,
+            FalseCallRate REAL NOT NULL,
+            TotalImages INTEGER NOT NULL,
+            FailedCount INTEGER NOT NULL,
+            CreatedAtUtc TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS BatchTestResults
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            RunId INTEGER NOT NULL,
+            ImagePath TEXT NOT NULL,
+            ImageName TEXT NOT NULL,
+            GroundTruth TEXT NOT NULL,
+            EngineResult TEXT NOT NULL,
+            Score REAL NOT NULL,
+            PassFail TEXT NOT NULL,
+            DefectType TEXT NOT NULL,
+            RoiX REAL NOT NULL,
+            RoiY REAL NOT NULL,
+            RoiWidth REAL NOT NULL,
+            RoiHeight REAL NOT NULL,
+            CreatedAtUtc TEXT NOT NULL,
+            FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
+        );
+
         CREATE TABLE IF NOT EXISTS ExportHistory
         (
             Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -542,5 +741,6 @@ public static class AoiDatabase
         CREATE INDEX IF NOT EXISTS IX_Images_FileHash ON Images(FileHash);
         CREATE INDEX IF NOT EXISTS IX_Images_BoardModel_LotId ON Images(BoardModel, LotId);
         CREATE INDEX IF NOT EXISTS IX_ReviewEvents_EventTimeUtc ON ReviewEvents(EventTimeUtc);
+        CREATE INDEX IF NOT EXISTS IX_BatchTestResults_RunId ON BatchTestResults(RunId);
         """;
 }

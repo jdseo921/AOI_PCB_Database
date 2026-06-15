@@ -23,6 +23,7 @@ public partial class MainWindow : Window
         ["compare"]  = "SIDE-BY-SIDE GOLDEN COMPARISON",
         ["library"]  = "DEFECT IMAGE LIBRARY / DATABASE BROWSER",
         ["recipe"]   = "INSPECTION PROGRAM / RECIPE MATRIX",
+        ["modeltest"] = "AI MODEL TEST / STAGE 1 CUSTOMER VALIDATION",
         ["spc"]      = "SPC / TRACEABILITY / DATABASE HEALTH",
         ["reports"]  = "REPORTS / EXPORT / MAINTENANCE UTILITIES",
         ["install"]  = "INSTALLATION PLAN / BACKGROUND RUNTIME MODEL",
@@ -66,6 +67,7 @@ public partial class MainWindow : Window
                 "compare"  => new CompareView(),
                 "library"  => new LibraryView(),
                 "recipe"   => new RecipeView(),
+                "modeltest" => new AIModelTestView(),
                 "spc"      => new SpcView(),
                 "reports"  => new ReportsView(),
                 "install"  => new InstallView(),
@@ -119,6 +121,10 @@ public partial class MainWindow : Window
         {
             library.RefreshFromState();
         }
+        else if (PageContent.Content is AIModelTestView modelTest)
+        {
+            modelTest.RefreshFromState();
+        }
 
         MessageBox.Show("View refreshed.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
@@ -161,7 +167,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        MessageBox.Show("Export is available on Compare and Library pages.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        if (PageContent.Content is AIModelTestView modelTest)
+        {
+            modelTest.ExportResults();
+            return;
+        }
+
+        MessageBox.Show("Export is available on Compare, Library, and AI Model Test pages.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void OnWorkflowStateChanged()

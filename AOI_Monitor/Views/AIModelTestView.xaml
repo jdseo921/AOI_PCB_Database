@@ -1,0 +1,159 @@
+<UserControl x:Class="AOI_Monitor.Views.AIModelTestView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0B0E10">
+  <UserControl.Resources>
+    <Style x:Key="BatchResultRow" TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding IsFailed}" Value="True">
+          <Setter Property="Background" Value="#35191B"/>
+          <Setter Property="Foreground" Value="#FFCDD0"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding PassFail}" Value="N/A">
+          <Setter Property="Background" Value="#252417"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="ResultStatusChipBorder" TargetType="Border" BasedOn="{StaticResource Chip}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding PassFail}" Value="PASS">
+          <Setter Property="Background" Value="#14311D"/>
+          <Setter Property="BorderBrush" Value="#377849"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding PassFail}" Value="FAIL">
+          <Setter Property="Background" Value="#35191B"/>
+          <Setter Property="BorderBrush" Value="#9A393E"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding PassFail}" Value="N/A">
+          <Setter Property="Background" Value="#372914"/>
+          <Setter Property="BorderBrush" Value="#8C6C35"/>
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </UserControl.Resources>
+
+  <Grid Margin="8">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <Border Grid.Row="0" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="25"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <TextBlock Text="Stage 1 Customer Validation" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+        </Border>
+        <Grid Grid.Row="1" Margin="8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="8"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="8"/>
+            <ColumnDefinition Width="260"/>
+          </Grid.ColumnDefinitions>
+
+          <StackPanel Grid.Column="0">
+            <TextBlock Text="Test Image Folder" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <Grid>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
+              <TextBox x:Name="FolderPathText" Style="{StaticResource ReadonlyInput}" Text="No folder selected"/>
+              <Button Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Select" Click="OnSelectFolderClick"/>
+            </Grid>
+          </StackPanel>
+
+          <StackPanel Grid.Column="2">
+            <TextBlock Text="Ground Truth CSV (optional)" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <Grid>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
+              <TextBox x:Name="GroundTruthPathText" Style="{StaticResource ReadonlyInput}" Text="No CSV selected"/>
+              <Button Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Select" Click="OnSelectGroundTruthClick"/>
+            </Grid>
+          </StackPanel>
+
+          <StackPanel Grid.Column="4">
+            <TextBlock Text="Engine" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <TextBox Style="{StaticResource ReadonlyInput}" Text="Pixel Difference / Prototype Engine"/>
+            <Button Style="{StaticResource ActionBtnGreen}" Content="Run Batch Inspection" Margin="0,8,0,0" Click="OnRunBatchClick"/>
+          </StackPanel>
+        </Grid>
+      </Grid>
+    </Border>
+
+    <UniformGrid Grid.Row="2" Columns="4">
+      <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+        <StackPanel>
+          <TextBlock Text="Accuracy" Foreground="#7F8C95" FontSize="10"/>
+          <TextBlock x:Name="AccuracyText" Text="--" FontWeight="Bold" FontSize="18"/>
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+        <StackPanel>
+          <TextBlock Text="Precision" Foreground="#7F8C95" FontSize="10"/>
+          <TextBlock x:Name="PrecisionText" Text="--" FontWeight="Bold" FontSize="18"/>
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+        <StackPanel>
+          <TextBlock Text="Recall" Foreground="#7F8C95" FontSize="10"/>
+          <TextBlock x:Name="RecallText" Text="--" FontWeight="Bold" FontSize="18"/>
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource FieldBox}">
+        <StackPanel>
+          <TextBlock Text="False Call Rate" Foreground="#7F8C95" FontSize="10"/>
+          <TextBlock x:Name="FalseCallRateText" Text="--" FontWeight="Bold" FontSize="18"/>
+        </StackPanel>
+      </Border>
+    </UniformGrid>
+
+    <Border Grid.Row="4" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <DockPanel>
+            <TextBlock x:Name="RunSummaryText" DockPanel.Dock="Right" Text="No batch run loaded" Foreground="#9AA6AF" FontSize="11"/>
+            <TextBlock Text="Batch Results" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          </DockPanel>
+        </Border>
+        <DataGrid Grid.Row="1" x:Name="ResultsGrid" RowStyle="{StaticResource BatchResultRow}" SelectionChanged="OnResultSelectionChanged">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="*"/>
+            <DataGridTextColumn Header="Ground Truth" Binding="{Binding GroundTruth}" Width="110"/>
+            <DataGridTextColumn Header="AI/Engine Result" Binding="{Binding EngineResult}" Width="120"/>
+            <DataGridTextColumn Header="Score" Binding="{Binding ScoreDisplay}" Width="70"/>
+            <DataGridTemplateColumn Header="Pass/Fail" Width="90">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <Border Style="{StaticResource ResultStatusChipBorder}" HorizontalAlignment="Left" Margin="0,1,0,1">
+                    <TextBlock Text="{Binding PassFail}" FontWeight="Bold" FontSize="9.5"/>
+                  </Border>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="Defect / Hotspot" Binding="{Binding DefectType}" Width="150"/>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="6" Style="{StaticResource Panel}">
+      <DockPanel Margin="8">
+        <TextBlock x:Name="StatusText" Text="Select a folder to run Stage 1 validation." Foreground="#9AA6AF" VerticalAlignment="Center"/>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <Button Style="{StaticResource ActionBtn}" Content="Preview Selected" Margin="0,0,6,0" Click="OnPreviewSelectedClick"/>
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Export CSV" Margin="0,0,6,0" Click="OnExportCsvClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Export Annotated Images" Click="OnExportAnnotatedImagesClick"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+  </Grid>
+</UserControl>

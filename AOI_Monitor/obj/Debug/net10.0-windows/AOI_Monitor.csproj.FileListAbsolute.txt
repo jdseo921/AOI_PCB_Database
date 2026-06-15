@@ -74,3 +74,5 @@ C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\bin\Debug\net10.0-w
 C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\bin\Debug\net10.0-windows\runtimes\win-x86\native\e_sqlite3.dll
 C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net10.0-windows\AOI_Monitor.csproj.AssemblyReference.cache
 C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net10.0-windows\AOI_Moni.4FA3B179.Up2Date
+C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net10.0-windows\Views\AIModelTestView.baml
+C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\obj\Debug\net10.0-windows\Views\AIModelTestView.g.cs

@@ -57,3 +57,32 @@ public class StationInfo
 
 public record SpcStat(string Label, string Value, bool IsAlert);
 public record DbHealthRow(string Table, string Count, string Status);
+
+public record BatchTestRunRecord(
+    long Id,
+    string ImageFolder,
+    string? GroundTruthCsvPath,
+    string EngineName,
+    DateTime CreatedAtUtc,
+    double Accuracy,
+    double Precision,
+    double Recall,
+    double FalseCallRate,
+    int TotalImages,
+    int FailedCount);
+
+public record BatchTestResultRecord(
+    long Id,
+    long RunId,
+    string ImagePath,
+    string ImageName,
+    string GroundTruth,
+    string EngineResult,
+    double Score,
+    string PassFail,
+    string DefectType,
+    double RoiX,
+    double RoiY,
+    double RoiWidth,
+    double RoiHeight,
+    DateTime CreatedAtUtc);

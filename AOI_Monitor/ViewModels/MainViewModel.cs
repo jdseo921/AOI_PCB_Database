@@ -46,11 +46,12 @@ public class MainViewModel : ViewModelBase
         new NavPage { Key="compare",  Number="03", Title="Golden Compare",   Subtitle="defect/reference"   },
         new NavPage { Key="library",  Number="04", Title="Image Library",    Subtitle="records/search"     },
         new NavPage { Key="recipe",   Number="05", Title="Recipe Matrix",    Subtitle="ROI/rules"          },
-        new NavPage { Key="spc",      Number="06", Title="SPC / Database",   Subtitle="yield/trends"       },
-        new NavPage { Key="reports",  Number="07", Title="Reports",          Subtitle="export/backup"      },
-        new NavPage { Key="install",  Number="08", Title="Installation Plan",Subtitle="background GUI"     },
-        new NavPage { Key="settings", Number="09", Title="Settings",         Subtitle="system/localization"},
-        new NavPage { Key="guide",    Number="10", Title="Guide",            Subtitle="workflow reference"  },
+        new NavPage { Key="modeltest",Number="06", Title="AI Model Test",    Subtitle="stage 1 validation"  },
+        new NavPage { Key="spc",      Number="07", Title="SPC / Database",   Subtitle="yield/trends"       },
+        new NavPage { Key="reports",  Number="08", Title="Reports",          Subtitle="export/backup"      },
+        new NavPage { Key="install",  Number="09", Title="Installation Plan",Subtitle="background GUI"     },
+        new NavPage { Key="settings", Number="10", Title="Settings",         Subtitle="system/localization"},
+        new NavPage { Key="guide",    Number="11", Title="Guide",            Subtitle="workflow reference"  },
     };
 
     public IEnumerable<StatusCell> StatusCells { get; } = new[]

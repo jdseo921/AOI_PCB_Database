@@ -1,0 +1,121 @@
+# Stage 1 Acceptance Checklist
+
+This checklist is for the current local WPF prototype. It separates features that are implemented in Stage 1 from functions that are intentionally planned for later stages.
+
+## Test Setup
+
+- [ ] Build succeeds with `dotnet build AOI_Monitor\AOI_Monitor.csproj`.
+- [ ] App launches on Windows with WPF desktop support.
+- [ ] Readiness panel shows:
+  - Database: `Connected`
+  - Image Vault: `Available`
+  - Inspection Engine: `Prototype`
+  - Camera: `Simulated / Not Connected`
+  - Robot: `Not Connected`
+  - MES / ERP: `Not Connected`
+- [ ] Demo images are available locally. See [SampleData/README.md](../SampleData/README.md).
+
+## Implemented Stage 1 Checks
+
+### Image Import
+
+- [ ] Open `Main Inspection`.
+- [ ] Open `Image Library`.
+- [ ] Click `Open Record`.
+- [ ] Select a PNG/JPG/JPEG PCB sample image.
+- [ ] Confirm the image is copied into `%LOCALAPPDATA%\AOI_Monitor\image_vault\`.
+- [ ] Confirm the imported image appears in the Image Library grid after refresh or re-open.
+
+### Batch Import
+
+- [ ] Open `Image Library`.
+- [ ] Click `Batch Import`.
+- [ ] Select a folder containing small demo PNG/JPG/JPEG images.
+- [ ] Confirm the import summary reports imported, duplicate, unsupported, missing, or invalid files.
+- [ ] Confirm imported image rows are visible in the Image Library grid.
+
+### Database Persistence
+
+- [ ] Import at least one image.
+- [ ] Close and restart the app.
+- [ ] Confirm the imported image record reloads from SQLite.
+- [ ] Run one comparison or recipe test run.
+- [ ] Open `Log & Export`.
+- [ ] Confirm inspection history and/or review events are loaded from SQLite.
+
+### Pixel-Difference / Prototype Inference
+
+- [ ] In `Image Library`, select or import a sample image.
+- [ ] Click `Compare Golden`.
+- [ ] Select a golden/reference image.
+- [ ] Confirm analysis completes with an `OK`, `REVIEW`, or `NG` verdict.
+- [ ] Confirm the UI shows score, confidence, suggested defect, and evidence.
+- [ ] Confirm this is presented as prototype pixel-difference inference, not a trained ML model.
+
+### Defect Overlay Display
+
+- [ ] Open `Golden Compare` after a comparison.
+- [ ] Confirm the normalized hotspot/overlay appears on the sample image.
+- [ ] Use overlay/zoom controls and confirm the visual remains usable.
+- [ ] Export a comparison snapshot if needed for evidence.
+
+### Review Disposition
+
+- [ ] Open `Disposition`.
+- [ ] Confirm current analysis details are visible when an inspection result exists.
+- [ ] Try `Confirm NG`, `Mark False Call`, `Mark Possible Escape`, `Queue Candidate`, and `Hold for 2nd Review` as appropriate.
+- [ ] Confirm guardrails display a warning when confidence policy blocks an action.
+- [ ] Confirm disposition events are recorded in local logs.
+
+### CSV Export
+
+- [ ] Open `Log & Export`.
+- [ ] Apply a date/result/operator/board filter if useful.
+- [ ] Click `Inspection History CSV`.
+- [ ] Confirm the export confirmation dialog appears.
+- [ ] Save the CSV and open it in a spreadsheet/text editor.
+- [ ] Repeat for `Review Log CSV`.
+- [ ] Confirm each export appears in the Export History grid.
+
+### Annotated Image Export
+
+- [ ] Open `Log & Export`.
+- [ ] Ensure filtered inspection rows include accessible sample image paths.
+- [ ] Click `Annotated Overlays`.
+- [ ] Confirm the export confirmation dialog appears.
+- [ ] Select an output folder.
+- [ ] Confirm PNG overlay images are written.
+- [ ] Confirm the export appears in Export History.
+
+### Customer Validation Batch Test
+
+- [ ] Open `AI Model Test`.
+- [ ] Select a folder containing small demo PCB images.
+- [ ] Optionally select a ground-truth CSV if available.
+- [ ] Click `Run Batch Inspection`.
+- [ ] Confirm accuracy/precision/recall/false-call metrics update.
+- [ ] Export CSV and annotated images if needed.
+- [ ] Open `Log & Export` and create a `Customer Package` using filtered logs.
+
+## Planned Stage 2 / 3 / 4 Checks
+
+These are not implemented in Stage 1 and should remain clearly labeled as planned or not connected:
+
+- [ ] Camera integration is marked `Simulated / Not Connected`.
+- [ ] Lighting control is marked planned Stage 2.
+- [ ] 3D Profile Viewer is disabled/planned Stage 2.
+- [ ] Robot/handler integration is marked `Not Connected` / planned Stage 3.
+- [ ] MES / ERP integration is marked `Not Connected` / planned Stage 4.
+- [ ] Training Set Export is local file preparation only; no model training, fine-tuning, or deployment is run.
+- [ ] Inspection Engine reports `Prototype`, not `ML Model`, unless a real ML model is integrated later.
+
+## Evidence to Capture
+
+- Screenshot of readiness panel.
+- Screenshot of imported image list.
+- Screenshot of Golden Compare result with overlay.
+- Screenshot of Log & Export filtered rows.
+- Exported inspection CSV.
+- Exported review CSV.
+- Annotated overlay PNG.
+- Customer validation package folder contents.

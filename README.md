@@ -16,6 +16,8 @@ For the detailed feature inventory, see [IMPLEMENTED_FEATURES.md](IMPLEMENTED_FE
 - `AOI_Monitor/Services/` - shared workflow state, image analysis, and machine-interface exports.
 - `AOI_Monitor/Models/` - AOI workflow and export contract models.
 - `AOI_Monitor/Data/` - local SQLite initialization and image-vault persistence.
+- `Docs/` - acceptance checklists and implementation notes.
+- `SampleData/` - instructions for placing small local demo images.
 - `AOI_Monitor/bin/` and `AOI_Monitor/obj/` - local build outputs.
 
 ## Run
@@ -60,6 +62,22 @@ Generated files are written below the running application's `exports/` folder, u
 ```text
 AOI_Monitor/bin/Debug/net10.0-windows/exports/
 ```
+
+## Stage 1 Demo Workflow
+
+Use [Docs/Stage1_Acceptance_Checklist.md](Docs/Stage1_Acceptance_Checklist.md) as the formal verification script. Use [SampleData/README.md](SampleData/README.md) to prepare small, non-confidential demo images.
+
+Short walkthrough:
+
+1. Build the app with `dotnet build AOI_Monitor\AOI_Monitor.csproj`.
+2. Launch the app and confirm the readiness panel shows local Database and Image Vault availability.
+3. Open `Main Inspection > Image Library`, import a sample image, then select a golden/reference image with `Compare Golden`.
+4. Review the pixel-difference prototype result and overlay in `Golden Compare`.
+5. Open `Disposition` and record a review action or queue a local training-set export candidate.
+6. Open `AI Model Test`, select a small batch folder, and run the Stage 1 batch validation.
+7. Open `Log & Export`, export inspection/review CSV files, annotated overlays, and a customer validation package.
+
+Do not commit large demo image datasets. Keep customer/private images outside the repository and import them locally.
 
 ## Local Database and Image Vault
 

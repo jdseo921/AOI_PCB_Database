@@ -32,6 +32,7 @@ public static class AoiDatabase
         using var command = connection.CreateCommand();
         command.CommandText = SchemaSql;
         command.ExecuteNonQuery();
+        EnsureSchemaCompatibility(connection);
 
         _initialized = true;
     }
@@ -163,21 +164,25 @@ public static class AoiDatabase
         EnsureInitialized();
 
         using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText =
             """
             INSERT INTO InspectionResults
-                (SampleImagePath, GoldenImagePath, DifferenceScore, MeanBrightness, Verdict, Confidence,
+                (SampleImagePath, GoldenImagePath, InspectionEngine, DifferenceScore, MeanBrightness, Verdict, Confidence,
                  SuggestedDefect, PolicyName, ModelVersion, DecisionReason, HotspotX, HotspotY, HotspotWidth,
                  HotspotHeight, CreatedAtUtc)
             VALUES
-                ($sampleImagePath, $goldenImagePath, $differenceScore, $meanBrightness, $verdict, $confidence,
+                ($sampleImagePath, $goldenImagePath, $inspectionEngine, $differenceScore, $meanBrightness, $verdict, $confidence,
                  $suggestedDefect, $policyName, $modelVersion, $decisionReason, $hotspotX, $hotspotY, $hotspotWidth,
                  $hotspotHeight, $createdAtUtc);
+            SELECT last_insert_rowid();
             """;
 
         command.Parameters.AddWithValue("$sampleImagePath", result.SamplePath);
         command.Parameters.AddWithValue("$goldenImagePath", (object?)result.GoldenPath ?? DBNull.Value);
+        command.Parameters.AddWithValue("$inspectionEngine", result.InspectionEngine);
         command.Parameters.AddWithValue("$differenceScore", result.DifferenceScore);
         command.Parameters.AddWithValue("$meanBrightness", result.MeanBrightness);
         command.Parameters.AddWithValue("$verdict", result.Verdict);
@@ -191,7 +196,42 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$hotspotWidth", result.Hotspot.Width);
         command.Parameters.AddWithValue("$hotspotHeight", result.Hotspot.Height);
         command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
-        command.ExecuteNonQuery();
+        var inspectionResultId = (long)(command.ExecuteScalar() ?? 0L);
+
+        foreach (var defect in result.Defects)
+        {
+            using var defectCommand = connection.CreateCommand();
+            defectCommand.Transaction = transaction;
+            defectCommand.CommandText =
+                """
+                INSERT INTO Defects
+                    (InspectionResultId, ImageId, RefDes, DefectType, Severity, Confidence,
+                     RoiX, RoiY, RoiWidth, RoiHeight, XPosition, YPosition, SideOrViewType,
+                     RoiId, JudgmentStatus, CreatedAtUtc)
+                VALUES
+                    ($inspectionResultId, NULL, NULL, $defectType, $severity, $confidence,
+                     $roiX, $roiY, $roiWidth, $roiHeight, $xPosition, $yPosition, $sideOrViewType,
+                     $roiId, $judgmentStatus, $createdAtUtc);
+                """;
+
+            defectCommand.Parameters.AddWithValue("$inspectionResultId", inspectionResultId);
+            defectCommand.Parameters.AddWithValue("$defectType", defect.DefectType);
+            defectCommand.Parameters.AddWithValue("$severity", ToDefectSeverity(defect.JudgmentStatus));
+            defectCommand.Parameters.AddWithValue("$confidence", defect.Confidence);
+            defectCommand.Parameters.AddWithValue("$roiX", defect.BoundingBox.X);
+            defectCommand.Parameters.AddWithValue("$roiY", defect.BoundingBox.Y);
+            defectCommand.Parameters.AddWithValue("$roiWidth", defect.BoundingBox.Width);
+            defectCommand.Parameters.AddWithValue("$roiHeight", defect.BoundingBox.Height);
+            defectCommand.Parameters.AddWithValue("$xPosition", defect.XPosition);
+            defectCommand.Parameters.AddWithValue("$yPosition", defect.YPosition);
+            defectCommand.Parameters.AddWithValue("$sideOrViewType", defect.SideOrViewType);
+            defectCommand.Parameters.AddWithValue("$roiId", defect.RoiId);
+            defectCommand.Parameters.AddWithValue("$judgmentStatus", defect.JudgmentStatus);
+            defectCommand.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            defectCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
     }
 
     public static void RecordWorkflowEvent(string category, string message, DateTime timestamp)
@@ -342,6 +382,46 @@ public static class AoiDatabase
             reader.GetString(8));
     }
 
+    private static void EnsureSchemaCompatibility(SqliteConnection connection)
+    {
+        AddColumnIfMissing(connection, "InspectionResults", "InspectionEngine", "TEXT NOT NULL DEFAULT 'Pixel Difference'");
+        AddColumnIfMissing(connection, "Defects", "Confidence", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "Defects", "XPosition", "REAL NULL");
+        AddColumnIfMissing(connection, "Defects", "YPosition", "REAL NULL");
+        AddColumnIfMissing(connection, "Defects", "SideOrViewType", "TEXT NOT NULL DEFAULT 'sample'");
+        AddColumnIfMissing(connection, "Defects", "RoiId", "TEXT NOT NULL DEFAULT 'ROI-UNASSIGNED'");
+        AddColumnIfMissing(connection, "Defects", "JudgmentStatus", "TEXT NOT NULL DEFAULT 'REVIEW'");
+    }
+
+    private static void AddColumnIfMissing(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
+    {
+        using var readCommand = connection.CreateCommand();
+        readCommand.CommandText = $"PRAGMA table_info({tableName});";
+
+        using (var reader = readCommand.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+        }
+
+        using var alterCommand = connection.CreateCommand();
+        alterCommand.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
+        alterCommand.ExecuteNonQuery();
+    }
+
+    private static string ToDefectSeverity(string judgmentStatus)
+    {
+        return judgmentStatus.ToUpperInvariant() switch
+        {
+            "NG" => "Major",
+            "OK" => "Info",
+            _ => "Review",
+        };
+    }
+
     private static string MakeVaultFileName(DateTime timestampUtc, string viewType, string originalName)
     {
         var extension = Path.GetExtension(originalName);
@@ -381,6 +461,7 @@ public static class AoiDatabase
             Id INTEGER PRIMARY KEY AUTOINCREMENT,
             SampleImagePath TEXT NOT NULL,
             GoldenImagePath TEXT NULL,
+            InspectionEngine TEXT NOT NULL DEFAULT 'Pixel Difference',
             DifferenceScore REAL NOT NULL,
             MeanBrightness REAL NOT NULL,
             Verdict TEXT NOT NULL,
@@ -404,10 +485,16 @@ public static class AoiDatabase
             RefDes TEXT NULL,
             DefectType TEXT NOT NULL,
             Severity TEXT NOT NULL,
+            Confidence REAL NOT NULL DEFAULT 0,
             RoiX REAL NULL,
             RoiY REAL NULL,
             RoiWidth REAL NULL,
             RoiHeight REAL NULL,
+            XPosition REAL NULL,
+            YPosition REAL NULL,
+            SideOrViewType TEXT NOT NULL DEFAULT 'sample',
+            RoiId TEXT NOT NULL DEFAULT 'ROI-UNASSIGNED',
+            JudgmentStatus TEXT NOT NULL DEFAULT 'REVIEW',
             CreatedAtUtc TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
             FOREIGN KEY (InspectionResultId) REFERENCES InspectionResults(Id),
             FOREIGN KEY (ImageId) REFERENCES Images(Id)

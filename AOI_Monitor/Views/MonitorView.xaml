@@ -209,7 +209,7 @@
           <Grid>
             <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
             <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Recipe / Model Status" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+              <TextBlock Text="Recipe / Engine Status" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
             </Border>
             <StackPanel Grid.Row="1" Margin="8">
               <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -225,8 +225,8 @@
                 <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="TOP/SIDE/BOTTOM" FontSize="11.5"/>
               </Grid>
               <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Model Version" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="AOI_AI_0.8.1" FontSize="11.5"/>
+                <TextBlock Text="Engine Version" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+                <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference 0.1" FontSize="11.5"/>
               </Grid>
               <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <TextBlock Text="Revision Lock" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>

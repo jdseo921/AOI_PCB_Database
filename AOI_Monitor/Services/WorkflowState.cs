@@ -16,7 +16,7 @@ public sealed class WorkflowState
     public string StationId { get; } = "AOI-LIB-01";
     public string OperatorId { get; set; } = "Engineer01";
     public string BoardProgram { get; } = "TBOX-MAIN";
-    public string ModelVersion { get; } = "AOI_AI_0.8.1";
+    public string ModelVersion { get; } = "PIXEL_DIFF_0.1";
     public bool IsRecipeLocked { get; set; }
     public DetectionPriority DetectionPriority { get; private set; } = DetectionPriority.MinimizeFalsePositives;
     public TrainingSessionState Training { get; } = new();

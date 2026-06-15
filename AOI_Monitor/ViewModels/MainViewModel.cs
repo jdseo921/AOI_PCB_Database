@@ -59,7 +59,7 @@ public class MainViewModel : ViewModelBase
         new StatusCell("Runtime Model",    "Background Service + GUI Mon.", ""),
         new StatusCell("Board / Program",  "TBOX-MAIN / TBOX_TOP_V1.2",    "green"),
         new StatusCell("Review Policy",    "False Negative Priority",       "amber"),
-        new StatusCell("AI Model",         "AOI_AI_0.8.1",                  ""),
+        new StatusCell("Inspection Engine","Pixel Difference 0.1",          ""),
         new StatusCell("Storage",          "Local SQLite + Image Vault",    ""),
     };
 

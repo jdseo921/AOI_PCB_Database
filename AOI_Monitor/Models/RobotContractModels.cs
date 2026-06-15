@@ -7,7 +7,7 @@ public sealed class RobotInspectionContract
     public DateTime TimestampUtc { get; set; }
     public string StationId { get; set; } = "AOI-LIB-01";
     public string BoardProgram { get; set; } = "TBOX-MAIN";
-    public string ModelVersion { get; set; } = "AOI_AI_0.8.1";
+    public string ModelVersion { get; set; } = "PIXEL_DIFF_0.1";
     public string Policy { get; set; } = "Minimize False Positives";
     public string SampleImagePath { get; set; } = string.Empty;
     public string? GoldenImagePath { get; set; }

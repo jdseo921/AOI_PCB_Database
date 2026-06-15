@@ -7,6 +7,22 @@ public record DefectRecord(
     string Severity, string AiResult, string GroundTruth, string Risk,
     string ImageLink, string Date);
 
+public record ImageLibraryRecord(
+    string Sample,
+    string Board,
+    string RefDes,
+    string Defect,
+    string Severity,
+    string AiResult,
+    string GroundTruth,
+    string Risk,
+    string ImageLink,
+    string Date,
+    string VaultPath,
+    string OriginalPath,
+    string FileHash,
+    bool IsDemo);
+
 public class StationInfo
 {
     public string Name        { get; set; }

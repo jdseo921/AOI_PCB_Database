@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
+using System.Windows.Media.Imaging;
 using AOI_Monitor.Models;
 using Microsoft.Data.Sqlite;
 
@@ -9,6 +10,11 @@ namespace AOI_Monitor.Data;
 public static class AoiDatabase
 {
     private const string AppFolderName = "AOI_Monitor";
+    private static readonly HashSet<string> SupportedImportExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg",
+    };
+
     private static bool _initialized;
 
     public static string StorageRoot { get; } = ResolveStorageRoot();
@@ -70,6 +76,86 @@ public static class AoiDatabase
 
         var id = (long)(command.ExecuteScalar() ?? 0L);
         return new ImportedImage(id, sourcePath, vaultPath, originalName, boardModel, lotId, viewType, importedAt, hash);
+    }
+
+    public static ImageImportResult TryImportImage(
+        string sourcePath,
+        string boardModel,
+        string lotId,
+        string viewType)
+    {
+        EnsureInitialized();
+
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+            return new ImageImportResult(null, false, "Missing", "File does not exist.");
+
+        var extension = Path.GetExtension(sourcePath);
+        if (!SupportedImportExtensions.Contains(extension))
+            return new ImageImportResult(null, false, "Unsupported", "Only PNG, JPG, and JPEG images are supported.");
+
+        try
+        {
+            using var stream = File.Open(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length == 0)
+                return new ImageImportResult(null, false, "Unreadable", "File is empty.");
+        }
+        catch (Exception ex)
+        {
+            return new ImageImportResult(null, false, "Unreadable", ex.Message);
+        }
+
+        try
+        {
+            using var stream = File.Open(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var decoder = BitmapDecoder.Create(
+                stream,
+                BitmapCreateOptions.PreservePixelFormat,
+                BitmapCacheOption.OnLoad);
+
+            if (decoder.Frames.Count == 0)
+                return new ImageImportResult(null, false, "Invalid", "Image decoder found no frames.");
+        }
+        catch (Exception ex)
+        {
+            return new ImageImportResult(null, false, "Invalid", ex.Message);
+        }
+
+        try
+        {
+            var hash = ComputeSha256(sourcePath);
+            if (TryGetImageByHash(hash) is { } existing)
+                return new ImageImportResult(existing, false, "Duplicate", "Image already exists in the vault.");
+
+            var imported = ImportImage(sourcePath, boardModel, lotId, viewType);
+            return new ImageImportResult(imported, true, "Imported", "Image copied into the vault.");
+        }
+        catch (Exception ex)
+        {
+            return new ImageImportResult(null, false, "Invalid", ex.Message);
+        }
+    }
+
+    public static IReadOnlyList<ImportedImage> GetImportedImages()
+    {
+        EnsureInitialized();
+
+        var images = new List<ImportedImage>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, OriginalPath, VaultPath, FileName, BoardModel, LotId, ViewType, ImportedAtUtc, FileHash
+            FROM Images
+            ORDER BY datetime(ImportedAtUtc) DESC, Id DESC;
+            """;
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            images.Add(ReadImportedImage(reader));
+        }
+
+        return images;
     }
 
     public static void RecordInspectionResult(AnalysisResult result)
@@ -213,6 +299,47 @@ public static class AoiDatabase
         using var stream = File.OpenRead(path);
         var hash = SHA256.HashData(stream);
         return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static ImportedImage? TryGetImageByHash(string hash)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, OriginalPath, VaultPath, FileName, BoardModel, LotId, ViewType, ImportedAtUtc, FileHash
+            FROM Images
+            WHERE FileHash = $fileHash
+            ORDER BY Id DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$fileHash", hash);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadImportedImage(reader) : null;
+    }
+
+    private static ImportedImage ReadImportedImage(SqliteDataReader reader)
+    {
+        var importedAtText = reader.GetString(7);
+        var importedAt = DateTime.TryParse(
+            importedAtText,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed
+            : DateTime.MinValue;
+
+        return new ImportedImage(
+            reader.GetInt64(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetString(6),
+            importedAt,
+            reader.GetString(8));
     }
 
     private static string MakeVaultFileName(DateTime timestampUtc, string viewType, string originalName)

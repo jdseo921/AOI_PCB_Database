@@ -1,50 +1,54 @@
-﻿using System.Text;
+using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.IO;
 using System.Windows.Media.Imaging;
-using Microsoft.Win32;
 using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
+using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
 public partial class LibraryView : UserControl
 {
-    // Prototype seed rows remain static until the browser is fully backed by SQLite queries.
-    private static readonly DefectRecord[] Records =
+    private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        new("IMG_0241","TBOX-MAIN","U107","Solder Bridge",  "Critical","OK","NG","Possible Escape","LINK","01-28 18:04"),
-        new("IMG_0188","TBOX-MAIN","C684","Insuff. Solder", "Major",   "NG","NG","Verified NG",    "LINK","01-28 17:52"),
-        new("IMG_0182","TBOX-MAIN","CN8", "Pin Height Err.","Major",   "NG","OK","False Call",     "LINK","01-28 17:44"),
-        new("IMG_0177","TBOX-MAIN","D12", "Polarity Error", "Critical","OK","NG","Possible Escape","LINK","01-28 17:39"),
-        new("IMG_0164","TBOX-MAIN","R88", "Tombstone",      "Major",   "NG","NG","Verified NG",    "LINK","01-28 17:20"),
-        new("IMG_0153","TBOX-MAIN","SH1", "Shield Can Gap", "Major",   "NG","OK","False Call",     "LINK","01-28 17:11"),
+        ".png", ".jpg", ".jpeg",
+    };
+
+    // Demo rows are shown only while the SQLite image table is empty.
+    private static readonly ImageLibraryRecord[] DemoRecords =
+    {
+        new("IMG_0241","TBOX-MAIN","U107","Solder Bridge",  "Critical","OK","NG","Possible Escape","DEMO","01-28 18:04", "", "", "", true),
+        new("IMG_0188","TBOX-MAIN","C684","Insuff. Solder", "Major",   "NG","NG","Verified NG",    "DEMO","01-28 17:52", "", "", "", true),
+        new("IMG_0182","TBOX-MAIN","CN8", "Pin Height Err.","Major",   "NG","OK","False Call",     "DEMO","01-28 17:44", "", "", "", true),
+        new("IMG_0177","TBOX-MAIN","D12", "Polarity Error", "Critical","OK","NG","Possible Escape","DEMO","01-28 17:39", "", "", "", true),
+        new("IMG_0164","TBOX-MAIN","R88", "Tombstone",      "Major",   "NG","NG","Verified NG",    "DEMO","01-28 17:20", "", "", "", true),
+        new("IMG_0153","TBOX-MAIN","SH1", "Shield Can Gap", "Major",   "NG","OK","False Call",     "DEMO","01-28 17:11", "", "", "", true),
     };
 
     // Temporary schema preview text; the actual PoC schema is created in Data/AoiDatabase.cs.
     private static readonly object[] SchemaRows =
     {
-        new { Table = "samples",       Columns = "sample_id, board_model, lot_id, fov, refdes",                Status = "OK" },
-        new { Table = "annotations",   Columns = "bbox_x, bbox_y, bbox_w, bbox_h, defect_code",               Status = "OK" },
-        new { Table = "ai_results",    Columns = "model_version, confidence, ai_result, threshold",            Status = "OK" },
-        new { Table = "review_events", Columns = "reviewer, disposition, timestamp, comment",                  Status = "OK" },
-        new { Table = "image_index",   Columns = "image_path, roi_crop_path, similarity_vector",               Status = "OK" },
+        new { Table = "Images",            Columns = "id, original_path, vault_path, hash, board, lot, view", Status = "LIVE" },
+        new { Table = "InspectionResults", Columns = "score, verdict, confidence, policy, hotspot",          Status = "LIVE" },
+        new { Table = "Defects",           Columns = "inspection_result_id, image_id, refdes, roi",          Status = "READY" },
+        new { Table = "ReviewEvents",      Columns = "category, message, disposition, operator, timestamp",  Status = "LIVE" },
+        new { Table = "TrainingSamples",   Columns = "source_path, vault_path, label, notes",                Status = "LIVE" },
     };
 
     public LibraryView()
     {
         InitializeComponent();
-        RecordsGrid.ItemsSource = Records;
-        RecordsGrid.SelectedIndex = 0;
         SchemaGrid.ItemsSource = SchemaRows;
+        LoadRecordsFromDatabase();
     }
 
     public void RefreshFromState()
     {
-        RecordsGrid.Items.Refresh();
+        LoadRecordsFromDatabase();
         SchemaGrid.Items.Refresh();
     }
 
@@ -57,41 +61,79 @@ public partial class LibraryView : UserControl
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Select sample PCB image",
-            Filter = "Image files|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff",
+            Title = "Import sample PCB image",
+            Filter = "PCB image files|*.png;*.jpg;*.jpeg",
         };
 
         if (dialog.ShowDialog() != true) return;
 
-        var state = WorkflowState.Instance;
-        var imported = AoiDatabase.ImportImage(dialog.FileName, state.BoardProgram, "POC-LOT", "sample");
-        state.SetSampleImage(imported.VaultPath);
-        ShowImagePreview(imported.VaultPath, "Sample Image");
+        var result = ImportOne(dialog.FileName, "sample");
+        LoadRecordsFromDatabase(result.Image?.Id);
+
+        if (result.Image is { } image && File.Exists(image.VaultPath))
+        {
+            WorkflowState.Instance.SetSampleImage(image.VaultPath);
+            TryShowImagePreview(image.VaultPath, "Sample Image");
+        }
+
+        ShowImportStatus(new[] { result }, "Single image import");
+    }
+
+    private void OnBatchImportClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select a folder containing PNG/JPG/JPEG PCB images",
+            Multiselect = false,
+        };
+
+        if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.FolderName))
+            return;
+
+        var results = ImportFolder(dialog.FolderName).ToArray();
+        var newestId = results.FirstOrDefault(r => r.Imported)?.Image?.Id;
+        LoadRecordsFromDatabase(newestId);
+        ShowImportStatus(results, $"Batch import from {dialog.FolderName}");
     }
 
     private void OnCompareGoldenClick(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
-        if (string.IsNullOrWhiteSpace(state.SampleImagePath))
+        if (!EnsureSelectedRecordAsSample())
         {
-            MessageBox.Show("Load a sample image first using Open Record.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Import or select a valid sample image first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         var dialog = new OpenFileDialog
         {
-            Title = "Select golden reference image",
-            Filter = "Image files|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff",
+            Title = "Import golden reference image",
+            Filter = "PCB image files|*.png;*.jpg;*.jpeg",
         };
 
         if (dialog.ShowDialog() != true) return;
 
-        var imported = AoiDatabase.ImportImage(dialog.FileName, state.BoardProgram, "POC-LOT", "golden");
-        state.SetGoldenImage(imported.VaultPath);
-        ShowImagePreview(imported.VaultPath, "Golden Reference Image");
+        var result = ImportOne(dialog.FileName, "golden");
+        if (result.Image is null)
+        {
+            ShowImportStatus(new[] { result }, "Golden import");
+            return;
+        }
 
-        var result = ImageAnalysisService.Analyze(state.SampleImagePath!, state.GoldenImagePath, state.DetectionPriority);
-        state.SetAnalysis(result);
+        state.SetGoldenImage(result.Image.VaultPath);
+        TryShowImagePreview(result.Image.VaultPath, "Golden Reference Image");
+        ShowImportStatus(new[] { result }, "Golden import");
+
+        try
+        {
+            var analysis = ImageAnalysisService.Analyze(state.SampleImagePath!, state.GoldenImagePath, state.DetectionPriority);
+            state.SetAnalysis(analysis);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Comparison could not run:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
         if (FindMainVm() is { } vm)
             vm.CurrentPage = "compare";
@@ -100,9 +142,9 @@ public partial class LibraryView : UserControl
     private void OnAddToTrainingClick(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
-        if (string.IsNullOrWhiteSpace(state.SampleImagePath) || !File.Exists(state.SampleImagePath))
+        if (!EnsureSelectedRecordAsSample() || string.IsNullOrWhiteSpace(state.SampleImagePath) || !File.Exists(state.SampleImagePath))
         {
-            MessageBox.Show("No sample image loaded.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("No valid sample image is selected.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -127,7 +169,7 @@ public partial class LibraryView : UserControl
 
     private void OnExportSelectedClick(object sender, RoutedEventArgs e)
     {
-        var selected = RecordsGrid.SelectedItem as DefectRecord ?? Records.FirstOrDefault();
+        var selected = RecordsGrid.SelectedItem as ImageLibraryRecord ?? DemoRecords.FirstOrDefault();
         if (selected is null)
             return;
 
@@ -141,8 +183,21 @@ public partial class LibraryView : UserControl
         if (dialog.ShowDialog() != true) return;
 
         var sb = new StringBuilder();
-        sb.AppendLine("Sample,Board,RefDes,Defect,Severity,AI,GT,Risk,Image,Updated");
-        sb.AppendLine($"{selected.Sample},{selected.Board},{selected.RefDes},{selected.Defect},{selected.Severity},{selected.AiResult},{selected.GroundTruth},{selected.Risk},{selected.ImageLink},{selected.Date}");
+        sb.AppendLine("Sample,Board,RefDes,Defect,Severity,AI,GT,Risk,Image,Updated,VaultPath,OriginalPath,FileHash");
+        sb.AppendLine(string.Join(",",
+            EscapeCsv(selected.Sample),
+            EscapeCsv(selected.Board),
+            EscapeCsv(selected.RefDes),
+            EscapeCsv(selected.Defect),
+            EscapeCsv(selected.Severity),
+            EscapeCsv(selected.AiResult),
+            EscapeCsv(selected.GroundTruth),
+            EscapeCsv(selected.Risk),
+            EscapeCsv(selected.ImageLink),
+            EscapeCsv(selected.Date),
+            EscapeCsv(selected.VaultPath),
+            EscapeCsv(selected.OriginalPath),
+            EscapeCsv(selected.FileHash)));
 
         var analysis = WorkflowState.Instance.LastAnalysis;
         if (analysis is not null)
@@ -157,36 +212,174 @@ public partial class LibraryView : UserControl
         WorkflowState.Instance.AddEvent("EXPORT", $"Library record exported: {Path.GetFileName(dialog.FileName)}");
     }
 
+    private void OnRecordsSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (RecordsGrid.SelectedItem is not ImageLibraryRecord record || record.IsDemo)
+            return;
+
+        ImportStatusText.Text = File.Exists(record.VaultPath)
+            ? $"Selected {record.Sample} from vault."
+            : $"Selected {record.Sample}, but the vaulted image file is missing.";
+    }
+
+    private void LoadRecordsFromDatabase(long? selectedImageId = null)
+    {
+        var images = AoiDatabase.GetImportedImages();
+        var records = images.Select(ToLibraryRecord).ToArray();
+
+        RecordsGrid.ItemsSource = records.Length > 0 ? records : DemoRecords;
+
+        if (selectedImageId is not null)
+            RecordsGrid.SelectedItem = records.FirstOrDefault(r => r.ImageLink == selectedImageId.Value.ToString());
+
+        if (RecordsGrid.SelectedIndex < 0 && RecordsGrid.Items.Count > 0)
+            RecordsGrid.SelectedIndex = 0;
+
+        ImportStatusText.Text = records.Length > 0
+            ? $"{records.Length} imported image record(s) loaded from SQLite."
+            : "No imported images yet. Showing demo records until the SQLite image table has data.";
+    }
+
+    private static ImageLibraryRecord ToLibraryRecord(ImportedImage image)
+    {
+        var importedLocal = image.ImportedAt.Kind == DateTimeKind.Utc
+            ? image.ImportedAt.ToLocalTime()
+            : image.ImportedAt;
+
+        return new ImageLibraryRecord(
+            Path.GetFileNameWithoutExtension(image.FileName),
+            image.BoardModel,
+            image.ViewType,
+            "Imported PCB Image",
+            File.Exists(image.VaultPath) ? "Available" : "Missing",
+            "PENDING",
+            "PENDING",
+            File.Exists(image.VaultPath) ? "Vaulted" : "Missing",
+            image.Id.ToString(),
+            importedLocal == DateTime.MinValue ? "--" : importedLocal.ToString("MM-dd HH:mm"),
+            image.VaultPath,
+            image.OriginalPath,
+            image.FileHash,
+            false);
+    }
+
+    private ImageImportResult ImportOne(string path, string viewType)
+    {
+        var state = WorkflowState.Instance;
+        return AoiDatabase.TryImportImage(path, state.BoardProgram, "POC-LOT", viewType);
+    }
+
+    private IEnumerable<ImageImportResult> ImportFolder(string folderPath)
+    {
+        if (!Directory.Exists(folderPath))
+        {
+            yield return new ImageImportResult(null, false, "Missing", "Folder does not exist.");
+            yield break;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.TopDirectoryOnly))
+        {
+            if (!SupportedImageExtensions.Contains(Path.GetExtension(file)))
+            {
+                yield return new ImageImportResult(null, false, "Unsupported", $"{Path.GetFileName(file)} is not PNG/JPG/JPEG.");
+                continue;
+            }
+
+            yield return ImportOne(file, "sample");
+        }
+    }
+
+    private bool EnsureSelectedRecordAsSample()
+    {
+        var state = WorkflowState.Instance;
+        if (RecordsGrid.SelectedItem is not ImageLibraryRecord record || record.IsDemo)
+            return !string.IsNullOrWhiteSpace(state.SampleImagePath) && File.Exists(state.SampleImagePath);
+
+        if (string.IsNullOrWhiteSpace(record.VaultPath) || !File.Exists(record.VaultPath))
+            return !string.IsNullOrWhiteSpace(state.SampleImagePath) && File.Exists(state.SampleImagePath);
+
+        state.SetSampleImage(record.VaultPath);
+        return true;
+    }
+
+    private void ShowImportStatus(IReadOnlyCollection<ImageImportResult> results, string title)
+    {
+        if (results.Count == 0)
+        {
+            ImportStatusText.Text = $"{title}: no PNG/JPG/JPEG files found.";
+            MessageBox.Show("No PNG/JPG/JPEG images were found to import.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var imported = results.Count(r => r.Imported);
+        var duplicates = results.Count(r => r.Status == "Duplicate");
+        var unsupported = results.Count(r => r.Status == "Unsupported");
+        var missing = results.Count(r => r.Status == "Missing");
+        var invalid = results.Count(r => r.Status is "Unreadable" or "Invalid");
+        var summary = $"{title}: imported {imported}, duplicate {duplicates}, unsupported {unsupported}, missing {missing}, invalid/unreadable {invalid}.";
+
+        ImportStatusText.Text = summary;
+        WorkflowState.Instance.AddEvent("IMPORT", summary);
+
+        var details = results
+            .Where(r => !r.Imported)
+            .Take(8)
+            .Select(r => $"{r.Status}: {r.Image?.FileName ?? r.Message}")
+            .ToArray();
+
+        var message = details.Length == 0
+            ? summary
+            : summary + Environment.NewLine + Environment.NewLine + string.Join(Environment.NewLine, details);
+
+        MessageBox.Show(
+            message,
+            "AOI Monitor",
+            MessageBoxButton.OK,
+            invalid > 0 || missing > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+    }
+
     private MainViewModel? FindMainVm()
         => (Window.GetWindow(this) as MainWindow)?.DataContext as MainViewModel;
 
-    private void ShowImagePreview(string path, string title)
+    private void TryShowImagePreview(string path, string title)
     {
-        var previewBitmap = LoadPreviewBitmap(path, 1400);
-        var image = new System.Windows.Controls.Image
+        if (!File.Exists(path))
         {
-            Stretch = System.Windows.Media.Stretch.Uniform,
-            Source = previewBitmap,
-        };
+            MessageBox.Show($"Image file is missing:\n{path}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
-        var win = new Window
+        try
         {
-            Title = title,
-            Width = 860,
-            Height = 620,
-            Content = new Border
+            var previewBitmap = LoadPreviewBitmap(path, 1400);
+            var image = new System.Windows.Controls.Image
             {
-                Background = System.Windows.Media.Brushes.Black,
-                Padding = new Thickness(10),
-                Child = image,
-            },
-            Owner = Window.GetWindow(this),
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-        };
+                Stretch = System.Windows.Media.Stretch.Uniform,
+                Source = previewBitmap,
+            };
 
-        win.Closed += (_, _) => image.Source = null;
+            var win = new Window
+            {
+                Title = title,
+                Width = 860,
+                Height = 620,
+                Content = new Border
+                {
+                    Background = System.Windows.Media.Brushes.Black,
+                    Padding = new Thickness(10),
+                    Child = image,
+                },
+                Owner = Window.GetWindow(this),
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
 
-        win.Show();
+            win.Closed += (_, _) => image.Source = null;
+            win.Show();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Image preview failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private static BitmapImage LoadPreviewBitmap(string path, int decodePixelWidth)
@@ -200,4 +393,7 @@ public partial class LibraryView : UserControl
         bmp.Freeze();
         return bmp;
     }
+
+    private static string EscapeCsv(string value)
+        => $"\"{value.Replace("\"", "\"\"")}\"";
 }

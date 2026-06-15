@@ -10,3 +10,9 @@ public sealed record ImportedImage(
     string ViewType,
     DateTime ImportedAt,
     string FileHash);
+
+public sealed record ImageImportResult(
+    ImportedImage? Image,
+    bool Imported,
+    string Status,
+    string Message);

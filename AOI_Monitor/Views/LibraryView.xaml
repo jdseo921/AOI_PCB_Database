@@ -89,11 +89,18 @@
           </Grid>
           <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
             <Button Style="{StaticResource ActionBtn}" Content="Open Record" Margin="0,0,6,0" Click="OnOpenRecordClick"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Batch Import" Margin="0,0,6,0" Click="OnBatchImportClick"/>
             <Button Style="{StaticResource ActionBtn}" Content="Compare Golden" Margin="0,0,6,0" Click="OnCompareGoldenClick"/>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Add to Training" Margin="0,0,6,0" Click="OnAddToTrainingClick"/>
             <Button Style="{StaticResource ActionBtnAmber}" Content="Batch Relabel" Margin="0,0,6,0" Click="OnBatchRelabelClick"/>
             <Button Style="{StaticResource ActionBtnGreen}" Content="Export Selected" Click="OnExportSelectedClick"/>
           </StackPanel>
+          <TextBlock x:Name="ImportStatusText"
+                     Text="Imported images are loaded from the local SQLite image table."
+                     Foreground="#9AA6AF"
+                     FontSize="11"
+                     TextWrapping="Wrap"
+                     Margin="0,6,0,0"/>
         </StackPanel>
       </Grid>
     </Border>
@@ -105,7 +112,7 @@
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <TextBlock Text="Inspection Records" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
         </Border>
-        <DataGrid Grid.Row="1" x:Name="RecordsGrid">
+        <DataGrid Grid.Row="1" x:Name="RecordsGrid" SelectionChanged="OnRecordsSelectionChanged">
           <DataGrid.Columns>
             <DataGridTextColumn Header="Sample"   Binding="{Binding Sample}"      Width="80"/>
             <DataGridTextColumn Header="Board"    Binding="{Binding Board}"       Width="80"/>

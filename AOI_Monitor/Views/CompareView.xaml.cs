@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.IO;
 using Microsoft.Win32;
+using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
 
@@ -142,6 +143,7 @@ public partial class CompareView : UserControl
         using var fs = File.Create(dialog.FileName);
         encoder.Save(fs);
 
+        AoiDatabase.RecordExport("ComparisonSnapshot", dialog.FileName);
         WorkflowState.Instance.AddEvent("EXPORT", $"Comparison pair exported: {Path.GetFileName(dialog.FileName)}");
     }
 }

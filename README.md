@@ -13,6 +13,7 @@ For the detailed feature inventory, see [IMPLEMENTED_FEATURES.md](IMPLEMENTED_FE
 - `AOI_Monitor/Views/` - page-specific UI and workflow code.
 - `AOI_Monitor/Services/` - shared workflow state, image analysis, and machine-interface exports.
 - `AOI_Monitor/Models/` - AOI workflow and export contract models.
+- `AOI_Monitor/Data/` - local SQLite initialization and image-vault persistence.
 - `AOI_Monitor/bin/` and `AOI_Monitor/obj/` - local build outputs.
 
 ## Run
@@ -56,6 +57,34 @@ Generated files are written below the running application's `exports/` folder, u
 ```text
 AOI_Monitor/bin/Debug/net10.0-windows/exports/
 ```
+
+## Local Database and Image Vault
+
+On startup, the app creates its local PoC persistence store automatically. On Windows the default location is:
+
+```text
+%LOCALAPPDATA%\AOI_Monitor\
+```
+
+The SQLite database is stored at:
+
+```text
+%LOCALAPPDATA%\AOI_Monitor\aoi_monitor.sqlite
+```
+
+Imported PCB sample and golden images are copied into the managed image vault:
+
+```text
+%LOCALAPPDATA%\AOI_Monitor\image_vault\
+```
+
+Training candidates are copied below:
+
+```text
+%LOCALAPPDATA%\AOI_Monitor\image_vault\training\
+```
+
+The database is initialized with tables for images, inspection results, defects, review events, recipe revisions, training samples, and export history. Image records include original path, vault path, filename, board model, lot ID, view type, import time, and SHA-256 file hash. If the OS local-app-data folder cannot be resolved, the app falls back to a `data/` folder beside the executable.
 
 ## Troubleshooting
 

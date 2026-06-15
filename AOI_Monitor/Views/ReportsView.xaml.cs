@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.IO;
 using System.Linq;
+using AOI_Monitor.Data;
 using AOI_Monitor.Services;
 
 namespace AOI_Monitor.Views;
@@ -14,6 +15,7 @@ public partial class ReportsView : UserControl
         ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff",
     };
 
+    // Package rows are still a static prototype list; generated files are now logged in SQLite ExportHistory.
     private static readonly object[] Packages =
     {
         new { Package = "Customer validation package",    Format = "CSV/PDF", Status = "OK"    },
@@ -44,6 +46,7 @@ public partial class ReportsView : UserControl
         var path = Path.Combine(exportDir, $"{fileSafe}_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
         File.WriteAllText(path, $"Package: {packageName}{Environment.NewLine}Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
+        AoiDatabase.RecordExport("Package", path);
         WorkflowState.Instance.AddEvent("EXPORT", $"Package exported: {Path.GetFileName(path)}");
         MessageBox.Show($"Exported:\n{path}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
@@ -146,7 +149,20 @@ public partial class ReportsView : UserControl
         int warnings = 0;
         int failures = 0;
 
-        // SQLite may be external in this prototype; check critical artifacts and logs for operational readiness.
+        var integrity = AoiDatabase.RunIntegrityCheck();
+        if (string.Equals(integrity, "ok", StringComparison.OrdinalIgnoreCase))
+        {
+            sb.AppendLine($"[PASS] SQLite integrity_check returned: {integrity}");
+        }
+        else
+        {
+            failures++;
+            sb.AppendLine($"[FAIL] SQLite integrity_check returned: {integrity}");
+        }
+
+        sb.AppendLine($"DatabasePath: {AoiDatabase.DatabasePath}");
+        sb.AppendLine($"ImageVaultPath: {AoiDatabase.ImageVaultPath}");
+
         var auditLogPath = Path.Combine(exportsDir, "review_disposition_log.csv");
         if (!File.Exists(auditLogPath))
         {
@@ -228,6 +244,7 @@ public partial class ReportsView : UserControl
         }
 
         File.WriteAllLines(file, lines);
+        AoiDatabase.RecordExport("ImageIndex", file);
         WorkflowState.Instance.AddEvent("UTILITY", $"Image index rebuilt with {count} entries.");
 
         MessageBox.Show(
@@ -249,6 +266,7 @@ public partial class ReportsView : UserControl
             sb.AppendLine($"{h.Timestamp:yyyy-MM-dd HH:mm:ss},{h.Category},\"{h.Message.Replace("\"", "''")}\"");
 
         File.WriteAllText(file, sb.ToString());
+        AoiDatabase.RecordExport("AuditTrail", file);
         WorkflowState.Instance.AddEvent("EXPORT", $"Audit trail exported: {Path.GetFileName(file)}");
         MessageBox.Show($"Audit trail exported:\n{file}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }

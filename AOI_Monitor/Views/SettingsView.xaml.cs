@@ -5,6 +5,7 @@ using System.IO;
 using System.Globalization;
 using System.Windows.Markup;
 using System.Windows.Media;
+using AOI_Monitor.Data;
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
 
@@ -122,7 +123,7 @@ public partial class SettingsView : UserControl
 
     private void OnOpenTrainingFolderClick(object sender, RoutedEventArgs e)
     {
-        var trainingDir = Path.Combine(AppContext.BaseDirectory, "exports", "training_set");
+        var trainingDir = AoiDatabase.TrainingVaultPath;
         Directory.CreateDirectory(trainingDir);
 
         Process.Start(new ProcessStartInfo

@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 
 namespace AOI_Monitor.Services;
@@ -43,6 +44,7 @@ public sealed class WorkflowState
     public void SetAnalysis(AnalysisResult result)
     {
         LastAnalysis = result;
+        AoiDatabase.RecordInspectionResult(result);
         AddEvent("ANALYSIS", $"Compared images -> score {result.DifferenceScore:F1}% ({result.Verdict})");
 
         try
@@ -121,12 +123,15 @@ public sealed class WorkflowState
 
     public void AddEvent(string category, string message)
     {
-        History.Add(new WorkflowEvent
+        var entry = new WorkflowEvent
         {
             Category = category,
             Message = message,
             Timestamp = DateTime.Now,
-        });
+        };
+
+        History.Add(entry);
+        AoiDatabase.RecordWorkflowEvent(category, message, entry.Timestamp);
 
         if (History.Count > MaxHistoryEntries)
             History.RemoveRange(0, History.Count - MaxHistoryEntries);

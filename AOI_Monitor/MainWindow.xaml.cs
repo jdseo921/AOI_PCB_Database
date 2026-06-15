@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.IO;
 using System.Diagnostics;
+using AOI_Monitor.Data;
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
 using AOI_Monitor.Views;
@@ -37,6 +38,9 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        AoiDatabase.Initialize();
+        WorkflowState.Instance.AddEvent("STORAGE", $"SQLite ready: {AoiDatabase.DatabasePath}");
+
         _vm = (MainViewModel)DataContext;
         _vm.PropertyChanged += (_, args) =>
         {

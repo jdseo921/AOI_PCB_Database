@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.IO;
 using Microsoft.Win32;
+using AOI_Monitor.Data;
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
 
@@ -131,11 +132,12 @@ public partial class ReviewView : UserControl
             return;
         }
 
-        var targetDir = Path.Combine(AppContext.BaseDirectory, "exports", "training_set");
+        var targetDir = AoiDatabase.TrainingVaultPath;
         Directory.CreateDirectory(targetDir);
 
         var target = Path.Combine(targetDir, $"review_{DateTime.Now:yyyyMMdd_HHmmss}_{Path.GetFileName(sample)}");
         File.Copy(sample, target, true);
+        AoiDatabase.RecordTrainingSample(target, "review_candidate", "Queued from Review Send to Training Set.");
         WorkflowState.Instance.QueueTrainingSample(Path.GetFileName(target));
         MessageBox.Show("Sample copied to training set.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
@@ -197,6 +199,7 @@ public partial class ReviewView : UserControl
                 EscapeCsv(analysis.ModelVersion),
                 EscapeCsv(analysis.DecisionReason),
                 EscapeCsv(action)) + Environment.NewLine);
+        AoiDatabase.RecordExport("ReviewDispositionLog", file);
 
         try
         {

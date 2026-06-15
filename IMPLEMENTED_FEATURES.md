@@ -179,10 +179,10 @@ Implemented features:
 - Batch relabel event logging.
 - Export selected record to CSV, including latest analysis score/verdict metadata when available.
 
-Training samples are copied to:
+Training samples are copied to the local app-data image vault:
 
 ```text
-<application folder>/exports/training_set/
+%LOCALAPPDATA%\AOI_Monitor\image_vault\training\
 ```
 
 ### Recipe Matrix
@@ -207,7 +207,7 @@ The SPC / Database page displays static database-health rows for:
 - Audit trail
 - Unresolved conflicts
 
-The view is currently a prototype health dashboard. It does not connect to a live SQLite database. Some supporting SPC values are also present in the main view model, such as first-pass yield, false-call ratio, escape-risk rate, annotation coverage, broken image links, and missing RefDes count.
+The view is currently a prototype health dashboard. The app initializes a local SQLite database, but the SPC grid rows are still static prototype data. Some supporting SPC values are also present in the main view model, such as first-pass yield, false-call ratio, escape-risk rate, annotation coverage, broken image links, and missing RefDes count.
 
 ### Reports
 
@@ -219,7 +219,7 @@ Implemented features:
 - Package export that creates a timestamped text file under `exports/packages`.
 - Image-path verification report for exported image files plus currently loaded sample/golden paths.
 - Reviewed-sample archive utility for `exports/training_set`.
-- Database integrity check against current local artifacts, including review log header validation, workflow-history volume, and training-folder write access.
+- Database integrity check against SQLite `PRAGMA integrity_check` plus current local artifacts, including review log header validation, workflow-history volume, and training-folder write access.
 - Image index rebuild that scans exported image files and writes `exports/image_index.csv`.
 - Audit-trail export from workflow history.
 - Active recipe lock/unlock.
@@ -268,7 +268,7 @@ The Guide page provides an operator workflow reference. It lists recommended AOI
 
 ## Data Handling Summary
 
-The current implementation combines in-memory workflow state, static prototype records, user-selected image files, and local filesystem exports.
+The current implementation combines in-memory workflow state, static prototype records, user-selected image files copied into an app-data image vault, a local SQLite PoC database, and local filesystem exports.
 
 In-memory data:
 
@@ -286,6 +286,8 @@ User-selected file inputs:
 
 Generated local artifacts:
 
+- SQLite database at `%LOCALAPPDATA%\AOI_Monitor\aoi_monitor.sqlite`
+- Managed image vault at `%LOCALAPPDATA%\AOI_Monitor\image_vault\`
 - Comparison PNG snapshots
 - ROI crop PNG files
 - Selected-record CSV exports
@@ -313,13 +315,13 @@ The implemented application is a functional desktop prototype, but several produ
 
 Current boundaries:
 
-- No live SQLite database connection is implemented.
-- Database tables and health rows are static prototype data.
+- SQLite is local-only PoC persistence, not a production database service.
+- Several UI tables and health rows are still static prototype data.
 - The image-analysis routine is pixel-difference based, not a production ML inference pipeline.
 - There is no direct camera, PLC, robot, conveyor, or AOI machine control.
 - The background inspection service shown in the UI is conceptual.
 - Defect records and station metrics are static sample data.
-- Workflow state is session-local unless exported to files.
+- Some workflow state remains session-local, although key events, imports, analysis results, training samples, and exports are persisted locally.
 - Training-session behavior is simulated; no model training pipeline is run.
 
 Despite these boundaries, the code already implements the core review loop: load sample image, load golden image, compute comparison, produce verdict/evidence, export a machine-readable decision, record human disposition, collect training candidates, and export audit/reporting artifacts.
@@ -333,6 +335,7 @@ Key implementation areas:
 - `AOI_Monitor/Services/WorkflowState.cs`: shared workflow state, event history, policy changes, training state
 - `AOI_Monitor/Services/ImageAnalysisService.cs`: image loading, comparison, thresholds, verdict/evidence generation
 - `AOI_Monitor/Services/RobotIntegrationService.cs`: JSON/NDJSON machine-interface exports
+- `AOI_Monitor/Data/AoiDatabase.cs`: SQLite schema initialization, database paths, image vault import, and persistence helpers
 - `AOI_Monitor/Models/WorkflowModels.cs`: analysis result, detection policy, workflow event, training state
 - `AOI_Monitor/Models/RobotContractModels.cs`: machine decision contract shape
 - `AOI_Monitor/Views/*.xaml.cs`: page-specific AOI workflows and export utilities

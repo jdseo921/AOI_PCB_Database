@@ -91,7 +91,7 @@ namespace AOI_Monitor.Controls {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/AOI_Monitor;V1.0.0.0;component/controls/circulargauge.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/AOI_Monitor;component/controls/circulargauge.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\Controls\CircularGauge.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

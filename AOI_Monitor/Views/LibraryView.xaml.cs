@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.IO;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
+using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
@@ -12,6 +13,7 @@ namespace AOI_Monitor.Views;
 
 public partial class LibraryView : UserControl
 {
+    // Prototype seed rows remain static until the browser is fully backed by SQLite queries.
     private static readonly DefectRecord[] Records =
     {
         new("IMG_0241","TBOX-MAIN","U107","Solder Bridge",  "Critical","OK","NG","Possible Escape","LINK","01-28 18:04"),
@@ -22,6 +24,7 @@ public partial class LibraryView : UserControl
         new("IMG_0153","TBOX-MAIN","SH1", "Shield Can Gap", "Major",   "NG","OK","False Call",     "LINK","01-28 17:11"),
     };
 
+    // Temporary schema preview text; the actual PoC schema is created in Data/AoiDatabase.cs.
     private static readonly object[] SchemaRows =
     {
         new { Table = "samples",       Columns = "sample_id, board_model, lot_id, fov, refdes",                Status = "OK" },
@@ -60,8 +63,10 @@ public partial class LibraryView : UserControl
 
         if (dialog.ShowDialog() != true) return;
 
-        WorkflowState.Instance.SetSampleImage(dialog.FileName);
-        ShowImagePreview(dialog.FileName, "Sample Image");
+        var state = WorkflowState.Instance;
+        var imported = AoiDatabase.ImportImage(dialog.FileName, state.BoardProgram, "POC-LOT", "sample");
+        state.SetSampleImage(imported.VaultPath);
+        ShowImagePreview(imported.VaultPath, "Sample Image");
     }
 
     private void OnCompareGoldenClick(object sender, RoutedEventArgs e)
@@ -81,8 +86,9 @@ public partial class LibraryView : UserControl
 
         if (dialog.ShowDialog() != true) return;
 
-        state.SetGoldenImage(dialog.FileName);
-        ShowImagePreview(dialog.FileName, "Golden Reference Image");
+        var imported = AoiDatabase.ImportImage(dialog.FileName, state.BoardProgram, "POC-LOT", "golden");
+        state.SetGoldenImage(imported.VaultPath);
+        ShowImagePreview(imported.VaultPath, "Golden Reference Image");
 
         var result = ImageAnalysisService.Analyze(state.SampleImagePath!, state.GoldenImagePath, state.DetectionPriority);
         state.SetAnalysis(result);
@@ -100,12 +106,13 @@ public partial class LibraryView : UserControl
             return;
         }
 
-        var trainingDir = Path.Combine(AppContext.BaseDirectory, "exports", "training_set");
+        var trainingDir = AoiDatabase.TrainingVaultPath;
         Directory.CreateDirectory(trainingDir);
 
         var fileName = $"{DateTime.Now:yyyyMMdd_HHmmss}_{Path.GetFileName(state.SampleImagePath)}";
         var target = Path.Combine(trainingDir, fileName);
         File.Copy(state.SampleImagePath, target, true);
+        AoiDatabase.RecordTrainingSample(target, "candidate", "Queued from Library Add to Training.");
 
         state.QueueTrainingSample(fileName);
         MessageBox.Show($"Saved to training set:\n{target}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -146,6 +153,7 @@ public partial class LibraryView : UserControl
         }
 
         File.WriteAllText(dialog.FileName, sb.ToString());
+        AoiDatabase.RecordExport("LibraryRecord", dialog.FileName);
         WorkflowState.Instance.AddEvent("EXPORT", $"Library record exported: {Path.GetFileName(dialog.FileName)}");
     }
 

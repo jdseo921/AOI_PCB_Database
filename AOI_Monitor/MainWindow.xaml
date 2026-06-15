@@ -71,7 +71,7 @@
               <Ellipse Width="8" Height="8" Margin="0,0,6,0">
                 <Ellipse.Fill><SolidColorBrush Color="#50F56E"/></Ellipse.Fill>
               </Ellipse>
-              <TextBlock Text="Local DB" Foreground="#A8B2B9" FontSize="11.5"/>
+              <TextBlock Text="DB Status" Foreground="#A8B2B9" FontSize="11.5"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
               <Ellipse Width="8" Height="8" Margin="0,0,6,0">
@@ -149,38 +149,38 @@
           <UniformGrid Columns="3" Rows="2">
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
               <StackPanel>
-                <TextBlock Text="Console Scope" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
-                <TextBlock Text="Local Review Workstation" Foreground="#F0F5F8" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+                <TextBlock Text="Database" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+                <TextBlock x:Name="DatabaseStatusText" Text="Not Connected" Foreground="#F27777" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
               <StackPanel>
-                <TextBlock Text="Runtime Model" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
-                <TextBlock Text="Local WPF Prototype" Foreground="#F0F5F8" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
-              </StackPanel>
-            </Border>
-            <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
-              <StackPanel>
-                <TextBlock Text="Board / Program" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
-                <TextBlock Text="TBOX-MAIN / TBOX_TOP_V1.2" Foreground="#50F56E" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
-              </StackPanel>
-            </Border>
-            <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
-              <StackPanel>
-                <TextBlock Text="Review Policy" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
-                <TextBlock x:Name="ReviewPolicyText" Text="Minimize False Positives" Foreground="#E1A334" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+                <TextBlock Text="Image Vault" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+                <TextBlock x:Name="ImageVaultStatusText" Text="Not Available" Foreground="#F27777" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
               <StackPanel>
                 <TextBlock Text="Inspection Engine" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
-                <TextBlock Text="Pixel Difference 0.1" Foreground="#F0F5F8" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+                <TextBlock x:Name="InspectionEngineStatusText" Text="Prototype" Foreground="#E1A334" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+            <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
+              <StackPanel>
+                <TextBlock Text="Camera" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+                <TextBlock x:Name="CameraStatusText" Text="Simulated / Not Connected" Foreground="#E1A334" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+            <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
+              <StackPanel>
+                <TextBlock Text="Robot" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+                <TextBlock x:Name="RobotStatusText" Text="Not Connected" Foreground="#F27777" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
             <Border Padding="10,6">
               <StackPanel>
-                <TextBlock Text="Storage" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
-                <TextBlock Text="Local SQLite + Image Vault" Foreground="#F0F5F8" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
+                <TextBlock Text="MES / ERP" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+                <TextBlock x:Name="MesStatusText" Text="Not Connected" Foreground="#F27777" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
           </UniformGrid>
@@ -266,7 +266,7 @@
                 <StackPanel>
                   <TextBlock Text="ACTIVE MESSAGE" Foreground="#F0A0A0" FontWeight="ExtraBold" FontSize="10.5" Margin="0,0,0,5"/>
                   <TextBlock Text="Prototype runs local file-based inspection only." Foreground="#ED6262" FontSize="10" TextWrapping="Wrap"/>
-                  <TextBlock Text="Live hardware, robot, MES, and production training are planned integrations."
+                  <TextBlock Text="Planned: camera/lighting/3D Stage 2; robot Stage 3; MES/ERP Stage 4."
                              Foreground="#ED6262" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"/>
                 </StackPanel>
               </Border>

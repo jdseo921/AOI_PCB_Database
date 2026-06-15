@@ -67,7 +67,7 @@ namespace AOI_Monitor.Views {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/AOI_Monitor;V1.0.0.0;component/views/plannedstageview.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/AOI_Monitor;component/views/plannedstageview.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\..\Views\PlannedStageView.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

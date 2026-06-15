@@ -51,8 +51,8 @@ public sealed class WorkflowState
 
         try
         {
-            var path = RobotIntegrationService.ExportInspectionDecision(result);
-            AddEvent("INTEGRATION", $"Machine decision contract exported: {Path.GetFileName(path)}");
+            var path = MachineInterfaceExportService.ExportInspectionDecision(result);
+            AddEvent("INTEGRATION", $"Machine interface JSON exported: {Path.GetFileName(path)}");
         }
         catch (Exception ex)
         {
@@ -91,7 +91,7 @@ public sealed class WorkflowState
     public void QueueTrainingSample(string fileName)
     {
         Training.QueuedSamples++;
-        AddEvent("CANDIDATE", $"Queued sample candidate: {fileName}");
+        AddEvent("TRAINING_SET_EXPORT", $"Queued sample for training set export: {fileName}");
         Notify();
     }
 
@@ -99,14 +99,14 @@ public sealed class WorkflowState
     {
         Training.IsRunning = true;
         Training.LastStartedAt = DateTime.Now;
-        AddEvent("CANDIDATE", "Candidate queue simulation started.");
+        AddEvent("TRAINING_SET_EXPORT", "Training set export preparation started.");
         Notify();
     }
 
     public void StopTraining()
     {
         Training.IsRunning = false;
-        AddEvent("CANDIDATE", "Candidate queue simulation stopped.");
+        AddEvent("TRAINING_SET_EXPORT", "Training set export preparation stopped.");
         Notify();
     }
 
@@ -119,7 +119,7 @@ public sealed class WorkflowState
         if (Training.QueuedSamples > 0)
             Training.QueuedSamples--;
 
-        AddEvent("CANDIDATE", $"Simulated epoch completed. Validation score {validationScore:F1}%.");
+        AddEvent("TRAINING_SET_EXPORT", $"Training set list check completed. Quality score {validationScore:F1}%.");
         Notify();
     }
 

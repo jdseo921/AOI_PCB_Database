@@ -4,6 +4,8 @@ AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspec
 
 The application currently demonstrates the review loop with local files and static prototype data. It can load a sample PCB image and a golden reference image, run a deterministic pixel-difference comparison, produce an `OK`, `REVIEW`, or `NG` verdict, record disposition actions, collect candidate samples for future training review, and write local export artifacts. It is not yet connected to live AOI hardware, cameras, PLCs, robots, conveyors, a production database, or a trained ML inference pipeline.
 
+The main window includes an explicit readiness panel for Database, Image Vault, Inspection Engine, Camera, Robot, and MES/ERP. Camera, lighting, 3D profile workflows, robot/handler integration, MES/ERP integration, and real ML model training are marked as planned Stage 2/3/4 work unless a future implementation backs them.
+
 For the detailed feature inventory, see [IMPLEMENTED_FEATURES.md](IMPLEMENTED_FEATURES.md).
 
 ## Project Layout

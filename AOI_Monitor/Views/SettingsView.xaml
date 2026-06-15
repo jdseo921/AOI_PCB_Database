@@ -151,26 +151,26 @@
           <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Candidate Queue / Policy" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <TextBlock Text="Training Set Export / Policy" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
         </Border>
         <StackPanel Grid.Row="1" Margin="8">
           <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
             <StackPanel>
-              <TextBlock Text="Training Candidate Queue (Simulated)" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,4"/>
+              <TextBlock Text="Training Set Export (Local Files)" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,4"/>
               <WrapPanel>
-                <Button Style="{StaticResource MiniBtnGreen}" Content="Start" Margin="0,0,6,6" Click="OnStartTrainingClick"/>
-                <Button Style="{StaticResource MiniBtn}" Content="Run Epoch" Margin="0,0,6,6" Click="OnRunEpochClick"/>
+                <Button Style="{StaticResource MiniBtnGreen}" Content="Prepare" Margin="0,0,6,6" Click="OnStartTrainingClick"/>
+                <Button Style="{StaticResource MiniBtn}" Content="Validate List" Margin="0,0,6,6" Click="OnRunEpochClick"/>
                 <Button Style="{StaticResource MiniBtnAmber}" Content="Stop" Margin="0,0,6,6" Click="OnStopTrainingClick"/>
                 <Button Style="{StaticResource MiniBtn}" Content="Open Folder" Margin="0,0,0,6" Click="OnOpenTrainingFolderClick"/>
               </WrapPanel>
               <UniformGrid Columns="2" Margin="0,4,0,0">
-                <TextBlock Text="Status" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock Text="Export status" Foreground="#9AA6AF" FontSize="11"/>
                 <TextBlock x:Name="TrainingStatusText" Text="IDLE" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
                 <TextBlock Text="Queued samples" Foreground="#9AA6AF" FontSize="11"/>
                 <TextBlock x:Name="TrainingQueueText" Text="0" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
-                <TextBlock Text="Simulated epochs" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock Text="List checks" Foreground="#9AA6AF" FontSize="11"/>
                 <TextBlock x:Name="TrainingEpochText" Text="0" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
-                <TextBlock Text="Simulated validation" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock Text="List quality" Foreground="#9AA6AF" FontSize="11"/>
                 <TextBlock x:Name="TrainingValidationText" Text="--" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
               </UniformGrid>
             </StackPanel>
@@ -188,7 +188,7 @@
             <StackPanel>
               <TextBlock Text="Configuration Policy" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,4"/>
               <TextBlock TextWrapping="Wrap" LineHeight="18" FontSize="11.5"
-                Text="Candidate controls simulate queue and validation counters only. No production model training or deployment is run from this prototype."/>
+                Text="Training set export prepares local candidate files only. No model training, fine-tuning, or deployment is run from this prototype."/>
             </StackPanel>
           </Border>
         </StackPanel>

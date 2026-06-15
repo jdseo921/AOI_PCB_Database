@@ -2,7 +2,7 @@
 
 ## Purpose and Context
 
-AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspection (AOI) review workflows. The implemented program focuses on defect-image review, golden-image comparison, operator disposition, recipe/policy visibility, training-sample collection, traceability exports, and local data-handling utilities.
+AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspection (AOI) review workflows. The implemented program focuses on defect-image review, golden-image comparison, operator disposition, recipe/policy visibility, training-set export preparation, traceability exports, and local data-handling utilities.
 
 The application is framed around PCBA production and quality workflows for a board program named `TBOX-MAIN`, station `AOI-LIB-01`, and model version `AOI_AI_0.8.1`. It uses defect concepts such as solder bridge, insufficient solder, polarity error, tombstone, pin-height error, false call, possible escape, verified NG, reference designator, FOV, ROI crop, AI result, ground truth, and review disposition.
 
@@ -19,7 +19,7 @@ The main window provides a factory-style navigation shell with six top-level mod
 - 3D Profile Viewer
 - Settings / Guide
 
-Main Inspection contains contextual access to the former Station Monitor, Disposition, Golden Compare, and Image Library workflows. Log & Export contains the former Reports functionality and links to database health. Settings / Guide contains the operator guide, settings, and installation/prototype notes. The 3D Profile Viewer is displayed as a disabled planned Stage 2 module.
+Main Inspection contains contextual access to the former Station Monitor, Disposition, Golden Compare, and Image Library workflows. Log & Export contains the former Reports functionality and links to database health. Settings / Guide contains the operator guide, settings, and installation/prototype notes. The 3D Profile Viewer is displayed as a disabled planned Stage 2 module. Camera and lighting integration are planned Stage 2, robot/handler integration is planned Stage 3, and MES/ERP integration is planned Stage 4.
 
 The shell keeps a shared workflow summary visible while pages change. It shows the active detection policy, loaded sample image, loaded golden reference image, latest comparison score, and latest verdict. Page instances are cached after first creation, and page transitions use a short fade/slide animation.
 
@@ -35,10 +35,10 @@ The program uses a singleton `WorkflowState` object to coordinate page-to-page b
 - Station ID, operator ID, board program, and model version
 - Active recipe-lock state
 - Detection priority policy
-- Training-session counters and status
+- Training-set export counters and status
 - In-memory workflow history, capped at 500 entries
 
-Pages subscribe to workflow state changes and update their UI when images, analysis results, policies, dispositions, training state, or exported events change.
+Pages subscribe to workflow state changes and update their UI when images, analysis results, policies, dispositions, training-set export state, or exported events change.
 
 ## Detection and Analysis
 
@@ -70,7 +70,9 @@ Implemented policy thresholds:
 
 ## Machine Interface Export
 
-When an analysis result is accepted into workflow state, the program exports a machine-readable inspection decision through `RobotIntegrationService`.
+When an analysis result is accepted into workflow state, the program exports a machine-readable inspection decision through `MachineInterfaceExportService`.
+
+This is file export only. It does not control a robot, PLC, conveyor, or machine interlock.
 
 Files are written under:
 
@@ -106,7 +108,7 @@ Disposition events are appended to:
 
 ### Main Inspection
 
-The Main Inspection module opens on the former Station Monitor dashboard and provides shortcuts to Disposition, Golden Compare, and Image Library. The dashboard renders static AOI station cards for cameras `CAM01` through `CAM08`. Each station displays sample count, review count, waiting count, yield gauge, detected percentage, false count, and status styling.
+The Main Inspection module opens on the former Station Monitor dashboard and provides shortcuts to Disposition, Golden Compare, and Image Library. The dashboard renders static FOV/review cells, not live camera connections. Each cell displays sample count, review count, waiting count, yield gauge, detected percentage, false count, and status styling.
 
 This page is currently a dashboard mockup backed by static station records. It does not poll hardware or a live AOI service.
 
@@ -127,7 +129,7 @@ Implemented features:
   - Mark False Call
   - Mark Possible Escape
   - Hold for 2nd Review
-- Send current sample image to the training set.
+- Queue current sample image for local training-set export.
 
 Disposition guardrails are implemented:
 
@@ -173,11 +175,11 @@ Implemented features:
 - Compare Golden action for selecting a golden reference image.
 - Automatic analysis after loading the golden image.
 - Automatic navigation to the Golden Compare page after analysis.
-- Add current sample image to the local training set.
+- Add current sample image to the local training-set export folder.
 - Batch relabel event logging.
 - Export selected record to CSV, including latest analysis score/verdict metadata when available.
 
-Training samples are copied to the local app-data image vault:
+Training-set export candidates are copied to the local app-data image vault:
 
 ```text
 %LOCALAPPDATA%\AOI_Monitor\image_vault\training\
@@ -255,7 +257,7 @@ This area is informational. It does not install a service or control AOI hardwar
 
 Settings secondary view:
 
-The Settings secondary view controls display preferences, detection policy, and a simulated candidate queue.
+The Settings secondary view controls display preferences, detection policy, and local training-set export preparation.
 
 Implemented features:
 
@@ -266,14 +268,14 @@ Implemented features:
   - Balanced
   - Maximize Defect Recall
 - Recipe-lock enforcement for detection-priority changes.
-- Candidate queue simulation controls:
-  - Start simulation
-  - Run simulated epoch
-  - Stop simulation
+- Training Set Export controls:
+  - Prepare export
+  - Validate list
+  - Stop preparation
   - Open training folder
-- Candidate status, queued-sample count, simulated epoch count, and simulated validation score display.
+- Export status, queued-sample count, list-check count, and list-quality score display.
 
-Candidate queue epochs are simulated with deterministic validation-score updates based on the selected detection priority. No production training pipeline is run.
+Training Set Export prepares local candidate files only. No production training, fine-tuning, or deployment pipeline is run.
 
 ## Data Handling Summary
 
@@ -284,7 +286,7 @@ In-memory data:
 - Current sample and golden image paths
 - Latest analysis result
 - Detection priority and recipe lock
-- Training status/counters
+- Training-set export status/counters
 - Workflow history
 - Static dashboard, library, recipe, SPC, installation, and guide rows
 
@@ -304,7 +306,7 @@ Generated local artifacts:
 - Machine decision JSON snapshots
 - Machine decision NDJSON history
 - Disposition NDJSON events
-- Training-set image copies
+- Training-set export image copies
 - Package export text files
 - Image-path verification reports
 - DB integrity reports
@@ -330,10 +332,10 @@ Current boundaries:
 - There is no direct camera, PLC, robot, conveyor, or AOI machine control.
 - Service hosting and hardware links are marked as planned/documentation only.
 - Defect records and station metrics are static sample data.
-- Some workflow state remains session-local, although key events, imports, analysis results, training samples, and exports are persisted locally.
-- Training-session behavior is simulated; no model training pipeline is run.
+- Some workflow state remains session-local, although key events, imports, analysis results, training-set candidates, and exports are persisted locally.
+- Training Set Export is local file preparation only; no model training pipeline is run.
 
-Despite these boundaries, the code already implements the core review loop: load sample image, load golden image, compute comparison, produce verdict/evidence, export a machine-readable decision, record human disposition, collect training candidates, and export audit/reporting artifacts.
+Despite these boundaries, the code already implements the core review loop: load sample image, load golden image, compute comparison, produce verdict/evidence, export a machine-readable JSON decision, record human disposition, collect training-set export candidates, and export audit/reporting artifacts.
 
 ## Source Map
 
@@ -341,10 +343,10 @@ Key implementation areas:
 
 - `AOI_Monitor/MainWindow.xaml.cs`: navigation, global workflow summary, refresh/export/recipe-lock actions
 - `AOI_Monitor/ViewModels/MainViewModel.cs`: navigation items and static dashboard seed data
-- `AOI_Monitor/Services/WorkflowState.cs`: shared workflow state, event history, policy changes, training state
+- `AOI_Monitor/Services/WorkflowState.cs`: shared workflow state, event history, policy changes, training-set export state
 - `AOI_Monitor/Services/ImageAnalysisService.cs`: image loading, comparison, thresholds, verdict/evidence generation
-- `AOI_Monitor/Services/RobotIntegrationService.cs`: JSON/NDJSON machine-interface exports
+- `AOI_Monitor/Services/MachineInterfaceExportService.cs`: JSON/NDJSON machine-interface exports
 - `AOI_Monitor/Data/AoiDatabase.cs`: SQLite schema initialization, database paths, image vault import, and persistence helpers
-- `AOI_Monitor/Models/WorkflowModels.cs`: analysis result, detection policy, workflow event, training state
-- `AOI_Monitor/Models/RobotContractModels.cs`: machine decision contract shape
+- `AOI_Monitor/Models/WorkflowModels.cs`: analysis result, detection policy, workflow event, training-set export state
+- `AOI_Monitor/Models/MachineInterfaceContractModels.cs`: machine decision contract shape
 - `AOI_Monitor/Views/*.xaml.cs`: page-specific AOI workflows and export utilities

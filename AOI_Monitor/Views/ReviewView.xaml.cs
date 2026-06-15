@@ -203,7 +203,7 @@ public partial class ReviewView : UserControl
 
         try
         {
-            RobotIntegrationService.ExportDispositionEvent(action, analysis);
+            MachineInterfaceExportService.ExportDispositionEvent(action, analysis);
         }
         catch (Exception ex)
         {

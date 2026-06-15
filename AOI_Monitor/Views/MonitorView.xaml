@@ -240,8 +240,8 @@
                 <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="TBOX-MAIN" FontSize="11.5"/>
               </Grid>
               <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Camera Set" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="TOP/SIDE/BOTTOM" FontSize="11.5"/>
+                <TextBlock Text="View Set" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+                <TextBox Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="TOP/SIDE/BOTTOM (camera planned)" FontSize="11.5"/>
               </Grid>
               <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <TextBlock Text="Engine Version" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
@@ -273,7 +273,7 @@
 
       <!-- Bottom alarm -->
       <Border Margin="0,8,0,0" Background="#14080A" BorderBrush="#4B2325" BorderThickness="1" Padding="7,10">
-        <TextBlock Text="CAM05 status changed: possible escape review required -> 3 samples in process"
+        <TextBlock Text="FOV05 simulated review alert: possible escape review required -> 3 samples queued"
                    Foreground="#F27777" FontWeight="ExtraBold" TextAlignment="Center" FontSize="12"/>
       </Border>
 

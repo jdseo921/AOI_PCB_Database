@@ -5,7 +5,7 @@ using AOI_Monitor.Models;
 
 namespace AOI_Monitor.Services;
 
-public static class RobotIntegrationService
+public static class MachineInterfaceExportService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -53,7 +53,7 @@ public static class RobotIntegrationService
         return path;
     }
 
-    private static RobotInspectionContract BuildContract(AnalysisResult result)
+    private static MachineInterfaceInspectionContract BuildContract(AnalysisResult result)
     {
         var state = WorkflowState.Instance;
         var verdict = result.Verdict.ToUpperInvariant();
@@ -65,7 +65,7 @@ public static class RobotIntegrationService
             _ => 1,
         };
 
-        return new RobotInspectionContract
+        return new MachineInterfaceInspectionContract
         {
             InspectionId = $"AOI-{result.Timestamp:yyyyMMddHHmmssfff}",
             TimestampUtc = result.Timestamp.ToUniversalTime(),

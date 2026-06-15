@@ -1,6 +1,6 @@
 namespace AOI_Monitor.Models;
 
-public sealed class RobotInspectionContract
+public sealed class MachineInterfaceInspectionContract
 {
     public string SchemaVersion { get; set; } = "1.0.0";
     public string InspectionId { get; set; } = string.Empty;

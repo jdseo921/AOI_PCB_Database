@@ -57,7 +57,7 @@ public class MainViewModel : ViewModelBase
         new StatusCell("Board / Program",  "TBOX-MAIN / TBOX_TOP_V1.2",    "green"),
         new StatusCell("Review Policy",    "False Negative Priority",       "amber"),
         new StatusCell("Inspection Engine","Pixel Difference 0.1",          ""),
-        new StatusCell("Storage",          "Local SQLite + Image Vault",    ""),
+        new StatusCell("Storage",          "See readiness panel",           ""),
     };
 
     public IEnumerable<DefectRecord> DefectRecords { get; } = new[]
@@ -72,14 +72,14 @@ public class MainViewModel : ViewModelBase
 
     public IEnumerable<StationInfo> Stations { get; } = new[]
     {
-        new StationInfo("CAM01","In Process",1930,  3,0, 81.0,81,2, "TOP FOV",      "green"),
-        new StationInfo("CAM02","In Process",2060,  14,0,67.0,67,3, "BGA Area",     "green"),
-        new StationInfo("CAM03","In Process",1840,  25,1,44.0,44,5, "Passive",      "amber"),
-        new StationInfo("CAM04","In Process",1970,  36,0,73.0,73,4, "Connector",    "green"),
-        new StationInfo("CAM05","Hold",       19,    6,0, 19.0, 6,62,"Review Hold",  "red"),
-        new StationInfo("CAM06","In Process",2100,  42,0,42.0,42,5, "Shield",       "green"),
-        new StationInfo("CAM07","In Process",1800,  38,2,38.0,38,6, "Side View",    "green"),
-        new StationInfo("CAM08","No Link",      0,   0,0,  0.0, 0,0, "No Link",     "red"),
+        new StationInfo("FOV01","Review Set",1930,  3,0, 81.0,81,2, "TOP FOV",      "green"),
+        new StationInfo("FOV02","Review Set",2060,  14,0,67.0,67,3, "BGA Area",     "green"),
+        new StationInfo("FOV03","Review Set",1840,  25,1,44.0,44,5, "Passive",      "amber"),
+        new StationInfo("FOV04","Review Set",1970,  36,0,73.0,73,4, "Connector",    "green"),
+        new StationInfo("FOV05","Hold",       19,    6,0, 19.0, 6,62,"Review Hold",  "red"),
+        new StationInfo("FOV06","Review Set",2100,  42,0,42.0,42,5, "Shield",       "green"),
+        new StationInfo("FOV07","Review Set",1800,  38,2,38.0,38,6, "Side View",    "green"),
+        new StationInfo("FOV08","Planned Input",0,   0,0,  0.0, 0,0, "Not Connected","red"),
     };
 
     public IEnumerable<SpcStat> SpcStats { get; } = new[]

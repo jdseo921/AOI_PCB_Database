@@ -40,8 +40,17 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        AoiDatabase.Initialize();
-        WorkflowState.Instance.AddEvent("STORAGE", $"SQLite ready: {AoiDatabase.DatabasePath}");
+        try
+        {
+            AoiDatabase.Initialize();
+            WorkflowState.Instance.AddEvent("STORAGE", $"SQLite ready: {AoiDatabase.DatabasePath}");
+            UpdateReadinessPanel(databaseConnected: File.Exists(AoiDatabase.DatabasePath), vaultAvailable: Directory.Exists(AoiDatabase.ImageVaultPath));
+        }
+        catch (Exception ex)
+        {
+            UpdateReadinessPanel(databaseConnected: false, vaultAvailable: false);
+            MessageBox.Show($"Local database initialization failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
 
         _vm = (MainViewModel)DataContext;
         _vm.PropertyChanged += (_, args) =>
@@ -198,7 +207,6 @@ public partial class MainWindow : Window
     private void UpdateWorkflowPanel()
     {
         var state = WorkflowState.Instance;
-        ReviewPolicyText.Text = WorkflowState.ToDisplay(state.DetectionPriority);
 
         WorkflowSampleText.Text = string.IsNullOrWhiteSpace(state.SampleImagePath)
             ? "none"
@@ -240,4 +248,28 @@ public partial class MainWindow : Window
             WorkflowVerdictBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8C6C35"));
         }
     }
+
+    private void UpdateReadinessPanel(bool databaseConnected, bool vaultAvailable)
+    {
+        DatabaseStatusText.Text = databaseConnected ? "Connected" : "Not Connected";
+        DatabaseStatusText.Foreground = StatusBrush(databaseConnected);
+
+        ImageVaultStatusText.Text = vaultAvailable ? "Available" : "Not Available";
+        ImageVaultStatusText.Foreground = StatusBrush(vaultAvailable);
+
+        InspectionEngineStatusText.Text = "Prototype";
+        InspectionEngineStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"));
+
+        CameraStatusText.Text = "Simulated / Not Connected";
+        CameraStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"));
+
+        RobotStatusText.Text = "Not Connected";
+        RobotStatusText.Foreground = StatusBrush(false);
+
+        MesStatusText.Text = "Not Connected";
+        MesStatusText.Foreground = StatusBrush(false);
+    }
+
+    private static Brush StatusBrush(bool ok)
+        => new SolidColorBrush((Color)ColorConverter.ConvertFromString(ok ? "#50F56E" : "#F27777"));
 }

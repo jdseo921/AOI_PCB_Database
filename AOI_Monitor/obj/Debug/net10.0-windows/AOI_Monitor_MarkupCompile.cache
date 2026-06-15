@@ -1,5 +1,5 @@
 ﻿AOI_Monitor
-1.0.0.0
+
 
 winexe
 C#
@@ -12,8 +12,8 @@ TRACE;DEBUG;NET;NET10_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_O
 C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\App.xaml
 151109182477
 
-50492686532
-420-945685202
+31-2039282428
+210-472842601
 Controls\CircularGauge.xaml;Controls\LineChart.xaml;MainWindow.xaml;Views\AIModelTestView.xaml;Views\CompareView.xaml;Views\GuideView.xaml;Views\InstallView.xaml;Views\LibraryView.xaml;Views\MonitorView.xaml;Views\PlannedStageView.xaml;Views\RecipeView.xaml;Views\ReportsView.xaml;Views\ReviewView.xaml;Views\SettingsView.xaml;Views\SpcView.xaml;
 
 False

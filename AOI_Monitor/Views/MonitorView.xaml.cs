@@ -11,14 +11,14 @@ public partial class MonitorView : UserControl
 {
     private static readonly StationInfo[] Stations =
     {
-        new("CAM01","In Process",1930,  3,0, 81.0,81, 2,  "TOP FOV",    "green"),
-        new("CAM02","In Process",2060,  14,0,67.0,67, 3,  "BGA Area",   "green"),
-        new("CAM03","In Process",1840,  25,1,44.0,44, 5,  "Passive",    "amber"),
-        new("CAM04","In Process",1970,  36,0,73.0,73, 4,  "Connector",  "green"),
-        new("CAM05","Hold",        19,   6,0,19.0, 6,62,  "Review Hold","red"),
-        new("CAM06","In Process",2100,  42,0,42.0,42, 5,  "Shield",     "green"),
-        new("CAM07","In Process",1800,  38,2,38.0,38, 6,  "Side View",  "green"),
-        new("CAM08","No Link",      0,   0,0, 0.0, 0, 0,  "No Link",    "red"),
+        new("FOV01","Review Set",1930,  3,0, 81.0,81, 2,  "TOP FOV",    "green"),
+        new("FOV02","Review Set",2060,  14,0,67.0,67, 3,  "BGA Area",   "green"),
+        new("FOV03","Review Set",1840,  25,1,44.0,44, 5,  "Passive",    "amber"),
+        new("FOV04","Review Set",1970,  36,0,73.0,73, 4,  "Connector",  "green"),
+        new("FOV05","Hold",        19,   6,0,19.0, 6,62,  "Review Hold","red"),
+        new("FOV06","Review Set",2100,  42,0,42.0,42, 5,  "Shield",     "green"),
+        new("FOV07","Review Set",1800,  38,2,38.0,38, 6,  "Side View",  "green"),
+        new("FOV08","Planned Input",0,   0,0, 0.0, 0, 0,  "Not Connected","red"),
     };
 
     public MonitorView()

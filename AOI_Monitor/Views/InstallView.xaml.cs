@@ -6,18 +6,18 @@ public partial class InstallView : UserControl
 {
     private static readonly object[] Runtime =
     {
-        new { Element = "Background inspection service", Status = "RUN",    Purpose = "Executes inspection and result logging without requiring the GUI to stay foregrounded." },
-        new { Element = "GUI monitor / review console",  Status = "READY",  Purpose = "Used for station visibility, disposition, database access, recipe lock, and export." },
-        new { Element = "Shared local storage",          Status = "READY",  Purpose = "SQLite records and image-vault links remain accessible to the monitor." },
-        new { Element = "Service restart",               Status = "MANUAL", Purpose = "Maintenance action only; not part of normal operator review." },
+        new { Element = "Local WPF process",             Status = "READY",  Purpose = "Runs review, disposition, recipe, logs, and settings workflows on this workstation." },
+        new { Element = "SQLite / image vault",          Status = "LOCAL",  Purpose = "Stores imported images, inspection history, review events, recipe revisions, and exports." },
+        new { Element = "Inspection engine",             Status = "LOCAL",  Purpose = "Uses deterministic pixel difference against selected local images." },
+        new { Element = "Service deployment",            Status = "PLANNED",Purpose = "Windows service, camera, robot, PLC, and MES links are outside this prototype." },
     };
 
     private static readonly object[] Boundary =
     {
-        new { Topic = "Prototype purpose",      Desc = "Visual direction and workflow confirmation for installed GUI." },
-        new { Topic = "Installation implication",Desc = "Final software may run as a background service with a separate monitoring console." },
-        new { Topic = "Reference usage",        Desc = "Factory-style monitor layout is used as visual direction only; AOI-specific data is retained." },
-        new { Topic = "Not implemented here",   Desc = "Hardware control and final service daemon are outside this HTML prototype." },
+        new { Topic = "Implemented now",        Desc = "Local review console, image-vault persistence, recipe revision saves, and local export packages." },
+        new { Topic = "Operator role",          Desc = "Operators use the GUI for review, disposition, recipe editing, and evidence export." },
+        new { Topic = "Planned integration",    Desc = "Final software may add hardware links, service hosting, MES writeback, and 3D profile input." },
+        new { Topic = "Not implemented here",   Desc = "No camera, PLC, robot, conveyor, Windows service, or production training pipeline is controlled by this app." },
     };
 
     public InstallView()

@@ -10,11 +10,11 @@ none
 false
 TRACE;DEBUG;NET;NET10_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NET9_0_OR_GREATER;NET10_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
 C:\Users\smic9\OneDrive\Desktop\AOI_PCB_Database\AOI_Monitor\App.xaml
-14-1018121880
+151109182477
 
-32-792339278
-210-472842601
-Controls\CircularGauge.xaml;Controls\LineChart.xaml;MainWindow.xaml;Views\AIModelTestView.xaml;Views\CompareView.xaml;Views\GuideView.xaml;Views\InstallView.xaml;Views\LibraryView.xaml;Views\MonitorView.xaml;Views\RecipeView.xaml;Views\ReportsView.xaml;Views\ReviewView.xaml;Views\SettingsView.xaml;Views\SpcView.xaml;
+50492686532
+420-945685202
+Controls\CircularGauge.xaml;Controls\LineChart.xaml;MainWindow.xaml;Views\AIModelTestView.xaml;Views\CompareView.xaml;Views\GuideView.xaml;Views\InstallView.xaml;Views\LibraryView.xaml;Views\MonitorView.xaml;Views\PlannedStageView.xaml;Views\RecipeView.xaml;Views\ReportsView.xaml;Views\ReviewView.xaml;Views\SettingsView.xaml;Views\SpcView.xaml;
 
 False
 

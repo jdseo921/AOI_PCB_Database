@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using AOI_Monitor.Controls;
 using AOI_Monitor.Models;
+using AOI_Monitor.ViewModels;
 
 namespace AOI_Monitor.Views;
 
@@ -24,6 +25,16 @@ public partial class MonitorView : UserControl
     {
         InitializeComponent();
         BuildStationCards();
+    }
+
+    private void OnOpenDispositionClick(object sender, RoutedEventArgs e) => Navigate("review");
+    private void OnOpenCompareClick(object sender, RoutedEventArgs e) => Navigate("compare");
+    private void OnOpenLibraryClick(object sender, RoutedEventArgs e) => Navigate("library");
+
+    private void Navigate(string key)
+    {
+        if (Window.GetWindow(this)?.DataContext is MainViewModel vm)
+            vm.CurrentPage = key;
     }
 
     private void BuildStationCards()

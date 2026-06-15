@@ -154,10 +154,10 @@ public partial class LibraryView : UserControl
         var fileName = $"{DateTime.Now:yyyyMMdd_HHmmss}_{Path.GetFileName(state.SampleImagePath)}";
         var target = Path.Combine(trainingDir, fileName);
         File.Copy(state.SampleImagePath, target, true);
-        AoiDatabase.RecordTrainingSample(target, "candidate", "Queued from Library Add to Training.");
+        AoiDatabase.RecordTrainingSample(target, "candidate", "Queued from Library candidate action.");
 
         state.QueueTrainingSample(fileName);
-        MessageBox.Show($"Saved to training set:\n{target}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show($"Saved to local candidate queue:\n{target}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void OnBatchRelabelClick(object sender, RoutedEventArgs e)

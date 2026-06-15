@@ -137,9 +137,9 @@ public partial class ReviewView : UserControl
 
         var target = Path.Combine(targetDir, $"review_{DateTime.Now:yyyyMMdd_HHmmss}_{Path.GetFileName(sample)}");
         File.Copy(sample, target, true);
-        AoiDatabase.RecordTrainingSample(target, "review_candidate", "Queued from Review Send to Training Set.");
+        AoiDatabase.RecordTrainingSample(target, "review_candidate", "Queued from Review candidate action.");
         WorkflowState.Instance.QueueTrainingSample(Path.GetFileName(target));
-        MessageBox.Show("Sample copied to training set.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show("Sample copied to the local candidate queue.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void LogDisposition(string action)

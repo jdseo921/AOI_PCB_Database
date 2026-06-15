@@ -3,51 +3,141 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#0B0E10">
   <Grid Margin="8">
-    <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="*"/>
-      <ColumnDefinition Width="8"/>
-      <ColumnDefinition Width="340"/>
-    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
 
-    <!-- Export packages -->
-    <Border Grid.Column="0" Style="{StaticResource Panel}">
+    <Border Grid.Row="0" Style="{StaticResource Panel}">
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Export Packages" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <TextBlock Text="Log Filters" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
         </Border>
-        <DataGrid Grid.Row="1" x:Name="PackagesGrid">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="Package"  Binding="{Binding Package}"  Width="*"/>
-            <DataGridTextColumn Header="Format"   Binding="{Binding Format}"   Width="75"/>
-            <DataGridTextColumn Header="Status"   Binding="{Binding Status}"   Width="60"/>
-            <DataGridTemplateColumn Header="Action" Width="80">
-              <DataGridTemplateColumn.CellTemplate>
-                <DataTemplate>
-                  <Button Style="{StaticResource MiniBtnGreen}" Content="Export" Margin="4,2" Click="OnPackageExportClick"/>
-                </DataTemplate>
-              </DataGridTemplateColumn.CellTemplate>
-            </DataGridTemplateColumn>
-          </DataGrid.Columns>
-        </DataGrid>
+        <Grid Grid.Row="1" Margin="8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="120"/>
+            <ColumnDefinition Width="6"/>
+            <ColumnDefinition Width="120"/>
+            <ColumnDefinition Width="6"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="6"/>
+            <ColumnDefinition Width="130"/>
+            <ColumnDefinition Width="6"/>
+            <ColumnDefinition Width="115"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="260"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0">
+            <TextBlock Text="From" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <DatePicker x:Name="FromDatePicker"/>
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+            <TextBlock Text="To" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <DatePicker x:Name="ToDatePicker"/>
+          </StackPanel>
+          <StackPanel Grid.Column="4">
+            <TextBlock Text="Model / Board" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <TextBox x:Name="BoardFilterText" Text=""/>
+          </StackPanel>
+          <StackPanel Grid.Column="6">
+            <TextBlock Text="Operator" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <TextBox x:Name="OperatorFilterText" Text=""/>
+          </StackPanel>
+          <StackPanel Grid.Column="8">
+            <TextBlock Text="Result" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <ComboBox x:Name="ResultFilterCombo" SelectedIndex="0">
+              <ComboBoxItem Content="ALL"/>
+              <ComboBoxItem Content="OK"/>
+              <ComboBoxItem Content="REVIEW"/>
+              <ComboBoxItem Content="NG"/>
+            </ComboBox>
+          </StackPanel>
+          <WrapPanel Grid.Column="10" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+            <Button Style="{StaticResource ActionBtnGreen}" Content="Apply Filters" Margin="0,0,6,0" Click="OnApplyFiltersClick"/>
+            <Button Style="{StaticResource ActionBtn}" Content="Clear" Click="OnClearFiltersClick"/>
+          </WrapPanel>
+        </Grid>
       </Grid>
     </Border>
 
-    <!-- Maintenance utilities -->
-    <Border Grid.Column="2" Style="{StaticResource Panel}">
+    <Border Grid.Row="2" Style="{StaticResource Panel}">
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Maintenance Utilities" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <DockPanel>
+            <TextBlock x:Name="LogSummaryText" DockPanel.Dock="Right" Text="No records loaded" Foreground="#9AA6AF" FontSize="11"/>
+            <TextBlock Text="SQLite Logs" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          </DockPanel>
         </Border>
-        <UniformGrid Grid.Row="1" Columns="2" Margin="8" Rows="3">
-          <Button Style="{StaticResource ActionBtn}" Content="Rebuild Image Index" Margin="0,0,5,6" Click="OnRebuildImageIndexClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Verify Image Paths" Margin="0,0,0,6" Click="OnVerifyImagePathsClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Archive Reviewed Samples" Margin="0,0,5,6" Click="OnArchiveReviewedSamplesClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Run DB Integrity Check" Margin="0,0,0,6" Click="OnRunDbIntegrityCheckClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Export Audit Trail" Margin="0,0,5,0" Click="OnExportAuditTrailClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Active Recipe" Margin="0" Click="OnLockActiveRecipeClick"/>
-        </UniformGrid>
+        <TabControl Grid.Row="1" Background="#151A1E" BorderBrush="#343D44">
+          <TabItem Header="Inspection History">
+            <DataGrid x:Name="InspectionGrid" CanUserSortColumns="True">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
+                <DataGridTextColumn Header="Board" Binding="{Binding BoardProgram}" Width="110"/>
+                <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="90"/>
+                <DataGridTextColumn Header="Result" Binding="{Binding Verdict}" Width="70"/>
+                <DataGridTextColumn Header="Score" Binding="{Binding ScoreDisplay}" SortMemberPath="DifferenceScore" Width="65"/>
+                <DataGridTextColumn Header="Confidence" Binding="{Binding ConfidenceDisplay}" SortMemberPath="Confidence" Width="82"/>
+                <DataGridTextColumn Header="Engine" Binding="{Binding InspectionEngine}" Width="140"/>
+                <DataGridTextColumn Header="Defect" Binding="{Binding SuggestedDefect}" Width="150"/>
+                <DataGridTextColumn Header="Image" Binding="{Binding ImageName}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </TabItem>
+          <TabItem Header="Review / Disposition Events">
+            <DataGrid x:Name="ReviewGrid" CanUserSortColumns="True">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="EventTimeUtc" Width="125"/>
+                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="105"/>
+                <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="90"/>
+                <DataGridTextColumn Header="Disposition" Binding="{Binding Disposition}" Width="110"/>
+                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </TabItem>
+          <TabItem Header="Export History">
+            <DataGrid x:Name="ExportGrid" CanUserSortColumns="True">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding ExportType}" Width="160"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="70"/>
+                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </TabItem>
+        </TabControl>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="4" Style="{StaticResource Panel}">
+      <Grid Margin="8">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="420"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock Text="Auto-Archive Policy" Foreground="#9AA6AF" FontSize="10" Margin="0,0,0,3"/>
+          <TextBlock x:Name="ArchivePolicyText"
+                     Text="Logs older than 30 days are copied into LogArchive during startup. Source rows remain in place, so the archive is reversible and audit-safe."
+                     TextWrapping="Wrap" FontSize="11.5" Foreground="#DCE5EB"/>
+          <TextBlock x:Name="StatusText" Text="Ready." Foreground="#9AA6AF" FontSize="11" Margin="0,6,0,0"/>
+        </StackPanel>
+        <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Inspection History CSV" Margin="0,0,6,6" Click="OnExportInspectionHistoryClick"/>
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Review Log CSV" Margin="0,0,6,6" Click="OnExportReviewLogClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Annotated Overlays" Margin="0,0,6,6" Click="OnExportAnnotatedOverlaysClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Customer Package" Margin="0,0,6,6" Click="OnExportCustomerPackageClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="DB Integrity" Margin="0,0,6,0" Click="OnRunDbIntegrityCheckClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Database Health" Margin="0,0,6,0" Click="OnOpenDatabaseHealthClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Verify Paths" Margin="0,0,6,0" Click="OnVerifyImagePathsClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Rebuild Image Index" Margin="0,0,6,0" Click="OnRebuildImageIndexClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Recipe" Click="OnLockActiveRecipeClick"/>
+        </WrapPanel>
       </Grid>
     </Border>
   </Grid>

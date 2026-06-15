@@ -6,6 +6,25 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="8">
 
+      <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
+        <Grid Margin="8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="430"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Text="Main Inspection" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            <TextBlock Text="Operator review workspace. Station dashboard data is prototype/local only; use the shortcuts for detailed review, compare, and image records."
+                       Foreground="#8B969E" FontSize="10.5" TextWrapping="Wrap" Margin="0,3,0,0"/>
+          </StackPanel>
+          <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <Button Style="{StaticResource ActionBtnGreen}" Content="Disposition" Margin="0,0,6,0" Click="OnOpenDispositionClick"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Golden Compare" Margin="0,0,6,0" Click="OnOpenCompareClick"/>
+            <Button Style="{StaticResource ActionBtn}" Content="Image Library" Click="OnOpenLibraryClick"/>
+          </WrapPanel>
+        </Grid>
+      </Border>
+
       <!-- ══ KPI STRIP (6 cards) ══ -->
       <UniformGrid Columns="6">
 

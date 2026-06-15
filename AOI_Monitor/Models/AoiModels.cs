@@ -86,3 +86,80 @@ public record BatchTestResultRecord(
     double RoiWidth,
     double RoiHeight,
     DateTime CreatedAtUtc);
+
+public sealed class LogFilter
+{
+    public DateTime? FromDate { get; set; }
+    public DateTime? ToDate { get; set; }
+    public string? BoardProgram { get; set; }
+    public string? OperatorId { get; set; }
+    public string? Result { get; set; }
+}
+
+public record InspectionHistoryRecord(
+    long Id,
+    DateTime CreatedAtUtc,
+    string BoardProgram,
+    string OperatorId,
+    string InspectionEngine,
+    string ModelVersion,
+    string SampleImagePath,
+    string GoldenImagePath,
+    string Verdict,
+    double DifferenceScore,
+    double Confidence,
+    string SuggestedDefect,
+    string DecisionReason,
+    double HotspotX,
+    double HotspotY,
+    double HotspotWidth,
+    double HotspotHeight);
+
+public record ReviewEventRecord(
+    long Id,
+    DateTime EventTimeUtc,
+    string Category,
+    string OperatorId,
+    string Disposition,
+    string Message);
+
+public record ExportHistoryRecord(
+    long Id,
+    DateTime CreatedAtUtc,
+    string ExportType,
+    string FilePath,
+    string Status);
+
+public record RecipeRevisionRecord(
+    long Id,
+    string RecipeName,
+    string Revision,
+    string BoardProgram,
+    string OperatorId,
+    string DetectionPriority,
+    string BackgroundImagePath,
+    string RecipeJson,
+    DateTime CreatedAtUtc);
+
+public sealed class RecipeDocument
+{
+    public string RecipeName { get; set; } = "TBOX_TOP";
+    public string BoardProgram { get; set; } = "TBOX-MAIN";
+    public string BackgroundImagePath { get; set; } = string.Empty;
+    public List<RecipeRoiDocument> Rois { get; set; } = new();
+}
+
+public sealed class RecipeRoiDocument
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string RoiType { get; set; } = "Presence";
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+    public double AiScoreThreshold { get; set; } = 0.65;
+    public double HeightMin { get; set; }
+    public double HeightMax { get; set; }
+    public double VolumeMin { get; set; }
+    public double VolumeMax { get; set; }
+}

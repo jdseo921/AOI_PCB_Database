@@ -1,8 +1,8 @@
 # AOI Monitor
 
-AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspection review workflows. It gives operators a local console for station monitoring, defect disposition, golden-image comparison, image-library review, recipe visibility, SPC-style status, reports, settings, and workflow guidance.
+AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspection review workflows. It gives operators a simplified local console organized around Main Inspection, Recipe Editor, AI Model Test, Log & Export, a planned 3D Profile Viewer, and Settings / Guide.
 
-The application currently demonstrates the review loop with local files and static prototype data. It can load a sample PCB image and a golden reference image, run a deterministic pixel-difference comparison, produce an `OK`, `REVIEW`, or `NG` verdict, record disposition actions, collect training candidates, and write local export artifacts. It is not yet connected to live AOI hardware, cameras, PLCs, robots, conveyors, a production database, or a trained ML inference pipeline.
+The application currently demonstrates the review loop with local files and static prototype data. It can load a sample PCB image and a golden reference image, run a deterministic pixel-difference comparison, produce an `OK`, `REVIEW`, or `NG` verdict, record disposition actions, collect candidate samples for future training review, and write local export artifacts. It is not yet connected to live AOI hardware, cameras, PLCs, robots, conveyors, a production database, or a trained ML inference pipeline.
 
 For the detailed feature inventory, see [IMPLEMENTED_FEATURES.md](IMPLEMENTED_FEATURES.md).
 
@@ -45,12 +45,13 @@ If a previous build already exists, you can also launch the debug executable dir
 
 ## Basic Workflow
 
-1. Open the app and use the left navigation to move between AOI workflow pages.
-2. In Image Library, choose a sample PCB image with Open Record.
-3. Choose a golden reference image with Compare Golden.
-4. Review the generated score, verdict, evidence, and hotspot on Golden Compare.
-5. Use Disposition to confirm, mark false calls, hold for review, or send samples to the local training set.
-6. Use Reports to create local audit, package, image-index, and integrity-check artifacts.
+1. Open Main Inspection from the left navigation.
+2. Use its shortcuts to open Image Library, Disposition, or Golden Compare as needed.
+3. In Image Library, choose a sample PCB image with Open Record.
+4. Choose a golden reference image with Compare Golden.
+5. Review the generated score, verdict, evidence, and hotspot on Golden Compare.
+6. Use Disposition to confirm, mark false calls, hold for review, or queue local candidate samples.
+7. Use Log & Export to inspect SQLite history, create CSV exports, build customer packages, and open database health.
 
 Generated files are written below the running application's `exports/` folder, usually under:
 
@@ -78,7 +79,7 @@ Imported PCB sample and golden images are copied into the managed image vault:
 %LOCALAPPDATA%\AOI_Monitor\image_vault\
 ```
 
-Training candidates are copied below:
+Candidate samples for future/offline training review are copied below:
 
 ```text
 %LOCALAPPDATA%\AOI_Monitor\image_vault\training\
@@ -92,8 +93,9 @@ The database is initialized with tables for images, inspection results, defects,
 - If WPF build errors mention Windows targeting, run the project on Windows and build from the `AOI_Monitor` folder.
 - If images do not compare, make sure both the sample image and golden reference image are readable local image files.
 - If exports are missing, check the `exports/` folder under the executable directory, not necessarily the repository root.
-- If recipe or detection-priority controls seem locked, use the recipe lock/unlock action in the application shell or Reports page.
-- If generated reports look sparse, remember that station metrics, database rows, recipes, and many dashboard records are static prototype data.
+- If recipe or detection-priority controls seem locked, use the recipe lock/unlock action in the application shell or Log & Export page.
+- If generated reports look sparse, remember that station metrics and several dashboard records are static prototype data.
+- The 3D Profile Viewer is intentionally marked as planned; no 3D height-map workflow is implemented yet.
 
 ## Current State
 

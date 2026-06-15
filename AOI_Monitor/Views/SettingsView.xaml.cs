@@ -80,7 +80,7 @@ public partial class SettingsView : UserControl
         var state = WorkflowState.Instance;
         if (state.Training.IsRunning)
         {
-            MessageBox.Show("Training session is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Candidate queue simulation is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -92,7 +92,7 @@ public partial class SettingsView : UserControl
         var state = WorkflowState.Instance;
         if (!state.Training.IsRunning)
         {
-            MessageBox.Show("Start a training session first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Start the candidate queue simulation first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -114,7 +114,7 @@ public partial class SettingsView : UserControl
         var state = WorkflowState.Instance;
         if (!state.Training.IsRunning)
         {
-            MessageBox.Show("Training session is already stopped.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Candidate queue simulation is already stopped.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 

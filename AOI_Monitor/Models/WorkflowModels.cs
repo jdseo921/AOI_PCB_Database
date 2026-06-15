@@ -13,6 +13,8 @@ public class AnalysisResult
 {
     public string SamplePath { get; set; } = "";
     public string? GoldenPath { get; set; }
+    public string BoardProgram { get; set; } = "UNKNOWN";
+    public string OperatorId { get; set; } = "UNKNOWN";
     public string InspectionEngine { get; set; } = "Pixel Difference";
     public double DifferenceScore { get; set; }
     public double MeanBrightness { get; set; }

@@ -91,7 +91,7 @@
             <Button Style="{StaticResource ActionBtn}" Content="Open Record" Margin="0,0,6,0" Click="OnOpenRecordClick"/>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Batch Import" Margin="0,0,6,0" Click="OnBatchImportClick"/>
             <Button Style="{StaticResource ActionBtn}" Content="Compare Golden" Margin="0,0,6,0" Click="OnCompareGoldenClick"/>
-            <Button Style="{StaticResource ActionBtnBlue}" Content="Add to Training" Margin="0,0,6,0" Click="OnAddToTrainingClick"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Candidate" Margin="0,0,6,0" Click="OnAddToTrainingClick"/>
             <Button Style="{StaticResource ActionBtnAmber}" Content="Batch Relabel" Margin="0,0,6,0" Click="OnBatchRelabelClick"/>
             <Button Style="{StaticResource ActionBtnGreen}" Content="Export Selected" Click="OnExportSelectedClick"/>
           </StackPanel>

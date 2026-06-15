@@ -18,17 +18,18 @@ public partial class MainWindow : Window
 
     private static readonly Dictionary<string, string> PageTitles = new()
     {
-        ["monitor"]  = "INSTALLATION MONITOR / AOI SERVICE STATUS",
-        ["review"]   = "REVIEW / DISPOSITION STATION",
-        ["compare"]  = "SIDE-BY-SIDE GOLDEN COMPARISON",
-        ["library"]  = "DEFECT IMAGE LIBRARY / DATABASE BROWSER",
-        ["recipe"]   = "INSPECTION PROGRAM / RECIPE MATRIX",
+        ["monitor"]  = "MAIN INSPECTION / REVIEW WORKFLOW",
+        ["review"]   = "MAIN INSPECTION / DISPOSITION",
+        ["compare"]  = "MAIN INSPECTION / GOLDEN COMPARE",
+        ["library"]  = "MAIN INSPECTION / IMAGE LIBRARY",
+        ["recipe"]   = "RECIPE EDITOR",
         ["modeltest"] = "AI MODEL TEST / STAGE 1 CUSTOMER VALIDATION",
-        ["spc"]      = "SPC / TRACEABILITY / DATABASE HEALTH",
-        ["reports"]  = "REPORTS / EXPORT / MAINTENANCE UTILITIES",
-        ["install"]  = "INSTALLATION PLAN / BACKGROUND RUNTIME MODEL",
-        ["settings"] = "SYSTEM SETTINGS / LOCALIZATION",
-        ["guide"]    = "OPERATION GUIDE / INDUSTRIAL WORKFLOW",
+        ["reports"]  = "LOG & EXPORT / TRACEABILITY PACKAGE",
+        ["spc"]      = "LOG & EXPORT / DATABASE HEALTH",
+        ["profile"]  = "3D PROFILE VIEWER / PLANNED STAGE 2",
+        ["settings"] = "SETTINGS",
+        ["install"]  = "SETTINGS / GUIDE / INSTALLATION NOTES",
+        ["guide"]    = "SETTINGS / GUIDE",
     };
 
     public MainWindow()
@@ -68,6 +69,7 @@ public partial class MainWindow : Window
                 "library"  => new LibraryView(),
                 "recipe"   => new RecipeView(),
                 "modeltest" => new AIModelTestView(),
+                "profile"  => new PlannedStageView("3D Profile Viewer", "Stage 2 planned: height-map import, 3D surface rendering, slice measurement, and profile export."),
                 "spc"      => new SpcView(),
                 "reports"  => new ReportsView(),
                 "install"  => new InstallView(),
@@ -125,6 +127,18 @@ public partial class MainWindow : Window
         {
             modelTest.RefreshFromState();
         }
+        else if (PageContent.Content is RecipeView recipe)
+        {
+            recipe.RefreshFromState();
+        }
+        else if (PageContent.Content is ReportsView reports)
+        {
+            reports.RefreshFromState();
+        }
+        else if (PageContent.Content is SpcView spc)
+        {
+            spc.RefreshFromState();
+        }
 
         MessageBox.Show("View refreshed.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
@@ -173,7 +187,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        MessageBox.Show("Export is available on Compare, Library, and AI Model Test pages.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show("Export is available on Golden Compare, Image Library, AI Model Test, and Log & Export pages.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void OnWorkflowStateChanged()

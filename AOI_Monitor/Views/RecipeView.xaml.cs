@@ -1,31 +1,596 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
+using System.IO;
+using System.Text.Json;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using AOI_Monitor.Data;
+using AOI_Monitor.Models;
+using AOI_Monitor.Services;
+using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
 public partial class RecipeView : UserControl
 {
-    private static readonly object[] Thresholds =
-    {
-        new { Type = "Solder Bridge",    Threshold = "0.42", FnMode = "LOW", FpMode = "0.62", Status = "LOCK" },
-        new { Type = "Missing Component",Threshold = "0.38", FnMode = "LOW", FpMode = "0.58", Status = "LOCK" },
-        new { Type = "Polarity Error",   Threshold = "0.44", FnMode = "LOW", FpMode = "0.66", Status = "LOCK" },
-        new { Type = "Pin Height",       Threshold = "0.48", FnMode = "LOW", FpMode = "0.70", Status = "REVIEW" },
-    };
+    private const double MinRoiPixels = 8;
+    private readonly ObservableCollection<RecipeRoiRow> _rois = new();
+    private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
-    private static readonly object[] Matrix =
-    {
-        new { Item = "U107 BGA",      Presence = "ON",  Polarity = "ON",  Bridge = "ON",  Coplanarity = "ON",  Volume = "ON",  Action = "Review bridge ROI" },
-        new { Item = "C684/C688",     Presence = "ON",  Polarity = "N/A", Bridge = "ON",  Coplanarity = "N/A", Volume = "ON",  Action = "Locked" },
-        new { Item = "CN8 Connector", Presence = "ON",  Polarity = "ON",  Bridge = "OFF", Coplanarity = "ON",  Volume = "OFF", Action = "Locked" },
-        new { Item = "Shield Can",    Presence = "ON",  Polarity = "ON",  Bridge = "OFF", Coplanarity = "OFF", Volume = "ON",  Action = "Locked" },
-        new { Item = "R Network",     Presence = "ON",  Polarity = "OFF", Bridge = "ON",  Coplanarity = "OFF", Volume = "ON",  Action = "Locked" },
-        new { Item = "Test Pads",     Presence = "N/A", Polarity = "N/A", Bridge = "OFF", Coplanarity = "OFF", Volume = "OFF", Action = "Locked" },
-    };
+    private string _backgroundImagePath = string.Empty;
+    private BitmapSource? _backgroundBitmap;
+    private RecipeRoiRow? _activeRoi;
+    private Point _dragStart;
+    private Rect _dragOriginal;
+    private DragMode _dragMode = DragMode.None;
+    private bool _isUpdatingFields;
+    private bool _isRightPanning;
+    private Point _panStart;
+    private Point _panOrigin;
 
     public RecipeView()
     {
         InitializeComponent();
-        ThresholdGrid.ItemsSource = Thresholds;
-        MatrixGrid.ItemsSource    = Matrix;
+        RoiGrid.ItemsSource = _rois;
+        WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
+        Unloaded += (_, _) => WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
+        RefreshFromState();
+        LoadLatestRecipe();
+    }
+
+    public void RefreshFromState()
+    {
+        var state = WorkflowState.Instance;
+        BoardProgramText.Text = state.BoardProgram;
+        OperatorText.Text = state.OperatorId;
+        LockStatusText.Text = state.IsRecipeLocked ? "LOCKED" : "UNLOCKED";
+        LockStatusText.Foreground = state.IsRecipeLocked ? Brushes.Orange : Brushes.LightGreen;
+    }
+
+    private void OnWorkflowStateChanged()
+    {
+        Dispatcher.Invoke(RefreshFromState);
+    }
+
+    private void LoadLatestRecipe()
+    {
+        var state = WorkflowState.Instance;
+        var revision = AoiDatabase.GetLatestRecipeRevision(state.BoardProgram);
+        if (revision is null || string.IsNullOrWhiteSpace(revision.RecipeJson))
+        {
+            RecipeStatusText.Text = "No saved recipe revision found. Load a PCB image to start.";
+            return;
+        }
+
+        try
+        {
+            var doc = JsonSerializer.Deserialize<RecipeDocument>(revision.RecipeJson);
+            if (doc is null)
+                return;
+
+            RecipeNameText.Text = doc.RecipeName;
+            _backgroundImagePath = doc.BackgroundImagePath;
+            if (File.Exists(_backgroundImagePath))
+                LoadBackground(_backgroundImagePath);
+
+            _rois.Clear();
+            foreach (var roi in doc.Rois)
+            {
+                _rois.Add(RecipeRoiRow.FromDocument(roi, isSaved: true));
+            }
+
+            _activeRoi = _rois.FirstOrDefault();
+            RoiGrid.SelectedItem = _activeRoi;
+            UpdateFieldPanel();
+            RenderRois();
+            RevisionText.Text = $"Loaded revision {revision.Revision} saved {ToLocalDisplay(revision.CreatedAtUtc)} by {revision.OperatorId}.";
+            RecipeStatusText.Text = $"Loaded {revision.RecipeName} with {_rois.Count} ROI(s).";
+        }
+        catch (Exception ex)
+        {
+            RecipeStatusText.Text = $"Recipe load failed: {ex.Message}";
+        }
+    }
+
+    private void OnLoadImageClick(object sender, RoutedEventArgs e)
+    {
+        if (!EnsureUnlocked("Load image"))
+            return;
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Load recipe background image",
+            Filter = "PCB image files|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff",
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        LoadBackground(dialog.FileName);
+        WorkflowState.Instance.SetSampleImage(dialog.FileName);
+        RecipeStatusText.Text = $"Background loaded: {Path.GetFileName(dialog.FileName)}";
+    }
+
+    private void LoadBackground(string path)
+    {
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.UriSource = new Uri(path, UriKind.Absolute);
+        bmp.EndInit();
+        bmp.Freeze();
+
+        _backgroundImagePath = path;
+        _backgroundBitmap = bmp;
+        RecipeImage.Source = bmp;
+        RecipeImage.Width = bmp.PixelWidth;
+        RecipeImage.Height = bmp.PixelHeight;
+        ViewportCanvas.Width = bmp.PixelWidth;
+        ViewportCanvas.Height = bmp.PixelHeight;
+        RoiCanvas.Width = bmp.PixelWidth;
+        RoiCanvas.Height = bmp.PixelHeight;
+
+        FitToView();
+        RenderRois();
+    }
+
+    private void OnCanvasLeftDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_backgroundBitmap is null || !EnsureUnlocked("Edit ROI"))
+            return;
+
+        ViewportCanvas.Focus();
+        _dragStart = ClampToImage(e.GetPosition(RoiCanvas));
+        var hit = HitTestRoi(_dragStart);
+        if (hit is not null)
+        {
+            SelectRoi(hit);
+            _dragOriginal = ToPixelRect(hit);
+            _dragMode = IsResizeHandle(_dragStart, _dragOriginal) ? DragMode.Resize : DragMode.Move;
+        }
+        else
+        {
+            var roi = new RecipeRoiRow
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                RoiType = SelectedRoiType(),
+                AiScoreThreshold = 0.65,
+                X = _dragStart.X / _backgroundBitmap.PixelWidth,
+                Y = _dragStart.Y / _backgroundBitmap.PixelHeight,
+                Width = MinRoiPixels / _backgroundBitmap.PixelWidth,
+                Height = MinRoiPixels / _backgroundBitmap.PixelHeight,
+                IsSaved = false,
+            };
+            _rois.Add(roi);
+            SelectRoi(roi);
+            _dragOriginal = ToPixelRect(roi);
+            _dragMode = DragMode.Draw;
+        }
+
+        RoiCanvas.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void OnCanvasMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_isRightPanning)
+        {
+            var panCurrent = e.GetPosition(ViewportCanvas);
+            CanvasPan.X = _panOrigin.X + panCurrent.X - _panStart.X;
+            CanvasPan.Y = _panOrigin.Y + panCurrent.Y - _panStart.Y;
+            return;
+        }
+
+        if (_dragMode == DragMode.None || _activeRoi is null || _backgroundBitmap is null)
+            return;
+
+        var current = ClampToImage(e.GetPosition(RoiCanvas));
+        var dx = current.X - _dragStart.X;
+        var dy = current.Y - _dragStart.Y;
+        var rect = _dragOriginal;
+
+        if (_dragMode == DragMode.Move)
+        {
+            rect.X = Math.Clamp(_dragOriginal.X + dx, 0, _backgroundBitmap.PixelWidth - _dragOriginal.Width);
+            rect.Y = Math.Clamp(_dragOriginal.Y + dy, 0, _backgroundBitmap.PixelHeight - _dragOriginal.Height);
+        }
+        else
+        {
+            rect.Width = Math.Max(MinRoiPixels, _dragOriginal.Width + dx);
+            rect.Height = Math.Max(MinRoiPixels, _dragOriginal.Height + dy);
+            rect.Width = Math.Min(rect.Width, _backgroundBitmap.PixelWidth - rect.X);
+            rect.Height = Math.Min(rect.Height, _backgroundBitmap.PixelHeight - rect.Y);
+        }
+
+        ApplyPixelRect(_activeRoi, rect);
+        _activeRoi.IsSaved = false;
+        UpdateFieldPanel();
+        RoiGrid.Items.Refresh();
+        RenderRois();
+    }
+
+    private void OnCanvasLeftUp(object sender, MouseButtonEventArgs e)
+    {
+        _dragMode = DragMode.None;
+        RoiCanvas.ReleaseMouseCapture();
+    }
+
+    private void OnCanvasRightDown(object sender, MouseButtonEventArgs e)
+    {
+        _isRightPanning = true;
+        _panStart = e.GetPosition(ViewportCanvas);
+        _panOrigin = new Point(CanvasPan.X, CanvasPan.Y);
+        ViewportCanvas.CaptureMouse();
+    }
+
+    private void OnCanvasRightUp(object sender, MouseButtonEventArgs e)
+    {
+        _isRightPanning = false;
+        ViewportCanvas.ReleaseMouseCapture();
+    }
+
+    private void OnCanvasMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        SetZoom(CanvasScale.ScaleX * (e.Delta > 0 ? 1.12 : 0.89));
+    }
+
+    private void OnCanvasKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete)
+            DeleteActiveRoi();
+    }
+
+    private void OnRoiSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (RoiGrid.SelectedItem is RecipeRoiRow roi)
+            SelectRoi(roi);
+    }
+
+    private void SelectRoi(RecipeRoiRow roi)
+    {
+        _activeRoi = roi;
+        RoiGrid.SelectedItem = roi;
+        UpdateFieldPanel();
+        RenderRois();
+    }
+
+    private void OnRoiParameterChanged(object sender, EventArgs e)
+    {
+        if (_isUpdatingFields || _activeRoi is null)
+            return;
+
+        if (WorkflowState.Instance.IsRecipeLocked)
+            return;
+
+        _activeRoi.RoiType = SelectedRoiType();
+        _activeRoi.AiScoreThreshold = ParseDouble(AiThresholdText.Text, _activeRoi.AiScoreThreshold);
+        _activeRoi.HeightMin = ParseDouble(HeightMinText.Text, _activeRoi.HeightMin);
+        _activeRoi.HeightMax = ParseDouble(HeightMaxText.Text, _activeRoi.HeightMax);
+        _activeRoi.VolumeMin = ParseDouble(VolumeMinText.Text, _activeRoi.VolumeMin);
+        _activeRoi.VolumeMax = ParseDouble(VolumeMaxText.Text, _activeRoi.VolumeMax);
+        _activeRoi.IsSaved = false;
+        RoiGrid.Items.Refresh();
+        RenderRois();
+    }
+
+    private void OnDeleteRoiClick(object sender, RoutedEventArgs e)
+    {
+        DeleteActiveRoi();
+    }
+
+    private void DeleteActiveRoi()
+    {
+        if (_activeRoi is null || !EnsureUnlocked("Delete ROI"))
+            return;
+
+        _rois.Remove(_activeRoi);
+        _activeRoi = _rois.FirstOrDefault();
+        RoiGrid.SelectedItem = _activeRoi;
+        UpdateFieldPanel();
+        RenderRois();
+        RecipeStatusText.Text = "ROI deleted.";
+    }
+
+    private void OnTestRunClick(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_backgroundImagePath) || !File.Exists(_backgroundImagePath))
+        {
+            MessageBox.Show("Load a recipe background image before running a test.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            var state = WorkflowState.Instance;
+            state.SetSampleImage(_backgroundImagePath);
+            var analysis = ImageAnalysisService.Analyze(_backgroundImagePath, state.GoldenImagePath, state.DetectionPriority);
+            state.SetAnalysis(analysis);
+            RecipeStatusText.Text = $"Test run complete: {analysis.Verdict}, score {analysis.DifferenceScore:F1}%.";
+            MessageBox.Show(RecipeStatusText.Text, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Test run failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnSaveRecipeClick(object sender, RoutedEventArgs e)
+    {
+        if (!EnsureUnlocked("Save recipe"))
+            return;
+
+        if (string.IsNullOrWhiteSpace(_backgroundImagePath) || !File.Exists(_backgroundImagePath))
+        {
+            MessageBox.Show("Load a recipe background image before saving.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var state = WorkflowState.Instance;
+        var doc = new RecipeDocument
+        {
+            RecipeName = string.IsNullOrWhiteSpace(RecipeNameText.Text) ? "AOI_RECIPE" : RecipeNameText.Text.Trim(),
+            BoardProgram = state.BoardProgram,
+            BackgroundImagePath = _backgroundImagePath,
+            Rois = _rois.Select(r => r.ToDocument()).ToList(),
+        };
+
+        var json = JsonSerializer.Serialize(doc, _jsonOptions);
+        var id = AoiDatabase.SaveRecipeRevision(
+            doc.RecipeName,
+            state.BoardProgram,
+            state.OperatorId,
+            WorkflowState.ToDisplay(state.DetectionPriority),
+            _backgroundImagePath,
+            json);
+
+        foreach (var roi in _rois)
+            roi.IsSaved = true;
+
+        state.AddEvent("RECIPE", $"Recipe revision saved: {doc.RecipeName}, {doc.Rois.Count} ROI(s), rev id {id}.");
+        RevisionText.Text = $"Saved revision id {id} at {DateTime.Now:yyyy-MM-dd HH:mm:ss} by {state.OperatorId}.";
+        RecipeStatusText.Text = $"Recipe saved with {doc.Rois.Count} ROI(s).";
+        RoiGrid.Items.Refresh();
+        RenderRois();
+    }
+
+    private void OnZoomInClick(object sender, RoutedEventArgs e) => SetZoom(CanvasScale.ScaleX * 1.2);
+    private void OnZoomOutClick(object sender, RoutedEventArgs e) => SetZoom(CanvasScale.ScaleX / 1.2);
+    private void OnFitClick(object sender, RoutedEventArgs e) => FitToView();
+
+    private void RenderRois()
+    {
+        RoiCanvas.Children.Clear();
+        if (_backgroundBitmap is null)
+            return;
+
+        foreach (var roi in _rois)
+        {
+            var rect = ToPixelRect(roi);
+            var isActive = ReferenceEquals(roi, _activeRoi);
+            var stroke = isActive ? Brushes.Yellow : roi.IsSaved ? Brushes.LimeGreen : Brushes.DeepSkyBlue;
+            var shape = new System.Windows.Shapes.Rectangle
+            {
+                Width = rect.Width,
+                Height = rect.Height,
+                Stroke = stroke,
+                StrokeThickness = isActive ? 3 : 2,
+                Fill = Brushes.Transparent,
+                Tag = roi,
+            };
+
+            Canvas.SetLeft(shape, rect.X);
+            Canvas.SetTop(shape, rect.Y);
+            RoiCanvas.Children.Add(shape);
+
+            var label = new TextBlock
+            {
+                Text = roi.RoiType,
+                Foreground = stroke,
+                Background = Brushes.Black,
+                FontSize = 13,
+                FontWeight = FontWeights.Bold,
+                Padding = new Thickness(3, 1, 3, 1),
+            };
+            Canvas.SetLeft(label, rect.X);
+            Canvas.SetTop(label, Math.Max(0, rect.Y - 20));
+            RoiCanvas.Children.Add(label);
+        }
+    }
+
+    private void UpdateFieldPanel()
+    {
+        _isUpdatingFields = true;
+        try
+        {
+            var roi = _activeRoi;
+            SetComboText(roi?.RoiType ?? "Presence");
+            AiThresholdText.Text = FormatDouble(roi?.AiScoreThreshold ?? 0.65);
+            HeightMinText.Text = FormatDouble(roi?.HeightMin ?? 0);
+            HeightMaxText.Text = FormatDouble(roi?.HeightMax ?? 0);
+            VolumeMinText.Text = FormatDouble(roi?.VolumeMin ?? 0);
+            VolumeMaxText.Text = FormatDouble(roi?.VolumeMax ?? 0);
+        }
+        finally
+        {
+            _isUpdatingFields = false;
+        }
+    }
+
+    private RecipeRoiRow? HitTestRoi(Point point)
+    {
+        for (var i = _rois.Count - 1; i >= 0; i--)
+        {
+            if (ToPixelRect(_rois[i]).Contains(point))
+                return _rois[i];
+        }
+
+        return null;
+    }
+
+    private Rect ToPixelRect(RecipeRoiRow roi)
+    {
+        if (_backgroundBitmap is null)
+            return Rect.Empty;
+
+        return new Rect(
+            roi.X * _backgroundBitmap.PixelWidth,
+            roi.Y * _backgroundBitmap.PixelHeight,
+            roi.Width * _backgroundBitmap.PixelWidth,
+            roi.Height * _backgroundBitmap.PixelHeight);
+    }
+
+    private void ApplyPixelRect(RecipeRoiRow roi, Rect rect)
+    {
+        if (_backgroundBitmap is null)
+            return;
+
+        roi.X = Math.Round(rect.X / _backgroundBitmap.PixelWidth, 5);
+        roi.Y = Math.Round(rect.Y / _backgroundBitmap.PixelHeight, 5);
+        roi.Width = Math.Round(rect.Width / _backgroundBitmap.PixelWidth, 5);
+        roi.Height = Math.Round(rect.Height / _backgroundBitmap.PixelHeight, 5);
+    }
+
+    private Point ClampToImage(Point point)
+    {
+        if (_backgroundBitmap is null)
+            return point;
+
+        return new Point(
+            Math.Clamp(point.X, 0, _backgroundBitmap.PixelWidth),
+            Math.Clamp(point.Y, 0, _backgroundBitmap.PixelHeight));
+    }
+
+    private bool IsResizeHandle(Point point, Rect rect)
+    {
+        var tolerance = Math.Max(10, 16 / Math.Max(0.1, CanvasScale.ScaleX));
+        return Math.Abs(point.X - rect.Right) <= tolerance && Math.Abs(point.Y - rect.Bottom) <= tolerance;
+    }
+
+    private void FitToView()
+    {
+        if (_backgroundBitmap is null)
+            return;
+
+        var host = ViewportCanvas.Parent as FrameworkElement;
+        var availableWidth = Math.Max(100, host?.ActualWidth - 20 ?? 900);
+        var availableHeight = Math.Max(100, host?.ActualHeight - 20 ?? 520);
+        var scale = Math.Min(availableWidth / _backgroundBitmap.PixelWidth, availableHeight / _backgroundBitmap.PixelHeight);
+        SetZoom(Math.Clamp(scale, 0.1, 2.0));
+        CanvasPan.X = 0;
+        CanvasPan.Y = 0;
+    }
+
+    private void SetZoom(double zoom)
+    {
+        zoom = Math.Clamp(zoom, 0.1, 6.0);
+        CanvasScale.ScaleX = zoom;
+        CanvasScale.ScaleY = zoom;
+        ZoomText.Text = $"{zoom:P0}";
+    }
+
+    private bool EnsureUnlocked(string action)
+    {
+        if (!WorkflowState.Instance.IsRecipeLocked)
+            return true;
+
+        MessageBox.Show(
+            $"{action} is blocked because the recipe is locked. Unlock the recipe before editing.",
+            "AOI Monitor",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+        return false;
+    }
+
+    private string SelectedRoiType()
+        => (RoiTypeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Presence";
+
+    private void SetComboText(string value)
+    {
+        foreach (var item in RoiTypeCombo.Items.OfType<ComboBoxItem>())
+        {
+            if (string.Equals(item.Content?.ToString(), value, StringComparison.OrdinalIgnoreCase))
+            {
+                RoiTypeCombo.SelectedItem = item;
+                return;
+            }
+        }
+
+        RoiTypeCombo.SelectedIndex = 0;
+    }
+
+    private static double ParseDouble(string text, double fallback)
+        => double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : fallback;
+
+    private static string FormatDouble(double value)
+        => value.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static string ToLocalDisplay(DateTime value)
+    {
+        var local = value.Kind == DateTimeKind.Utc ? value.ToLocalTime() : value;
+        return local == DateTime.MinValue ? "--" : local.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+    }
+
+    private enum DragMode
+    {
+        None,
+        Draw,
+        Move,
+        Resize,
+    }
+
+    public sealed class RecipeRoiRow
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string RoiType { get; set; } = "Presence";
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+        public double AiScoreThreshold { get; set; } = 0.65;
+        public double HeightMin { get; set; }
+        public double HeightMax { get; set; }
+        public double VolumeMin { get; set; }
+        public double VolumeMax { get; set; }
+        public bool IsSaved { get; set; }
+
+        public static RecipeRoiRow FromDocument(RecipeRoiDocument doc, bool isSaved)
+        {
+            return new RecipeRoiRow
+            {
+                Id = doc.Id,
+                RoiType = doc.RoiType,
+                X = doc.X,
+                Y = doc.Y,
+                Width = doc.Width,
+                Height = doc.Height,
+                AiScoreThreshold = doc.AiScoreThreshold,
+                HeightMin = doc.HeightMin,
+                HeightMax = doc.HeightMax,
+                VolumeMin = doc.VolumeMin,
+                VolumeMax = doc.VolumeMax,
+                IsSaved = isSaved,
+            };
+        }
+
+        public RecipeRoiDocument ToDocument()
+        {
+            return new RecipeRoiDocument
+            {
+                Id = Id,
+                RoiType = RoiType,
+                X = X,
+                Y = Y,
+                Width = Width,
+                Height = Height,
+                AiScoreThreshold = AiScoreThreshold,
+                HeightMin = HeightMin,
+                HeightMax = HeightMax,
+                VolumeMin = VolumeMin,
+                VolumeMax = VolumeMax,
+            };
+        }
     }
 }

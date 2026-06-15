@@ -10,22 +10,20 @@ This document describes the features currently implemented in the codebase. Stat
 
 ## Application Shell
 
-The main window provides a factory-style navigation shell with ten pages:
+The main window provides a factory-style navigation shell with six top-level modules:
 
-- Station Monitor
-- Disposition
-- Golden Compare
-- Image Library
-- Recipe Matrix
-- SPC / Database
-- Reports
-- Installation Plan
-- Settings
-- Guide
+- Main Inspection
+- Recipe Editor
+- AI Model Test
+- Log & Export
+- 3D Profile Viewer
+- Settings / Guide
+
+Main Inspection contains contextual access to the former Station Monitor, Disposition, Golden Compare, and Image Library workflows. Log & Export contains the former Reports functionality and links to database health. Settings / Guide contains the operator guide, settings, and installation/prototype notes. The 3D Profile Viewer is displayed as a disabled planned Stage 2 module.
 
 The shell keeps a shared workflow summary visible while pages change. It shows the active detection policy, loaded sample image, loaded golden reference image, latest comparison score, and latest verdict. Page instances are cached after first creation, and page transitions use a short fade/slide animation.
 
-Global actions include refresh, recipe lock/unlock, export, and opening the local export folder. The export shortcut delegates to the active Compare or Library page when applicable.
+Global actions include refresh, recipe lock/unlock, export, and opening the local export folder. The export shortcut delegates to applicable workflow pages.
 
 ## Shared Workflow State
 
@@ -106,9 +104,9 @@ Disposition events are appended to:
 
 ## Page Features
 
-### Station Monitor
+### Main Inspection
 
-The Station Monitor page renders static AOI station cards for cameras `CAM01` through `CAM08`. Each station displays sample count, review count, waiting count, yield gauge, detected percentage, false count, and status styling.
+The Main Inspection module opens on the former Station Monitor dashboard and provides shortcuts to Disposition, Golden Compare, and Image Library. The dashboard renders static AOI station cards for cameras `CAM01` through `CAM08`. Each station displays sample count, review count, waiting count, yield gauge, detected percentage, false count, and status styling.
 
 This page is currently a dashboard mockup backed by static station records. It does not poll hardware or a live AOI service.
 
@@ -185,33 +183,43 @@ Training samples are copied to the local app-data image vault:
 %LOCALAPPDATA%\AOI_Monitor\image_vault\training\
 ```
 
-### Recipe Matrix
+### Recipe Editor
 
-The Recipe Matrix page displays static AOI rule and inspection-program data.
+The Recipe Editor page is a basic working editor for local recipe revision proof-of-concept data.
 
-Implemented tables include:
+Implemented behavior:
 
-- Defect threshold rows for solder bridge, missing component, polarity error, and pin height.
-- A component/inspection matrix for presence, polarity, bridge, coplanarity, and volume checks.
+- Load an image as the recipe background.
+- Draw, select, move, resize, and delete rectangular ROI.
+- Assign ROI types for Presence, Polarity, Solder Bridge, Height, and Anomaly.
+- Edit AI score threshold, height min/max, and volume min/max parameters.
+- Save recipe revisions to local SQLite with timestamp, board program, operator ID, and JSON ROI data.
+- Reload the latest saved recipe revision for the active board program on startup.
+- Run a local test inspection against the selected image using the current pixel-difference engine.
+- Enforce the global recipe lock before unsafe edits and saves.
 
-The page is currently read-only. Recipe lock/unlock is implemented globally through the main shell and Reports page, and detection-priority changes are blocked when the recipe is locked.
+Active ROI is shown in yellow, saved ROI in green, and unsaved inactive ROI in blue.
 
-### SPC / Database
+### Log & Export
 
-The SPC / Database page displays static database-health rows for:
+The Log & Export module combines log browsing, export utilities, and database-health access.
 
-- Samples
-- Annotations
-- ROI crops
-- Similar-image index
-- Audit trail
-- Unresolved conflicts
+Implemented log behavior:
 
-The view is currently a prototype health dashboard. The app initializes a local SQLite database, but the SPC grid rows are still static prototype data. Some supporting SPC values are also present in the main view model, such as first-pass yield, false-call ratio, escape-risk rate, annotation coverage, broken image links, and missing RefDes count.
+- Displays inspection history from SQLite.
+- Displays review/disposition events from SQLite.
+- Displays export history from SQLite.
+- Filters by date range, board/model text, operator, and result.
+- Sortable inspection, review, and export-history grids.
+- Exports filtered inspection history CSV and review log CSV.
+- Exports annotated image overlays.
+- Exports customer validation packages.
+- Records exports in `ExportHistory`.
+- Includes copy-only archive indexing for older log rows in `LogArchive`; source records remain queryable.
 
-### Reports
+Database health remains available as a secondary screen from Log & Export. It displays SQLite table counts and local health indicators. Some dashboard/SPC values remain static prototype data.
 
-The Reports page provides local export and maintenance utilities.
+Additional local utilities:
 
 Implemented features:
 
@@ -224,25 +232,30 @@ Implemented features:
 - Audit-trail export from workflow history.
 - Active recipe lock/unlock.
 
-Reports are local filesystem artifacts generated under the application `exports` folder.
+Exports are local filesystem artifacts generated under the application `exports` folder.
 
-### Installation Plan
+### 3D Profile Viewer
 
-The Installation Plan page documents intended runtime boundaries using static rows.
+The 3D Profile Viewer is visible in the top-level navigation as a disabled planned Stage 2 module. It does not currently import height maps, render 3D surfaces, measure slices, or export profiles.
 
-Implemented content covers:
+### Settings / Guide
 
-- Background inspection service concept
-- GUI monitor/review console concept
-- Shared local storage concept
-- Manual service restart concept
-- Prototype scope and non-implemented hardware/service boundaries
+Settings / Guide contains operator workflow guidance, local settings, and prototype installation notes. Installation notes are documentation only and are no longer a top-level production module.
 
-This page is informational. It does not install a service or control AOI hardware.
+Guide content covers:
 
-### Settings
+- Local review sequence.
+- Recipe/model/lot confirmation.
+- Disposition priorities.
+- Log & Export/database-health checks.
+- Recipe lock and audit export reminders.
+- Documentation boundaries for planned hardware, MES, service hosting, and 3D profile integrations.
 
-The Settings page controls display preferences, detection policy, and training-session state.
+This area is informational. It does not install a service or control AOI hardware.
+
+Settings secondary view:
+
+The Settings secondary view controls display preferences, detection policy, and a simulated candidate queue.
 
 Implemented features:
 
@@ -253,18 +266,14 @@ Implemented features:
   - Balanced
   - Maximize Defect Recall
 - Recipe-lock enforcement for detection-priority changes.
-- Training session controls:
-  - Start training session
-  - Run training epoch
-  - Stop training session
+- Candidate queue simulation controls:
+  - Start simulation
+  - Run simulated epoch
+  - Stop simulation
   - Open training folder
-- Training status, queued-sample count, epoch count, and validation score display.
+- Candidate status, queued-sample count, simulated epoch count, and simulated validation score display.
 
-Training epochs are simulated with deterministic validation-score updates based on the selected detection priority.
-
-### Guide
-
-The Guide page provides an operator workflow reference. It lists recommended AOI review steps such as confirming service state, checking recipe/model/lot information, reviewing possible escapes first, comparing overlays, checking historical defects, recording disposition, reviewing SPC/database health, locking recipe, and exporting audit evidence.
+Candidate queue epochs are simulated with deterministic validation-score updates based on the selected detection priority. No production training pipeline is run.
 
 ## Data Handling Summary
 
@@ -319,7 +328,7 @@ Current boundaries:
 - Several UI tables and health rows are still static prototype data.
 - The image-analysis routine is pixel-difference based, not a production ML inference pipeline.
 - There is no direct camera, PLC, robot, conveyor, or AOI machine control.
-- The background inspection service shown in the UI is conceptual.
+- Service hosting and hardware links are marked as planned/documentation only.
 - Defect records and station metrics are static sample data.
 - Some workflow state remains session-local, although key events, imports, analysis results, training samples, and exports are persisted locally.
 - Training-session behavior is simulated; no model training pipeline is run.

@@ -43,6 +43,8 @@ public sealed class WorkflowState
 
     public void SetAnalysis(AnalysisResult result)
     {
+        result.BoardProgram = BoardProgram;
+        result.OperatorId = OperatorId;
         LastAnalysis = result;
         AoiDatabase.RecordInspectionResult(result);
         AddEvent("ANALYSIS", $"Compared images -> score {result.DifferenceScore:F1}% ({result.Verdict})");
@@ -89,7 +91,7 @@ public sealed class WorkflowState
     public void QueueTrainingSample(string fileName)
     {
         Training.QueuedSamples++;
-        AddEvent("TRAINING", $"Queued sample for training: {fileName}");
+        AddEvent("CANDIDATE", $"Queued sample candidate: {fileName}");
         Notify();
     }
 
@@ -97,14 +99,14 @@ public sealed class WorkflowState
     {
         Training.IsRunning = true;
         Training.LastStartedAt = DateTime.Now;
-        AddEvent("TRAINING", "Training session started.");
+        AddEvent("CANDIDATE", "Candidate queue simulation started.");
         Notify();
     }
 
     public void StopTraining()
     {
         Training.IsRunning = false;
-        AddEvent("TRAINING", "Training session stopped.");
+        AddEvent("CANDIDATE", "Candidate queue simulation stopped.");
         Notify();
     }
 
@@ -117,7 +119,7 @@ public sealed class WorkflowState
         if (Training.QueuedSamples > 0)
             Training.QueuedSamples--;
 
-        AddEvent("TRAINING", $"Epoch completed. Validation score {validationScore:F1}%.");
+        AddEvent("CANDIDATE", $"Simulated epoch completed. Validation score {validationScore:F1}%.");
         Notify();
     }
 
@@ -131,7 +133,7 @@ public sealed class WorkflowState
         };
 
         History.Add(entry);
-        AoiDatabase.RecordWorkflowEvent(category, message, entry.Timestamp);
+        AoiDatabase.RecordWorkflowEvent(category, message, entry.Timestamp, OperatorId);
 
         if (History.Count > MaxHistoryEntries)
             History.RemoveRange(0, History.Count - MaxHistoryEntries);

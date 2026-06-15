@@ -11,6 +11,7 @@ public class NavPage : ViewModelBase
     public string Number   { get; set; } = "";
     public string Title    { get; set; } = "";
     public string Subtitle { get; set; } = "";
+    public bool IsEnabled  { get; set; } = true;
     public bool IsActive
     {
         get => _isActive;
@@ -29,7 +30,7 @@ public class MainViewModel : ViewModelBase
         set
         {
             SetField(ref _currentPage, value);
-            foreach (var p in NavPages) p.IsActive = p.Key == value;
+            foreach (var p in NavPages) p.IsActive = IsTopLevelActive(p.Key, value);
         }
     }
 
@@ -41,23 +42,18 @@ public class MainViewModel : ViewModelBase
 
     public ObservableCollection<NavPage> NavPages { get; } = new()
     {
-        new NavPage { Key="monitor",  Number="01", Title="Station Monitor",  Subtitle="service/status"     },
-        new NavPage { Key="review",   Number="02", Title="Disposition",      Subtitle="escape/false call"  },
-        new NavPage { Key="compare",  Number="03", Title="Golden Compare",   Subtitle="defect/reference"   },
-        new NavPage { Key="library",  Number="04", Title="Image Library",    Subtitle="records/search"     },
-        new NavPage { Key="recipe",   Number="05", Title="Recipe Matrix",    Subtitle="ROI/rules"          },
-        new NavPage { Key="modeltest",Number="06", Title="AI Model Test",    Subtitle="stage 1 validation"  },
-        new NavPage { Key="spc",      Number="07", Title="SPC / Database",   Subtitle="yield/trends"       },
-        new NavPage { Key="reports",  Number="08", Title="Reports",          Subtitle="export/backup"      },
-        new NavPage { Key="install",  Number="09", Title="Installation Plan",Subtitle="background GUI"     },
-        new NavPage { Key="settings", Number="10", Title="Settings",         Subtitle="system/localization"},
-        new NavPage { Key="guide",    Number="11", Title="Guide",            Subtitle="workflow reference"  },
+        new NavPage { Key="monitor",  Number="01", Title="Main Inspection",   Subtitle="review workflow" },
+        new NavPage { Key="recipe",   Number="02", Title="Recipe Editor",     Subtitle="ROI/rules" },
+        new NavPage { Key="modeltest",Number="03", Title="AI Model Test",     Subtitle="stage 1 validation" },
+        new NavPage { Key="reports",  Number="04", Title="Log & Export",      Subtitle="history/package" },
+        new NavPage { Key="profile",  Number="05", Title="3D Profile Viewer", Subtitle="planned stage 2", IsEnabled=false },
+        new NavPage { Key="guide",    Number="06", Title="Settings / Guide",  Subtitle="setup/docs" },
     };
 
     public IEnumerable<StatusCell> StatusCells { get; } = new[]
     {
-        new StatusCell("Install Target",   "Factory Station PC",            ""),
-        new StatusCell("Runtime Model",    "Background Service + GUI Mon.", ""),
+        new StatusCell("Console Scope",    "Local Review Workstation",      ""),
+        new StatusCell("Runtime Model",    "Local WPF Prototype",           ""),
         new StatusCell("Board / Program",  "TBOX-MAIN / TBOX_TOP_V1.2",    "green"),
         new StatusCell("Review Policy",    "False Negative Priority",       "amber"),
         new StatusCell("Inspection Engine","Pixel Difference 0.1",          ""),
@@ -111,7 +107,15 @@ public class MainViewModel : ViewModelBase
     public MainViewModel()
     {
         NavPages[0].IsActive = true;
-        NavigateCommand = new RelayCommand(key => CurrentPage = (string?)key ?? "monitor");
+        NavigateCommand = new RelayCommand(key =>
+        {
+            var pageKey = (string?)key ?? "monitor";
+            var navPage = NavPages.FirstOrDefault(p => p.Key == pageKey);
+            if (navPage?.IsEnabled == false)
+                return;
+
+            CurrentPage = pageKey;
+        });
 
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
         timer.Tick += (_, _) => TickClock();
@@ -123,5 +127,19 @@ public class MainViewModel : ViewModelBase
     {
         var n = DateTime.Now;
         ClockText = $"{n.Hour:D2}:{n.Minute:D2}";
+    }
+
+    private static bool IsTopLevelActive(string navKey, string currentPage)
+    {
+        if (navKey == currentPage)
+            return true;
+
+        return navKey switch
+        {
+            "monitor" => currentPage is "review" or "compare" or "library",
+            "reports" => currentPage == "spc",
+            "guide" => currentPage is "settings" or "install",
+            _ => false,
+        };
     }
 }

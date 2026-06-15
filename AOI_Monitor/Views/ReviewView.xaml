@@ -325,7 +325,7 @@
             <Button Style="{StaticResource ActionBtnGreen}" Content="Confirm NG" Margin="0,0,0,6" Click="OnConfirmNgClick"/>
             <Button Style="{StaticResource ActionBtnAmber}" Content="Mark False Call" Margin="0,0,0,6" Click="OnFalseCallClick"/>
             <Button Style="{StaticResource ActionBtnRed}" Content="Mark Possible Escape" Margin="0,0,0,6" Click="OnPossibleEscapeClick"/>
-            <Button Style="{StaticResource ActionBtnBlue}" Content="Send to Training Set" Margin="0,0,0,6" Click="OnSendTrainingClick"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Candidate" Margin="0,0,0,6" Click="OnSendTrainingClick"/>
             <Button Style="{StaticResource ActionBtn}" Content="Hold for 2nd Review" Click="OnHoldClick"/>
           </StackPanel>
         </Grid>

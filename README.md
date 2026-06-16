@@ -60,6 +60,16 @@ If a previous build already exists, you can also launch the debug executable dir
 .\AOI_Monitor\bin\Debug\net10.0-windows\AOI_Monitor.exe
 ```
 
+## Tests
+
+The repository includes `AOI_Monitor.Tests/` for non-UI logic. The tests use temporary folders/databases and generated tiny image files, so they do not depend on committed customer images.
+
+From the repository root:
+
+```powershell
+dotnet test
+```
+
 ## Basic Workflow
 
 1. Open Main Inspection from the left navigation.

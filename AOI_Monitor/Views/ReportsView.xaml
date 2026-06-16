@@ -135,7 +135,7 @@
           <Button Style="{StaticResource ActionBtnGreen}" Content="Inspection History CSV" Margin="0,0,6,6" Click="OnExportInspectionHistoryClick"/>
           <Button Style="{StaticResource ActionBtnGreen}" Content="Review Log CSV" Margin="0,0,6,6" Click="OnExportReviewLogClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Annotated Overlays" Margin="0,0,6,6" Click="OnExportAnnotatedOverlaysClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Customer Package" Margin="0,0,6,6" Click="OnExportCustomerPackageClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Create Stage 1 Customer Package" Margin="0,0,6,6" Click="OnExportCustomerPackageClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="DB Integrity" Margin="0,0,6,0" Click="OnRunDbIntegrityCheckClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Database Health" Margin="0,0,6,0" Click="OnOpenDatabaseHealthClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Verify Paths" Margin="0,0,6,0" Click="OnVerifyImagePathsClick"/>

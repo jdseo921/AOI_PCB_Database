@@ -16,11 +16,21 @@ public static class AoiDatabase
     };
 
     private static bool _initialized;
+    private static string _storageRoot = ResolveStorageRoot();
 
-    public static string StorageRoot { get; } = ResolveStorageRoot();
-    public static string DatabasePath { get; } = Path.Combine(StorageRoot, "aoi_monitor.sqlite");
-    public static string ImageVaultPath { get; } = Path.Combine(StorageRoot, "image_vault");
-    public static string TrainingVaultPath { get; } = Path.Combine(ImageVaultPath, "training");
+    public static string StorageRoot => _storageRoot;
+    public static string DatabasePath => Path.Combine(StorageRoot, "aoi_monitor.sqlite");
+    public static string ImageVaultPath => Path.Combine(StorageRoot, "image_vault");
+    public static string TrainingVaultPath => Path.Combine(ImageVaultPath, "training");
+
+    public static void ConfigureStorageRoot(string storageRoot)
+    {
+        if (string.IsNullOrWhiteSpace(storageRoot))
+            throw new ArgumentException("Storage root is required.", nameof(storageRoot));
+
+        _storageRoot = Path.GetFullPath(storageRoot);
+        _initialized = false;
+    }
 
     public static void Initialize()
     {

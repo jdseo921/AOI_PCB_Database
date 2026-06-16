@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AOI_Monitor.Tests/AOI_Monitor.Tests.csproj" />
+  <Project Path="AOI_Monitor/AOI_Monitor.csproj" />
+</Solution>

@@ -15,6 +15,7 @@ public sealed class WorkflowState
     public AnalysisResult? LastAnalysis { get; private set; }
     public string StationId { get; } = "AOI-LIB-01";
     public string OperatorId { get; set; } = "Engineer01";
+    public UserRole CurrentRole { get; private set; } = UserRole.Operator;
     public string BoardProgram { get; } = "TBOX-MAIN";
     public string ModelVersion { get; } = "PIXEL_DIFF_0.1";
     public bool IsRecipeLocked { get; set; }
@@ -26,6 +27,29 @@ public sealed class WorkflowState
     public event Action? StateChanged;
 
     private WorkflowState() { }
+
+    public void SetRole(UserRole role)
+    {
+        CurrentRole = role;
+        AddEvent("ROLE", $"Local role changed to {role}.");
+        Notify();
+    }
+
+    public bool HasPermission(Func<UserRole, bool> permission) => permission(CurrentRole);
+
+    public bool TryAuthorize(Func<UserRole, bool> permission, string action, out string message)
+    {
+        if (permission(CurrentRole))
+        {
+            message = string.Empty;
+            return true;
+        }
+
+        message = RoleAuthorization.DeniedMessage(CurrentRole, action);
+        AddEvent("ACCESS_DENIED", message);
+        Notify();
+        return false;
+    }
 
     public void SetSampleImage(string path)
     {
@@ -47,7 +71,7 @@ public sealed class WorkflowState
     public void SetAnalysis(AnalysisResult result, bool persist)
     {
         result.BoardProgram = BoardProgram;
-        result.OperatorId = OperatorId;
+        result.OperatorId = OperatorWithRole;
         LastAnalysis = result;
         if (persist)
         {
@@ -144,7 +168,7 @@ public sealed class WorkflowState
         };
 
         History.Add(entry);
-        AoiDatabase.RecordWorkflowEvent(category, message, entry.Timestamp, OperatorId);
+        AoiDatabase.RecordWorkflowEvent(category, message, entry.Timestamp, OperatorWithRole);
 
         if (History.Count > MaxHistoryEntries)
             History.RemoveRange(0, History.Count - MaxHistoryEntries);
@@ -159,4 +183,6 @@ public sealed class WorkflowState
     };
 
     private void Notify() => StateChanged?.Invoke();
+
+    public string OperatorWithRole => $"{OperatorId} [{CurrentRole}]";
 }

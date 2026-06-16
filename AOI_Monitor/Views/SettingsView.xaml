@@ -148,7 +148,7 @@
                 <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
                 <TextBlock Text="Model Path" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
                 <TextBox x:Name="ModelPathText" Grid.Column="1" MinHeight="28"/>
-                <Button Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseModelClick"/>
+                <Button x:Name="BrowseModelBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseModelClick"/>
               </Grid>
               <Grid Margin="0,0,0,8">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>

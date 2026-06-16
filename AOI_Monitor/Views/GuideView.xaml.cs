@@ -1,4 +1,6 @@
 using System.Windows.Controls;
+using System.Windows;
+using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
 
 namespace AOI_Monitor.Views;
@@ -28,6 +30,15 @@ public partial class GuideView : UserControl
 
     private void Navigate(string key)
     {
+        var role = WorkflowState.Instance.CurrentRole;
+        if (!RoleAuthorization.CanAccessPage(role, key))
+        {
+            var message = RoleAuthorization.DeniedMessage(role, $"Opening {key}");
+            WorkflowState.Instance.AddEvent("ACCESS_DENIED", message);
+            MessageBox.Show(message, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         if (System.Windows.Window.GetWindow(this)?.DataContext is MainViewModel vm)
             vm.CurrentPage = key;
     }

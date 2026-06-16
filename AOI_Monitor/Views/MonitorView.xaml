@@ -71,7 +71,9 @@
             <CheckBox Grid.Column="2" x:Name="OverlayCheck" Content="Defect overlay layer" IsChecked="True"
                       VerticalAlignment="Center" Foreground="#DCE5EB" Checked="OnOverlayChanged" Unchecked="OnOverlayChanged"/>
             <StackPanel Grid.Column="4" Orientation="Horizontal">
-              <Button Style="{StaticResource MiniBtn}" Content="Select Folder" Margin="0,0,6,0" Click="OnSelectFolderClick"/>
+              <Button Style="{StaticResource MiniBtn}" Content="Top Folder" Margin="0,0,6,0" Click="OnSelectTopFolderClick"/>
+              <Button Style="{StaticResource MiniBtn}" Content="Side Folder" Margin="0,0,6,0" Click="OnSelectSideFolderClick"/>
+              <Button Style="{StaticResource MiniBtn}" Content="Bottom Folder" Margin="0,0,6,0" Click="OnSelectBottomFolderClick"/>
               <CheckBox x:Name="AutoSaveCheck" Content="Auto-save" Foreground="#DCE5EB" VerticalAlignment="Center"/>
             </StackPanel>
           </Grid>

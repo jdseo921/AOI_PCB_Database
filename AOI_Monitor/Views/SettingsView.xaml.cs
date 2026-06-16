@@ -16,6 +16,7 @@ namespace AOI_Monitor.Views;
 public partial class SettingsView : UserControl
 {
     private readonly MainViewModel _vm;
+    private bool _isKorean;
 
     public SettingsView(MainViewModel vm)
     {
@@ -47,9 +48,24 @@ public partial class SettingsView : UserControl
     private void OnApply(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
+        var existingConfig = InspectionModelConfigurationService.Load();
+        var newConfig = BuildConfigurationFromUi();
+        var modelConfigChanged =
+            !string.Equals(existingConfig.ModelFilePath, newConfig.ModelFilePath, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingConfig.SelectedEngineKey, newConfig.SelectedEngineKey, StringComparison.OrdinalIgnoreCase);
+        var thresholdChanged =
+            ComboToPriority(DetectionPriorityCombo.SelectedIndex) != state.DetectionPriority ||
+            Math.Abs(existingConfig.ConfidenceThreshold - newConfig.ConfidenceThreshold) > 0.0001;
+
+        if (modelConfigChanged && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths or selected model engine"))
+            return;
+
+        if (thresholdChanged && !Authorize(RoleAuthorization.CanChangeThresholds, "Changing inspection thresholds or detection priority"))
+            return;
+
         ApplyLanguageVisuals();
         ApplyFontPreset();
-        SaveInspectionConfiguration();
+        SaveInspectionConfiguration(newConfig);
 
         if (!state.TrySetDetectionPriority(ComboToPriority(DetectionPriorityCombo.SelectedIndex), out var message))
         {
@@ -58,11 +74,15 @@ public partial class SettingsView : UserControl
             return;
         }
 
+        RefreshWorkflowUi();
         MessageBox.Show($"Display settings applied.\n{message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void OnReset(object sender, RoutedEventArgs e)
     {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Resetting local settings"))
+            return;
+
         LangCombo.SelectedIndex = 0;
         FontCombo.SelectedIndex = 1;
         DetectionPriorityCombo.SelectedIndex = 0;
@@ -82,6 +102,7 @@ public partial class SettingsView : UserControl
             return;
         }
 
+        RefreshWorkflowUi();
         MessageBox.Show("Settings reset to defaults.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -133,6 +154,9 @@ public partial class SettingsView : UserControl
 
     private void OnBrowseModelClick(object sender, RoutedEventArgs e)
     {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Changing model path"))
+            return;
+
         var dialog = new OpenFileDialog
         {
             Title = "Select offline ONNX model",
@@ -171,7 +195,7 @@ public partial class SettingsView : UserControl
             _ => 0,
         };
 
-        ReviewDefaultText.Text = WorkflowState.ToDisplay(state.DetectionPriority);
+        ReviewDefaultText.Text = DetectionPriorityDisplay(state.DetectionPriority, _isKorean);
         TrainingStatusText.Text = state.Training.IsRunning ? "RUNNING" : "IDLE";
         TrainingQueueText.Text = state.Training.QueuedSamples.ToString();
         TrainingEpochText.Text = state.Training.EpochsCompleted.ToString();
@@ -179,7 +203,21 @@ public partial class SettingsView : UserControl
             ? "--"
             : $"{state.Training.LastValidationScore:F1}%";
 
+        RefreshRoleControls();
         RefreshInspectionConfigurationUi();
+    }
+
+    private void RefreshRoleControls()
+    {
+        var role = WorkflowState.Instance.CurrentRole;
+        var canManageSettings = RoleAuthorization.CanManageSettings(role);
+        var canChangeThresholds = RoleAuthorization.CanChangeThresholds(role);
+
+        DetectionPriorityCombo.IsEnabled = canChangeThresholds;
+        InspectionEngineCombo.IsEnabled = canManageSettings;
+        ModelPathText.IsEnabled = canManageSettings;
+        BrowseModelBtn.IsEnabled = canManageSettings;
+        ConfidenceThresholdText.IsEnabled = canChangeThresholds;
     }
 
     private void RefreshInspectionConfigurationUi()
@@ -205,9 +243,9 @@ public partial class SettingsView : UserControl
             : "PIXEL_DIFF_0.1";
     }
 
-    private void SaveInspectionConfiguration()
+    private void SaveInspectionConfiguration(InspectionModelConfiguration? preparedConfiguration = null)
     {
-        var configuration = BuildConfigurationFromUi();
+        var configuration = preparedConfiguration ?? BuildConfigurationFromUi();
         InspectionModelConfigurationService.Save(configuration);
 
         var state = WorkflowState.Instance;
@@ -270,8 +308,8 @@ public partial class SettingsView : UserControl
 
     private void ApplyLanguageVisuals()
     {
-        bool isKorean = LangCombo.SelectedIndex == 1;
-        var culture = isKorean ? new CultureInfo("ko-KR") : new CultureInfo("en-US");
+        _isKorean = LangCombo.SelectedIndex == 1;
+        var culture = _isKorean ? new CultureInfo("ko-KR") : new CultureInfo("en-US");
 
         CultureInfo.CurrentCulture = culture;
         CultureInfo.CurrentUICulture = culture;
@@ -279,30 +317,36 @@ public partial class SettingsView : UserControl
         if (Application.Current.MainWindow is Window mainWindow)
         {
             mainWindow.Language = XmlLanguage.GetLanguage(culture.IetfLanguageTag);
-            mainWindow.FontFamily = isKorean ? new FontFamily("Malgun Gothic") : new FontFamily("Segoe UI");
+            mainWindow.FontFamily = _isKorean ? new FontFamily("Malgun Gothic, Segoe UI") : new FontFamily("Segoe UI");
         }
 
-        DisplayLanguageHeaderText.Text = isKorean ? "í™”ë©´ / ì–¸ì–´" : "Display / Language";
-        LanguageLabelText.Text = isKorean ? "ì–¸ì–´" : "Language";
-        FontSizeLabelText.Text = isKorean ? "ê¸€ìž í¬ê¸°" : "Font Size";
-        StoragePathLabelText.Text = isKorean ? "ì €ìž¥ ê²½ë¡œ" : "Storage Path";
-        ReviewDefaultLabelText.Text = isKorean ? "ê²€í†  ê¸°ë³¸ê°’" : "Review Default";
-        DetectionPriorityLabelText.Text = isKorean ? "ê²€ì¶œ ìš°ì„ ìˆœìœ„" : "Detection Priority";
-        ApplyBtn.Content = isKorean ? "ì ìš©" : "Apply";
-        ResetBtn.Content = isKorean ? "ì´ˆê¸°í™”" : "Reset";
+        var languageFont = _isKorean ? new FontFamily("Malgun Gothic, Segoe UI") : new FontFamily("Segoe UI");
+        LangCombo.FontFamily = languageFont;
+        FontCombo.FontFamily = languageFont;
+        DetectionPriorityCombo.FontFamily = languageFont;
+        InspectionEngineCombo.FontFamily = languageFont;
+
+        DisplayLanguageHeaderText.Text = TextFor("Display / Language", "\uD654\uBA74 / \uC5B8\uC5B4");
+        LanguageLabelText.Text = TextFor("Language", "\uC5B8\uC5B4");
+        FontSizeLabelText.Text = TextFor("Font Size", "\uAE00\uC790 \uD06C\uAE30");
+        StoragePathLabelText.Text = TextFor("Storage Path", "\uC800\uC7A5 \uACBD\uB85C");
+        ReviewDefaultLabelText.Text = TextFor("Review Default", "\uAC80\uD1A0 \uAE30\uBCF8\uAC12");
+        DetectionPriorityLabelText.Text = TextFor("Detection Priority", "\uAC80\uCD9C \uC6B0\uC120\uC21C\uC704");
+        ApplyBtn.Content = TextFor("Apply", "\uC801\uC6A9");
+        ResetBtn.Content = TextFor("Reset", "\uCD08\uAE30\uD654");
 
         SetComboItemText(LangCombo, 0, "English");
-        SetComboItemText(LangCombo, 1, "Korean");
+        SetComboItemText(LangCombo, 1, TextFor("Korean", "\uD55C\uAD6D\uC5B4"));
 
-        if (isKorean)
+        if (_isKorean)
         {
-            SetComboItemText(FontCombo, 0, "ìž‘ê²Œ");
-            SetComboItemText(FontCombo, 1, "ê¸°ë³¸");
-            SetComboItemText(FontCombo, 2, "í¬ê²Œ");
+            SetComboItemText(FontCombo, 0, "\uC791\uAC8C");
+            SetComboItemText(FontCombo, 1, "\uAE30\uBCF8");
+            SetComboItemText(FontCombo, 2, "\uD06C\uAC8C");
 
-            SetComboItemText(DetectionPriorityCombo, 0, "ì˜¤ê²€ì¶œ ìµœì†Œí™”");
-            SetComboItemText(DetectionPriorityCombo, 1, "ê· í˜•");
-            SetComboItemText(DetectionPriorityCombo, 2, "ê²°í•¨ ê²€ì¶œ ìµœëŒ€í™”");
+            SetComboItemText(DetectionPriorityCombo, 0, DetectionPriorityDisplay(Models.DetectionPriority.MinimizeFalsePositives, true));
+            SetComboItemText(DetectionPriorityCombo, 1, DetectionPriorityDisplay(Models.DetectionPriority.Balanced, true));
+            SetComboItemText(DetectionPriorityCombo, 2, DetectionPriorityDisplay(Models.DetectionPriority.MaximizeDefectRecall, true));
         }
         else
         {
@@ -314,6 +358,8 @@ public partial class SettingsView : UserControl
             SetComboItemText(DetectionPriorityCombo, 1, "Balanced");
             SetComboItemText(DetectionPriorityCombo, 2, "Maximize Defect Recall");
         }
+
+        ReviewDefaultText.Text = DetectionPriorityDisplay(ComboToPriority(DetectionPriorityCombo.SelectedIndex), _isKorean);
     }
 
     private void ApplyFontPreset()
@@ -346,6 +392,31 @@ public partial class SettingsView : UserControl
 
         if (comboBox.Items[index] is ComboBoxItem item)
             item.Content = text;
+    }
+
+    private string TextFor(string english, string korean) => _isKorean ? korean : english;
+
+    private static bool Authorize(Func<UserRole, bool> permission, string action)
+    {
+        if (WorkflowState.Instance.TryAuthorize(permission, action, out var message))
+            return true;
+
+        MessageBox.Show(message, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+        return false;
+    }
+
+    private static string DetectionPriorityDisplay(Models.DetectionPriority priority, bool isKorean)
+    {
+        if (!isKorean)
+            return WorkflowState.ToDisplay(priority);
+
+        return priority switch
+        {
+            Models.DetectionPriority.MinimizeFalsePositives => "\uC624\uAC80\uCD9C \uCD5C\uC18C\uD654",
+            Models.DetectionPriority.Balanced => "\uADE0\uD615",
+            Models.DetectionPriority.MaximizeDefectRecall => "\uACB0\uD568 \uAC80\uCD9C \uCD5C\uB300\uD654",
+            _ => "\uADE0\uD615",
+        };
     }
 
     private static Models.DetectionPriority ComboToPriority(int selectedIndex) => selectedIndex switch

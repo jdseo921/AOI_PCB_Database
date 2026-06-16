@@ -15,16 +15,11 @@ namespace AOI_Monitor.Views;
 
 public partial class MonitorView : UserControl
 {
-    private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff",
-    };
-
     private readonly ObservableCollection<DefectRow> _defects = new();
     private readonly ObservableCollection<AlarmRow> _alarms = new();
-    private readonly List<string> _imageQueue = new();
+    private readonly Dictionary<CameraViewType, string> _viewFolders = new();
 
-    private int _queueIndex = -1;
+    private ICameraSource _cameraSource = CameraSourceFactory.ActiveSource;
     private bool _isRunning;
     private bool _currentResultSaved;
     private string? _currentImagePath;
@@ -62,35 +57,38 @@ public partial class MonitorView : UserControl
             vm.CurrentPage = key;
     }
 
-    private void OnSelectFolderClick(object sender, RoutedEventArgs e)
+    private void OnSelectTopFolderClick(object sender, RoutedEventArgs e) => SelectFolderForView(CameraViewType.Top);
+    private void OnSelectSideFolderClick(object sender, RoutedEventArgs e) => SelectFolderForView(CameraViewType.Side);
+    private void OnSelectBottomFolderClick(object sender, RoutedEventArgs e) => SelectFolderForView(CameraViewType.Bottom);
+
+    private void SelectFolderForView(CameraViewType viewType)
     {
         var dialog = new OpenFolderDialog
         {
-            Title = "Select simulated inspection image folder",
+            Title = $"Select simulated {viewType} camera image folder",
             Multiselect = false,
         };
 
         if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.FolderName))
             return;
 
-        _imageQueue.Clear();
-        _imageQueue.AddRange(Directory
-            .EnumerateFiles(dialog.FolderName, "*.*", SearchOption.TopDirectoryOnly)
-            .Where(path => SupportedImageExtensions.Contains(Path.GetExtension(path)))
-            .OrderBy(Path.GetFileName));
+        _viewFolders[viewType] = dialog.FolderName;
+        var source = CameraSourceFactory.CreateFolder(_viewFolders);
+        source.SelectedView = SelectedCameraView();
+        _cameraSource = source;
+        CameraSourceFactory.SetActiveSource(source);
 
-        _queueIndex = -1;
-        LogEvent("QUEUE", _imageQueue.Count == 0
-            ? $"No supported images found in {dialog.FolderName}."
-            : $"Loaded {_imageQueue.Count} simulated board image(s) from {dialog.FolderName}.");
+        LogEvent("CAMERA SOURCE", $"Configured simulated {viewType} folder: {dialog.FolderName}.");
     }
 
     private void OnStartClick(object sender, RoutedEventArgs e)
     {
         _isRunning = true;
+        _cameraSource.SelectedView = SelectedCameraView();
+        _cameraSource.StartAcquisition();
         ModeText.Text = "RUNNING";
         ModeText.Foreground = Brushes.LightGreen;
-        LogEvent("START", "Simulated inspection mode started.");
+        LogEvent("START", $"Simulated inspection mode started. Camera status: {CameraStatusText()}.");
 
         if (_currentImagePath is null)
             LoadNextBoard();
@@ -99,6 +97,7 @@ public partial class MonitorView : UserControl
     private void OnStopClick(object sender, RoutedEventArgs e)
     {
         _isRunning = false;
+        _cameraSource.StopAcquisition();
         ModeText.Text = "STOPPED";
         ModeText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"));
         LogEvent("STOP", "Simulated inspection mode paused.");
@@ -143,6 +142,9 @@ public partial class MonitorView : UserControl
 
     private void OnViewSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        _cameraSource.SelectedView = SelectedCameraView();
+        CameraSourceFactory.ActiveSource.SelectedView = SelectedCameraView();
+        RefreshHeader();
         RefreshDefectRows();
         RenderOverlay();
     }
@@ -179,10 +181,15 @@ public partial class MonitorView : UserControl
 
     private string? GetNextImagePath()
     {
-        if (_imageQueue.Count > 0)
+        _cameraSource.SelectedView = SelectedCameraView();
+        if (!_cameraSource.IsAcquiring)
+            _cameraSource.StartAcquisition();
+
+        var frame = _cameraSource.GetNextFrame();
+        if (frame is not null)
         {
-            _queueIndex = (_queueIndex + 1) % _imageQueue.Count;
-            return _imageQueue[_queueIndex];
+            LogEvent("FRAME", $"{frame.SourceName} supplied {frame.ViewType} frame: {Path.GetFileName(frame.ImagePath)}.");
+            return frame.ImagePath;
         }
 
         return WorkflowState.Instance.SampleImagePath;
@@ -256,9 +263,10 @@ public partial class MonitorView : UserControl
     {
         var state = WorkflowState.Instance;
         var engine = InspectionEngineFactory.Create();
+        _cameraSource = CameraSourceFactory.ActiveSource;
         BoardModelText.Text = state.BoardProgram;
         OperatorText.Text = state.OperatorId;
-        EngineText.Text = $"{engine.Name} / {engine.Version}";
+        EngineText.Text = $"{engine.Name} / {engine.Version} | Camera: {CameraStatusText()}";
     }
 
     private void RefreshDefectRows()
@@ -337,6 +345,22 @@ public partial class MonitorView : UserControl
 
     private string SelectedView()
         => (ViewSelector.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Top";
+
+    private CameraViewType SelectedCameraView()
+        => SelectedView() switch
+        {
+            "Side" => CameraViewType.Side,
+            "Bottom" => CameraViewType.Bottom,
+            _ => CameraViewType.Top,
+        };
+
+    private string CameraStatusText()
+        => _cameraSource.ConnectionStatus switch
+        {
+            CameraConnectionStatus.Simulated => "Simulated",
+            CameraConnectionStatus.Error => "Error",
+            _ => "Not Connected",
+        };
 
     private static Rect CalculateImageArea(double imageWidth, double imageHeight, double hostWidth, double hostHeight)
     {

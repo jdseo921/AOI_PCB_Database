@@ -27,6 +27,7 @@ public partial class AIModelTestView : UserControl
     private DateTime? _currentRunCreatedAtUtc;
     private string _currentEngineDisplay = "Pixel Difference / PIXEL_DIFF_0.1";
     private string _lastAnnotatedImageFolder = string.Empty;
+    private CancellationTokenSource? _workCts;
 
     public AIModelTestView()
     {
@@ -81,69 +82,149 @@ public partial class AIModelTestView : UserControl
         StatusText.Text = $"Loaded validation CSV: {Path.GetFileName(_groundTruthCsvPath)}";
     }
 
-    private void OnRunBatchClick(object sender, RoutedEventArgs e)
+    private async void OnRunBatchClick(object sender, RoutedEventArgs e)
     {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("A validation/export task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_selectedFolder) || !Directory.Exists(_selectedFolder))
         {
             MessageBox.Show("Select a valid test image folder first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        var imageFiles = Directory.EnumerateFiles(_selectedFolder, "*.*", SearchOption.TopDirectoryOnly)
-            .Where(path => SupportedImageExtensions.Contains(Path.GetExtension(path)))
-            .OrderBy(Path.GetFileName)
-            .ToArray();
+        var cts = BeginWork("Preparing validation batch...");
+        var progress = new Progress<WorkProgress>(UpdateProgress);
 
-        if (imageFiles.Length == 0)
+        try
         {
-            MessageBox.Show("The selected folder does not contain PNG/JPG/JPEG images.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
+            var batch = await Task.Run(() =>
+            {
+                var imageFiles = Directory.EnumerateFiles(_selectedFolder, "*.*", SearchOption.TopDirectoryOnly)
+                    .Where(path => SupportedImageExtensions.Contains(Path.GetExtension(path)))
+                    .OrderBy(Path.GetFileName)
+                    .ToArray();
+
+                if (imageFiles.Length == 0)
+                    return BatchRunOutcome.Empty("The selected folder does not contain PNG/JPG/JPEG images.");
+
+                var errors = new List<string>();
+                ValidationManifest manifest;
+                try
+                {
+                    manifest = LoadValidationManifest(_groundTruthCsvPath, _selectedFolder);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+                {
+                    errors.Add($"Invalid ground-truth CSV: {ex.Message}");
+                    manifest = new ValidationManifest(new Dictionary<string, GroundTruthEntry>(), new List<GroundTruthEntry>(), false);
+                }
+
+                var engine = InspectionEngineFactory.Create();
+                var engineDisplay = $"{engine.Name} / {engine.Version}";
+                var runItems = BuildRunItems(imageFiles, manifest);
+                var rows = new List<BatchTestRow>();
+
+                for (var i = 0; i < runItems.Count; i++)
+                {
+                    cts.Token.ThrowIfCancellationRequested();
+                    var item = runItems[i];
+                    ((IProgress<WorkProgress>)progress).Report(new WorkProgress(i, runItems.Count, $"Inspecting {Path.GetFileName(item.ImagePath)}..."));
+
+                    try
+                    {
+                        if (!File.Exists(item.ImagePath))
+                        {
+                            var message = $"Missing image file: {item.ImagePath}";
+                            errors.Add(message);
+                            rows.Add(ToErrorRow(item.ImagePath, item.Manifest, message));
+                            continue;
+                        }
+
+                        var analysis = engine.Analyze(
+                            item.ImagePath,
+                            string.IsNullOrWhiteSpace(item.Manifest.GoldenPath) ? null : item.Manifest.GoldenPath,
+                            WorkflowState.Instance.DetectionPriority);
+
+                        rows.Add(ToRow(item.ImagePath, item.Manifest, analysis));
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException)
+                    {
+                        var message = FriendlyFileError(item.ImagePath, ex);
+                        errors.Add(message);
+                        rows.Add(ToErrorRow(item.ImagePath, item.Manifest, message));
+                    }
+                }
+
+                var metrics = CalculateMetrics(rows);
+                long runId;
+                try
+                {
+                    runId = AoiDatabase.RecordBatchTestRun(
+                        _selectedFolder,
+                        _groundTruthCsvPath,
+                        engineDisplay,
+                        metrics.Accuracy,
+                        metrics.Precision,
+                        metrics.Recall,
+                        metrics.FalseCallRate,
+                        rows.Select(r => r.ToRecord()).ToArray());
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+                {
+                    errors.Add($"Database write failure: {ex.Message}");
+                    runId = 0;
+                }
+
+                ((IProgress<WorkProgress>)progress).Report(new WorkProgress(runItems.Count, runItems.Count, "Validation batch complete."));
+                return new BatchRunOutcome(rows, metrics, manifest.IsFormalManifest, engineDisplay, runId, errors, null);
+            }, cts.Token);
+
+            if (batch.Message is not null)
+            {
+                MessageBox.Show(batch.Message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            _currentRunId = batch.RunId > 0 ? batch.RunId : null;
+            _currentRunCreatedAtUtc = DateTime.UtcNow;
+            _currentEngineDisplay = batch.EngineDisplay;
+            _lastAnnotatedImageFolder = string.Empty;
+
+            _rows.Clear();
+            foreach (var row in batch.Rows)
+                _rows.Add(row);
+
+            ApplyMetrics(batch.Metrics);
+            RunSummaryText.Text = $"{batch.Rows.Count} images / {batch.Rows.Count(r => r.IsFailed)} failed / run {(_currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "not saved")}";
+            StatusText.Text = batch.IsFormalManifest
+                ? $"Formal manifest validation complete. {_rows.Count} row(s), {batch.Errors.Count} issue(s)."
+                : $"Batch inspection complete. {_rows.Count} row(s), {batch.Errors.Count} issue(s).";
+            WorkflowState.Instance.AddEvent("MODEL_TEST", $"Stage 1 validation run {_currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "not saved"}: {_rows.Count} images, {_rows.Count(r => r.IsFailed)} failed, {batch.Errors.Count} issue(s).");
+            foreach (var error in batch.Errors.Take(20))
+                WorkflowState.Instance.AddEvent("MODEL_TEST_ERROR", error);
+
+            if (batch.Errors.Count > 0)
+                MessageBox.Show(string.Join(Environment.NewLine, batch.Errors.Take(8)), "Validation completed with skipped rows", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-
-        var manifest = LoadValidationManifest(_groundTruthCsvPath, _selectedFolder);
-        var engine = InspectionEngineFactory.Create();
-        var engineDisplay = $"{engine.Name} / {engine.Version}";
-        var rows = new List<BatchTestRow>();
-        var runItems = BuildRunItems(imageFiles, manifest);
-
-        foreach (var item in runItems)
+        catch (OperationCanceledException)
         {
-            if (!File.Exists(item.ImagePath))
-                continue;
-
-            var analysis = engine.Analyze(
-                item.ImagePath,
-                string.IsNullOrWhiteSpace(item.Manifest.GoldenPath) ? null : item.Manifest.GoldenPath,
-                WorkflowState.Instance.DetectionPriority);
-
-            rows.Add(ToRow(item.ImagePath, item.Manifest, analysis));
+            StatusText.Text = "Validation batch canceled.";
+            WorkflowState.Instance.AddEvent("MODEL_TEST", "Stage 1 validation batch canceled by user.");
         }
-
-        var metrics = CalculateMetrics(rows);
-        var records = rows.Select(r => r.ToRecord()).ToArray();
-        _currentRunId = AoiDatabase.RecordBatchTestRun(
-            _selectedFolder,
-            _groundTruthCsvPath,
-            engineDisplay,
-            metrics.Accuracy,
-            metrics.Precision,
-            metrics.Recall,
-            metrics.FalseCallRate,
-            records);
-        _currentRunCreatedAtUtc = DateTime.UtcNow;
-        _currentEngineDisplay = engineDisplay;
-        _lastAnnotatedImageFolder = string.Empty;
-
-        _rows.Clear();
-        foreach (var row in rows)
-            _rows.Add(row);
-
-        ApplyMetrics(metrics);
-        RunSummaryText.Text = $"{rows.Count} images / {rows.Count(r => r.IsFailed)} failed / run {_currentRunId}";
-        StatusText.Text = manifest.IsFormalManifest
-            ? $"Formal manifest validation complete. Results stored in SQLite run {_currentRunId}."
-            : $"Batch inspection complete. Results stored in SQLite run {_currentRunId}.";
-        WorkflowState.Instance.AddEvent("MODEL_TEST", $"Stage 1 validation run {_currentRunId}: {rows.Count} images, {rows.Count(r => r.IsFailed)} failed.");
+        catch (Exception ex)
+        {
+            StatusText.Text = "Validation batch failed. The app is still usable.";
+            WorkflowState.Instance.AddEvent("MODEL_TEST_ERROR", $"Validation batch failed: {ex.Message}");
+            MessageBox.Show($"Validation batch failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            EndWork();
+        }
     }
 
     private void OnResultSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -195,8 +276,14 @@ public partial class AIModelTestView : UserControl
         StatusText.Text = $"CSV exported: {dialog.FileName}";
     }
 
-    private void OnExportAnnotatedImagesClick(object sender, RoutedEventArgs e)
+    private async void OnExportAnnotatedImagesClick(object sender, RoutedEventArgs e)
     {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("A validation/export task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         if (_rows.Count == 0)
         {
             MessageBox.Show("No batch results are available to export.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -212,24 +299,77 @@ public partial class AIModelTestView : UserControl
         if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.FolderName))
             return;
 
-        var exported = 0;
-        foreach (var row in _rows)
+        var cts = BeginWork("Exporting annotated images...");
+        var progress = new Progress<WorkProgress>(UpdateProgress);
+        try
         {
-            if (!File.Exists(row.ImagePath))
-                continue;
+            var rows = _rows.ToArray();
+            var result = await Task.Run(() =>
+            {
+                var errors = new List<string>();
+                var exported = 0;
+                Directory.CreateDirectory(dialog.FolderName);
 
-            var annotated = CreateAnnotatedBitmap(row);
-            var target = Path.Combine(
-                dialog.FolderName,
-                $"{Path.GetFileNameWithoutExtension(row.Image)}_{row.PassFail.ToLowerInvariant()}_overlay.png");
+                for (var i = 0; i < rows.Length; i++)
+                {
+                    cts.Token.ThrowIfCancellationRequested();
+                    var row = rows[i];
+                    ((IProgress<WorkProgress>)progress).Report(new WorkProgress(i, rows.Length, $"Exporting {row.Image}..."));
 
-            SavePng(annotated, target);
-            exported++;
+                    try
+                    {
+                        if (!File.Exists(row.ImagePath))
+                        {
+                            errors.Add($"Missing image file: {row.ImagePath}");
+                            continue;
+                        }
+
+                        var annotated = CreateAnnotatedBitmap(row);
+                        var target = Path.Combine(
+                            dialog.FolderName,
+                            $"{Path.GetFileNameWithoutExtension(row.Image)}_{row.PassFail.ToLowerInvariant()}_overlay.png");
+
+                        SavePng(annotated, target);
+                        exported++;
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException)
+                    {
+                        errors.Add(FriendlyFileError(row.ImagePath, ex));
+                    }
+                }
+
+                ((IProgress<WorkProgress>)progress).Report(new WorkProgress(rows.Length, rows.Length, "Annotated image export complete."));
+                return new ExportOutcome(exported, errors);
+            }, cts.Token);
+
+            AoiDatabase.RecordExport("Stage1AnnotatedImages", dialog.FolderName, result.Errors.Count == 0 ? "OK" : "WARN");
+            _lastAnnotatedImageFolder = dialog.FolderName;
+            StatusText.Text = $"Annotated image export complete: {result.Count} file(s), {result.Errors.Count} issue(s).";
+            WorkflowState.Instance.AddEvent("EXPORT", $"Stage 1 annotated images exported: {result.Count} file(s), {result.Errors.Count} issue(s).");
+            foreach (var error in result.Errors.Take(20))
+                WorkflowState.Instance.AddEvent("EXPORT_ERROR", error);
         }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Annotated image export canceled.";
+            WorkflowState.Instance.AddEvent("EXPORT", "Stage 1 annotated image export canceled by user.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            StatusText.Text = "Annotated image export failed. Check export folder permissions.";
+            WorkflowState.Instance.AddEvent("EXPORT_ERROR", $"Stage 1 annotated export failed: {ex.Message}");
+            MessageBox.Show($"Annotated image export failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            EndWork();
+        }
+    }
 
-        AoiDatabase.RecordExport("Stage1AnnotatedImages", dialog.FolderName);
-        _lastAnnotatedImageFolder = dialog.FolderName;
-        StatusText.Text = $"Annotated image export complete: {exported} file(s).";
+    private void OnCancelWorkClick(object sender, RoutedEventArgs e)
+    {
+        _workCts?.Cancel();
+        StatusText.Text = "Cancel requested. Finishing current file...";
     }
 
     private void OnGenerateReportClick(object sender, RoutedEventArgs e)
@@ -404,7 +544,7 @@ public partial class AIModelTestView : UserControl
 
         var lines = File.ReadAllLines(csvPath);
         if (lines.Length < 2)
-            return new ValidationManifest(entries, ordered, false);
+            throw new InvalidDataException("Ground-truth CSV has no data rows.");
 
         var headers = SplitCsvLine(lines[0]).Select(NormalizeHeader).ToArray();
         var imageIndex = FindHeader(headers, "image", "filename", "file", "image_name", "sample");
@@ -425,7 +565,7 @@ public partial class AIModelTestView : UserControl
             && HasHeader(headers, "board_model", "boardmodel");
 
         if (imageIndex < 0 || truthIndex < 0)
-            return new ValidationManifest(entries, ordered, isFormalManifest);
+            throw new InvalidDataException("Ground-truth CSV must include image and ground_truth/label columns.");
 
         var csvDir = Path.GetDirectoryName(csvPath) ?? imageFolder;
         foreach (var line in lines.Skip(1))
@@ -784,6 +924,76 @@ public partial class AIModelTestView : UserControl
             .Replace("<", "&lt;", StringComparison.Ordinal)
             .Replace(">", "&gt;", StringComparison.Ordinal)
             .Replace("\"", "&quot;", StringComparison.Ordinal);
+
+    private CancellationTokenSource BeginWork(string message)
+    {
+        _workCts = new CancellationTokenSource();
+        WorkProgressBar.Value = 0;
+        CancelWorkButton.IsEnabled = true;
+        StatusText.Text = message;
+        return _workCts;
+    }
+
+    private void EndWork()
+    {
+        _workCts?.Dispose();
+        _workCts = null;
+        CancelWorkButton.IsEnabled = false;
+        WorkProgressBar.Value = 0;
+    }
+
+    private void UpdateProgress(WorkProgress progress)
+    {
+        WorkProgressBar.Value = progress.Total <= 0 ? 0 : Math.Min(100, progress.Completed * 100.0 / progress.Total);
+        StatusText.Text = progress.Message;
+    }
+
+    private static BatchTestRow ToErrorRow(string imagePath, GroundTruthEntry manifest, string message)
+    {
+        return new BatchTestRow
+        {
+            ImagePath = imagePath,
+            Image = string.IsNullOrWhiteSpace(imagePath) ? "(missing)" : Path.GetFileName(imagePath),
+            GroundTruth = string.IsNullOrWhiteSpace(manifest.Label) ? "UNKNOWN" : manifest.Label.Trim().ToUpperInvariant(),
+            EngineResult = "REVIEW",
+            Score = 0,
+            PassFail = "N/A",
+            DefectType = message,
+            Side = manifest.Side,
+            RefDes = manifest.RefDes,
+            LotId = manifest.LotId,
+            BoardModel = manifest.BoardModel,
+        };
+    }
+
+    private static string FriendlyFileError(string path, Exception ex)
+    {
+        var name = string.IsNullOrWhiteSpace(path) ? "(unknown file)" : Path.GetFileName(path);
+        return ex switch
+        {
+            UnauthorizedAccessException => $"Permission denied or locked file: {name}",
+            NotSupportedException => $"Unsupported image format: {name}",
+            IOException => $"File could not be read or written: {name} ({ex.Message})",
+            _ => $"{name}: {ex.Message}",
+        };
+    }
+
+    private sealed record WorkProgress(int Completed, int Total, string Message);
+
+    private sealed record ExportOutcome(int Count, IReadOnlyList<string> Errors);
+
+    private sealed record BatchRunOutcome(
+        IReadOnlyList<BatchTestRow> Rows,
+        BatchMetrics Metrics,
+        bool IsFormalManifest,
+        string EngineDisplay,
+        long RunId,
+        IReadOnlyList<string> Errors,
+        string? Message)
+    {
+        public static BatchRunOutcome Empty(string message)
+            => new(Array.Empty<BatchTestRow>(), new BatchMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), false, string.Empty, 0, Array.Empty<string>(), message);
+    }
 
     private sealed record ValidationManifest(
         IReadOnlyDictionary<string, GroundTruthEntry> ByImageName,

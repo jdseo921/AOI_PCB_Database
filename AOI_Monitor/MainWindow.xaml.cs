@@ -26,7 +26,7 @@ public partial class MainWindow : Window
         ["modeltest"] = "AI MODEL TEST / STAGE 1 CUSTOMER VALIDATION",
         ["reports"]  = "LOG & EXPORT / TRACEABILITY PACKAGE",
         ["spc"]      = "LOG & EXPORT / DATABASE HEALTH",
-        ["profile"]  = "3D PROFILE VIEWER / PLANNED STAGE 2",
+        ["profile"]  = "3D PROFILE VIEWER / SAMPLE DATA MODE",
         ["settings"] = "SETTINGS",
         ["install"]  = "SETTINGS / GUIDE / INSTALLATION NOTES",
         ["guide"]    = "SETTINGS / GUIDE",
@@ -53,6 +53,14 @@ public partial class MainWindow : Window
         }
 
         _vm = (MainViewModel)DataContext;
+        RoleCombo.SelectedIndex = WorkflowState.Instance.CurrentRole switch
+        {
+            UserRole.Admin => 2,
+            UserRole.Engineer => 1,
+            _ => 0,
+        };
+        _vm.RefreshRolePermissions(WorkflowState.Instance.CurrentRole);
+        RefreshRoleUi();
         _vm.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(MainViewModel.CurrentPage))
@@ -61,8 +69,10 @@ public partial class MainWindow : Window
 
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
+        CameraSourceFactory.ActiveSourceChanged += OnCameraSourceChanged;
         Closed += (_, _) => WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         Closed += (_, _) => InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
+        Closed += (_, _) => CameraSourceFactory.ActiveSourceChanged -= OnCameraSourceChanged;
 
         SwitchPage("monitor");
         UpdateWorkflowPanel();
@@ -70,6 +80,9 @@ public partial class MainWindow : Window
 
     private void SwitchPage(string key)
     {
+        if (!EnsurePageAccess(key))
+            return;
+
         if (!_pageCache.TryGetValue(key, out var page))
         {
             page = key switch
@@ -80,7 +93,7 @@ public partial class MainWindow : Window
                 "library"  => new LibraryView(),
                 "recipe"   => new RecipeView(),
                 "modeltest" => new AIModelTestView(),
-                "profile"  => new PlannedStageView("3D Profile Viewer", "Stage 2 planned: height-map import, 3D surface rendering, slice measurement, and profile export."),
+                "profile"  => new ProfileView(),
                 "spc"      => new SpcView(),
                 "reports"  => new ReportsView(),
                 "install"  => new InstallView(),
@@ -156,6 +169,9 @@ public partial class MainWindow : Window
 
     private void OnMenuFileClick(object sender, RoutedEventArgs e)
     {
+        if (!EnsurePermission(RoleAuthorization.CanExportLogs, "Opening the export folder"))
+            return;
+
         var exportDir = Path.Combine(AppContext.BaseDirectory, "exports");
         Directory.CreateDirectory(exportDir);
         Process.Start(new ProcessStartInfo
@@ -167,6 +183,9 @@ public partial class MainWindow : Window
 
     private void OnLockRecipeClick(object sender, RoutedEventArgs e)
     {
+        if (!EnsurePermission(RoleAuthorization.CanUseMaintenanceActions, "Recipe lock maintenance"))
+            return;
+
         var state = WorkflowState.Instance;
         state.IsRecipeLocked = !state.IsRecipeLocked;
         state.AddEvent("SYSTEM", state.IsRecipeLocked ? "Recipe locked." : "Recipe unlocked.");
@@ -180,6 +199,9 @@ public partial class MainWindow : Window
 
     private void OnExportClick(object sender, RoutedEventArgs e)
     {
+        if (!EnsurePermission(RoleAuthorization.CanExportLogs, "Export"))
+            return;
+
         if (PageContent.Content is CompareView compare)
         {
             compare.ExportPair();
@@ -203,12 +225,72 @@ public partial class MainWindow : Window
 
     private void OnWorkflowStateChanged()
     {
-        Dispatcher.Invoke(UpdateWorkflowPanel);
+        Dispatcher.Invoke(() =>
+        {
+            _vm.RefreshRolePermissions(WorkflowState.Instance.CurrentRole);
+            RefreshRoleUi();
+            UpdateWorkflowPanel();
+        });
+    }
+
+    private void OnRoleSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+
+        var role = RoleCombo.SelectedIndex switch
+        {
+            2 => UserRole.Admin,
+            1 => UserRole.Engineer,
+            _ => UserRole.Operator,
+        };
+
+        WorkflowState.Instance.SetRole(role);
+        _vm.RefreshRolePermissions(role);
+        RefreshRoleUi();
+        MessageBox.Show($"Local role set to {role}.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void RefreshRoleUi()
+    {
+        var isAdmin = WorkflowState.Instance.CurrentRole == UserRole.Admin;
+        FileMenuBtn.IsEnabled = isAdmin;
+        LockRecipeBtn.IsEnabled = isAdmin;
+        ExportBtn.IsEnabled = isAdmin;
+    }
+
+    private bool EnsurePageAccess(string key)
+    {
+        var role = WorkflowState.Instance.CurrentRole;
+        if (RoleAuthorization.CanAccessPage(role, key))
+            return true;
+
+        var message = RoleAuthorization.DeniedMessage(role, $"Opening {PageTitles.GetValueOrDefault(key, key)}");
+        WorkflowState.Instance.AddEvent("ACCESS_DENIED", message);
+        MessageBox.Show(message, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+        _vm.RefreshRolePermissions(role);
+        if (_vm.CurrentPage != "monitor")
+            _vm.CurrentPage = "monitor";
+        return false;
+    }
+
+    private bool EnsurePermission(Func<UserRole, bool> permission, string action)
+    {
+        if (WorkflowState.Instance.TryAuthorize(permission, action, out var message))
+            return true;
+
+        MessageBox.Show(message, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+        return false;
     }
 
     private void OnInspectionConfigurationChanged()
     {
         Dispatcher.Invoke(() => UpdateInspectionEngineStatus());
+    }
+
+    private void OnCameraSourceChanged()
+    {
+        Dispatcher.Invoke(UpdateCameraStatus);
     }
 
     private void UpdateWorkflowPanel()
@@ -266,8 +348,7 @@ public partial class MainWindow : Window
 
         UpdateInspectionEngineStatus();
 
-        CameraStatusText.Text = "Simulated / Not Connected";
-        CameraStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"));
+        UpdateCameraStatus();
 
         RobotStatusText.Text = "Not Connected";
         RobotStatusText.Foreground = StatusBrush(false);
@@ -290,6 +371,23 @@ public partial class MainWindow : Window
             Models.InspectionEngineStatus.MlModelConfigured => "#50F56E",
             Models.InspectionEngineStatus.MlRuntimeError => "#F27777",
             _ => "#E1A334",
+        }));
+    }
+
+    private void UpdateCameraStatus()
+    {
+        var status = CameraSourceFactory.ActiveSource.ConnectionStatus;
+        CameraStatusText.Text = status switch
+        {
+            CameraConnectionStatus.Simulated => "Simulated",
+            CameraConnectionStatus.Error => "Error",
+            _ => "Not Connected",
+        };
+        CameraStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
+        {
+            CameraConnectionStatus.Simulated => "#E1A334",
+            CameraConnectionStatus.Error => "#F27777",
+            _ => "#F27777",
         }));
     }
 }

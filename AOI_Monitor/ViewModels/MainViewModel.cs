@@ -1,17 +1,23 @@
 using System.Collections.ObjectModel;
 using System.Windows.Threading;
 using AOI_Monitor.Models;
+using AOI_Monitor.Services;
 
 namespace AOI_Monitor.ViewModels;
 
 public class NavPage : ViewModelBase
 {
     private bool _isActive;
+    private bool _isEnabled = true;
     public string Key      { get; set; } = "";
     public string Number   { get; set; } = "";
     public string Title    { get; set; } = "";
     public string Subtitle { get; set; } = "";
-    public bool IsEnabled  { get; set; } = true;
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set => SetField(ref _isEnabled, value);
+    }
     public bool IsActive
     {
         get => _isActive;
@@ -46,7 +52,7 @@ public class MainViewModel : ViewModelBase
         new NavPage { Key="recipe",   Number="02", Title="Recipe Editor",     Subtitle="ROI/rules" },
         new NavPage { Key="modeltest",Number="03", Title="AI Model Test",     Subtitle="stage 1 validation" },
         new NavPage { Key="reports",  Number="04", Title="Log & Export",      Subtitle="history/package" },
-        new NavPage { Key="profile",  Number="05", Title="3D Profile Viewer", Subtitle="planned stage 2", IsEnabled=false },
+        new NavPage { Key="profile",  Number="05", Title="3D Profile Viewer", Subtitle="sample CSV mode" },
         new NavPage { Key="guide",    Number="06", Title="Settings / Guide",  Subtitle="setup/docs" },
     };
 
@@ -107,6 +113,7 @@ public class MainViewModel : ViewModelBase
     public MainViewModel()
     {
         NavPages[0].IsActive = true;
+        RefreshRolePermissions(WorkflowState.Instance.CurrentRole);
         NavigateCommand = new RelayCommand(key =>
         {
             var pageKey = (string?)key ?? "monitor";
@@ -121,6 +128,15 @@ public class MainViewModel : ViewModelBase
         timer.Tick += (_, _) => TickClock();
         timer.Start();
         TickClock();
+    }
+
+    public void RefreshRolePermissions(UserRole role)
+    {
+        foreach (var page in NavPages)
+            page.IsEnabled = RoleAuthorization.CanAccessPage(role, page.Key);
+
+        if (!RoleAuthorization.CanAccessPage(role, CurrentPage))
+            CurrentPage = "monitor";
     }
 
     private void TickClock()

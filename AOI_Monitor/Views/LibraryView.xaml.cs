@@ -18,6 +18,8 @@ public partial class LibraryView : UserControl
         ".png", ".jpg", ".jpeg",
     };
 
+    private CancellationTokenSource? _importCts;
+
     // Demo rows are shown only while the SQLite image table is empty.
     private static readonly ImageLibraryRecord[] DemoRecords =
     {
@@ -79,8 +81,14 @@ public partial class LibraryView : UserControl
         ShowImportStatus(new[] { result }, "Single image import");
     }
 
-    private void OnBatchImportClick(object sender, RoutedEventArgs e)
+    private async void OnBatchImportClick(object sender, RoutedEventArgs e)
     {
+        if (_importCts is not null)
+        {
+            MessageBox.Show("A batch import is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         var dialog = new OpenFolderDialog
         {
             Title = "Select a folder containing PNG/JPG/JPEG PCB images",
@@ -90,10 +98,37 @@ public partial class LibraryView : UserControl
         if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.FolderName))
             return;
 
-        var results = ImportFolder(dialog.FolderName).ToArray();
-        var newestId = results.FirstOrDefault(r => r.Imported)?.Image?.Id;
-        LoadRecordsFromDatabase(newestId);
-        ShowImportStatus(results, $"Batch import from {dialog.FolderName}");
+        var cts = BeginImport($"Starting batch import from {dialog.FolderName}...");
+        var progress = new Progress<ImportProgress>(UpdateImportProgress);
+
+        try
+        {
+            var results = await Task.Run(() => ImportFolder(dialog.FolderName, cts.Token, progress).ToArray(), cts.Token);
+            var newestId = results.FirstOrDefault(r => r.Imported)?.Image?.Id;
+            LoadRecordsFromDatabase(newestId);
+            ShowImportStatus(results, $"Batch import from {dialog.FolderName}");
+        }
+        catch (OperationCanceledException)
+        {
+            ImportStatusText.Text = "Batch import canceled.";
+            WorkflowState.Instance.AddEvent("IMPORT", "Batch import canceled by user.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            ImportStatusText.Text = "Batch import failed. The app is still usable.";
+            WorkflowState.Instance.AddEvent("IMPORT_ERROR", $"Batch import failed: {ex.Message}");
+            MessageBox.Show($"Batch import failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            EndImport();
+        }
+    }
+
+    private void OnCancelImportClick(object sender, RoutedEventArgs e)
+    {
+        _importCts?.Cancel();
+        ImportStatusText.Text = "Cancel requested. Finishing current file...";
     }
 
     private void OnCompareGoldenClick(object sender, RoutedEventArgs e)
@@ -269,7 +304,7 @@ public partial class LibraryView : UserControl
         return AoiDatabase.TryImportImage(path, state.BoardProgram, "POC-LOT", viewType);
     }
 
-    private IEnumerable<ImageImportResult> ImportFolder(string folderPath)
+    private IEnumerable<ImageImportResult> ImportFolder(string folderPath, CancellationToken token, IProgress<ImportProgress> progress)
     {
         if (!Directory.Exists(folderPath))
         {
@@ -277,16 +312,55 @@ public partial class LibraryView : UserControl
             yield break;
         }
 
-        foreach (var file in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.TopDirectoryOnly))
+        string[] files;
+        string? folderError = null;
+        try
         {
+            files = Directory.EnumerateFiles(folderPath, "*.*", SearchOption.TopDirectoryOnly)
+                .OrderBy(Path.GetFileName)
+                .ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            files = Array.Empty<string>();
+            folderError = $"Folder cannot be read: {ex.Message}";
+        }
+
+        if (folderError is not null)
+        {
+            yield return new ImageImportResult(null, false, "Invalid", folderError);
+            yield break;
+        }
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            token.ThrowIfCancellationRequested();
+            var file = files[i];
+            progress.Report(new ImportProgress(i, files.Length, $"Importing {Path.GetFileName(file)}..."));
+
             if (!SupportedImageExtensions.Contains(Path.GetExtension(file)))
             {
                 yield return new ImageImportResult(null, false, "Unsupported", $"{Path.GetFileName(file)} is not PNG/JPG/JPEG.");
                 continue;
             }
 
-            yield return ImportOne(file, "sample");
+            ImageImportResult result;
+            try
+            {
+                result = ImportOne(file, "sample");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException)
+            {
+                result = new ImageImportResult(null, false, "Unreadable", FriendlyImportError(file, ex));
+            }
+
+            if (!result.Imported)
+                WorkflowState.Instance.AddEvent("IMPORT_ERROR", $"{Path.GetFileName(file)}: {result.Status} {result.Message}");
+
+            yield return result;
         }
+
+        progress.Report(new ImportProgress(files.Length, files.Length, "Batch import complete."));
     }
 
     private bool EnsureSelectedRecordAsSample()
@@ -396,4 +470,41 @@ public partial class LibraryView : UserControl
 
     private static string EscapeCsv(string value)
         => $"\"{value.Replace("\"", "\"\"")}\"";
+
+    private CancellationTokenSource BeginImport(string message)
+    {
+        _importCts = new CancellationTokenSource();
+        ImportProgressBar.Value = 0;
+        CancelImportButton.IsEnabled = true;
+        ImportStatusText.Text = message;
+        return _importCts;
+    }
+
+    private void EndImport()
+    {
+        _importCts?.Dispose();
+        _importCts = null;
+        CancelImportButton.IsEnabled = false;
+        ImportProgressBar.Value = 0;
+    }
+
+    private void UpdateImportProgress(ImportProgress progress)
+    {
+        ImportProgressBar.Value = progress.Total <= 0 ? 0 : Math.Min(100, progress.Completed * 100.0 / progress.Total);
+        ImportStatusText.Text = progress.Message;
+    }
+
+    private static string FriendlyImportError(string path, Exception ex)
+    {
+        var name = Path.GetFileName(path);
+        return ex switch
+        {
+            UnauthorizedAccessException => $"{name} cannot be imported because access is denied or the file is locked.",
+            NotSupportedException => $"{name} is not a supported image.",
+            IOException => $"{name} could not be read or written: {ex.Message}",
+            _ => $"{name}: {ex.Message}",
+        };
+    }
+
+    private sealed record ImportProgress(int Completed, int Total, string Message);
 }

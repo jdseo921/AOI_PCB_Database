@@ -1,0 +1,133 @@
+<UserControl x:Class="AOI_Monitor.Views.ProfileView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0B0E10">
+  <Grid Margin="8">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <Border Grid.Row="0" Style="{StaticResource Panel}">
+      <Grid Margin="8">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock Text="3D Profile Viewer" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <TextBlock Text="Sample Data Mode. CSV height-map review only. 3D Camera Not Connected."
+                     Foreground="#E1A334" FontSize="11" FontWeight="Bold" Margin="0,3,0,0"/>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Load Height CSV" Margin="0,0,8,0" Click="OnLoadCsvClick"/>
+          <Border Style="{StaticResource ChipAmber}" VerticalAlignment="Center">
+            <TextBlock Text="Sample Data Mode" FontWeight="Bold" FontSize="10.5"/>
+          </Border>
+          <Border Style="{StaticResource ChipRed}" VerticalAlignment="Center" Margin="6,0,0,0">
+            <TextBlock Text="3D Camera Not Connected" FontWeight="Bold" FontSize="10.5"/>
+          </Border>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="1.45*"/>
+        <ColumnDefinition Width="8"/>
+        <ColumnDefinition Width="1*"/>
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0" Style="{StaticResource Panel}">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="25"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+            <DockPanel>
+              <TextBlock x:Name="MapStatusText" DockPanel.Dock="Right" Text="No CSV loaded" Foreground="#9AA6AF" FontSize="11"/>
+              <TextBlock Text="2D Color-Coded Height Map" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            </DockPanel>
+          </Border>
+          <Border Grid.Row="1" Margin="8" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
+            <Grid>
+              <TextBlock x:Name="EmptyMapText" Text="Load a CSV with columns: x,y,height"
+                         Foreground="#68757D" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
+              <Image x:Name="HeightMapImage" Stretch="Uniform" MouseLeftButtonDown="OnHeightMapClick"/>
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
+
+      <Grid Grid.Column="2">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="8"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource Panel}">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="25"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+              <TextBlock Text="Selected Defect Details" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            </Border>
+            <Grid Grid.Row="1" Margin="8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="118"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
+              </Grid.RowDefinitions>
+              <TextBlock Text="CSV" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="1" x:Name="CsvNameText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+              <TextBlock Grid.Row="1" Text="Selected X/Y" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="1" Grid.Column="1" x:Name="SelectedPointText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="2" Text="Selected Height" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="2" Grid.Column="1" x:Name="SelectedHeightText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="3" Text="Height Min / Max" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="3" Grid.Column="1" x:Name="HeightRangeText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="4" Text="Status" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="4" Grid.Column="1" Text="CSV sample review only" Foreground="#E1A334" FontWeight="Bold" VerticalAlignment="Center"/>
+            </Grid>
+          </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Style="{StaticResource Panel}">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="25"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+              <TextBlock Text="Height Slice Profile" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            </Border>
+            <Canvas Grid.Row="1" x:Name="ProfileCanvas" Background="#050607" Margin="8"/>
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+
+    <Border Grid.Row="4" Style="{StaticResource Panel}">
+      <DockPanel Margin="8">
+        <TextBlock x:Name="StatusText" Text="Load sample CSV height map to begin." Foreground="#9AA6AF" VerticalAlignment="Center"/>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Accept Defect" Margin="0,0,8,0" Click="OnAcceptDefectClick"/>
+          <Button Style="{StaticResource ActionBtnRed}" Content="Reject Defect" Click="OnRejectDefectClick"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+  </Grid>
+</UserControl>

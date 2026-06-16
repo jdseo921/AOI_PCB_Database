@@ -493,6 +493,12 @@ public partial class RecipeView : UserControl
 
     private bool EnsureUnlocked(string action)
     {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanEditRecipes, action, out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
         if (!WorkflowState.Instance.IsRecipeLocked)
             return true;
 

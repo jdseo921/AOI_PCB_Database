@@ -165,6 +165,8 @@
       <DockPanel Margin="8">
         <TextBlock x:Name="StatusText" Text="Select a folder to run Stage 1 validation." Foreground="#9AA6AF" VerticalAlignment="Center"/>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <ProgressBar x:Name="WorkProgressBar" Width="140" Height="12" Minimum="0" Maximum="100" Value="0" Margin="0,0,8,0" VerticalAlignment="Center"/>
+          <Button x:Name="CancelWorkButton" Style="{StaticResource ActionBtn}" Content="Cancel" Margin="0,0,6,0" IsEnabled="False" Click="OnCancelWorkClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Preview Selected" Margin="0,0,6,0" Click="OnPreviewSelectedClick"/>
           <Button Style="{StaticResource ActionBtnGreen}" Content="Export CSV" Margin="0,0,6,0" Click="OnExportCsvClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Export Annotated Images" Margin="0,0,6,0" Click="OnExportAnnotatedImagesClick"/>

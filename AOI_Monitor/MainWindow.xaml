@@ -88,7 +88,7 @@
         <Border BorderBrush="#343C43" BorderThickness="0,0,0,1">
           <DockPanel>
             <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
-              <Button Style="{StaticResource MiniBtn}" Width="64" Margin="4,4,0,4" Content="File" Click="OnMenuFileClick"/>
+              <Button x:Name="FileMenuBtn" Style="{StaticResource MiniBtn}" Width="64" Margin="4,4,0,4" Content="File" Click="OnMenuFileClick"/>
             </StackPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
               <Border BorderBrush="#2D343A" BorderThickness="1,0,0,0">
@@ -120,9 +120,12 @@
                         <ColumnDefinition Width="66"/>
                         <ColumnDefinition Width="*"/>
                       </Grid.ColumnDefinitions>
-                      <TextBlock Text="Authority" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
-                      <TextBlock Grid.Column="1" Text="Review" FontWeight="SemiBold" Foreground="#E7ECEF" FontSize="11.5"
-                                 TextTrimming="CharacterEllipsis" ToolTip="Review" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                      <TextBlock Text="Role" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
+                      <ComboBox Grid.Column="1" x:Name="RoleCombo" SelectedIndex="0" MinHeight="24" Margin="4,0,0,0" SelectionChanged="OnRoleSelectionChanged">
+                        <ComboBoxItem Content="Operator"/>
+                        <ComboBoxItem Content="Engineer"/>
+                        <ComboBoxItem Content="Admin"/>
+                      </ComboBox>
                     </Grid>
                   </Border>
                   <Border Width="212" Padding="10,0">
@@ -168,7 +171,7 @@
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
               <StackPanel>
                 <TextBlock Text="Camera" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
-                <TextBlock x:Name="CameraStatusText" Text="Simulated / Not Connected" Foreground="#E1A334" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+                <TextBlock x:Name="CameraStatusText" Text="Not Connected" Foreground="#F27777" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
@@ -311,8 +314,8 @@
                     </StackPanel>
                   </Border>
                   <Button Style="{StaticResource MiniBtn}" Content="Refresh" Margin="0,0,6,0" Click="OnRefreshClick"/>
-                  <Button Style="{StaticResource MiniBtnAmber}" Content="Lock Recipe" Margin="0,0,6,0" Click="OnLockRecipeClick"/>
-                  <Button Style="{StaticResource MiniBtnGreen}" Content="Export" Click="OnExportClick"/>
+                  <Button x:Name="LockRecipeBtn" Style="{StaticResource MiniBtnAmber}" Content="Lock Recipe" Margin="0,0,6,0" Click="OnLockRecipeClick"/>
+                  <Button x:Name="ExportBtn" Style="{StaticResource MiniBtnGreen}" Content="Export" Click="OnExportClick"/>
                 </StackPanel>
                 <TextBlock x:Name="PageTitleText"
                            Foreground="#E8EDF2" FontWeight="ExtraBold" FontSize="12.5"

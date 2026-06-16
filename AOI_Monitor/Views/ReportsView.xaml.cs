@@ -25,6 +25,7 @@ public partial class ReportsView : UserControl
     private readonly ObservableCollection<InspectionLogRow> _inspectionRows = new();
     private readonly ObservableCollection<ReviewLogRow> _reviewRows = new();
     private readonly ObservableCollection<ExportHistoryRow> _exportRows = new();
+    private CancellationTokenSource? _workCts;
 
     public ReportsView()
     {
@@ -120,8 +121,14 @@ public partial class ReportsView : UserControl
         RefreshAfterExport($"Review log CSV exported: {dialog.FileName}");
     }
 
-    private void OnExportAnnotatedOverlaysClick(object sender, RoutedEventArgs e)
+    private async void OnExportAnnotatedOverlaysClick(object sender, RoutedEventArgs e)
     {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         var rows = _inspectionRows.Where(r => File.Exists(r.SampleImagePath)).ToArray();
         if (rows.Length == 0)
         {
@@ -141,14 +148,39 @@ public partial class ReportsView : UserControl
         if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.FolderName))
             return;
 
-        var exported = ExportAnnotatedOverlays(rows, dialog.FolderName);
-        AoiDatabase.RecordExport("AnnotatedImageOverlays", dialog.FolderName);
-        WorkflowState.Instance.AddEvent("EXPORT", $"Annotated overlays exported: {exported} image(s).");
-        RefreshAfterExport($"Annotated overlays exported: {exported} image(s) to {dialog.FolderName}");
+        var cts = BeginWork("Exporting annotated overlays...");
+        var progress = new Progress<WorkProgress>(UpdateProgress);
+        try
+        {
+            var result = await Task.Run(() => ExportAnnotatedOverlays(rows, dialog.FolderName, cts.Token, progress), cts.Token);
+            AoiDatabase.RecordExport("AnnotatedImageOverlays", dialog.FolderName, result.Errors.Count == 0 ? "OK" : "WARN");
+            WorkflowState.Instance.AddEvent("EXPORT", $"Annotated overlays exported: {result.Count} image(s), {result.Errors.Count} issue(s).");
+            LogErrors("EXPORT_ERROR", result.Errors);
+            RefreshAfterExport($"Annotated overlays exported: {result.Count} image(s), {result.Errors.Count} issue(s) to {dialog.FolderName}");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Annotated overlay export canceled.";
+            WorkflowState.Instance.AddEvent("EXPORT", "Annotated overlay export canceled by user.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Annotated overlay export failed", ex, "EXPORT_ERROR");
+        }
+        finally
+        {
+            EndWork();
+        }
     }
 
-    private void OnExportCustomerPackageClick(object sender, RoutedEventArgs e)
+    private async void OnExportCustomerPackageClick(object sender, RoutedEventArgs e)
     {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         if (_inspectionRows.Count == 0 && _reviewRows.Count == 0)
         {
             MessageBox.Show("No filtered log records are available for a customer validation package.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -167,27 +199,62 @@ public partial class ReportsView : UserControl
         if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.FolderName))
             return;
 
-        var packageDir = Path.Combine(dialog.FolderName, $"customer_validation_{DateTime.Now:yyyyMMdd_HHmmss}");
-        Directory.CreateDirectory(packageDir);
-        Directory.CreateDirectory(Path.Combine(packageDir, "annotated_overlays"));
+        var cts = BeginWork("Creating customer package...");
+        var progress = new Progress<WorkProgress>(UpdateProgress);
+        var inspectionRows = _inspectionRows.ToArray();
+        var reviewRows = _reviewRows.ToArray();
+        var filter = BuildFilter();
 
-        var inspectionCsv = Path.Combine(packageDir, "inspection_history.csv");
-        var reviewCsv = Path.Combine(packageDir, "review_log.csv");
-        File.WriteAllText(inspectionCsv, BuildInspectionCsv(_inspectionRows), CsvEncoding);
-        File.WriteAllText(reviewCsv, BuildReviewCsv(_reviewRows), CsvEncoding);
+        try
+        {
+            var result = await Task.Run(() =>
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                var packageDir = Path.Combine(dialog.FolderName, $"customer_validation_{DateTime.Now:yyyyMMdd_HHmmss}");
+                Directory.CreateDirectory(packageDir);
+                var overlayDir = Path.Combine(packageDir, "annotated_overlays");
+                Directory.CreateDirectory(overlayDir);
 
-        var overlayCount = ExportAnnotatedOverlays(
-            _inspectionRows.Where(r => File.Exists(r.SampleImagePath)).ToArray(),
-            Path.Combine(packageDir, "annotated_overlays"));
+                ((IProgress<WorkProgress>)progress).Report(new WorkProgress(1, 4, "Writing package CSV files..."));
+                File.WriteAllText(Path.Combine(packageDir, "inspection_history.csv"), BuildInspectionCsv(inspectionRows), CsvEncoding);
+                File.WriteAllText(Path.Combine(packageDir, "review_log.csv"), BuildReviewCsv(reviewRows), CsvEncoding);
 
-        File.WriteAllText(
-            Path.Combine(packageDir, "manifest.txt"),
-            BuildPackageManifest(packageDir, overlayCount),
-            CsvEncoding);
+                var overlays = ExportAnnotatedOverlays(
+                    inspectionRows.Where(r => File.Exists(r.SampleImagePath)).ToArray(),
+                    overlayDir,
+                    cts.Token,
+                    progress,
+                    completedOffset: 1,
+                    totalOffset: 3);
 
-        AoiDatabase.RecordExport("CustomerValidationPackage", packageDir);
-        WorkflowState.Instance.AddEvent("EXPORT", $"Customer validation package exported: {Path.GetFileName(packageDir)}");
-        RefreshAfterExport($"Customer validation package exported: {packageDir}");
+                cts.Token.ThrowIfCancellationRequested();
+                ((IProgress<WorkProgress>)progress).Report(new WorkProgress(4, 4, "Writing package manifest..."));
+                File.WriteAllText(
+                    Path.Combine(packageDir, "manifest.txt"),
+                    BuildPackageManifest(packageDir, overlays.Count, inspectionRows.Length, reviewRows.Length, filter),
+                    CsvEncoding);
+
+                return new PackageOutcome(packageDir, overlays.Count, overlays.Errors);
+            }, cts.Token);
+
+            AoiDatabase.RecordExport("CustomerValidationPackage", result.PackageDir, result.Errors.Count == 0 ? "OK" : "WARN");
+            WorkflowState.Instance.AddEvent("EXPORT", $"Customer validation package exported: {Path.GetFileName(result.PackageDir)}, overlays={result.OverlayCount}, issues={result.Errors.Count}.");
+            LogErrors("EXPORT_ERROR", result.Errors);
+            RefreshAfterExport($"Customer validation package exported: {result.PackageDir}");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Customer package export canceled.";
+            WorkflowState.Instance.AddEvent("EXPORT", "Customer package export canceled by user.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Customer package export failed", ex, "EXPORT_ERROR");
+        }
+        finally
+        {
+            EndWork();
+        }
     }
 
     private void OnVerifyImagePathsClick(object sender, RoutedEventArgs e)
@@ -221,29 +288,57 @@ public partial class ReportsView : UserControl
         RefreshAfterExport($"Image path verification complete. Issues={inaccessible}. Report: {reportPath}");
     }
 
-    private void OnRunDbIntegrityCheckClick(object sender, RoutedEventArgs e)
+    private async void OnRunDbIntegrityCheckClick(object sender, RoutedEventArgs e)
     {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         if (!ConfirmExport("Run SQLite integrity check and record the report?"))
             return;
 
-        var exportsDir = EnsureExportsDir();
-        var reportPath = Path.Combine(exportsDir, $"db_integrity_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-        var integrity = AoiDatabase.RunIntegrityCheck();
-        var status = string.Equals(integrity, "ok", StringComparison.OrdinalIgnoreCase) ? "OK" : "WARN";
+        var cts = BeginWork("Running SQLite integrity check...");
+        try
+        {
+            var result = await Task.Run(() =>
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                var exportsDir = EnsureExportsDir();
+                var reportPath = Path.Combine(exportsDir, $"db_integrity_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                var integrity = AoiDatabase.RunIntegrityCheck();
+                var status = string.Equals(integrity, "ok", StringComparison.OrdinalIgnoreCase) ? "OK" : "WARN";
 
-        var sb = new StringBuilder();
-        sb.AppendLine($"SQLiteIntegrityCheck: {integrity}");
-        sb.AppendLine($"DatabasePath: {AoiDatabase.DatabasePath}");
-        sb.AppendLine($"ImageVaultPath: {AoiDatabase.ImageVaultPath}");
-        sb.AppendLine($"InspectionRowsVisible: {_inspectionRows.Count}");
-        sb.AppendLine($"ReviewRowsVisible: {_reviewRows.Count}");
-        sb.AppendLine($"AutoArchivePolicy: copy-only archive for logs older than 30 days; source rows remain queryable.");
-        sb.AppendLine($"CheckedAt: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-        File.WriteAllText(reportPath, sb.ToString());
+                var sb = new StringBuilder();
+                sb.AppendLine($"SQLiteIntegrityCheck: {integrity}");
+                sb.AppendLine($"DatabasePath: {AoiDatabase.DatabasePath}");
+                sb.AppendLine($"ImageVaultPath: {AoiDatabase.ImageVaultPath}");
+                sb.AppendLine($"InspectionRowsVisible: {_inspectionRows.Count}");
+                sb.AppendLine($"ReviewRowsVisible: {_reviewRows.Count}");
+                sb.AppendLine($"AutoArchivePolicy: copy-only archive for logs older than 30 days; source rows remain queryable.");
+                sb.AppendLine($"CheckedAt: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                File.WriteAllText(reportPath, sb.ToString());
+                return new IntegrityOutcome(reportPath, integrity, status);
+            }, cts.Token);
 
-        AoiDatabase.RecordExport("DatabaseIntegrityReport", reportPath, status);
-        WorkflowState.Instance.AddEvent("UTILITY", $"DB integrity check result: {integrity}.");
-        RefreshAfterExport($"DB integrity check complete: {integrity}. Report: {reportPath}");
+            AoiDatabase.RecordExport("DatabaseIntegrityReport", result.ReportPath, result.Status);
+            WorkflowState.Instance.AddEvent("UTILITY", $"DB integrity check result: {result.Integrity}.");
+            RefreshAfterExport($"DB integrity check complete: {result.Integrity}. Report: {result.ReportPath}");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "DB integrity check canceled.";
+            WorkflowState.Instance.AddEvent("UTILITY", "DB integrity check canceled by user.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("DB integrity check failed", ex, "UTILITY_ERROR");
+        }
+        finally
+        {
+            EndWork();
+        }
     }
 
     private void OnOpenDatabaseHealthClick(object sender, RoutedEventArgs e)
@@ -252,47 +347,48 @@ public partial class ReportsView : UserControl
             vm.CurrentPage = "spc";
     }
 
-    private void OnRebuildImageIndexClick(object sender, RoutedEventArgs e)
+    private async void OnRebuildImageIndexClick(object sender, RoutedEventArgs e)
     {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         if (!ConfirmExport("Rebuild the image index for the current image vault and filtered inspection paths?"))
             return;
 
-        var exportsDir = EnsureExportsDir();
-        var file = Path.Combine(exportsDir, $"image_index_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var cts = BeginWork("Rebuilding image index...");
+        var progress = new Progress<WorkProgress>(UpdateProgress);
+        var rows = _inspectionRows.ToArray();
 
-        if (Directory.Exists(AoiDatabase.ImageVaultPath))
+        try
         {
-            foreach (var path in Directory.EnumerateFiles(AoiDatabase.ImageVaultPath, "*.*", SearchOption.AllDirectories))
-            {
-                if (ImageExtensions.Contains(Path.GetExtension(path)))
-                    paths.Add(path);
-            }
+            var result = await Task.Run(() => RebuildImageIndex(rows, cts.Token, progress), cts.Token);
+            AoiDatabase.RecordExport("ImageIndex", result.Path, result.Errors.Count == 0 ? "OK" : "WARN");
+            WorkflowState.Instance.AddEvent("UTILITY", $"Image index rebuilt with {result.Count} entries and {result.Errors.Count} issue(s).");
+            LogErrors("UTILITY_ERROR", result.Errors);
+            RefreshAfterExport($"Image index rebuilt with {result.Count} entries: {result.Path}");
         }
-
-        foreach (var row in _inspectionRows)
+        catch (OperationCanceledException)
         {
-            if (File.Exists(row.SampleImagePath))
-                paths.Add(row.SampleImagePath);
-            if (File.Exists(row.GoldenImagePath))
-                paths.Add(row.GoldenImagePath);
+            StatusText.Text = "Image index rebuild canceled.";
+            WorkflowState.Instance.AddEvent("UTILITY", "Image index rebuild canceled by user.");
         }
-
-        var sb = new StringBuilder();
-        sb.AppendLine("Path,Bytes,LastWriteUtc");
-        foreach (var path in paths.OrderBy(p => p))
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            var info = new FileInfo(path);
-            sb.AppendLine(string.Join(",",
-                EscapeCsv(path),
-                info.Length.ToString(CultureInfo.InvariantCulture),
-                EscapeCsv(info.LastWriteTimeUtc.ToString("O", CultureInfo.InvariantCulture))));
+            HandleWorkError("Image index rebuild failed", ex, "UTILITY_ERROR");
         }
+        finally
+        {
+            EndWork();
+        }
+    }
 
-        File.WriteAllText(file, sb.ToString(), CsvEncoding);
-        AoiDatabase.RecordExport("ImageIndex", file);
-        WorkflowState.Instance.AddEvent("UTILITY", $"Image index rebuilt with {paths.Count} entries.");
-        RefreshAfterExport($"Image index rebuilt with {paths.Count} entries: {file}");
+    private void OnCancelWorkClick(object sender, RoutedEventArgs e)
+    {
+        _workCts?.Cancel();
+        StatusText.Text = "Cancel requested. Finishing current file...";
     }
 
     private void OnLockActiveRecipeClick(object sender, RoutedEventArgs e)
@@ -304,26 +400,51 @@ public partial class ReportsView : UserControl
         MessageBox.Show(StatusText.Text, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    private int ExportAnnotatedOverlays(IReadOnlyCollection<InspectionLogRow> rows, string folder)
+    private ExportOutcome ExportAnnotatedOverlays(
+        IReadOnlyCollection<InspectionLogRow> rows,
+        string folder,
+        CancellationToken token,
+        IProgress<WorkProgress> progress,
+        int completedOffset = 0,
+        int totalOffset = 0)
     {
         Directory.CreateDirectory(folder);
+        var errors = new List<string>();
         var exported = 0;
+        var index = 0;
         foreach (var row in rows)
         {
+            token.ThrowIfCancellationRequested();
+            progress.Report(new WorkProgress(
+                completedOffset + index,
+                Math.Max(1, totalOffset + rows.Count),
+                $"Exporting overlay {index + 1} of {rows.Count}..."));
+
             try
             {
+                if (!File.Exists(row.SampleImagePath))
+                {
+                    errors.Add($"Missing sample image for inspection {row.Id}: {row.SampleImagePath}");
+                    continue;
+                }
+
                 var bitmap = CreateAnnotatedBitmap(row);
                 var path = Path.Combine(folder, $"{Path.GetFileNameWithoutExtension(row.ImageName)}_{row.Verdict}_{row.Id}_overlay.png");
                 SavePng(bitmap, path);
                 exported++;
             }
-            catch
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException)
             {
-                // Skip unreadable images and leave path details available in Verify Paths.
+                errors.Add(FriendlyFileError(row.SampleImagePath, ex));
+            }
+            finally
+            {
+                index++;
             }
         }
 
-        return exported;
+        progress.Report(new WorkProgress(completedOffset + rows.Count, Math.Max(1, totalOffset + rows.Count), "Annotated overlay export complete."));
+        return new ExportOutcome(exported, errors);
     }
 
     private static RenderTargetBitmap CreateAnnotatedBitmap(InspectionLogRow row)
@@ -434,15 +555,14 @@ public partial class ReportsView : UserControl
         return sb.ToString();
     }
 
-    private string BuildPackageManifest(string packageDir, int overlayCount)
+    private static string BuildPackageManifest(string packageDir, int overlayCount, int inspectionRows, int reviewRows, LogFilter filter)
     {
-        var filter = BuildFilter();
         var sb = new StringBuilder();
         sb.AppendLine("Customer Validation Package");
         sb.AppendLine($"GeneratedLocal: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine($"PackagePath: {packageDir}");
-        sb.AppendLine($"InspectionRows: {_inspectionRows.Count}");
-        sb.AppendLine($"ReviewRows: {_reviewRows.Count}");
+        sb.AppendLine($"InspectionRows: {inspectionRows}");
+        sb.AppendLine($"ReviewRows: {reviewRows}");
         sb.AppendLine($"AnnotatedOverlays: {overlayCount}");
         sb.AppendLine($"FromDate: {filter.FromDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "none"}");
         sb.AppendLine($"ToDate: {filter.ToDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "none"}");
@@ -492,6 +612,132 @@ public partial class ReportsView : UserControl
     private static string EscapeCsv(string value)
         => $"\"{value.Replace("\"", "\"\"")}\"";
 
+    private CancellationTokenSource BeginWork(string message)
+    {
+        _workCts = new CancellationTokenSource();
+        WorkProgressBar.Value = 0;
+        CancelWorkButton.IsEnabled = true;
+        StatusText.Text = message;
+        return _workCts;
+    }
+
+    private void EndWork()
+    {
+        _workCts?.Dispose();
+        _workCts = null;
+        CancelWorkButton.IsEnabled = false;
+        WorkProgressBar.Value = 0;
+    }
+
+    private void UpdateProgress(WorkProgress progress)
+    {
+        WorkProgressBar.Value = progress.Total <= 0 ? 0 : Math.Min(100, progress.Completed * 100.0 / progress.Total);
+        StatusText.Text = progress.Message;
+    }
+
+    private void HandleWorkError(string title, Exception ex, string category)
+    {
+        var message = ex is UnauthorizedAccessException
+            ? $"{title}: export folder or database access was denied."
+            : $"{title}: {ex.Message}";
+        StatusText.Text = message;
+        WorkflowState.Instance.AddEvent(category, message);
+        MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+
+    private static void LogErrors(string category, IReadOnlyList<string> errors)
+    {
+        foreach (var error in errors.Take(40))
+            WorkflowState.Instance.AddEvent(category, error);
+    }
+
+    private static string FriendlyFileError(string path, Exception ex)
+    {
+        var name = string.IsNullOrWhiteSpace(path) ? "(unknown file)" : Path.GetFileName(path);
+        return ex switch
+        {
+            UnauthorizedAccessException => $"Permission denied or locked file: {name}",
+            NotSupportedException => $"Unsupported image format: {name}",
+            IOException => $"File could not be read or written: {name} ({ex.Message})",
+            _ => $"{name}: {ex.Message}",
+        };
+    }
+
+    private static IndexOutcome RebuildImageIndex(IReadOnlyCollection<InspectionLogRow> rows, CancellationToken token, IProgress<WorkProgress> progress)
+    {
+        var exportsDir = EnsureExportsDir();
+        var file = Path.Combine(exportsDir, $"image_index_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var errors = new List<string>();
+
+        if (Directory.Exists(AoiDatabase.ImageVaultPath))
+        {
+            try
+            {
+                foreach (var path in Directory.EnumerateFiles(AoiDatabase.ImageVaultPath, "*.*", SearchOption.AllDirectories))
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (ImageExtensions.Contains(Path.GetExtension(path)))
+                        paths.Add(path);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                errors.Add($"Image vault cannot be fully indexed: {ex.Message}");
+            }
+        }
+        else
+        {
+            errors.Add($"Image vault folder is not available: {AoiDatabase.ImageVaultPath}");
+        }
+
+        var checkedRows = 0;
+        foreach (var row in rows)
+        {
+            token.ThrowIfCancellationRequested();
+            progress.Report(new WorkProgress(checkedRows, Math.Max(1, rows.Count), $"Indexing inspection image paths {checkedRows + 1} of {rows.Count}..."));
+            AddExistingPath(row.SampleImagePath, paths, errors, row.Id, "sample");
+            AddExistingPath(row.GoldenImagePath, paths, errors, row.Id, "golden");
+            checkedRows++;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Path,Bytes,LastWriteUtc");
+        var written = 0;
+        foreach (var path in paths.OrderBy(p => p))
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                var info = new FileInfo(path);
+                sb.AppendLine(string.Join(",",
+                    EscapeCsv(path),
+                    info.Length.ToString(CultureInfo.InvariantCulture),
+                    EscapeCsv(info.LastWriteTimeUtc.ToString("O", CultureInfo.InvariantCulture))));
+                written++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                errors.Add(FriendlyFileError(path, ex));
+            }
+        }
+
+        File.WriteAllText(file, sb.ToString(), CsvEncoding);
+        progress.Report(new WorkProgress(rows.Count, Math.Max(1, rows.Count), "Image index rebuild complete."));
+        return new IndexOutcome(file, written, errors);
+    }
+
+    private static void AddExistingPath(string path, ISet<string> paths, ICollection<string> errors, long inspectionId, string label)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        if (File.Exists(path))
+            paths.Add(path);
+        else
+            errors.Add($"Missing {label} image for inspection {inspectionId}: {path}");
+    }
+
     private static void CheckPath(string label, string path, long id, StringBuilder sb, ref int inaccessible)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
@@ -500,6 +746,16 @@ public partial class ReportsView : UserControl
             sb.AppendLine($"[MISSING] Inspection {id} {label}: {path}");
         }
     }
+
+    private sealed record WorkProgress(int Completed, int Total, string Message);
+
+    private sealed record ExportOutcome(int Count, IReadOnlyList<string> Errors);
+
+    private sealed record PackageOutcome(string PackageDir, int OverlayCount, IReadOnlyList<string> Errors);
+
+    private sealed record IntegrityOutcome(string ReportPath, string Integrity, string Status);
+
+    private sealed record IndexOutcome(string Path, int Count, IReadOnlyList<string> Errors);
 
     public sealed class InspectionLogRow
     {

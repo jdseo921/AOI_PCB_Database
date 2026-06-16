@@ -59,6 +59,7 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
             {
                 $"Selected engine: {Name}.",
                 $"Configured model: {(_configuration.HasModelFile ? _configuration.ModelFilePath : "missing")}.",
+                $"Label map: {LabelMapDisplay()}.",
                 $"Input size: {_configuration.InputImageWidth}x{_configuration.InputImageHeight}.",
                 "No ML inference was executed by this prototype build.",
             },
@@ -77,6 +78,16 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
         });
 
         return result;
+    }
+
+    private string LabelMapDisplay()
+    {
+        if (string.IsNullOrWhiteSpace(_configuration.LabelMapPath))
+            return "built-in fallback labels";
+
+        return File.Exists(_configuration.LabelMapPath)
+            ? _configuration.LabelMapPath
+            : $"missing ({_configuration.LabelMapPath})";
     }
 
     private static double CalculateBrightness(string path)

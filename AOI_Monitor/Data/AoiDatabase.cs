@@ -251,6 +251,7 @@ public static class AoiDatabase
         string imageFolder,
         string? groundTruthCsvPath,
         string engineName,
+        string modelVersion,
         double accuracy,
         double precision,
         double recall,
@@ -266,10 +267,10 @@ public static class AoiDatabase
         command.CommandText =
             """
             INSERT INTO BatchTestRuns
-                (ImageFolder, GroundTruthCsvPath, EngineName, Accuracy, Precision, Recall,
+                (ImageFolder, GroundTruthCsvPath, EngineName, ModelVersion, Accuracy, Precision, Recall,
                  FalseCallRate, TotalImages, FailedCount, CreatedAtUtc)
             VALUES
-                ($imageFolder, $groundTruthCsvPath, $engineName, $accuracy, $precision, $recall,
+                ($imageFolder, $groundTruthCsvPath, $engineName, $modelVersion, $accuracy, $precision, $recall,
                  $falseCallRate, $totalImages, $failedCount, $createdAtUtc);
             SELECT last_insert_rowid();
             """;
@@ -277,6 +278,7 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$imageFolder", imageFolder);
         command.Parameters.AddWithValue("$groundTruthCsvPath", (object?)groundTruthCsvPath ?? DBNull.Value);
         command.Parameters.AddWithValue("$engineName", engineName);
+        command.Parameters.AddWithValue("$modelVersion", modelVersion);
         command.Parameters.AddWithValue("$accuracy", accuracy);
         command.Parameters.AddWithValue("$precision", precision);
         command.Parameters.AddWithValue("$recall", recall);
@@ -294,11 +296,11 @@ public static class AoiDatabase
             resultCommand.CommandText =
                 """
                 INSERT INTO BatchTestResults
-                    (RunId, ImagePath, ImageName, GroundTruth, EngineResult, Score, PassFail,
-                     DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel, CreatedAtUtc)
+                    (RunId, ImagePath, ImageName, GroundTruth, EngineResult, InspectionEngine, ModelVersion, Score, PassFail,
+                     DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel, Notes, CreatedAtUtc)
                 VALUES
-                    ($runId, $imagePath, $imageName, $groundTruth, $engineResult, $score, $passFail,
-                     $defectType, $roiX, $roiY, $roiWidth, $roiHeight, $side, $refDes, $lotId, $boardModel, $createdAtUtc);
+                    ($runId, $imagePath, $imageName, $groundTruth, $engineResult, $inspectionEngine, $modelVersion, $score, $passFail,
+                     $defectType, $roiX, $roiY, $roiWidth, $roiHeight, $side, $refDes, $lotId, $boardModel, $notes, $createdAtUtc);
                 """;
 
             resultCommand.Parameters.AddWithValue("$runId", runId);
@@ -306,6 +308,8 @@ public static class AoiDatabase
             resultCommand.Parameters.AddWithValue("$imageName", result.ImageName);
             resultCommand.Parameters.AddWithValue("$groundTruth", result.GroundTruth);
             resultCommand.Parameters.AddWithValue("$engineResult", result.EngineResult);
+            resultCommand.Parameters.AddWithValue("$inspectionEngine", result.InspectionEngine);
+            resultCommand.Parameters.AddWithValue("$modelVersion", result.ModelVersion);
             resultCommand.Parameters.AddWithValue("$score", result.Score);
             resultCommand.Parameters.AddWithValue("$passFail", result.PassFail);
             resultCommand.Parameters.AddWithValue("$defectType", result.DefectType);
@@ -317,6 +321,7 @@ public static class AoiDatabase
             resultCommand.Parameters.AddWithValue("$refDes", result.RefDes);
             resultCommand.Parameters.AddWithValue("$lotId", result.LotId);
             resultCommand.Parameters.AddWithValue("$boardModel", result.BoardModel);
+            resultCommand.Parameters.AddWithValue("$notes", result.Notes);
             resultCommand.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
             resultCommand.ExecuteNonQuery();
         }
@@ -333,7 +338,7 @@ public static class AoiDatabase
         using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT Id, ImageFolder, GroundTruthCsvPath, EngineName, CreatedAtUtc, Accuracy, Precision,
+            SELECT Id, ImageFolder, GroundTruthCsvPath, EngineName, ModelVersion, CreatedAtUtc, Accuracy, Precision,
                    Recall, FalseCallRate, TotalImages, FailedCount
             FROM BatchTestRuns
             ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
@@ -354,7 +359,8 @@ public static class AoiDatabase
         command.CommandText =
             """
             SELECT Id, RunId, ImagePath, ImageName, GroundTruth, EngineResult, Score, PassFail,
-                   DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel, CreatedAtUtc
+                   DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel,
+                   InspectionEngine, ModelVersion, Notes, CreatedAtUtc
             FROM BatchTestResults
             WHERE RunId = $runId
             ORDER BY Id ASC;
@@ -678,13 +684,14 @@ public static class AoiDatabase
             reader.GetString(1),
             reader.IsDBNull(2) ? null : reader.GetString(2),
             reader.GetString(3),
-            ParseDateTime(reader.GetString(4)),
-            reader.GetDouble(5),
+            reader.IsDBNull(4) ? "UNKNOWN" : reader.GetString(4),
+            ParseDateTime(reader.GetString(5)),
             reader.GetDouble(6),
             reader.GetDouble(7),
             reader.GetDouble(8),
-            reader.GetInt32(9),
-            reader.GetInt32(10));
+            reader.GetDouble(9),
+            reader.GetInt32(10),
+            reader.GetInt32(11));
     }
 
     private static BatchTestResultRecord ReadBatchTestResult(SqliteDataReader reader)
@@ -696,6 +703,8 @@ public static class AoiDatabase
             reader.GetString(3),
             reader.GetString(4),
             reader.GetString(5),
+            reader.IsDBNull(17) ? "Pixel Difference" : reader.GetString(17),
+            reader.IsDBNull(18) ? "PIXEL_DIFF_0.1" : reader.GetString(18),
             reader.GetDouble(6),
             reader.GetString(7),
             reader.GetString(8),
@@ -707,7 +716,8 @@ public static class AoiDatabase
             reader.IsDBNull(14) ? string.Empty : reader.GetString(14),
             reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
             reader.IsDBNull(16) ? string.Empty : reader.GetString(16),
-            ParseDateTime(reader.GetString(17)));
+            reader.IsDBNull(19) ? string.Empty : reader.GetString(19),
+            ParseDateTime(reader.GetString(20)));
     }
 
     private static InspectionHistoryRecord ReadInspectionHistory(SqliteDataReader reader)
@@ -868,10 +878,14 @@ public static class AoiDatabase
         AddColumnIfMissing(connection, "RecipeRevisions", "OperatorId", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
         AddColumnIfMissing(connection, "RecipeRevisions", "BackgroundImagePath", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "RecipeRevisions", "RecipeJson", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, "BatchTestRuns", "ModelVersion", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
+        AddColumnIfMissing(connection, "BatchTestResults", "InspectionEngine", "TEXT NOT NULL DEFAULT 'Pixel Difference'");
+        AddColumnIfMissing(connection, "BatchTestResults", "ModelVersion", "TEXT NOT NULL DEFAULT 'PIXEL_DIFF_0.1'");
         AddColumnIfMissing(connection, "BatchTestResults", "Side", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "BatchTestResults", "RefDes", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "BatchTestResults", "LotId", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "BatchTestResults", "BoardModel", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, "BatchTestResults", "Notes", "TEXT NOT NULL DEFAULT ''");
     }
 
     private static void AutoArchiveOldLogs(SqliteConnection connection)
@@ -1075,6 +1089,7 @@ public static class AoiDatabase
             ImageFolder TEXT NOT NULL,
             GroundTruthCsvPath TEXT NULL,
             EngineName TEXT NOT NULL,
+            ModelVersion TEXT NOT NULL DEFAULT 'UNKNOWN',
             Accuracy REAL NOT NULL,
             Precision REAL NOT NULL,
             Recall REAL NOT NULL,
@@ -1092,6 +1107,8 @@ public static class AoiDatabase
             ImageName TEXT NOT NULL,
             GroundTruth TEXT NOT NULL,
             EngineResult TEXT NOT NULL,
+            InspectionEngine TEXT NOT NULL DEFAULT 'Pixel Difference',
+            ModelVersion TEXT NOT NULL DEFAULT 'PIXEL_DIFF_0.1',
             Score REAL NOT NULL,
             PassFail TEXT NOT NULL,
             DefectType TEXT NOT NULL,
@@ -1103,6 +1120,7 @@ public static class AoiDatabase
             RefDes TEXT NOT NULL DEFAULT '',
             LotId TEXT NOT NULL DEFAULT '',
             BoardModel TEXT NOT NULL DEFAULT '',
+            Notes TEXT NOT NULL DEFAULT '',
             CreatedAtUtc TEXT NOT NULL,
             FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
         );

@@ -27,6 +27,7 @@ public partial class AIModelTestView : UserControl
     private DateTime? _currentRunCreatedAtUtc;
     private string _currentEngineDisplay = "Pixel Difference / PIXEL_DIFF_0.1";
     private string _lastAnnotatedImageFolder = string.Empty;
+    private string _lastReportPath = string.Empty;
     private CancellationTokenSource? _workCts;
 
     public AIModelTestView()
@@ -140,7 +141,7 @@ public partial class AIModelTestView : UserControl
                         {
                             var message = $"Missing image file: {item.ImagePath}";
                             errors.Add(message);
-                            rows.Add(BatchValidationService.ToErrorRow(item.ImagePath, item.Manifest, message));
+                            rows.Add(BatchValidationService.ToErrorRow(item.ImagePath, item.Manifest, message, engine.Name, engine.Version));
                             continue;
                         }
 
@@ -155,7 +156,7 @@ public partial class AIModelTestView : UserControl
                     {
                         var message = FriendlyFileError(item.ImagePath, ex);
                         errors.Add(message);
-                        rows.Add(BatchValidationService.ToErrorRow(item.ImagePath, item.Manifest, message));
+                        rows.Add(BatchValidationService.ToErrorRow(item.ImagePath, item.Manifest, message, engine.Name, engine.Version));
                     }
                 }
 
@@ -166,7 +167,8 @@ public partial class AIModelTestView : UserControl
                     runId = AoiDatabase.RecordBatchTestRun(
                         _selectedFolder,
                         _groundTruthCsvPath,
-                        engineDisplay,
+                        engine.Name,
+                        engine.Version,
                         metrics.Accuracy,
                         metrics.Precision,
                         metrics.Recall,
@@ -193,6 +195,7 @@ public partial class AIModelTestView : UserControl
             _currentRunCreatedAtUtc = DateTime.UtcNow;
             _currentEngineDisplay = batch.EngineDisplay;
             _lastAnnotatedImageFolder = string.Empty;
+            _lastReportPath = string.Empty;
 
             _rows.Clear();
             foreach (var row in batch.Rows)
@@ -203,6 +206,7 @@ public partial class AIModelTestView : UserControl
             StatusText.Text = batch.IsFormalManifest
                 ? $"Formal manifest validation complete. {_rows.Count} row(s), {batch.Errors.Count} issue(s)."
                 : $"Batch inspection complete. {_rows.Count} row(s), {batch.Errors.Count} issue(s).";
+            ReportPathText.Text = "Report: not generated";
             WorkflowState.Instance.AddEvent("MODEL_TEST", $"Stage 1 validation run {_currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "not saved"}: {_rows.Count} images, {_rows.Count(r => r.IsFailed)} failed, {batch.Errors.Count} issue(s).");
             foreach (var error in batch.Errors.Take(20))
                 WorkflowState.Instance.AddEvent("MODEL_TEST_ERROR", error);
@@ -398,6 +402,8 @@ public partial class AIModelTestView : UserControl
 
         File.WriteAllText(dialog.FileName, report, Encoding.UTF8);
         AoiDatabase.RecordExport("CustomerValidationReport", dialog.FileName);
+        _lastReportPath = dialog.FileName;
+        ReportPathText.Text = $"Report: {dialog.FileName}";
         StatusText.Text = $"Customer validation report saved: {dialog.FileName}";
         WorkflowState.Instance.AddEvent("EXPORT", $"Customer validation report exported for run {_currentRunId}: {Path.GetFileName(dialog.FileName)}");
     }
@@ -410,9 +416,11 @@ public partial class AIModelTestView : UserControl
 
         _currentRunId = run.Id;
         _currentRunCreatedAtUtc = run.CreatedAtUtc;
-        _currentEngineDisplay = run.EngineName;
+        _currentEngineDisplay = $"{run.EngineName} / {run.ModelVersion}";
         _selectedFolder = run.ImageFolder;
         _groundTruthCsvPath = run.GroundTruthCsvPath;
+        _lastReportPath = string.Empty;
+        ReportPathText.Text = "Report: not generated";
         FolderPathText.Text = run.ImageFolder;
         GroundTruthPathText.Text = string.IsNullOrWhiteSpace(run.GroundTruthCsvPath)
             ? "No CSV selected"
@@ -437,6 +445,9 @@ public partial class AIModelTestView : UserControl
         TnText.Text = metrics.TrueNegative.ToString(CultureInfo.InvariantCulture);
         FpText.Text = metrics.FalsePositive.ToString(CultureInfo.InvariantCulture);
         FnText.Text = metrics.FalseNegative.ToString(CultureInfo.InvariantCulture);
+        OkCountText.Text = metrics.OkCount.ToString(CultureInfo.InvariantCulture);
+        NgCountText.Text = metrics.NgCount.ToString(CultureInfo.InvariantCulture);
+        ReviewCountText.Text = metrics.ReviewCount.ToString(CultureInfo.InvariantCulture);
         FalseCallText.Text = metrics.FalseCall.ToString(CultureInfo.InvariantCulture);
         PossibleEscapeText.Text = metrics.PossibleEscape.ToString(CultureInfo.InvariantCulture);
         VerifiedNgText.Text = metrics.VerifiedNg.ToString(CultureInfo.InvariantCulture);
@@ -446,6 +457,7 @@ public partial class AIModelTestView : UserControl
     private string BuildMarkdownReport(BatchMetrics metrics)
     {
         var failed = _rows.Where(r => r.PassFail == "FAIL").ToArray();
+        var configuration = InspectionModelConfigurationService.Load();
         var generatedAt = _currentRunCreatedAtUtc is { } runTime
             ? (runTime.Kind == DateTimeKind.Utc ? runTime.ToLocalTime() : runTime)
             : DateTime.Now;
@@ -455,10 +467,17 @@ public partial class AIModelTestView : UserControl
         sb.AppendLine();
         sb.AppendLine($"- Run ID: {_currentRunId}");
         sb.AppendLine($"- Date/time: {generatedAt:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"- Operator: {EscapeMarkdown(WorkflowState.Instance.OperatorWithRole)}");
+        sb.AppendLine($"- Board model: {EscapeMarkdown(SummarizeDistinct(_rows.Select(r => r.BoardModel)))}");
+        sb.AppendLine($"- Lot ID: {EscapeMarkdown(SummarizeDistinct(_rows.Select(r => r.LotId)))}");
         sb.AppendLine($"- Model/engine name: {EscapeMarkdown(GetEngineNamePart())}");
         sb.AppendLine($"- Model version: {EscapeMarkdown(GetEngineVersionPart())}");
+        sb.AppendLine($"- Confidence threshold: {configuration.ConfidenceThreshold.ToString("P0", CultureInfo.InvariantCulture)}");
         sb.AppendLine($"- Dataset folder: {EscapeMarkdown(_selectedFolder ?? string.Empty)}");
+        sb.AppendLine($"- Ground truth file: {EscapeMarkdown(_groundTruthCsvPath ?? "Not selected")}");
         sb.AppendLine($"- Total images: {_rows.Count}");
+        sb.AppendLine($"- Passed count: {_rows.Count(r => r.PassFail == "PASS")}");
+        sb.AppendLine($"- Failed count: {failed.Length}");
         sb.AppendLine($"- Accuracy: {FormatPercent(metrics.Accuracy)}");
         sb.AppendLine($"- Precision: {FormatPercent(metrics.Precision)}");
         sb.AppendLine($"- Recall: {FormatPercent(metrics.Recall)}");
@@ -473,9 +492,9 @@ public partial class AIModelTestView : UserControl
         sb.AppendLine();
         sb.AppendLine("## Review Categories");
         sb.AppendLine();
-        sb.AppendLine("| False Call | Possible Escape | Verified NG | Unknown / Unlabeled |");
-        sb.AppendLine("|---:|---:|---:|---:|");
-        sb.AppendLine($"| {metrics.FalseCall} | {metrics.PossibleEscape} | {metrics.VerifiedNg} | {metrics.Unknown} |");
+        sb.AppendLine("| OK | NG | REVIEW | False Call | Possible Escape | Unknown / Unlabeled |");
+        sb.AppendLine("|---:|---:|---:|---:|---:|---:|");
+        sb.AppendLine($"| {metrics.OkCount} | {metrics.NgCount} | {metrics.ReviewCount} | {metrics.FalseCall} | {metrics.PossibleEscape} | {metrics.Unknown} |");
         sb.AppendLine();
         sb.AppendLine("## Failed Samples");
         sb.AppendLine();
@@ -485,11 +504,11 @@ public partial class AIModelTestView : UserControl
         }
         else
         {
-            sb.AppendLine("| Image | Ground Truth | Engine Result | Defect Type | Side | RefDes | Lot ID | Board Model |");
-            sb.AppendLine("|---|---|---|---|---|---|---|---|");
+            sb.AppendLine("| Image | Ground Truth | Engine Result | Pass/Fail | Defect Type | Side | RefDes | Lot ID | Board Model | Notes |");
+            sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|");
             foreach (var row in failed)
             {
-                sb.AppendLine($"| {EscapeMarkdown(row.Image)} | {EscapeMarkdown(row.GroundTruth)} | {EscapeMarkdown(row.EngineResult)} | {EscapeMarkdown(row.DefectType)} | {EscapeMarkdown(row.Side)} | {EscapeMarkdown(row.RefDes)} | {EscapeMarkdown(row.LotId)} | {EscapeMarkdown(row.BoardModel)} |");
+                sb.AppendLine($"| {EscapeMarkdown(row.Image)} | {EscapeMarkdown(row.GroundTruth)} | {EscapeMarkdown(row.EngineResult)} | {EscapeMarkdown(row.PassFail)} | {EscapeMarkdown(row.DefectType)} | {EscapeMarkdown(row.Side)} | {EscapeMarkdown(row.RefDes)} | {EscapeMarkdown(row.LotId)} | {EscapeMarkdown(row.BoardModel)} | {EscapeMarkdown(row.Notes)} |");
             }
         }
 
@@ -499,12 +518,14 @@ public partial class AIModelTestView : UserControl
     private string BuildHtmlReport(BatchMetrics metrics)
     {
         var failedRows = _rows.Where(r => r.PassFail == "FAIL")
-            .Select(row => $"<tr><td>{EscapeHtml(row.Image)}</td><td>{EscapeHtml(row.GroundTruth)}</td><td>{EscapeHtml(row.EngineResult)}</td><td>{EscapeHtml(row.DefectType)}</td><td>{EscapeHtml(row.Side)}</td><td>{EscapeHtml(row.RefDes)}</td><td>{EscapeHtml(row.LotId)}</td><td>{EscapeHtml(row.BoardModel)}</td></tr>");
+            .Select(row => $"<tr class=\"failed\"><td>{EscapeHtml(row.Image)}</td><td>{EscapeHtml(row.GroundTruth)}</td><td>{EscapeHtml(row.EngineResult)}</td><td>{EscapeHtml(row.PassFail)}</td><td>{EscapeHtml(row.DefectType)}</td><td>{EscapeHtml(row.Side)}</td><td>{EscapeHtml(row.RefDes)}</td><td>{EscapeHtml(row.LotId)}</td><td>{EscapeHtml(row.BoardModel)}</td><td>{EscapeHtml(row.Notes)}</td></tr>");
 
         var failedTableRows = string.Join(Environment.NewLine, failedRows);
         if (string.IsNullOrWhiteSpace(failedTableRows))
-            failedTableRows = "<tr><td colspan=\"8\">No failed samples.</td></tr>";
+            failedTableRows = "<tr><td colspan=\"10\">No failed samples.</td></tr>";
 
+        var failedCount = _rows.Count(r => r.PassFail == "FAIL");
+        var configuration = InspectionModelConfigurationService.Load();
         var runDateTime = _currentRunCreatedAtUtc is { } runTime
             ? (runTime.Kind == DateTimeKind.Utc ? runTime.ToLocalTime() : runTime)
             : DateTime.Now;
@@ -521,6 +542,7 @@ public partial class AIModelTestView : UserControl
             th, td { border: 1px solid #b8c1c8; padding: 7px 9px; text-align: left; }
             th { background: #edf2f5; }
             .metrics td:first-child { font-weight: 700; width: 240px; }
+            .failed td { background: #fff0f1; }
           </style>
         </head>
         <body>
@@ -528,10 +550,17 @@ public partial class AIModelTestView : UserControl
           <table class="metrics">
             <tr><td>Run ID</td><td>{{_currentRunId}}</td></tr>
             <tr><td>Date/time</td><td>{{runDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}}</td></tr>
+            <tr><td>Operator</td><td>{{EscapeHtml(WorkflowState.Instance.OperatorWithRole)}}</td></tr>
+            <tr><td>Board model</td><td>{{EscapeHtml(SummarizeDistinct(_rows.Select(r => r.BoardModel)))}}</td></tr>
+            <tr><td>Lot ID</td><td>{{EscapeHtml(SummarizeDistinct(_rows.Select(r => r.LotId)))}}</td></tr>
             <tr><td>Model/engine name</td><td>{{EscapeHtml(GetEngineNamePart())}}</td></tr>
             <tr><td>Model version</td><td>{{EscapeHtml(GetEngineVersionPart())}}</td></tr>
+            <tr><td>Confidence threshold</td><td>{{configuration.ConfidenceThreshold.ToString("P0", CultureInfo.InvariantCulture)}}</td></tr>
             <tr><td>Dataset folder</td><td>{{EscapeHtml(_selectedFolder ?? string.Empty)}}</td></tr>
+            <tr><td>Ground truth file</td><td>{{EscapeHtml(_groundTruthCsvPath ?? "Not selected")}}</td></tr>
             <tr><td>Total images</td><td>{{_rows.Count}}</td></tr>
+            <tr><td>Passed count</td><td>{{_rows.Count(r => r.PassFail == "PASS")}}</td></tr>
+            <tr><td>Failed count</td><td>{{failedCount}}</td></tr>
             <tr><td>Accuracy</td><td>{{FormatPercent(metrics.Accuracy)}}</td></tr>
             <tr><td>Precision</td><td>{{FormatPercent(metrics.Precision)}}</td></tr>
             <tr><td>Recall</td><td>{{FormatPercent(metrics.Recall)}}</td></tr>
@@ -541,9 +570,9 @@ public partial class AIModelTestView : UserControl
           <h2>Confusion Matrix</h2>
           <table><tr><th>TP</th><th>TN</th><th>FP</th><th>FN</th></tr><tr><td>{{metrics.TruePositive}}</td><td>{{metrics.TrueNegative}}</td><td>{{metrics.FalsePositive}}</td><td>{{metrics.FalseNegative}}</td></tr></table>
           <h2>Review Categories</h2>
-          <table><tr><th>False Call</th><th>Possible Escape</th><th>Verified NG</th><th>Unknown / Unlabeled</th></tr><tr><td>{{metrics.FalseCall}}</td><td>{{metrics.PossibleEscape}}</td><td>{{metrics.VerifiedNg}}</td><td>{{metrics.Unknown}}</td></tr></table>
+          <table><tr><th>OK</th><th>NG</th><th>REVIEW</th><th>False Call</th><th>Possible Escape</th><th>Unknown / Unlabeled</th></tr><tr><td>{{metrics.OkCount}}</td><td>{{metrics.NgCount}}</td><td>{{metrics.ReviewCount}}</td><td>{{metrics.FalseCall}}</td><td>{{metrics.PossibleEscape}}</td><td>{{metrics.Unknown}}</td></tr></table>
           <h2>Failed Samples</h2>
-          <table><tr><th>Image</th><th>Ground Truth</th><th>Engine Result</th><th>Defect Type</th><th>Side</th><th>RefDes</th><th>Lot ID</th><th>Board Model</th></tr>{{failedTableRows}}</table>
+          <table><tr><th>Image</th><th>Ground Truth</th><th>Engine Result</th><th>Pass/Fail</th><th>Defect Type</th><th>Side</th><th>RefDes</th><th>Lot ID</th><th>Board Model</th><th>Notes</th></tr>{{failedTableRows}}</table>
         </body>
         </html>
         """;
@@ -556,6 +585,18 @@ public partial class AIModelTestView : UserControl
     {
         var parts = _currentEngineDisplay.Split(" / ", StringSplitOptions.None);
         return parts.Length > 1 ? parts[1] : "UNKNOWN";
+    }
+
+    private static string SummarizeDistinct(IEnumerable<string> values)
+    {
+        var distinct = values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .ToArray();
+
+        return distinct.Length == 0 ? "Not provided" : string.Join(", ", distinct);
     }
 
     private void PreviewRow(BatchTestRow row)
@@ -715,7 +756,7 @@ public partial class AIModelTestView : UserControl
         string? Message)
     {
         public static BatchRunOutcome Empty(string message)
-            => new(Array.Empty<BatchTestRow>(), new BatchMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), false, string.Empty, 0, Array.Empty<string>(), message);
+            => new(Array.Empty<BatchTestRow>(), new BatchMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), false, string.Empty, 0, Array.Empty<string>(), message);
     }
 
 }

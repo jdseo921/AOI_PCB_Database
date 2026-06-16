@@ -596,6 +596,7 @@ public partial class ReportsView : UserControl
         sb.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine($"Validation run: {(run is null ? "Not available" : run.Id.ToString(CultureInfo.InvariantCulture))}");
         sb.AppendLine($"Engine: {run?.EngineName ?? "Not available"}");
+        sb.AppendLine($"ModelVersion: {run?.ModelVersion ?? "Not available"}");
         sb.AppendLine($"Dataset folder: {run?.ImageFolder ?? "Not available"}");
         sb.AppendLine($"Ground-truth CSV: {run?.GroundTruthCsvPath ?? "Not available"}");
         sb.AppendLine($"Total validation rows: {rows.Count}");

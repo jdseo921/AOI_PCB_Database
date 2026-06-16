@@ -52,6 +52,8 @@ public partial class SettingsView : UserControl
         var newConfig = BuildConfigurationFromUi();
         var modelConfigChanged =
             !string.Equals(existingConfig.ModelFilePath, newConfig.ModelFilePath, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingConfig.ModelVersion, newConfig.ModelVersion, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingConfig.LabelMapPath, newConfig.LabelMapPath, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingConfig.SelectedEngineKey, newConfig.SelectedEngineKey, StringComparison.OrdinalIgnoreCase);
         var thresholdChanged =
             ComboToPriority(DetectionPriorityCombo.SelectedIndex) != state.DetectionPriority ||
@@ -88,6 +90,8 @@ public partial class SettingsView : UserControl
         DetectionPriorityCombo.SelectedIndex = 0;
         InspectionEngineCombo.SelectedIndex = 0;
         ModelPathText.Text = string.Empty;
+        ModelVersionText.Text = "UNCONFIGURED";
+        LabelMapPathText.Text = string.Empty;
         ConfidenceThresholdText.Text = "0.65";
         InspectionModelConfigurationService.Save(new InspectionModelConfiguration());
 
@@ -167,7 +171,27 @@ public partial class SettingsView : UserControl
             return;
 
         ModelPathText.Text = dialog.FileName;
+        if (string.IsNullOrWhiteSpace(ModelVersionText.Text) || ModelVersionText.Text == "UNCONFIGURED")
+            ModelVersionText.Text = Path.GetFileNameWithoutExtension(dialog.FileName);
         InspectionEngineCombo.SelectedIndex = 1;
+        RefreshInspectionConfigurationUi(BuildConfigurationFromUi());
+    }
+
+    private void OnBrowseLabelMapClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Changing label map path"))
+            return;
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select inspection label map",
+            Filter = "Label map|*.json;*.txt;*.csv|All files|*.*",
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        LabelMapPathText.Text = dialog.FileName;
         RefreshInspectionConfigurationUi(BuildConfigurationFromUi());
     }
 
@@ -216,7 +240,10 @@ public partial class SettingsView : UserControl
         DetectionPriorityCombo.IsEnabled = canChangeThresholds;
         InspectionEngineCombo.IsEnabled = canManageSettings;
         ModelPathText.IsEnabled = canManageSettings;
+        ModelVersionText.IsEnabled = canManageSettings;
+        LabelMapPathText.IsEnabled = canManageSettings;
         BrowseModelBtn.IsEnabled = canManageSettings;
+        BrowseLabelMapBtn.IsEnabled = canManageSettings;
         ConfidenceThresholdText.IsEnabled = canChangeThresholds;
     }
 
@@ -227,6 +254,8 @@ public partial class SettingsView : UserControl
     {
         InspectionEngineCombo.SelectedIndex = configuration.IsOnnxSelected ? 1 : 0;
         ModelPathText.Text = configuration.ModelFilePath;
+        ModelVersionText.Text = configuration.ModelVersion;
+        LabelMapPathText.Text = configuration.LabelMapPath;
         ConfidenceThresholdText.Text = configuration.ConfidenceThreshold.ToString("0.###", CultureInfo.InvariantCulture);
 
         var status = GetStatus(configuration);
@@ -259,9 +288,16 @@ public partial class SettingsView : UserControl
     private InspectionModelConfiguration BuildConfigurationFromUi()
     {
         var modelPath = ModelPathText.Text.Trim();
-        var version = string.IsNullOrWhiteSpace(modelPath)
+        var version = string.IsNullOrWhiteSpace(ModelVersionText.Text)
+            ? string.Empty
+            : ModelVersionText.Text.Trim();
+
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            version = string.IsNullOrWhiteSpace(modelPath)
             ? "UNCONFIGURED"
             : Path.GetFileNameWithoutExtension(modelPath);
+        }
 
         return new InspectionModelConfiguration
         {
@@ -270,6 +306,7 @@ public partial class SettingsView : UserControl
                 : InspectionEngineFactory.DefaultEngineKey,
             ModelFilePath = modelPath,
             ModelVersion = version,
+            LabelMapPath = LabelMapPathText.Text.Trim(),
             ConfidenceThreshold = double.TryParse(
                 ConfidenceThresholdText.Text,
                 NumberStyles.Float,

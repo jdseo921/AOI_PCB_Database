@@ -63,6 +63,7 @@ public record BatchTestRunRecord(
     string ImageFolder,
     string? GroundTruthCsvPath,
     string EngineName,
+    string ModelVersion,
     DateTime CreatedAtUtc,
     double Accuracy,
     double Precision,
@@ -78,6 +79,8 @@ public record BatchTestResultRecord(
     string ImageName,
     string GroundTruth,
     string EngineResult,
+    string InspectionEngine,
+    string ModelVersion,
     double Score,
     string PassFail,
     string DefectType,
@@ -89,6 +92,7 @@ public record BatchTestResultRecord(
     string RefDes,
     string LotId,
     string BoardModel,
+    string Notes,
     DateTime CreatedAtUtc);
 
 public sealed class LogFilter

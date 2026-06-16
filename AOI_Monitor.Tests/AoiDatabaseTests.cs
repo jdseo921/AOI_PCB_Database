@@ -152,6 +152,9 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal(1, metrics.FalsePositive);
         Assert.Equal(1, metrics.FalseNegative);
         Assert.Equal(1, metrics.Unknown);
+        Assert.Equal(2, metrics.OkCount);
+        Assert.Equal(3, metrics.NgCount);
+        Assert.Equal(0, metrics.ReviewCount);
     }
 
     [Fact]
@@ -168,8 +171,8 @@ public sealed class AoiDatabaseTests : IDisposable
             csv,
             string.Join(
                 Environment.NewLine,
-                "image,ground_truth,golden_image,defect_type,side,refdes,lot_id,board_model",
-                "\"board-1.png\",NG,\"golden-1.png\",\"Solder, Bridge\",top,U10,LOT-7,TBOX"),
+                "image,ground_truth,golden_image,defect_type,side,refdes,lot_id,board_model,notes",
+                "\"board-1.png\",NG,\"golden-1.png\",\"Solder, Bridge\",top,U10,LOT-7,TBOX,\"customer sample\""),
             Encoding.UTF8);
 
         var manifest = BatchValidationService.LoadValidationManifest(csv, imageFolder);
@@ -182,6 +185,9 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal("Solder, Bridge", entry.DefectType);
         Assert.Equal("top", entry.Side);
         Assert.Equal("U10", entry.RefDes);
+        Assert.Equal("LOT-7", entry.LotId);
+        Assert.Equal("TBOX", entry.BoardModel);
+        Assert.Equal("customer sample", entry.Notes);
         Assert.Equal(samplePath, entry.ImagePath);
         Assert.Equal(goldenPath, entry.GoldenPath);
     }
@@ -259,6 +265,7 @@ public sealed class AoiDatabaseTests : IDisposable
             @"C:\validation",
             @"C:\validation\ground_truth.csv",
             "Unit Test Engine",
+            "TEST-1",
             metrics.Accuracy,
             metrics.Precision,
             metrics.Recall,
@@ -272,8 +279,12 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal(2, run.TotalImages);
         Assert.Equal(1, run.FailedCount);
         Assert.Equal(metrics.Accuracy, run.Accuracy, precision: 3);
+        Assert.Equal("TEST-1", run.ModelVersion);
         Assert.Equal(2, persistedRows.Count);
         Assert.Equal("FAIL", persistedRows[1].PassFail);
+        Assert.Equal("Unit Test Engine", persistedRows[0].InspectionEngine);
+        Assert.Equal("TEST-1", persistedRows[0].ModelVersion);
+        Assert.Equal("Synthetic note", persistedRows[0].Notes);
     }
 
     private IReadOnlySet<string> ReadTableNames()
@@ -306,6 +317,8 @@ public sealed class AoiDatabaseTests : IDisposable
             ImagePath = Path.Combine(@"C:\validation", imageName),
             GroundTruth = groundTruth,
             EngineResult = engineResult,
+            InspectionEngine = "Unit Test Engine",
+            ModelVersion = "TEST-1",
             Score = engineResult == "NG" ? 80 : 5,
             PassFail = passFail,
             DefectType = "Synthetic",
@@ -313,6 +326,7 @@ public sealed class AoiDatabaseTests : IDisposable
             RefDes = "U1",
             LotId = "LOT",
             BoardModel = "TBOX",
+            Notes = "Synthetic note",
             RoiX = 0.1,
             RoiY = 0.2,
             RoiWidth = 0.3,

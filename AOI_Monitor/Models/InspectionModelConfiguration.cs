@@ -10,7 +10,7 @@ public enum InspectionEngineStatus
     MlRuntimeError,
 }
 
-public sealed class InspectionModelConfiguration
+public class InspectionEngineSettings
 {
     public string SelectedEngineKey { get; set; } = "pixel-difference";
     public string ModelFilePath { get; set; } = string.Empty;
@@ -37,4 +37,8 @@ public sealed class InspectionModelConfiguration
 
     public string EffectiveModelVersion =>
         string.IsNullOrWhiteSpace(ModelVersion) ? Path.GetFileNameWithoutExtension(ModelFilePath) : ModelVersion.Trim();
+}
+
+public sealed class InspectionModelConfiguration : InspectionEngineSettings
+{
 }

@@ -115,15 +115,20 @@
           </StackPanel>
         </Border>
       </UniformGrid>
-      <UniformGrid Columns="8" Margin="0,6,0,0">
+      <UniformGrid Columns="7" Margin="0,6,0,0">
         <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TP" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="TpText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
         <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TN" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="TnText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
         <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FP" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="FpText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
         <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FN" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="FnText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="OK" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="OkCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="NG" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="NgCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="REVIEW" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="ReviewCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+      </UniformGrid>
+      <UniformGrid Columns="4" Margin="0,6,0,0">
         <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="False Call" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="FalseCallText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
         <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Possible Escape" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="PossibleEscapeText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
         <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Verified NG" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="VerifiedNgText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Unknown" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="UnknownText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Unknown / Unlabeled" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="UnknownText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
       </UniformGrid>
     </StackPanel>
 
@@ -156,6 +161,7 @@
             <DataGridTextColumn Header="RefDes" Binding="{Binding RefDes}" Width="90"/>
             <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100"/>
             <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="110"/>
+            <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="160"/>
           </DataGrid.Columns>
         </DataGrid>
       </Grid>
@@ -163,7 +169,10 @@
 
     <Border Grid.Row="6" Style="{StaticResource Panel}">
       <DockPanel Margin="8">
-        <TextBlock x:Name="StatusText" Text="Select a folder to run Stage 1 validation." Foreground="#9AA6AF" VerticalAlignment="Center"/>
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock x:Name="StatusText" Text="Select a folder to run Stage 1 validation." Foreground="#9AA6AF"/>
+          <TextBlock x:Name="ReportPathText" Text="Report: not generated" Foreground="#7F8C95" FontSize="11" TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
           <ProgressBar x:Name="WorkProgressBar" Width="140" Height="12" Minimum="0" Maximum="100" Value="0" Margin="0,0,8,0" VerticalAlignment="Center"/>
           <Button x:Name="CancelWorkButton" Style="{StaticResource ActionBtn}" Content="Cancel" Margin="0,0,6,0" IsEnabled="False" Click="OnCancelWorkClick"/>

@@ -20,6 +20,8 @@ public static class BatchValidationService
             Image = Path.GetFileName(imagePath),
             GroundTruth = expected,
             EngineResult = analysis.Verdict,
+            InspectionEngine = analysis.InspectionEngine,
+            ModelVersion = analysis.ModelVersion,
             Score = analysis.DifferenceScore,
             PassFail = passFail,
             DefectType = string.IsNullOrWhiteSpace(manifest.DefectType)
@@ -29,6 +31,7 @@ public static class BatchValidationService
             RefDes = manifest.RefDes,
             LotId = manifest.LotId,
             BoardModel = manifest.BoardModel,
+            Notes = manifest.Notes,
             RoiX = roi.X,
             RoiY = roi.Y,
             RoiWidth = roi.Width,
@@ -36,7 +39,12 @@ public static class BatchValidationService
         };
     }
 
-    public static BatchTestRow ToErrorRow(string imagePath, GroundTruthEntry manifest, string message)
+    public static BatchTestRow ToErrorRow(
+        string imagePath,
+        GroundTruthEntry manifest,
+        string message,
+        string inspectionEngine = "Pixel Difference",
+        string modelVersion = "PIXEL_DIFF_0.1")
     {
         return new BatchTestRow
         {
@@ -44,6 +52,8 @@ public static class BatchValidationService
             Image = string.IsNullOrWhiteSpace(imagePath) ? "(missing)" : Path.GetFileName(imagePath),
             GroundTruth = string.IsNullOrWhiteSpace(manifest.Label) ? "UNKNOWN" : manifest.Label.Trim().ToUpperInvariant(),
             EngineResult = "REVIEW",
+            InspectionEngine = inspectionEngine,
+            ModelVersion = modelVersion,
             Score = 0,
             PassFail = "N/A",
             DefectType = message,
@@ -51,6 +61,7 @@ public static class BatchValidationService
             RefDes = manifest.RefDes,
             LotId = manifest.LotId,
             BoardModel = manifest.BoardModel,
+            Notes = manifest.Notes,
         };
     }
 
@@ -68,7 +79,7 @@ public static class BatchValidationService
     {
         var known = rows.Where(r => NormalizeBinaryLabel(r.GroundTruth) != "UNKNOWN").ToArray();
         if (known.Length == 0)
-            return new BatchMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, rows.Count);
+            return new BatchMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, rows.Count, CountResult(rows, "OK"), CountResult(rows, "NG"), CountResult(rows, "REVIEW"));
 
         var tp = known.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "NG" && NormalizeBinaryLabel(r.EngineResult) == "NG");
         var tn = known.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "OK" && NormalizeBinaryLabel(r.EngineResult) == "OK");
@@ -80,8 +91,11 @@ public static class BatchValidationService
         var recall = tp + fn == 0 ? 0 : tp / (double)(tp + fn);
         var falseCallRate = fp + tn == 0 ? 0 : fp / (double)(fp + tn);
         var unknown = rows.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "UNKNOWN");
-        return new BatchMetrics(accuracy, precision, recall, falseCallRate, tp, tn, fp, fn, fp, fn, tp, unknown);
+        return new BatchMetrics(accuracy, precision, recall, falseCallRate, tp, tn, fp, fn, fp, fn, tp, unknown, CountResult(rows, "OK"), CountResult(rows, "NG"), CountResult(rows, "REVIEW"));
     }
+
+    private static int CountResult(IEnumerable<BatchTestRow> rows, string result)
+        => rows.Count(r => string.Equals(r.EngineResult, result, StringComparison.OrdinalIgnoreCase));
 
     public static string NormalizeBinaryLabel(string label)
     {
@@ -137,6 +151,7 @@ public static class BatchValidationService
         var refDesIndex = FindHeader(headers, "refdes", "ref_des", "reference", "reference_designator");
         var lotIndex = FindHeader(headers, "lotid", "lot_id", "lot");
         var boardIndex = FindHeader(headers, "boardmodel", "board_model", "model", "board");
+        var notesIndex = FindHeader(headers, "notes", "note", "comment", "comments");
         var isFormalManifest = HasHeader(headers, "image")
             && HasHeader(headers, "ground_truth", "groundtruth")
             && HasHeader(headers, "golden_image", "goldenimage")
@@ -173,6 +188,7 @@ public static class BatchValidationService
                 Cell(cells, refDesIndex),
                 Cell(cells, lotIndex),
                 Cell(cells, boardIndex),
+                Cell(cells, notesIndex),
                 imagePath);
 
             if (!string.IsNullOrWhiteSpace(imageName))
@@ -188,13 +204,15 @@ public static class BatchValidationService
     public static string BuildResultsCsv(IEnumerable<BatchTestRow> rows)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Image,Ground Truth,AI/Engine Result,Score,Pass/Fail,Defect Type,Side,RefDes,LotId,BoardModel,Image Path,RoiX,RoiY,RoiWidth,RoiHeight");
+        sb.AppendLine("Image,Ground Truth,AI/Engine Result,Inspection Engine,Model Version,Score,Pass/Fail,Defect Type,Side,RefDes,LotId,BoardModel,Notes,Image Path,RoiX,RoiY,RoiWidth,RoiHeight");
         foreach (var row in rows)
         {
             sb.AppendLine(string.Join(",",
                 EscapeCsv(row.Image),
                 EscapeCsv(row.GroundTruth),
                 EscapeCsv(row.EngineResult),
+                EscapeCsv(row.InspectionEngine),
+                EscapeCsv(row.ModelVersion),
                 row.Score.ToString("F4", CultureInfo.InvariantCulture),
                 EscapeCsv(row.PassFail),
                 EscapeCsv(row.DefectType),
@@ -202,6 +220,7 @@ public static class BatchValidationService
                 EscapeCsv(row.RefDes),
                 EscapeCsv(row.LotId),
                 EscapeCsv(row.BoardModel),
+                EscapeCsv(row.Notes),
                 EscapeCsv(row.ImagePath),
                 row.RoiX.ToString("F4", CultureInfo.InvariantCulture),
                 row.RoiY.ToString("F4", CultureInfo.InvariantCulture),
@@ -300,7 +319,10 @@ public sealed record BatchMetrics(
     int FalseCall,
     int PossibleEscape,
     int VerifiedNg,
-    int Unknown);
+    int Unknown,
+    int OkCount,
+    int NgCount,
+    int ReviewCount);
 
 public sealed record ValidationManifest(
     IReadOnlyDictionary<string, GroundTruthEntry> ByImageName,
@@ -317,9 +339,10 @@ public sealed record GroundTruthEntry(
     string RefDes,
     string LotId,
     string BoardModel,
+    string Notes,
     string? ImagePath)
 {
-    public static GroundTruthEntry Unknown { get; } = new("UNKNOWN", null, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, null);
+    public static GroundTruthEntry Unknown { get; } = new("UNKNOWN", null, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, null);
 }
 
 public sealed class BatchTestRow
@@ -328,6 +351,8 @@ public sealed class BatchTestRow
     public string Image { get; set; } = string.Empty;
     public string GroundTruth { get; set; } = "UNKNOWN";
     public string EngineResult { get; set; } = "REVIEW";
+    public string InspectionEngine { get; set; } = "Pixel Difference";
+    public string ModelVersion { get; set; } = "PIXEL_DIFF_0.1";
     public double Score { get; set; }
     public string ScoreDisplay => $"{Score:F1}%";
     public string PassFail { get; set; } = "N/A";
@@ -337,6 +362,7 @@ public sealed class BatchTestRow
     public string RefDes { get; set; } = string.Empty;
     public string LotId { get; set; } = string.Empty;
     public string BoardModel { get; set; } = string.Empty;
+    public string Notes { get; set; } = string.Empty;
     public double RoiX { get; set; }
     public double RoiY { get; set; }
     public double RoiWidth { get; set; }
@@ -351,6 +377,8 @@ public sealed class BatchTestRow
             Image,
             GroundTruth,
             EngineResult,
+            InspectionEngine,
+            ModelVersion,
             Score,
             PassFail,
             DefectType,
@@ -362,6 +390,7 @@ public sealed class BatchTestRow
             RefDes,
             LotId,
             BoardModel,
+            Notes,
             DateTime.UtcNow);
     }
 
@@ -373,6 +402,8 @@ public sealed class BatchTestRow
             Image = record.ImageName,
             GroundTruth = record.GroundTruth,
             EngineResult = record.EngineResult,
+            InspectionEngine = record.InspectionEngine,
+            ModelVersion = record.ModelVersion,
             Score = record.Score,
             PassFail = record.PassFail,
             DefectType = record.DefectType,
@@ -380,6 +411,7 @@ public sealed class BatchTestRow
             RefDes = record.RefDes,
             LotId = record.LotId,
             BoardModel = record.BoardModel,
+            Notes = record.Notes,
             RoiX = record.RoiX,
             RoiY = record.RoiY,
             RoiWidth = record.RoiWidth,

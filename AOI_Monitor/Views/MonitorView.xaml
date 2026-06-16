@@ -127,19 +127,25 @@
                 <RowDefinition Height="28"/>
                 <RowDefinition Height="28"/>
                 <RowDefinition Height="28"/>
-                <RowDefinition Height="40"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="68"/>
               </Grid.RowDefinitions>
-              <TextBlock Text="Board / Model" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-              <TextBlock Grid.Column="1" x:Name="BoardModelText" Text="TBOX-MAIN" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="1" Text="Lot ID" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="1" Grid.Column="1" x:Name="LotText" Text="POC-LOT" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="2" Text="Operator" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="2" Grid.Column="1" x:Name="OperatorText" Text="Engineer01" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="3" Text="Engine" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="3" Grid.Column="1" x:Name="EngineText" Text="Pixel Difference" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-              <TextBlock Grid.Row="4" Text="Status" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-              <Border Grid.Row="4" Grid.Column="1" x:Name="ResultStatusBorder" Style="{StaticResource ChipAmber}" HorizontalAlignment="Left" VerticalAlignment="Center">
-                <TextBlock x:Name="ResultStatusText" Text="WARNING" FontWeight="Bold" FontSize="11"/>
+              <TextBlock Text="Station" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="1" x:Name="StationText" Text="AOI-LIB-01" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="1" Text="Board / Model" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="1" Grid.Column="1" x:Name="BoardModelText" Text="TBOX-MAIN" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="2" Text="Lot ID" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="2" Grid.Column="1" x:Name="LotText" Text="POC-LOT" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="3" Text="Operator" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="3" Grid.Column="1" x:Name="OperatorText" Text="Engineer01" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="4" Text="Engine" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="4" Grid.Column="1" x:Name="EngineText" Text="Pixel Difference" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+              <TextBlock Grid.Row="5" Text="Model Version" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="5" Grid.Column="1" x:Name="ModelVersionText" Text="PIXEL_DIFF_0.1" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+              <TextBlock Grid.Row="6" Text="Result" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <Border Grid.Row="6" Grid.Column="1" x:Name="ResultStatusBorder" Background="#372914" BorderBrush="#8C6C35" BorderThickness="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="10,6">
+                <TextBlock x:Name="ResultStatusText" Text="REVIEW" FontWeight="ExtraBold" FontSize="28" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Border>
             </Grid>
           </Grid>

@@ -18,12 +18,15 @@ public partial class MonitorView : UserControl
     private readonly ObservableCollection<DefectRow> _defects = new();
     private readonly ObservableCollection<AlarmRow> _alarms = new();
     private readonly Dictionary<CameraViewType, string> _viewFolders = new();
+    private readonly List<ImportedImage> _importedQueue = new();
 
     private ICameraSource _cameraSource = CameraSourceFactory.ActiveSource;
     private bool _isRunning;
     private bool _currentResultSaved;
+    private int _importedQueueIndex = -1;
     private string? _currentImagePath;
     private BitmapSource? _currentBitmap;
+    private ImportedImage? _currentImportedImage;
     private AnalysisResult? _currentAnalysis;
 
     public MonitorView()
@@ -34,6 +37,7 @@ public partial class MonitorView : UserControl
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged += OnEngineConfigurationChanged;
         Unloaded += OnUnloaded;
+        ReloadImportedQueue();
         RefreshHeader();
         LogEvent("READY", "Main Inspection ready. Use folder simulation or Image Library imported images.");
     }
@@ -158,19 +162,21 @@ public partial class MonitorView : UserControl
     {
         try
         {
-            var nextImage = GetNextImagePath();
-            if (string.IsNullOrWhiteSpace(nextImage) || !File.Exists(nextImage))
+            var nextBoard = GetNextBoard();
+            if (nextBoard is null || string.IsNullOrWhiteSpace(nextBoard.ImagePath) || !File.Exists(nextBoard.ImagePath))
             {
                 LogEvent("ERROR", "No simulated board image is available. Select a folder or import an image first.");
                 MessageBox.Show("Select a simulated image folder or load an image from Image Library first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            _currentImagePath = nextImage;
+            _currentImagePath = nextBoard.ImagePath;
+            _currentImportedImage = nextBoard.ImportedImage;
             _currentResultSaved = false;
-            WorkflowState.Instance.SetSampleImage(nextImage);
-            LoadImage(nextImage);
-            RunInspection(nextImage);
+            WorkflowState.Instance.SetSampleImage(nextBoard.ImagePath);
+            LoadImage(nextBoard.ImagePath);
+            RefreshHeader();
+            RunInspection(nextBoard.ImagePath);
         }
         catch (Exception ex)
         {
@@ -179,7 +185,7 @@ public partial class MonitorView : UserControl
         }
     }
 
-    private string? GetNextImagePath()
+    private BoardImageContext? GetNextBoard()
     {
         _cameraSource.SelectedView = SelectedCameraView();
         if (!_cameraSource.IsAcquiring)
@@ -189,10 +195,49 @@ public partial class MonitorView : UserControl
         if (frame is not null)
         {
             LogEvent("FRAME", $"{frame.SourceName} supplied {frame.ViewType} frame: {Path.GetFileName(frame.ImagePath)}.");
-            return frame.ImagePath;
+            return new BoardImageContext(frame.ImagePath, null);
         }
 
-        return WorkflowState.Instance.SampleImagePath;
+        var imported = GetNextImportedImage();
+        if (imported is not null)
+        {
+            LogEvent("QUEUE", $"Loaded imported image queue item: {imported.FileName}.");
+            return new BoardImageContext(imported.VaultPath, imported);
+        }
+
+        return string.IsNullOrWhiteSpace(WorkflowState.Instance.SampleImagePath)
+            ? null
+            : new BoardImageContext(WorkflowState.Instance.SampleImagePath, null);
+    }
+
+    private ImportedImage? GetNextImportedImage()
+    {
+        ReloadImportedQueue();
+        if (_importedQueue.Count == 0)
+            return null;
+
+        var selectedView = SelectedView();
+        var candidates = _importedQueue
+            .Where(image =>
+                !string.Equals(image.ViewType, "golden", StringComparison.OrdinalIgnoreCase) &&
+                (string.Equals(image.ViewType, "sample", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(image.ViewType, selectedView, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+        if (candidates.Length == 0)
+            candidates = _importedQueue.Where(image => !string.Equals(image.ViewType, "golden", StringComparison.OrdinalIgnoreCase)).ToArray();
+
+        if (candidates.Length == 0)
+            return null;
+
+        _importedQueueIndex = (_importedQueueIndex + 1) % candidates.Length;
+        return candidates[_importedQueueIndex];
+    }
+
+    private void ReloadImportedQueue()
+    {
+        _importedQueue.Clear();
+        _importedQueue.AddRange(AoiDatabase.GetImportedImages().Where(image => File.Exists(image.VaultPath)));
     }
 
     private void LoadImage(string imagePath)
@@ -218,8 +263,8 @@ public partial class MonitorView : UserControl
         RefreshHeader();
 
         var analysis = engine.Analyze(imagePath, state.GoldenImagePath, state.DetectionPriority);
-        analysis.BoardProgram = state.BoardProgram;
-        analysis.OperatorId = state.OperatorId;
+        analysis.BoardProgram = _currentImportedImage?.BoardModel ?? state.BoardProgram;
+        analysis.OperatorId = state.OperatorWithRole;
 
         var selectedView = SelectedView();
         foreach (var defect in analysis.Defects)
@@ -264,9 +309,12 @@ public partial class MonitorView : UserControl
         var state = WorkflowState.Instance;
         var engine = InspectionEngineFactory.Create();
         _cameraSource = CameraSourceFactory.ActiveSource;
-        BoardModelText.Text = state.BoardProgram;
-        OperatorText.Text = state.OperatorId;
-        EngineText.Text = $"{engine.Name} / {engine.Version} | Camera: {CameraStatusText()}";
+        StationText.Text = state.StationId;
+        BoardModelText.Text = _currentImportedImage?.BoardModel ?? state.BoardProgram;
+        LotText.Text = _currentImportedImage?.LotId ?? "POC-LOT";
+        OperatorText.Text = state.OperatorWithRole;
+        EngineText.Text = $"{engine.Name} | Camera: {CameraStatusText()}";
+        ModelVersionText.Text = engine.Version;
     }
 
     private void RefreshDefectRows()
@@ -311,6 +359,21 @@ public partial class MonitorView : UserControl
             Canvas.SetLeft(rect, imageArea.X + box.X * imageArea.Width);
             Canvas.SetTop(rect, imageArea.Y + box.Y * imageArea.Height);
             DefectOverlayCanvas.Children.Add(rect);
+
+            var label = $"{defect.DefectType} {defect.Confidence:P0}";
+            var text = new TextBlock
+            {
+                Text = label,
+                Background = new SolidColorBrush(Color.FromArgb(210, 5, 6, 7)),
+                Foreground = new SolidColorBrush(ToVerdictColor(_currentAnalysis.Verdict)),
+                FontWeight = FontWeights.Bold,
+                FontSize = 18,
+                Padding = new Thickness(5, 2, 5, 2),
+            };
+
+            Canvas.SetLeft(text, imageArea.X + box.X * imageArea.Width);
+            Canvas.SetTop(text, Math.Max(0, imageArea.Y + box.Y * imageArea.Height - 30));
+            DefectOverlayCanvas.Children.Add(text);
         }
     }
 
@@ -320,17 +383,20 @@ public partial class MonitorView : UserControl
         if (normalized == "OK")
         {
             ResultStatusText.Text = "OK";
-            ResultStatusBorder.Style = (Style)Application.Current.FindResource("ChipGreen");
+            ResultStatusBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#14311D"));
+            ResultStatusBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#50F56E"));
         }
         else if (normalized == "NG")
         {
             ResultStatusText.Text = "NG";
-            ResultStatusBorder.Style = (Style)Application.Current.FindResource("ChipRed");
+            ResultStatusBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#35191B"));
+            ResultStatusBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F13B3F"));
         }
         else
         {
-            ResultStatusText.Text = "WARNING";
-            ResultStatusBorder.Style = (Style)Application.Current.FindResource("ChipAmber");
+            ResultStatusText.Text = normalized == "WARNING" ? "WARNING" : "REVIEW";
+            ResultStatusBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#372914"));
+            ResultStatusBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"));
         }
     }
 
@@ -385,4 +451,6 @@ public partial class MonitorView : UserControl
     }
 
     public sealed record AlarmRow(string Time, string Event, string Message);
+
+    private sealed record BoardImageContext(string ImagePath, ImportedImage? ImportedImage);
 }

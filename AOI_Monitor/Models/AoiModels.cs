@@ -136,7 +136,8 @@ public record ExportHistoryRecord(
     DateTime CreatedAtUtc,
     string ExportType,
     string FilePath,
-    string Status);
+    string Status,
+    string OperatorId);
 
 public record RecipeRevisionRecord(
     long Id,

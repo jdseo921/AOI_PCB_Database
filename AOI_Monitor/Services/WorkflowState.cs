@@ -14,8 +14,13 @@ public sealed class WorkflowState
     public string? GoldenImagePath { get; private set; }
     public AnalysisResult? LastAnalysis { get; private set; }
     public string StationId { get; } = "AOI-LIB-01";
-    public string OperatorId { get; set; } = "Engineer01";
-    public UserRole CurrentRole { get; private set; } = UserRole.Operator;
+    public CurrentUser CurrentUser { get; } = new();
+    public string OperatorId
+    {
+        get => CurrentUser.UserId;
+        set => CurrentUser.UserId = NormalizeUserId(value);
+    }
+    public UserRole CurrentRole => CurrentUser.Role;
     public string BoardProgram { get; } = "TBOX-MAIN";
     public string ModelVersion { get; } = "PIXEL_DIFF_0.1";
     public bool IsRecipeLocked { get; set; }
@@ -26,11 +31,22 @@ public sealed class WorkflowState
 
     public event Action? StateChanged;
 
-    private WorkflowState() { }
+    private WorkflowState()
+    {
+        AoiDatabase.AuditOperatorProvider = () => OperatorWithRole;
+    }
+
+    public void SetCurrentUser(string userId, UserRole role)
+    {
+        CurrentUser.UserId = NormalizeUserId(userId);
+        CurrentUser.Role = role;
+        AddEvent("LOGIN", $"Local user set to {OperatorWithRole}. MES authentication is Stage 4 planned.");
+        Notify();
+    }
 
     public void SetRole(UserRole role)
     {
-        CurrentRole = role;
+        CurrentUser.Role = role;
         AddEvent("ROLE", $"Local role changed to {role}.");
         Notify();
     }
@@ -184,5 +200,8 @@ public sealed class WorkflowState
 
     private void Notify() => StateChanged?.Invoke();
 
-    public string OperatorWithRole => $"{OperatorId} [{CurrentRole}]";
+    public string OperatorWithRole => CurrentUser.AuditId;
+
+    private static string NormalizeUserId(string? userId)
+        => string.IsNullOrWhiteSpace(userId) ? "UNKNOWN" : userId.Trim();
 }

@@ -4,7 +4,8 @@ public sealed class NullCameraSource : ICameraSource
 {
     public string Name => "No Camera Connected";
     public CameraViewType SelectedView { get; set; } = CameraViewType.Top;
-    public CameraConnectionStatus ConnectionStatus => CameraConnectionStatus.NotConnected;
+    public CameraSourceStatus ConnectionStatus => CameraSourceStatus.NotConnected;
+    public string StatusMessage => "No camera source is configured.";
     public bool IsAcquiring { get; private set; }
 
     public void StartAcquisition()

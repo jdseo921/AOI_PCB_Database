@@ -25,6 +25,8 @@ public partial class MonitorView : UserControl
     private bool _currentResultSaved;
     private int _importedQueueIndex = -1;
     private string? _currentImagePath;
+    private string _currentBoardModel = "TBOX-MAIN";
+    private string _currentLotId = "POC-LOT";
     private BitmapSource? _currentBitmap;
     private ImportedImage? _currentImportedImage;
     private AnalysisResult? _currentAnalysis;
@@ -172,6 +174,8 @@ public partial class MonitorView : UserControl
 
             _currentImagePath = nextBoard.ImagePath;
             _currentImportedImage = nextBoard.ImportedImage;
+            _currentBoardModel = nextBoard.BoardModel;
+            _currentLotId = nextBoard.LotId;
             _currentResultSaved = false;
             WorkflowState.Instance.SetSampleImage(nextBoard.ImagePath);
             LoadImage(nextBoard.ImagePath);
@@ -194,20 +198,20 @@ public partial class MonitorView : UserControl
         var frame = _cameraSource.GetNextFrame();
         if (frame is not null)
         {
-            LogEvent("FRAME", $"{frame.SourceName} supplied {frame.ViewType} frame: {Path.GetFileName(frame.ImagePath)}.");
-            return new BoardImageContext(frame.ImagePath, null);
+            LogEvent("FRAME", $"{frame.SourceName} supplied {frame.ViewType} frame {frame.FrameId}: {Path.GetFileName(frame.SourcePath)}.");
+            return new BoardImageContext(frame.SourcePath, null, frame.BoardModel, frame.LotId);
         }
 
         var imported = GetNextImportedImage();
         if (imported is not null)
         {
             LogEvent("QUEUE", $"Loaded imported image queue item: {imported.FileName}.");
-            return new BoardImageContext(imported.VaultPath, imported);
+            return new BoardImageContext(imported.VaultPath, imported, imported.BoardModel, imported.LotId);
         }
 
         return string.IsNullOrWhiteSpace(WorkflowState.Instance.SampleImagePath)
             ? null
-            : new BoardImageContext(WorkflowState.Instance.SampleImagePath, null);
+            : new BoardImageContext(WorkflowState.Instance.SampleImagePath, null, WorkflowState.Instance.BoardProgram, "POC-LOT");
     }
 
     private ImportedImage? GetNextImportedImage()
@@ -263,7 +267,7 @@ public partial class MonitorView : UserControl
         RefreshHeader();
 
         var analysis = engine.Analyze(imagePath, state.GoldenImagePath, state.DetectionPriority);
-        analysis.BoardProgram = _currentImportedImage?.BoardModel ?? state.BoardProgram;
+        analysis.BoardProgram = BoardModelText.Text;
         analysis.OperatorId = state.OperatorWithRole;
 
         var selectedView = SelectedView();
@@ -310,8 +314,8 @@ public partial class MonitorView : UserControl
         var engine = InspectionEngineFactory.Create();
         _cameraSource = CameraSourceFactory.ActiveSource;
         StationText.Text = state.StationId;
-        BoardModelText.Text = _currentImportedImage?.BoardModel ?? state.BoardProgram;
-        LotText.Text = _currentImportedImage?.LotId ?? "POC-LOT";
+        BoardModelText.Text = string.IsNullOrWhiteSpace(_currentBoardModel) ? state.BoardProgram : _currentBoardModel;
+        LotText.Text = string.IsNullOrWhiteSpace(_currentLotId) ? "POC-LOT" : _currentLotId;
         OperatorText.Text = state.OperatorWithRole;
         EngineText.Text = $"{engine.Name} | Camera: {CameraStatusText()}";
         ModelVersionText.Text = engine.Version;
@@ -423,8 +427,8 @@ public partial class MonitorView : UserControl
     private string CameraStatusText()
         => _cameraSource.ConnectionStatus switch
         {
-            CameraConnectionStatus.Simulated => "Simulated",
-            CameraConnectionStatus.Error => "Error",
+            CameraSourceStatus.Simulated => "Simulated",
+            CameraSourceStatus.Error => "Error",
             _ => "Not Connected",
         };
 
@@ -452,5 +456,5 @@ public partial class MonitorView : UserControl
 
     public sealed record AlarmRow(string Time, string Event, string Message);
 
-    private sealed record BoardImageContext(string ImagePath, ImportedImage? ImportedImage);
+    private sealed record BoardImageContext(string ImagePath, ImportedImage? ImportedImage, string BoardModel, string LotId);
 }

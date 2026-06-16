@@ -45,7 +45,7 @@ public partial class RecipeView : UserControl
     {
         var state = WorkflowState.Instance;
         BoardProgramText.Text = state.BoardProgram;
-        OperatorText.Text = state.OperatorId;
+        OperatorText.Text = state.OperatorWithRole;
         LockStatusText.Text = state.IsRecipeLocked ? "LOCKED" : "UNLOCKED";
         LockStatusText.Foreground = state.IsRecipeLocked ? Brushes.Orange : Brushes.LightGreen;
     }
@@ -341,7 +341,7 @@ public partial class RecipeView : UserControl
         var id = AoiDatabase.SaveRecipeRevision(
             doc.RecipeName,
             state.BoardProgram,
-            state.OperatorId,
+            state.OperatorWithRole,
             WorkflowState.ToDisplay(state.DetectionPriority),
             _backgroundImagePath,
             json);
@@ -350,7 +350,7 @@ public partial class RecipeView : UserControl
             roi.IsSaved = true;
 
         state.AddEvent("RECIPE", $"Recipe revision saved: {doc.RecipeName}, {doc.Rois.Count} ROI(s), rev id {id}.");
-        RevisionText.Text = $"Saved revision id {id} at {DateTime.Now:yyyy-MM-dd HH:mm:ss} by {state.OperatorId}.";
+        RevisionText.Text = $"Saved revision id {id} at {DateTime.Now:yyyy-MM-dd HH:mm:ss} by {state.OperatorWithRole}.";
         RecipeStatusText.Text = $"Recipe saved with {doc.Rois.Count} ROI(s).";
         RoiGrid.Items.Refresh();
         RenderRois();

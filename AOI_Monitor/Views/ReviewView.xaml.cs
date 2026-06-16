@@ -190,7 +190,7 @@ public partial class ReviewView : UserControl
             string.Join(",",
                 DateTime.UtcNow.ToString("O"),
                 EscapeCsv(state.StationId),
-                EscapeCsv(state.OperatorId),
+                EscapeCsv(state.OperatorWithRole),
                 EscapeCsv(Path.GetFileName(analysis.SamplePath)),
                 EscapeCsv(analysis.GoldenPath is null ? "none" : Path.GetFileName(analysis.GoldenPath)),
                 EscapeCsv(analysis.Verdict),

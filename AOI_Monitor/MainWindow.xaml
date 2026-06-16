@@ -93,15 +93,14 @@
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
               <Border BorderBrush="#2D343A" BorderThickness="1,0,0,0">
                 <StackPanel Orientation="Horizontal">
-                  <Border Width="182" BorderBrush="#2D343A" BorderThickness="0,0,1,0" Padding="10,0">
+                  <Border Width="220" BorderBrush="#2D343A" BorderThickness="0,0,1,0" Padding="10,0">
                     <Grid VerticalAlignment="Center">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="62"/>
                         <ColumnDefinition Width="*"/>
                       </Grid.ColumnDefinitions>
                       <TextBlock Text="Operator" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
-                      <TextBlock Grid.Column="1" Text="Engineer01" FontWeight="SemiBold" Foreground="#E7ECEF" FontSize="11.5"
-                                 TextTrimming="CharacterEllipsis" ToolTip="Engineer01" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                      <TextBox Grid.Column="1" x:Name="UserIdText" Text="Engineer01" MinHeight="24" FontSize="11.5" Margin="6,0,0,0"/>
                     </Grid>
                   </Border>
                   <Border Width="100" BorderBrush="#2D343A" BorderThickness="0,0,1,0" Padding="10,0">
@@ -128,15 +127,17 @@
                       </ComboBox>
                     </Grid>
                   </Border>
-                  <Border Width="212" Padding="10,0">
+                  <Border Width="254" Padding="10,0">
                     <Grid VerticalAlignment="Center">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="46"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="68"/>
                       </Grid.ColumnDefinitions>
                       <TextBlock Text="Mode" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
                       <TextBlock Grid.Column="1" Text="Local Review" FontWeight="SemiBold" Foreground="#E7ECEF" FontSize="11.5"
                                  TextTrimming="CharacterEllipsis" ToolTip="Local Review" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                      <Button Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Login" Margin="6,4,0,4" Click="OnLocalLoginClick"/>
                     </Grid>
                   </Border>
                 </StackPanel>

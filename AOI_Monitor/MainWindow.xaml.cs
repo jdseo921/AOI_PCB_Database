@@ -43,6 +43,7 @@ public partial class MainWindow : Window
         try
         {
             AoiDatabase.Initialize();
+            CameraSourceSettingsService.ApplyActiveSource();
             WorkflowState.Instance.AddEvent("STORAGE", $"SQLite ready: {AoiDatabase.DatabasePath}");
             UpdateReadinessPanel(databaseConnected: File.Exists(AoiDatabase.DatabasePath), vaultAvailable: Directory.Exists(AoiDatabase.ImageVaultPath));
         }
@@ -53,6 +54,7 @@ public partial class MainWindow : Window
         }
 
         _vm = (MainViewModel)DataContext;
+        UserIdText.Text = WorkflowState.Instance.OperatorId;
         RoleCombo.SelectedIndex = WorkflowState.Instance.CurrentRole switch
         {
             UserRole.Admin => 2,
@@ -245,10 +247,29 @@ public partial class MainWindow : Window
             _ => UserRole.Operator,
         };
 
-        WorkflowState.Instance.SetRole(role);
+        WorkflowState.Instance.SetCurrentUser(UserIdText.Text, role);
         _vm.RefreshRolePermissions(role);
         RefreshRoleUi();
-        MessageBox.Show($"Local role set to {role}.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show($"Local user set to {WorkflowState.Instance.OperatorWithRole}.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void OnLocalLoginClick(object sender, RoutedEventArgs e)
+    {
+        var role = RoleCombo.SelectedIndex switch
+        {
+            2 => UserRole.Admin,
+            1 => UserRole.Engineer,
+            _ => UserRole.Operator,
+        };
+
+        WorkflowState.Instance.SetCurrentUser(UserIdText.Text, role);
+        _vm.RefreshRolePermissions(role);
+        RefreshRoleUi();
+        MessageBox.Show(
+            $"Local user set to {WorkflowState.Instance.OperatorWithRole}.\nMES authentication is Stage 4 planned.",
+            "AOI Monitor",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void RefreshRoleUi()
@@ -353,7 +374,7 @@ public partial class MainWindow : Window
         RobotStatusText.Text = "Not Connected";
         RobotStatusText.Foreground = StatusBrush(false);
 
-        MesStatusText.Text = "Not Connected";
+        MesStatusText.Text = "Stage 4 Planned";
         MesStatusText.Foreground = StatusBrush(false);
     }
 
@@ -379,14 +400,14 @@ public partial class MainWindow : Window
         var status = CameraSourceFactory.ActiveSource.ConnectionStatus;
         CameraStatusText.Text = status switch
         {
-            CameraConnectionStatus.Simulated => "Simulated",
-            CameraConnectionStatus.Error => "Error",
+            CameraSourceStatus.Simulated => "Simulated",
+            CameraSourceStatus.Error => "Error",
             _ => "Not Connected",
         };
         CameraStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
         {
-            CameraConnectionStatus.Simulated => "#E1A334",
-            CameraConnectionStatus.Error => "#F27777",
+            CameraSourceStatus.Simulated => "#E1A334",
+            CameraSourceStatus.Error => "#F27777",
             _ => "#F27777",
         }));
     }

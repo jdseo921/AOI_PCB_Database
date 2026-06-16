@@ -4,7 +4,8 @@ public interface ICameraSource
 {
     string Name { get; }
     CameraViewType SelectedView { get; set; }
-    CameraConnectionStatus ConnectionStatus { get; }
+    CameraSourceStatus ConnectionStatus { get; }
+    string StatusMessage { get; }
     bool IsAcquiring { get; }
 
     void StartAcquisition();
@@ -27,6 +28,6 @@ public interface ILightingController
 
 public interface ICameraStatusDiagnostics
 {
-    CameraConnectionStatus GetStatus();
+    CameraSourceStatus GetStatus();
     IReadOnlyList<string> GetMessages();
 }

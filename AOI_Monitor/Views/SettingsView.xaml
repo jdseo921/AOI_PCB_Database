@@ -197,6 +197,51 @@
         <StackPanel Grid.Row="1" Margin="8">
           <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
             <StackPanel>
+              <TextBlock Text="Camera Source" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Mode" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <ComboBox x:Name="CameraSourceCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="No Camera / Not Connected"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Folder Simulation"/>
+                </ComboBox>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Top Folder" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="CameraTopFolderText" Grid.Column="1" MinHeight="28"/>
+                <Button x:Name="BrowseCameraTopBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseCameraTopClick"/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Side Folder" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="CameraSideFolderText" Grid.Column="1" MinHeight="28"/>
+                <Button x:Name="BrowseCameraSideBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseCameraSideClick"/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Bottom Folder" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="CameraBottomFolderText" Grid.Column="1" MinHeight="28"/>
+                <Button x:Name="BrowseCameraBottomBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseCameraBottomClick"/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Board Model" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="CameraBoardModelText" Grid.Column="1" MinHeight="28" Text="TBOX-MAIN"/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Lot ID" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="CameraLotIdText" Grid.Column="1" MinHeight="28" Text="POC-LOT"/>
+              </Grid>
+              <UniformGrid Columns="2">
+                <TextBlock Text="Source status" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock x:Name="CameraSourceStatusText" Text="Not Connected" FontWeight="Bold" FontSize="11.5" Foreground="#F27777" HorizontalAlignment="Right"/>
+              </UniformGrid>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
+            <StackPanel>
               <TextBlock Text="Training Set Export (Local Files)" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,4"/>
               <WrapPanel>
                 <Button Style="{StaticResource MiniBtnGreen}" Content="Prepare" Margin="0,0,6,6" Click="OnStartTrainingClick"/>

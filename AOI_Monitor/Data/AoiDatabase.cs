@@ -18,6 +18,8 @@ public static class AoiDatabase
     private static bool _initialized;
     private static string _storageRoot = ResolveStorageRoot();
 
+    public static Func<string>? AuditOperatorProvider { get; set; }
+
     public static string StorageRoot => _storageRoot;
     public static string DatabasePath => Path.Combine(StorageRoot, "aoi_monitor.sqlite");
     public static string ImageVaultPath => Path.Combine(StorageRoot, "image_vault");
@@ -437,7 +439,7 @@ public static class AoiDatabase
         using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT Id, CreatedAtUtc, ExportType, FilePath, Status
+            SELECT Id, CreatedAtUtc, ExportType, FilePath, Status, OperatorId
             FROM ExportHistory
             ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
             LIMIT $limit;
@@ -573,7 +575,7 @@ public static class AoiDatabase
         command.ExecuteNonQuery();
     }
 
-    public static void RecordExport(string exportType, string filePath, string status = "OK")
+    public static void RecordExport(string exportType, string filePath, string status = "OK", string? operatorId = null)
     {
         EnsureInitialized();
 
@@ -581,12 +583,13 @@ public static class AoiDatabase
         using var command = connection.CreateCommand();
         command.CommandText =
             """
-            INSERT INTO ExportHistory (ExportType, FilePath, Status, CreatedAtUtc)
-            VALUES ($exportType, $filePath, $status, $createdAtUtc);
+            INSERT INTO ExportHistory (ExportType, FilePath, Status, OperatorId, CreatedAtUtc)
+            VALUES ($exportType, $filePath, $status, $operatorId, $createdAtUtc);
             """;
         command.Parameters.AddWithValue("$exportType", exportType);
         command.Parameters.AddWithValue("$filePath", filePath);
         command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$operatorId", string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId);
         command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         command.ExecuteNonQuery();
     }
@@ -760,7 +763,8 @@ public static class AoiDatabase
             ParseDateTime(reader.GetString(1)),
             reader.GetString(2),
             reader.GetString(3),
-            reader.GetString(4));
+            reader.GetString(4),
+            reader.IsDBNull(5) ? "UNKNOWN" : reader.GetString(5));
     }
 
     private static RecipeRevisionRecord ReadRecipeRevision(SqliteDataReader reader)
@@ -886,6 +890,7 @@ public static class AoiDatabase
         AddColumnIfMissing(connection, "BatchTestResults", "LotId", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "BatchTestResults", "BoardModel", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "BatchTestResults", "Notes", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, "ExportHistory", "OperatorId", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
     }
 
     private static void AutoArchiveOldLogs(SqliteConnection connection)
@@ -1131,6 +1136,7 @@ public static class AoiDatabase
             ExportType TEXT NOT NULL,
             FilePath TEXT NOT NULL,
             Status TEXT NOT NULL,
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
             CreatedAtUtc TEXT NOT NULL
         );
 

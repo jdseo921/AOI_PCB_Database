@@ -197,13 +197,36 @@ public sealed class AoiDatabaseTests : IDisposable
     {
         AoiDatabase.Initialize();
 
-        AoiDatabase.RecordExport("InspectionHistoryCsv", @"C:\exports\history.csv", "WARN");
+        AoiDatabase.RecordExport("InspectionHistoryCsv", @"C:\exports\history.csv", "WARN", "Admin01 [Admin]");
 
         var history = AoiDatabase.GetExportHistory();
         Assert.Single(history);
         Assert.Equal("InspectionHistoryCsv", history[0].ExportType);
         Assert.Equal(@"C:\exports\history.csv", history[0].FilePath);
         Assert.Equal("WARN", history[0].Status);
+        Assert.Equal("Admin01 [Admin]", history[0].OperatorId);
+    }
+
+    [Fact]
+    public void LocalRolesEnforceExpectedPageAndActionPermissions()
+    {
+        WorkflowState.Instance.SetCurrentUser("Operator01", UserRole.Operator);
+
+        Assert.Equal("Operator01 [Operator]", WorkflowState.Instance.OperatorWithRole);
+        Assert.False(RoleAuthorization.CanEditRecipes(WorkflowState.Instance.CurrentRole));
+        Assert.False(RoleAuthorization.CanRunModelTests(WorkflowState.Instance.CurrentRole));
+        Assert.True(RoleAuthorization.CanAccessPage(WorkflowState.Instance.CurrentRole, "guide"));
+
+        WorkflowState.Instance.SetCurrentUser("Engineer01", UserRole.Engineer);
+        Assert.True(RoleAuthorization.CanEditRecipes(WorkflowState.Instance.CurrentRole));
+        Assert.True(RoleAuthorization.CanRunModelTests(WorkflowState.Instance.CurrentRole));
+        Assert.True(RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole));
+        Assert.False(RoleAuthorization.CanExportLogs(WorkflowState.Instance.CurrentRole));
+
+        WorkflowState.Instance.SetCurrentUser("Admin01", UserRole.Admin);
+        Assert.True(RoleAuthorization.CanExportLogs(WorkflowState.Instance.CurrentRole));
+        Assert.True(RoleAuthorization.CanManageSettings(WorkflowState.Instance.CurrentRole));
+        Assert.True(RoleAuthorization.CanUseMaintenanceActions(WorkflowState.Instance.CurrentRole));
     }
 
     [Fact]

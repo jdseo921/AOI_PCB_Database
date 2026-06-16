@@ -106,6 +106,7 @@
                 <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
                 <DataGridTextColumn Header="Type" Binding="{Binding ExportType}" Width="160"/>
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="70"/>
+                <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="130"/>
                 <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
               </DataGrid.Columns>
             </DataGrid>

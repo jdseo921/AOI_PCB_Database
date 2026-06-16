@@ -31,6 +31,7 @@ public partial class SettingsView : UserControl
     {
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
+        CameraSourceSettingsService.SettingsChanged += OnCameraSourceSettingsChanged;
         RefreshWorkflowUi();
         ApplyLanguageVisuals();
         ApplyFontPreset();
@@ -40,26 +41,37 @@ public partial class SettingsView : UserControl
     {
         WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
+        CameraSourceSettingsService.SettingsChanged -= OnCameraSourceSettingsChanged;
     }
 
     private void OnWorkflowStateChanged() => Dispatcher.Invoke(RefreshWorkflowUi);
     private void OnInspectionConfigurationChanged() => Dispatcher.Invoke(RefreshInspectionConfigurationUi);
+    private void OnCameraSourceSettingsChanged() => Dispatcher.Invoke(RefreshCameraSourceUi);
 
     private void OnApply(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
         var existingConfig = InspectionModelConfigurationService.Load();
         var newConfig = BuildConfigurationFromUi();
+        var existingCamera = CameraSourceSettingsService.Load();
+        var newCamera = BuildCameraSourceSettingsFromUi();
         var modelConfigChanged =
             !string.Equals(existingConfig.ModelFilePath, newConfig.ModelFilePath, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingConfig.ModelVersion, newConfig.ModelVersion, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingConfig.LabelMapPath, newConfig.LabelMapPath, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingConfig.SelectedEngineKey, newConfig.SelectedEngineKey, StringComparison.OrdinalIgnoreCase);
+        var cameraConfigChanged =
+            !string.Equals(existingCamera.SourceKey, newCamera.SourceKey, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingCamera.TopFolder, newCamera.TopFolder, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingCamera.SideFolder, newCamera.SideFolder, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingCamera.BottomFolder, newCamera.BottomFolder, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingCamera.BoardModel, newCamera.BoardModel, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingCamera.LotId, newCamera.LotId, StringComparison.OrdinalIgnoreCase);
         var thresholdChanged =
             ComboToPriority(DetectionPriorityCombo.SelectedIndex) != state.DetectionPriority ||
             Math.Abs(existingConfig.ConfidenceThreshold - newConfig.ConfidenceThreshold) > 0.0001;
 
-        if (modelConfigChanged && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths or selected model engine"))
+        if ((modelConfigChanged || cameraConfigChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, or camera source"))
             return;
 
         if (thresholdChanged && !Authorize(RoleAuthorization.CanChangeThresholds, "Changing inspection thresholds or detection priority"))
@@ -68,6 +80,7 @@ public partial class SettingsView : UserControl
         ApplyLanguageVisuals();
         ApplyFontPreset();
         SaveInspectionConfiguration(newConfig);
+        SaveCameraSourceSettings(newCamera);
 
         if (!state.TrySetDetectionPriority(ComboToPriority(DetectionPriorityCombo.SelectedIndex), out var message))
         {
@@ -94,6 +107,8 @@ public partial class SettingsView : UserControl
         LabelMapPathText.Text = string.Empty;
         ConfidenceThresholdText.Text = "0.65";
         InspectionModelConfigurationService.Save(new InspectionModelConfiguration());
+        CameraSourceSettingsService.Save(new CameraSourceSettings());
+        CameraSourceSettingsService.ApplyActiveSource();
 
         ApplyLanguageVisuals();
         ApplyFontPreset();
@@ -195,6 +210,41 @@ public partial class SettingsView : UserControl
         RefreshInspectionConfigurationUi(BuildConfigurationFromUi());
     }
 
+    private void OnBrowseCameraTopClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Top);
+    private void OnBrowseCameraSideClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Side);
+    private void OnBrowseCameraBottomClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Bottom);
+
+    private void BrowseCameraFolder(CameraViewType viewType)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Changing camera simulation folder"))
+            return;
+
+        var dialog = new OpenFolderDialog
+        {
+            Title = $"Select {viewType} camera simulation folder",
+            Multiselect = false,
+        };
+
+        if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.FolderName))
+            return;
+
+        switch (viewType)
+        {
+            case CameraViewType.Side:
+                CameraSideFolderText.Text = dialog.FolderName;
+                break;
+            case CameraViewType.Bottom:
+                CameraBottomFolderText.Text = dialog.FolderName;
+                break;
+            default:
+                CameraTopFolderText.Text = dialog.FolderName;
+                break;
+        }
+
+        CameraSourceCombo.SelectedIndex = 1;
+        RefreshCameraSourceUi(BuildCameraSourceSettingsFromUi());
+    }
+
     private void OnOpenTrainingFolderClick(object sender, RoutedEventArgs e)
     {
         var trainingDir = AoiDatabase.TrainingVaultPath;
@@ -229,6 +279,7 @@ public partial class SettingsView : UserControl
 
         RefreshRoleControls();
         RefreshInspectionConfigurationUi();
+        RefreshCameraSourceUi();
     }
 
     private void RefreshRoleControls()
@@ -239,6 +290,15 @@ public partial class SettingsView : UserControl
 
         DetectionPriorityCombo.IsEnabled = canChangeThresholds;
         InspectionEngineCombo.IsEnabled = canManageSettings;
+        CameraSourceCombo.IsEnabled = canManageSettings;
+        CameraTopFolderText.IsEnabled = canManageSettings;
+        CameraSideFolderText.IsEnabled = canManageSettings;
+        CameraBottomFolderText.IsEnabled = canManageSettings;
+        CameraBoardModelText.IsEnabled = canManageSettings;
+        CameraLotIdText.IsEnabled = canManageSettings;
+        BrowseCameraTopBtn.IsEnabled = canManageSettings;
+        BrowseCameraSideBtn.IsEnabled = canManageSettings;
+        BrowseCameraBottomBtn.IsEnabled = canManageSettings;
         ModelPathText.IsEnabled = canManageSettings;
         ModelVersionText.IsEnabled = canManageSettings;
         LabelMapPathText.IsEnabled = canManageSettings;
@@ -284,6 +344,59 @@ public partial class SettingsView : UserControl
                 ? $"Inspection engine set to ONNX ML Model; status {EngineRuntimeStatusText.Text}; version {configuration.EffectiveModelVersion}."
                 : "Inspection engine set to Pixel Difference / Prototype Engine.");
     }
+
+    private void SaveCameraSourceSettings(CameraSourceSettings? preparedSettings = null)
+    {
+        var settings = preparedSettings ?? BuildCameraSourceSettingsFromUi();
+        CameraSourceSettingsService.Save(settings);
+        CameraSourceSettingsService.ApplyActiveSource();
+
+        WorkflowState.Instance.AddEvent(
+            "CAMERA_CONFIG",
+            settings.IsFolderSimulation
+                ? $"Camera source set to Folder Simulation; status {CameraSourceFactory.ActiveSource.ConnectionStatus}."
+                : "Camera source set to No Camera / Not Connected.");
+    }
+
+    private void RefreshCameraSourceUi()
+        => RefreshCameraSourceUi(CameraSourceSettingsService.Load());
+
+    private void RefreshCameraSourceUi(CameraSourceSettings settings)
+    {
+        CameraSourceCombo.SelectedIndex = settings.IsFolderSimulation ? 1 : 0;
+        CameraTopFolderText.Text = settings.TopFolder;
+        CameraSideFolderText.Text = settings.SideFolder;
+        CameraBottomFolderText.Text = settings.BottomFolder;
+        CameraBoardModelText.Text = settings.BoardModel;
+        CameraLotIdText.Text = settings.LotId;
+
+        var source = CameraSourceFactory.Create(settings);
+        CameraSourceStatusText.Text = source.ConnectionStatus switch
+        {
+            CameraSourceStatus.Simulated => "Camera: Simulated",
+            CameraSourceStatus.Error => "Camera: Error",
+            _ => "Camera: Not Connected",
+        };
+        CameraSourceStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(source.ConnectionStatus switch
+        {
+            CameraSourceStatus.Simulated => "#E1A334",
+            CameraSourceStatus.Error => "#F27777",
+            _ => "#F27777",
+        }));
+    }
+
+    private CameraSourceSettings BuildCameraSourceSettingsFromUi()
+        => new()
+        {
+            SourceKey = CameraSourceCombo.SelectedIndex == 1
+                ? CameraSourceFactory.FolderSimulationSourceKey
+                : CameraSourceFactory.NullSourceKey,
+            TopFolder = CameraTopFolderText.Text.Trim(),
+            SideFolder = CameraSideFolderText.Text.Trim(),
+            BottomFolder = CameraBottomFolderText.Text.Trim(),
+            BoardModel = CameraBoardModelText.Text.Trim(),
+            LotId = CameraLotIdText.Text.Trim(),
+        };
 
     private InspectionModelConfiguration BuildConfigurationFromUi()
     {

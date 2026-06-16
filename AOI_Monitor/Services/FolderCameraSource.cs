@@ -12,17 +12,36 @@ public sealed class FolderCameraSource : ICameraSource
     private readonly Dictionary<CameraViewType, string> _folders = new();
     private readonly Dictionary<CameraViewType, List<string>> _frames = new();
     private readonly Dictionary<CameraViewType, int> _indices = new();
+    private long _frameSequence;
 
-    public FolderCameraSource(IReadOnlyDictionary<CameraViewType, string> folders)
+    public FolderCameraSource(
+        IReadOnlyDictionary<CameraViewType, string> folders,
+        string boardModel = "TBOX-MAIN",
+        string lotId = "POC-LOT")
     {
+        BoardModel = string.IsNullOrWhiteSpace(boardModel) ? "TBOX-MAIN" : boardModel.Trim();
+        LotId = string.IsNullOrWhiteSpace(lotId) ? "POC-LOT" : lotId.Trim();
+
         foreach (var (view, folder) in folders)
             SetFolder(view, folder);
     }
 
     public string Name => "Folder Camera Source";
     public CameraViewType SelectedView { get; set; } = CameraViewType.Top;
-    public CameraConnectionStatus ConnectionStatus => HasAnyFrames ? CameraConnectionStatus.Simulated : CameraConnectionStatus.NotConnected;
+    public CameraSourceStatus ConnectionStatus => HasAnyFrames
+        ? CameraSourceStatus.Simulated
+        : MissingConfiguredFolder
+            ? CameraSourceStatus.Error
+            : CameraSourceStatus.NotConnected;
+    public string StatusMessage => ConnectionStatus switch
+    {
+        CameraSourceStatus.Simulated => "Folder camera simulator is ready.",
+        CameraSourceStatus.Error => "One or more configured simulation folders cannot be read or contain no images.",
+        _ => "No simulation image folders are configured.",
+    };
     public bool IsAcquiring { get; private set; }
+    public string BoardModel { get; }
+    public string LotId { get; }
 
     public IReadOnlyDictionary<CameraViewType, string> Folders => _folders;
 
@@ -68,8 +87,10 @@ public sealed class FolderCameraSource : ICameraSource
         index = (index + 1) % frames.Count;
         _indices[SelectedView] = index;
 
-        return new CameraFrame(frames[index], SelectedView, DateTime.Now, Name);
+        var frameId = $"{SelectedView}-{Interlocked.Increment(ref _frameSequence):000000}";
+        return new CameraFrame(frameId, frames[index], SelectedView, DateTime.Now, Name, BoardModel, LotId);
     }
 
     private bool HasAnyFrames => _frames.Values.Any(frames => frames.Count > 0);
+    private bool MissingConfiguredFolder => _folders.Count > 0 && !HasAnyFrames;
 }

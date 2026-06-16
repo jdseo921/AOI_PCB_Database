@@ -7,7 +7,7 @@ public enum CameraViewType
     Bottom,
 }
 
-public enum CameraConnectionStatus
+public enum CameraSourceStatus
 {
     NotConnected,
     Simulated,
@@ -15,7 +15,13 @@ public enum CameraConnectionStatus
 }
 
 public sealed record CameraFrame(
-    string ImagePath,
+    string FrameId,
+    string SourcePath,
     CameraViewType ViewType,
     DateTime CapturedAt,
-    string SourceName);
+    string SourceName,
+    string BoardModel,
+    string LotId)
+{
+    public string ImagePath => SourcePath;
+}

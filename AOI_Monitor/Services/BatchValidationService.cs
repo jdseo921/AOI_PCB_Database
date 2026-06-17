@@ -242,15 +242,22 @@ public static class BatchValidationService
         if (string.IsNullOrWhiteSpace(path))
             return null;
 
-        if (Path.IsPathRooted(path))
-            return File.Exists(path) ? path : null;
+        try
+        {
+            if (Path.IsPathRooted(path))
+                return path;
 
-        var csvRelative = Path.Combine(csvDir, path);
-        if (File.Exists(csvRelative))
-            return csvRelative;
+            var csvRelative = Path.GetFullPath(Path.Combine(csvDir, path));
+            if (File.Exists(csvRelative))
+                return csvRelative;
 
-        var folderRelative = Path.Combine(imageFolder, path);
-        return File.Exists(folderRelative) ? folderRelative : null;
+            var folderRelative = Path.GetFullPath(Path.Combine(imageFolder, path));
+            return folderRelative;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new InvalidDataException($"Invalid path in validation CSV: '{path}'. {ex.Message}", ex);
+        }
     }
 
     private static int FindHeader(string[] headers, params string[] names)

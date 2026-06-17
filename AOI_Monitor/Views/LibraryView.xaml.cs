@@ -79,6 +79,7 @@ public partial class LibraryView : UserControl
         }
 
         ShowImportStatus(new[] { result }, "Single image import");
+        LogImportIssues(new[] { result });
     }
 
     private async void OnBatchImportClick(object sender, RoutedEventArgs e)
@@ -107,6 +108,7 @@ public partial class LibraryView : UserControl
             var newestId = results.FirstOrDefault(r => r.Imported)?.Image?.Id;
             LoadRecordsFromDatabase(newestId);
             ShowImportStatus(results, $"Batch import from {dialog.FolderName}");
+            LogImportIssues(results);
         }
         catch (OperationCanceledException)
         {
@@ -152,12 +154,14 @@ public partial class LibraryView : UserControl
         if (result.Image is null)
         {
             ShowImportStatus(new[] { result }, "Golden import");
+            LogImportIssues(new[] { result });
             return;
         }
 
         state.SetGoldenImage(result.Image.VaultPath);
         TryShowImagePreview(result.Image.VaultPath, "Golden Reference Image");
         ShowImportStatus(new[] { result }, "Golden import");
+        LogImportIssues(new[] { result });
 
         try
         {
@@ -183,16 +187,28 @@ public partial class LibraryView : UserControl
             return;
         }
 
-        var trainingDir = AoiDatabase.TrainingVaultPath;
-        Directory.CreateDirectory(trainingDir);
+        try
+        {
+            var trainingDir = AoiDatabase.TrainingVaultPath;
+            Directory.CreateDirectory(trainingDir);
 
-        var fileName = $"{DateTime.Now:yyyyMMdd_HHmmss}_{Path.GetFileName(state.SampleImagePath)}";
-        var target = Path.Combine(trainingDir, fileName);
-        File.Copy(state.SampleImagePath, target, true);
-        AoiDatabase.RecordTrainingSample(target, "candidate", "Queued from Library candidate action.");
+            var fileName = $"{DateTime.Now:yyyyMMdd_HHmmss}_{Path.GetFileName(state.SampleImagePath)}";
+            var target = Path.Combine(trainingDir, fileName);
+            File.Copy(state.SampleImagePath, target, true);
+            AoiDatabase.RecordTrainingSample(target, "candidate", "Queued from Library candidate action.");
 
-        state.QueueTrainingSample(fileName);
-        MessageBox.Show($"Saved to local candidate queue:\n{target}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            state.QueueTrainingSample(fileName);
+            MessageBox.Show($"Saved to local candidate queue:\n{target}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            var message = ex is UnauthorizedAccessException
+                ? "Training candidate copy failed: file access was denied or the image is locked."
+                : $"Training candidate copy failed: {ex.Message}";
+            ImportStatusText.Text = message;
+            WorkflowState.Instance.AddEvent("TRAINING_SET_EXPORT_ERROR", message);
+            MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OnBatchRelabelClick(object sender, RoutedEventArgs e)
@@ -242,9 +258,22 @@ public partial class LibraryView : UserControl
             sb.AppendLine($"{analysis.DifferenceScore:F2},{analysis.Verdict},{analysis.SuggestedDefect},{analysis.Timestamp:yyyy-MM-dd HH:mm:ss}");
         }
 
-        File.WriteAllText(dialog.FileName, sb.ToString());
-        AoiDatabase.RecordExport("LibraryRecord", dialog.FileName);
-        WorkflowState.Instance.AddEvent("EXPORT", $"Library record exported: {Path.GetFileName(dialog.FileName)}");
+        try
+        {
+            File.WriteAllText(dialog.FileName, sb.ToString());
+            AoiDatabase.RecordExport("LibraryRecord", dialog.FileName);
+            WorkflowState.Instance.AddEvent("EXPORT", $"Library record exported: {Path.GetFileName(dialog.FileName)}");
+            ImportStatusText.Text = $"Library record exported: {dialog.FileName}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            var message = ex is UnauthorizedAccessException
+                ? "Library record export failed: export folder access was denied or the file is locked."
+                : $"Library record export failed: {ex.Message}";
+            ImportStatusText.Text = message;
+            WorkflowState.Instance.AddEvent("EXPORT_ERROR", message);
+            MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OnRecordsSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -354,9 +383,6 @@ public partial class LibraryView : UserControl
                 result = new ImageImportResult(null, false, "Unreadable", FriendlyImportError(file, ex));
             }
 
-            if (!result.Imported)
-                WorkflowState.Instance.AddEvent("IMPORT_ERROR", $"{Path.GetFileName(file)}: {result.Status} {result.Message}");
-
             yield return result;
         }
 
@@ -410,6 +436,17 @@ public partial class LibraryView : UserControl
             "AOI Monitor",
             MessageBoxButton.OK,
             invalid > 0 || missing > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+    }
+
+    private static void LogImportIssues(IReadOnlyCollection<ImageImportResult> results)
+    {
+        foreach (var issue in results.Where(r => !r.Imported && r.Status != "Duplicate").Take(40))
+        {
+            var subject = issue.Image?.FileName;
+            WorkflowState.Instance.AddEvent(
+                "IMPORT_ERROR",
+                $"{issue.Status}: {(string.IsNullOrWhiteSpace(subject) ? issue.Message : subject + " - " + issue.Message)}");
+        }
     }
 
     private MainViewModel? FindMainVm()

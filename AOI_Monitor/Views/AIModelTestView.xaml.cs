@@ -20,6 +20,11 @@ public partial class AIModelTestView : UserControl
         ".png", ".jpg", ".jpeg",
     };
 
+    private static readonly HashSet<string> UnsupportedImageLikeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".bmp", ".tif", ".tiff", ".gif", ".webp",
+    };
+
     private readonly ObservableCollection<BatchTestRow> _rows = new();
     private string? _selectedFolder;
     private string? _groundTruthCsvPath;
@@ -104,15 +109,31 @@ public partial class AIModelTestView : UserControl
         {
             var batch = await Task.Run(() =>
             {
-                var imageFiles = Directory.EnumerateFiles(_selectedFolder, "*.*", SearchOption.TopDirectoryOnly)
+                var errors = new List<string>();
+                string[] folderFiles;
+                try
+                {
+                    folderFiles = Directory.EnumerateFiles(_selectedFolder, "*.*", SearchOption.TopDirectoryOnly)
+                        .OrderBy(Path.GetFileName)
+                        .ToArray();
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    var message = $"Validation image folder cannot be read: {ex.Message}";
+                    errors.Add(message);
+                    return BatchRunOutcome.Empty(message, errors);
+                }
+
+                foreach (var skipped in folderFiles.Where(path => UnsupportedImageLikeExtensions.Contains(Path.GetExtension(path))))
+                    errors.Add($"Unsupported image format skipped: {Path.GetFileName(skipped)}. Use PNG/JPG/JPEG for Stage 1 validation.");
+
+                var imageFiles = folderFiles
                     .Where(path => SupportedImageExtensions.Contains(Path.GetExtension(path)))
-                    .OrderBy(Path.GetFileName)
                     .ToArray();
 
                 if (imageFiles.Length == 0)
-                    return BatchRunOutcome.Empty("The selected folder does not contain PNG/JPG/JPEG images.");
+                    return BatchRunOutcome.Empty("The selected folder does not contain PNG/JPG/JPEG images.", errors);
 
-                var errors = new List<string>();
                 ValidationManifest manifest;
                 try
                 {
@@ -187,6 +208,10 @@ public partial class AIModelTestView : UserControl
 
             if (batch.Message is not null)
             {
+                StatusText.Text = batch.Message;
+                foreach (var error in batch.Errors.Take(20))
+                    WorkflowState.Instance.AddEvent("MODEL_TEST_ERROR", error);
+
                 MessageBox.Show(batch.Message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -275,9 +300,21 @@ public partial class AIModelTestView : UserControl
         if (dialog.ShowDialog() != true)
             return;
 
-        File.WriteAllText(dialog.FileName, BatchValidationService.BuildResultsCsv(_rows), Encoding.UTF8);
-        AoiDatabase.RecordExport("Stage1ValidationCsv", dialog.FileName);
-        StatusText.Text = $"CSV exported: {dialog.FileName}";
+        try
+        {
+            File.WriteAllText(dialog.FileName, BatchValidationService.BuildResultsCsv(_rows), Encoding.UTF8);
+            AoiDatabase.RecordExport("Stage1ValidationCsv", dialog.FileName);
+            StatusText.Text = $"CSV exported: {dialog.FileName}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            var message = ex is UnauthorizedAccessException
+                ? "CSV export failed: export folder access was denied or the file is locked."
+                : $"CSV export failed: {ex.Message}";
+            StatusText.Text = message;
+            WorkflowState.Instance.AddEvent("EXPORT_ERROR", message);
+            MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private async void OnExportAnnotatedImagesClick(object sender, RoutedEventArgs e)
@@ -400,12 +437,24 @@ public partial class AIModelTestView : UserControl
             ? BuildHtmlReport(metrics)
             : BuildMarkdownReport(metrics);
 
-        File.WriteAllText(dialog.FileName, report, Encoding.UTF8);
-        AoiDatabase.RecordExport("CustomerValidationReport", dialog.FileName);
-        _lastReportPath = dialog.FileName;
-        ReportPathText.Text = $"Report: {dialog.FileName}";
-        StatusText.Text = $"Customer validation report saved: {dialog.FileName}";
-        WorkflowState.Instance.AddEvent("EXPORT", $"Customer validation report exported for run {_currentRunId}: {Path.GetFileName(dialog.FileName)}");
+        try
+        {
+            File.WriteAllText(dialog.FileName, report, Encoding.UTF8);
+            AoiDatabase.RecordExport("CustomerValidationReport", dialog.FileName);
+            _lastReportPath = dialog.FileName;
+            ReportPathText.Text = $"Report: {dialog.FileName}";
+            StatusText.Text = $"Customer validation report saved: {dialog.FileName}";
+            WorkflowState.Instance.AddEvent("EXPORT", $"Customer validation report exported for run {_currentRunId}: {Path.GetFileName(dialog.FileName)}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            var message = ex is UnauthorizedAccessException
+                ? "Customer validation report export failed: export folder access was denied or the file is locked."
+                : $"Customer validation report export failed: {ex.Message}";
+            StatusText.Text = message;
+            WorkflowState.Instance.AddEvent("EXPORT_ERROR", message);
+            MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void LoadLatestRun()
@@ -756,7 +805,10 @@ public partial class AIModelTestView : UserControl
         string? Message)
     {
         public static BatchRunOutcome Empty(string message)
-            => new(Array.Empty<BatchTestRow>(), new BatchMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), false, string.Empty, 0, Array.Empty<string>(), message);
+            => Empty(message, Array.Empty<string>());
+
+        public static BatchRunOutcome Empty(string message, IReadOnlyList<string> errors)
+            => new(Array.Empty<BatchTestRow>(), new BatchMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), false, string.Empty, 0, errors, message);
     }
 
 }

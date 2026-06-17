@@ -57,7 +57,37 @@
             <Grid>
               <TextBlock x:Name="EmptyMapText" Text="Load a CSV with columns: x,y,height"
                          Foreground="#68757D" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
-              <Image x:Name="HeightMapImage" Stretch="Uniform" MouseLeftButtonDown="OnHeightMapClick"/>
+              <Image x:Name="HeightMapImage" Stretch="Uniform"
+                     MouseLeftButtonDown="OnHeightMapClick"
+                     MouseMove="OnHeightMapMouseMove"/>
+              <Canvas x:Name="SelectionOverlay" IsHitTestVisible="False"/>
+              <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,10,10"
+                      Background="#CC101519" BorderBrush="#4B5660" BorderThickness="1" Padding="8,6">
+                <Grid Width="190">
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                  </Grid.RowDefinitions>
+                  <DockPanel>
+                    <TextBlock x:Name="LegendMaxText" DockPanel.Dock="Right" Text="--" Foreground="#DCE5EB" FontSize="10.5" FontWeight="Bold"/>
+                    <TextBlock Text="Height Scale" Foreground="#9AA6AF" FontSize="10.5"/>
+                  </DockPanel>
+                  <Rectangle Grid.Row="1" Height="10" RadiusX="1" RadiusY="1">
+                    <Rectangle.Fill>
+                      <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                        <GradientStop Color="#2850DC" Offset="0"/>
+                        <GradientStop Color="#68C878" Offset="0.5"/>
+                        <GradientStop Color="#FF5018" Offset="1"/>
+                      </LinearGradientBrush>
+                    </Rectangle.Fill>
+                  </Rectangle>
+                  <DockPanel Grid.Row="2" Margin="0,4,0,0">
+                    <TextBlock x:Name="LegendMinText" Text="--" Foreground="#DCE5EB" FontSize="10.5" FontWeight="Bold"/>
+                    <TextBlock Text="low to high" HorizontalAlignment="Center" Foreground="#7F8C95" FontSize="10" TextAlignment="Center"/>
+                  </DockPanel>
+                </Grid>
+              </Border>
             </Grid>
           </Border>
         </Grid>
@@ -90,17 +120,26 @@
                 <RowDefinition Height="28"/>
                 <RowDefinition Height="28"/>
                 <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
               </Grid.RowDefinitions>
               <TextBlock Text="CSV" Foreground="#9AA6AF" VerticalAlignment="Center"/>
               <TextBlock Grid.Column="1" x:Name="CsvNameText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-              <TextBlock Grid.Row="1" Text="Selected X/Y" Foreground="#9AA6AF" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="1" Grid.Column="1" x:Name="SelectedPointText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="2" Text="Selected Height" Foreground="#9AA6AF" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="2" Grid.Column="1" x:Name="SelectedHeightText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="3" Text="Height Min / Max" Foreground="#9AA6AF" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="3" Grid.Column="1" x:Name="HeightRangeText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="4" Text="Status" Foreground="#9AA6AF" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="4" Grid.Column="1" Text="CSV sample review only" Foreground="#E1A334" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="1" Text="Type" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="1" Grid.Column="1" x:Name="DefectTypeText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="2" Text="Height" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="2" Grid.Column="1" x:Name="DefectHeightText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="3" Text="Volume" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="3" Grid.Column="1" x:Name="DefectVolumeText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="4" Text="X" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="4" Grid.Column="1" x:Name="DefectXText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="5" Text="Y" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="5" Grid.Column="1" x:Name="DefectYText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="6" Text="Height Min / Max" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="6" Grid.Column="1" x:Name="HeightRangeText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="7" Text="Status" Foreground="#9AA6AF" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="7" Grid.Column="1" Text="Sample Data Mode only" Foreground="#E1A334" FontWeight="Bold" VerticalAlignment="Center"/>
             </Grid>
           </Grid>
         </Border>
@@ -122,7 +161,9 @@
 
     <Border Grid.Row="4" Style="{StaticResource Panel}">
       <DockPanel Margin="8">
-        <TextBlock x:Name="StatusText" Text="Load sample CSV height map to begin." Foreground="#9AA6AF" VerticalAlignment="Center"/>
+        <TextBlock x:Name="StatusText"
+                   Text="Sample Data Mode. 3D Camera Not Connected. Stage 2 hardware integration required for live 3D profile inspection."
+                   Foreground="#E1A334" FontWeight="Bold" VerticalAlignment="Center"/>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
           <Button Style="{StaticResource ActionBtnGreen}" Content="Accept Defect" Margin="0,0,8,0" Click="OnAcceptDefectClick"/>
           <Button Style="{StaticResource ActionBtnRed}" Content="Reject Defect" Click="OnRejectDefectClick"/>

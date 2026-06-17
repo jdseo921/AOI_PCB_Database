@@ -19,6 +19,7 @@ public partial class ProfileView : UserControl
     private int _maxY;
     private double _minHeight;
     private double _maxHeight;
+    private double _meanHeight;
     private string _currentCsvPath = string.Empty;
     private (int X, int Y, double Height)? _selectedPoint;
 
@@ -68,19 +69,22 @@ public partial class ProfileView : UserControl
         _maxY = _points.Keys.Max(p => p.Y);
         _minHeight = _points.Values.Min();
         _maxHeight = _points.Values.Max();
+        _meanHeight = _points.Values.Average();
         _selectedPoint = loaded.OrderByDescending(p => p.Height).First();
 
         CsvNameText.Text = Path.GetFileName(path);
         HeightRangeText.Text = $"{_minHeight:F3} / {_maxHeight:F3}";
+        LegendMinText.Text = _minHeight.ToString("F3", CultureInfo.InvariantCulture);
+        LegendMaxText.Text = _maxHeight.ToString("F3", CultureInfo.InvariantCulture);
         MapStatusText.Text = $"{_points.Count:N0} height samples";
         EmptyMapText.Visibility = Visibility.Collapsed;
         HeightMapImage.Source = BuildHeatMapBitmap();
         RefreshSelectionUi();
         DrawProfileLine();
-        StatusText.Text = "Sample height-map loaded. This is not live 3D camera inspection.";
+        StatusText.Text = "Sample height-map loaded. Sample Data Mode only; 3D Camera Not Connected.";
     }
 
-    private static List<(int X, int Y, double Height)> ParseHeightMap(string path)
+    public static List<(int X, int Y, double Height)> ParseHeightMap(string path)
     {
         var rows = new List<(int X, int Y, double Height)>();
         var lines = File.ReadAllLines(path);
@@ -159,31 +163,45 @@ public partial class ProfileView : UserControl
         if (HeightMapImage.Source is not BitmapSource bitmap || _points.Count == 0)
             return;
 
-        var position = e.GetPosition(HeightMapImage);
-        var scaleX = bitmap.PixelWidth / Math.Max(1.0, HeightMapImage.ActualWidth);
-        var scaleY = bitmap.PixelHeight / Math.Max(1.0, HeightMapImage.ActualHeight);
-        var x = _minX + (int)Math.Clamp(Math.Floor(position.X * scaleX), 0, bitmap.PixelWidth - 1);
-        var y = _minY + (int)Math.Clamp(Math.Floor(position.Y * scaleY), 0, bitmap.PixelHeight - 1);
+        if (TryGetMapPoint(e.GetPosition(HeightMapImage), bitmap, out var point))
+            SelectPoint(point);
+    }
 
-        if (_points.TryGetValue((x, y), out var value))
-        {
-            _selectedPoint = (x, y, value);
-            RefreshSelectionUi();
-            DrawProfileLine();
-        }
+    private void OnHeightMapMouseMove(object sender, MouseEventArgs e)
+    {
+        if (HeightMapImage.Source is not BitmapSource bitmap || _points.Count == 0)
+            return;
+
+        if (TryGetMapPoint(e.GetPosition(HeightMapImage), bitmap, out var point))
+            SelectPoint(point);
+    }
+
+    private void SelectPoint((int X, int Y, double Height) point)
+    {
+        _selectedPoint = point;
+        RefreshSelectionUi();
+        DrawProfileLine();
     }
 
     private void RefreshSelectionUi()
     {
         if (_selectedPoint is not { } point)
         {
-            SelectedPointText.Text = "--";
-            SelectedHeightText.Text = "--";
+            DefectTypeText.Text = "--";
+            DefectHeightText.Text = "--";
+            DefectVolumeText.Text = "--";
+            DefectXText.Text = "--";
+            DefectYText.Text = "--";
+            SelectionOverlay.Children.Clear();
             return;
         }
 
-        SelectedPointText.Text = $"x={point.X}, y={point.Y}";
-        SelectedHeightText.Text = point.Height.ToString("F3", CultureInfo.InvariantCulture);
+        DefectTypeText.Text = GetDefectType(point.Height);
+        DefectHeightText.Text = point.Height.ToString("F3", CultureInfo.InvariantCulture);
+        DefectVolumeText.Text = ComputeVolumePlaceholder(point).ToString("F3", CultureInfo.InvariantCulture);
+        DefectXText.Text = point.X.ToString(CultureInfo.InvariantCulture);
+        DefectYText.Text = point.Y.ToString(CultureInfo.InvariantCulture);
+        DrawSelectionMarker(point);
     }
 
     private void DrawProfileLine()
@@ -224,6 +242,84 @@ public partial class ProfileView : UserControl
         ProfileCanvas.Children.Add(polyline);
     }
 
+    private bool TryGetMapPoint(Point position, BitmapSource bitmap, out (int X, int Y, double Height) point)
+    {
+        point = default;
+
+        var imageWidth = Math.Max(1.0, HeightMapImage.ActualWidth);
+        var imageHeight = Math.Max(1.0, HeightMapImage.ActualHeight);
+        var scale = Math.Min(imageWidth / bitmap.PixelWidth, imageHeight / bitmap.PixelHeight);
+        var displayWidth = bitmap.PixelWidth * scale;
+        var displayHeight = bitmap.PixelHeight * scale;
+        var offsetX = (imageWidth - displayWidth) / 2.0;
+        var offsetY = (imageHeight - displayHeight) / 2.0;
+
+        var pixelX = (position.X - offsetX) / Math.Max(0.000001, scale);
+        var pixelY = (position.Y - offsetY) / Math.Max(0.000001, scale);
+        if (pixelX < 0 || pixelY < 0 || pixelX >= bitmap.PixelWidth || pixelY >= bitmap.PixelHeight)
+            return false;
+
+        var x = _minX + (int)Math.Clamp(Math.Floor(pixelX), 0, bitmap.PixelWidth - 1);
+        var y = _minY + (int)Math.Clamp(Math.Floor(pixelY), 0, bitmap.PixelHeight - 1);
+        if (!_points.TryGetValue((x, y), out var value))
+            return false;
+
+        point = (x, y, value);
+        return true;
+    }
+
+    private void DrawSelectionMarker((int X, int Y, double Height) point)
+    {
+        SelectionOverlay.Children.Clear();
+        if (HeightMapImage.Source is not BitmapSource bitmap)
+            return;
+
+        SelectionOverlay.Width = HeightMapImage.ActualWidth;
+        SelectionOverlay.Height = HeightMapImage.ActualHeight;
+
+        var imageWidth = Math.Max(1.0, HeightMapImage.ActualWidth);
+        var imageHeight = Math.Max(1.0, HeightMapImage.ActualHeight);
+        var scale = Math.Min(imageWidth / bitmap.PixelWidth, imageHeight / bitmap.PixelHeight);
+        var displayWidth = bitmap.PixelWidth * scale;
+        var displayHeight = bitmap.PixelHeight * scale;
+        var offsetX = (imageWidth - displayWidth) / 2.0;
+        var offsetY = (imageHeight - displayHeight) / 2.0;
+        var x = offsetX + (point.X - _minX + 0.5) * scale;
+        var y = offsetY + (point.Y - _minY + 0.5) * scale;
+
+        var marker = new System.Windows.Shapes.Ellipse
+        {
+            Width = 14,
+            Height = 14,
+            Stroke = Brushes.White,
+            StrokeThickness = 2,
+            Fill = new SolidColorBrush(Color.FromArgb(80, 225, 163, 52)),
+        };
+        Canvas.SetLeft(marker, x - marker.Width / 2.0);
+        Canvas.SetTop(marker, y - marker.Height / 2.0);
+        SelectionOverlay.Children.Add(marker);
+
+        var vertical = new System.Windows.Shapes.Line { X1 = x, X2 = x, Y1 = y - 14, Y2 = y + 14, Stroke = Brushes.White, StrokeThickness = 1 };
+        var horizontal = new System.Windows.Shapes.Line { X1 = x - 14, X2 = x + 14, Y1 = y, Y2 = y, Stroke = Brushes.White, StrokeThickness = 1 };
+        SelectionOverlay.Children.Add(vertical);
+        SelectionOverlay.Children.Add(horizontal);
+    }
+
+    private string GetDefectType(double height)
+    {
+        var highLimit = _meanHeight + ((_maxHeight - _meanHeight) * 0.60);
+        var lowLimit = _meanHeight - ((_meanHeight - _minHeight) * 0.60);
+        if (height >= highLimit)
+            return "Height High";
+        if (height <= lowLimit)
+            return "Height Low";
+
+        return "Coplanarity Review";
+    }
+
+    private double ComputeVolumePlaceholder((int X, int Y, double Height) point)
+        => Math.Abs(point.Height - _meanHeight);
+
     private void OnAcceptDefectClick(object sender, RoutedEventArgs e) => RecordDisposition("Accept Defect");
     private void OnRejectDefectClick(object sender, RoutedEventArgs e) => RecordDisposition("Reject Defect");
 
@@ -235,7 +331,7 @@ public partial class ProfileView : UserControl
             return;
         }
 
-        var message = $"{action}: 3D sample-data point x={point.X}, y={point.Y}, height={point.Height:F3}, file={Path.GetFileName(_currentCsvPath)}. 3D camera not connected.";
+        var message = $"{action}: 3D sample-data defect type={GetDefectType(point.Height)}, x={point.X}, y={point.Y}, height={point.Height:F3}, volume-placeholder={ComputeVolumePlaceholder(point):F3}, file={Path.GetFileName(_currentCsvPath)}. 3D camera not connected; Stage 2 hardware integration required for live profile inspection.";
         WorkflowState.Instance.AddDisposition(message);
         StatusText.Text = $"{action} recorded in SQLite review events.";
     }

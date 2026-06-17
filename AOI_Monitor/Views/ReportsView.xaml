@@ -127,6 +127,7 @@
                      Text="Logs older than 30 days are copied into LogArchive during startup. Source rows remain in place, so the archive is reversible and audit-safe."
                      TextWrapping="Wrap" FontSize="11.5" Foreground="#DCE5EB"/>
           <TextBlock x:Name="StatusText" Text="Ready." Foreground="#9AA6AF" FontSize="11" Margin="0,6,0,0"/>
+          <TextBlock x:Name="PackagePathText" Text="Latest customer package: --" Foreground="#DCE5EB" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
           <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
             <ProgressBar x:Name="WorkProgressBar" Width="190" Height="12" Minimum="0" Maximum="100" Value="0" Margin="0,0,8,0" VerticalAlignment="Center"/>
             <Button x:Name="CancelWorkButton" Style="{StaticResource MiniBtn}" Content="Cancel" IsEnabled="False" Click="OnCancelWorkClick"/>

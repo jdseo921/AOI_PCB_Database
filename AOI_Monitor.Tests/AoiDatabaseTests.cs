@@ -193,6 +193,67 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
+    public void FormalValidationManifestPreservesMissingImageRowsForErrorReporting()
+    {
+        var imageFolder = Path.Combine(_root, "images");
+        Directory.CreateDirectory(imageFolder);
+        var csv = Path.Combine(_root, "ground_truth_missing.csv");
+        File.WriteAllText(
+            csv,
+            string.Join(
+                Environment.NewLine,
+                "image,ground_truth,golden_image,defect_type,side,refdes,lot_id,board_model,notes",
+                "missing-board.png,NG,missing-golden.png,Bridge,top,U10,LOT-7,TBOX,missing sample"),
+            Encoding.UTF8);
+
+        var manifest = BatchValidationService.LoadValidationManifest(csv, imageFolder);
+        var runItems = BatchValidationService.BuildRunItems(Array.Empty<string>(), manifest);
+
+        Assert.True(manifest.IsFormalManifest);
+        Assert.Single(runItems);
+        Assert.EndsWith("missing-board.png", runItems[0].ImagePath);
+        Assert.False(File.Exists(runItems[0].ImagePath));
+        Assert.EndsWith("missing-golden.png", runItems[0].Manifest.GoldenPath);
+    }
+
+    [Fact]
+    public void ProfileViewParsesHeightMapCsvWithRequiredColumns()
+    {
+        Directory.CreateDirectory(_root);
+        var csv = Path.Combine(_root, "height_map.csv");
+        File.WriteAllText(
+            csv,
+            string.Join(
+                Environment.NewLine,
+                "x,y,height",
+                "0,0,0.125",
+                "1,0,0.250",
+                "0,1,-0.050"),
+            Encoding.UTF8);
+
+        var points = Views.ProfileView.ParseHeightMap(csv);
+
+        Assert.Equal(3, points.Count);
+        Assert.Contains(points, p => p.X == 1 && p.Y == 0 && Math.Abs(p.Height - 0.250) < 0.0001);
+        Assert.Contains(points, p => p.X == 0 && p.Y == 1 && Math.Abs(p.Height + 0.050) < 0.0001);
+    }
+
+    [Fact]
+    public void ProfileDispositionEventsPersistUserAndRole()
+    {
+        AoiDatabase.Initialize();
+        WorkflowState.Instance.SetCurrentUser("Engineer3D", UserRole.Engineer);
+
+        WorkflowState.Instance.AddDisposition("Accept Defect: 3D sample-data defect type=Height High, x=1, y=2, height=0.250. 3D camera not connected.");
+
+        var events = AoiDatabase.GetReviewEvents(new LogFilter { Result = "Height High" });
+        Assert.Contains(events, e =>
+            e.Category == "DISPOSITION" &&
+            e.OperatorId == "Engineer3D [Engineer]" &&
+            e.Message.Contains("3D camera not connected", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void RecordExportPersistsExportHistory()
     {
         AoiDatabase.Initialize();

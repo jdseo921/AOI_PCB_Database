@@ -94,10 +94,17 @@ public partial class ReportsView : UserControl
         if (dialog.ShowDialog() != true)
             return;
 
-        File.WriteAllText(dialog.FileName, BuildInspectionCsv(_inspectionRows), CsvEncoding);
-        AoiDatabase.RecordExport("InspectionHistoryCsv", dialog.FileName);
-        WorkflowState.Instance.AddEvent("EXPORT", $"Inspection history CSV exported: {Path.GetFileName(dialog.FileName)}");
-        RefreshAfterExport($"Inspection history CSV exported: {dialog.FileName}");
+        try
+        {
+            File.WriteAllText(dialog.FileName, BuildInspectionCsv(_inspectionRows), CsvEncoding);
+            AoiDatabase.RecordExport("InspectionHistoryCsv", dialog.FileName);
+            WorkflowState.Instance.AddEvent("EXPORT", $"Inspection history CSV exported: {Path.GetFileName(dialog.FileName)}");
+            RefreshAfterExport($"Inspection history CSV exported: {dialog.FileName}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Inspection history CSV export failed", ex, "EXPORT_ERROR");
+        }
     }
 
     private void OnExportReviewLogClick(object sender, RoutedEventArgs e)
@@ -115,10 +122,17 @@ public partial class ReportsView : UserControl
         if (dialog.ShowDialog() != true)
             return;
 
-        File.WriteAllText(dialog.FileName, BuildReviewCsv(_reviewRows), CsvEncoding);
-        AoiDatabase.RecordExport("ReviewLogCsv", dialog.FileName);
-        WorkflowState.Instance.AddEvent("EXPORT", $"Review log CSV exported: {Path.GetFileName(dialog.FileName)}");
-        RefreshAfterExport($"Review log CSV exported: {dialog.FileName}");
+        try
+        {
+            File.WriteAllText(dialog.FileName, BuildReviewCsv(_reviewRows), CsvEncoding);
+            AoiDatabase.RecordExport("ReviewLogCsv", dialog.FileName);
+            WorkflowState.Instance.AddEvent("EXPORT", $"Review log CSV exported: {Path.GetFileName(dialog.FileName)}");
+            RefreshAfterExport($"Review log CSV exported: {dialog.FileName}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Review log CSV export failed", ex, "EXPORT_ERROR");
+        }
     }
 
     private async void OnExportAnnotatedOverlaysClick(object sender, RoutedEventArgs e)
@@ -257,6 +271,7 @@ public partial class ReportsView : UserControl
                 var configuration = InspectionModelConfigurationService.Load();
                 File.WriteAllText(Path.Combine(summariesDir, "model_engine_configuration.txt"), BuildModelConfigurationSummary(configuration, warnings), CsvEncoding);
                 File.WriteAllText(Path.Combine(summariesDir, "database_health_summary.txt"), BuildDatabaseHealthSummary(inspectionRows.Length, reviewRows.Length, warnings), CsvEncoding);
+                File.WriteAllText(Path.Combine(summariesDir, "recipe_revision_summary.txt"), BuildRecipeRevisionSummary(warnings), CsvEncoding);
 
                 cts.Token.ThrowIfCancellationRequested();
                 ((IProgress<WorkProgress>)progress).Report(new WorkProgress(6, 6, "Writing package README..."));
@@ -273,6 +288,7 @@ public partial class ReportsView : UserControl
             AoiDatabase.RecordExport("Stage1CustomerPackage", result.PackageDir, result.Warnings.Count == 0 ? "OK" : "WARN");
             WorkflowState.Instance.AddEvent("EXPORT", $"Stage 1 customer package exported: {Path.GetFileName(result.PackageDir)}, overlays={result.OverlayCount}, warnings={result.Warnings.Count}.");
             LogErrors("EXPORT_WARNING", result.Warnings);
+            PackagePathText.Text = $"Latest customer package: {result.PackageDir}";
             RefreshAfterExport($"Stage 1 customer package exported: {result.PackageDir}. Warnings: {result.Warnings.Count}.");
         }
         catch (OperationCanceledException)
@@ -333,16 +349,21 @@ public partial class ReportsView : UserControl
             return;
 
         var cts = BeginWork("Running SQLite integrity check...");
+        var progress = new Progress<WorkProgress>(UpdateProgress);
         try
         {
             var result = await Task.Run(() =>
             {
                 cts.Token.ThrowIfCancellationRequested();
+                ((IProgress<WorkProgress>)progress).Report(new WorkProgress(1, 4, "Preparing SQLite integrity report..."));
                 var exportsDir = EnsureExportsDir();
                 var reportPath = Path.Combine(exportsDir, $"db_integrity_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                ((IProgress<WorkProgress>)progress).Report(new WorkProgress(2, 4, "Running SQLite integrity check..."));
                 var integrity = AoiDatabase.RunIntegrityCheck();
                 var status = string.Equals(integrity, "ok", StringComparison.OrdinalIgnoreCase) ? "OK" : "WARN";
 
+                cts.Token.ThrowIfCancellationRequested();
+                ((IProgress<WorkProgress>)progress).Report(new WorkProgress(3, 4, "Writing SQLite integrity report..."));
                 var sb = new StringBuilder();
                 sb.AppendLine($"SQLiteIntegrityCheck: {integrity}");
                 sb.AppendLine($"DatabasePath: {AoiDatabase.DatabasePath}");
@@ -352,6 +373,7 @@ public partial class ReportsView : UserControl
                 sb.AppendLine($"AutoArchivePolicy: copy-only archive for logs older than 30 days; source rows remain queryable.");
                 sb.AppendLine($"CheckedAt: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 File.WriteAllText(reportPath, sb.ToString());
+                ((IProgress<WorkProgress>)progress).Report(new WorkProgress(4, 4, "SQLite integrity check complete."));
                 return new IntegrityOutcome(reportPath, integrity, status);
             }, cts.Token);
 
@@ -698,6 +720,69 @@ public partial class ReportsView : UserControl
         return sb.ToString();
     }
 
+    private static string BuildRecipeRevisionSummary(ICollection<string> warnings)
+    {
+        var boardProgram = WorkflowState.Instance.BoardProgram;
+        var revision = AoiDatabase.GetLatestRecipeRevision(boardProgram);
+        if (revision is null)
+            warnings.Add($"No recipe revision was found for board program '{boardProgram}'. summaries/recipe_revision_summary.txt was generated with no revision details.");
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Recipe Revision Summary");
+        sb.AppendLine($"GeneratedLocal: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"BoardProgram: {boardProgram}");
+        sb.AppendLine($"RecipeRevisionAvailable: {revision is not null}");
+
+        if (revision is null)
+        {
+            sb.AppendLine("Status: No persisted recipe revision is available for the active board program.");
+            sb.AppendLine("PrototypeNotice: Stage 1 can run the operator workflow without a saved production recipe; customer packages record that condition as a warning.");
+            return sb.ToString();
+        }
+
+        sb.AppendLine($"RecipeName: {revision.RecipeName}");
+        sb.AppendLine($"Revision: {revision.Revision}");
+        sb.AppendLine($"OperatorId: {revision.OperatorId}");
+        sb.AppendLine($"DetectionPriority: {revision.DetectionPriority}");
+        sb.AppendLine($"BackgroundImagePath: {NullIfEmpty(revision.BackgroundImagePath)}");
+        sb.AppendLine($"CreatedUtc: {revision.CreatedAtUtc.ToString("O", CultureInfo.InvariantCulture)}");
+
+        try
+        {
+            var document = System.Text.Json.JsonSerializer.Deserialize<RecipeDocument>(revision.RecipeJson);
+            sb.AppendLine($"RoiCount: {document?.Rois.Count ?? 0}");
+            if (document is not null)
+            {
+                foreach (var roi in document.Rois.Take(50))
+                {
+                    sb.AppendLine(string.Join(" | ",
+                        $"ROI={roi.Id}",
+                        $"Type={roi.RoiType}",
+                        $"X={roi.X:F4}",
+                        $"Y={roi.Y:F4}",
+                        $"W={roi.Width:F4}",
+                        $"H={roi.Height:F4}",
+                        $"Threshold={roi.AiScoreThreshold:F3}",
+                        $"HeightMin={roi.HeightMin:F3}",
+                        $"HeightMax={roi.HeightMax:F3}",
+                        $"VolumeMin={roi.VolumeMin:F3}",
+                        $"VolumeMax={roi.VolumeMax:F3}"));
+                }
+
+                if (document.Rois.Count > 50)
+                    sb.AppendLine($"RoiListTruncated: true; shown=50; total={document.Rois.Count}");
+            }
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            warnings.Add($"Latest recipe revision {revision.Id} could not be parsed for ROI details: {ex.Message}");
+            sb.AppendLine($"RoiParseStatus: Failed - {ex.Message}");
+        }
+
+        sb.AppendLine("PrototypeNotice: Recipe data reflects the local Stage 1 recipe editor and SQLite revision history.");
+        return sb.ToString();
+    }
+
     private static string BuildStage1PackageReadme(
         string packageDir,
         BatchTestRunRecord? run,
@@ -722,6 +807,7 @@ public partial class ReportsView : UserControl
         sb.AppendLine("- `logs/review_disposition_log.csv` - Filtered review and disposition event log.");
         sb.AppendLine("- `summaries/model_engine_configuration.txt` - Active model/engine configuration and prototype status.");
         sb.AppendLine("- `summaries/database_health_summary.txt` - SQLite health, table counts, and archive policy summary.");
+        sb.AppendLine("- `summaries/recipe_revision_summary.txt` - Latest local recipe revision for the active board program, when available.");
         sb.AppendLine("- `warnings.txt` - Missing optional items or non-blocking export issues.");
         sb.AppendLine();
         sb.AppendLine("## Package Summary");
@@ -746,7 +832,9 @@ public partial class ReportsView : UserControl
         sb.AppendLine();
         sb.AppendLine("## Prototype / Planned Scope");
         sb.AppendLine();
-        sb.AppendLine("Stage 1 is a local proof of concept focused on review workflow, deterministic image comparison, SQLite persistence, and evidence export. Live AOI hardware, cameras, lighting control, PLC/robot/handler integration, MES/ERP integration, production database integration, and trained ML inference are planned later-stage work unless separately configured.");
+        sb.AppendLine("Implemented in Stage 1: local operator/review workflow, deterministic prototype inspection engine, SQLite persistence, image import/library support, batch validation evidence, annotated overlay export, role-based local access controls, and customer package generation.");
+        sb.AppendLine();
+        sb.AppendLine("Planned for later stages: live AOI hardware, real 3D camera acquisition, lighting control, PLC/robot/handler integration, MES/ERP authentication and traceability, production database integration, and trained ML inference unless separately configured and verified.");
         sb.AppendLine();
         sb.AppendLine("Missing optional inputs, such as absent validation runs or inaccessible image paths, are recorded in `warnings.txt` and do not prevent package creation.");
         return sb.ToString();

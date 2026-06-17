@@ -3,6 +3,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Windows.Media.Imaging;
 using AOI_Monitor.Models;
+using AOI_Monitor.Services;
 using Microsoft.Data.Sqlite;
 
 namespace AOI_Monitor.Data;
@@ -19,6 +20,9 @@ public static class AoiDatabase
     private static string _storageRoot = ResolveStorageRoot();
 
     public static Func<string>? AuditOperatorProvider { get; set; }
+    public static Func<string>? AuditUserIdProvider { get; set; }
+    public static Func<string>? AuditUserRoleProvider { get; set; }
+    public static Func<string>? AuditStationProvider { get; set; }
 
     public static string StorageRoot => _storageRoot;
     public static string DatabasePath => Path.Combine(StorageRoot, "aoi_monitor.sqlite");
@@ -89,7 +93,14 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$fileHash", hash);
 
         var id = (long)(command.ExecuteScalar() ?? 0L);
-        return new ImportedImage(id, sourcePath, vaultPath, originalName, boardModel, lotId, viewType, importedAt, hash);
+        var imported = new ImportedImage(id, sourcePath, vaultPath, originalName, boardModel, lotId, viewType, importedAt, hash);
+        RecordAuditEvent(
+            "IMAGE_IMPORT",
+            $"Image imported to vault: {originalName}; board={boardModel}; lot={lotId}; view={viewType}.",
+            relatedEntityType: "Image",
+            relatedEntityId: id.ToString(CultureInfo.InvariantCulture),
+            relatedPath: vaultPath);
+        return imported;
     }
 
     public static ImageImportResult TryImportImage(
@@ -138,7 +149,15 @@ public static class AoiDatabase
         {
             var hash = ComputeSha256(sourcePath);
             if (TryGetImageByHash(hash) is { } existing)
+            {
+                RecordAuditEvent(
+                    "IMAGE_IMPORT_DUPLICATE",
+                    $"Duplicate image skipped: {Path.GetFileName(sourcePath)}.",
+                    relatedEntityType: "Image",
+                    relatedEntityId: existing.Id.ToString(CultureInfo.InvariantCulture),
+                    relatedPath: existing.VaultPath);
                 return new ImageImportResult(existing, false, "Duplicate", "Image already exists in the vault.");
+            }
 
             var imported = ImportImage(sourcePath, boardModel, lotId, viewType);
             return new ImageImportResult(imported, true, "Imported", "Image copied into the vault.");
@@ -172,7 +191,7 @@ public static class AoiDatabase
         return images;
     }
 
-    public static void RecordInspectionResult(AnalysisResult result)
+    public static long RecordInspectionResult(AnalysisResult result)
     {
         EnsureInitialized();
 
@@ -254,6 +273,14 @@ public static class AoiDatabase
         }
 
         transaction.Commit();
+        RecordAuditEvent(
+            "INSPECTION_RESULT",
+            $"Inspection result persisted: {result.Verdict}, engine {result.InspectionEngine}, score {result.DifferenceScore:F1}%.",
+            operatorWithRole: result.OperatorId,
+            relatedEntityType: "InspectionResult",
+            relatedEntityId: inspectionResultId.ToString(CultureInfo.InvariantCulture),
+            relatedPath: result.SamplePath);
+        return inspectionResultId;
     }
 
     public static long RecordBatchTestRun(
@@ -455,7 +482,7 @@ public static class AoiDatabase
         using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT Id, CreatedAtUtc, ExportType, FilePath, Status, OperatorId
+            SELECT Id, CreatedAtUtc, ExportType, FilePath, Status, OperatorId, AuditEventId
             FROM ExportHistory
             ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
             LIMIT $limit;
@@ -467,6 +494,32 @@ public static class AoiDatabase
         {
             records.Add(ReadExportHistory(reader));
         }
+
+        return records;
+    }
+
+    public static IReadOnlyList<AuditEventRecord> GetAuditEvents(LogFilter filter, int limit = 500)
+    {
+        EnsureInitialized();
+
+        var records = new List<AuditEventRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        var where = BuildAuditWhere(filter, command);
+        command.CommandText =
+            $"""
+            SELECT Id, TimestampUtc, LocalTimestamp, UserId, UserRole, StationId,
+                   ActionCategory, ActionDetail, RelatedEntityType, RelatedEntityId, RelatedPath
+            FROM AuditEvents
+            {where}
+            ORDER BY datetime(TimestampUtc) DESC, Id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            records.Add(ReadAuditEvent(reader));
 
         return records;
     }
@@ -525,7 +578,137 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$recipeJson", recipeJson);
         command.Parameters.AddWithValue("$notes", "Recipe editor revision");
         command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
-        return (long)(command.ExecuteScalar() ?? 0L);
+        var id = (long)(command.ExecuteScalar() ?? 0L);
+        RecordAuditEvent(
+            "RECIPE_SAVE",
+            $"Recipe revision saved: {recipeName}; board={boardProgram}; priority={detectionPriority}.",
+            operatorWithRole: operatorId,
+            relatedEntityType: "RecipeRevision",
+            relatedEntityId: id.ToString(CultureInfo.InvariantCulture),
+            relatedPath: backgroundImagePath);
+        return id;
+    }
+
+    public static long SaveCalibrationProfile(
+        string profileName,
+        string boardModel,
+        string viewType,
+        string sampleImagePath,
+        string operatorId,
+        IReadOnlyList<CalibrationPointInput> points)
+    {
+        EnsureInitialized();
+
+        if (string.IsNullOrWhiteSpace(profileName))
+            throw new ArgumentException("Calibration profile name is required.", nameof(profileName));
+        if (points.Count == 0)
+            throw new ArgumentException("At least one calibration point is required.", nameof(points));
+
+        var transform = CalibrationTransformService.Calculate(points);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO CalibrationProfiles
+                (ProfileName, BoardModel, ViewType, SampleImagePath, OperatorId, PointCount,
+                 ScaleX, OffsetX, ScaleY, OffsetY, TransformSummary, CreatedAtUtc)
+            VALUES
+                ($profileName, $boardModel, $viewType, $sampleImagePath, $operatorId, $pointCount,
+                 $scaleX, $offsetX, $scaleY, $offsetY, $transformSummary, $createdAtUtc);
+            SELECT last_insert_rowid();
+            """;
+
+        command.Parameters.AddWithValue("$profileName", profileName.Trim());
+        command.Parameters.AddWithValue("$boardModel", string.IsNullOrWhiteSpace(boardModel) ? "UNKNOWN" : boardModel.Trim());
+        command.Parameters.AddWithValue("$viewType", string.IsNullOrWhiteSpace(viewType) ? "Top" : viewType.Trim());
+        command.Parameters.AddWithValue("$sampleImagePath", string.IsNullOrWhiteSpace(sampleImagePath) ? string.Empty : sampleImagePath.Trim());
+        command.Parameters.AddWithValue("$operatorId", string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId.Trim());
+        command.Parameters.AddWithValue("$pointCount", points.Count);
+        command.Parameters.AddWithValue("$scaleX", transform.ScaleX);
+        command.Parameters.AddWithValue("$offsetX", transform.OffsetX);
+        command.Parameters.AddWithValue("$scaleY", transform.ScaleY);
+        command.Parameters.AddWithValue("$offsetY", transform.OffsetY);
+        command.Parameters.AddWithValue("$transformSummary", transform.Summary);
+        command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+
+        var profileId = (long)(command.ExecuteScalar() ?? 0L);
+        foreach (var point in points)
+        {
+            using var pointCommand = connection.CreateCommand();
+            pointCommand.Transaction = transaction;
+            pointCommand.CommandText =
+                """
+                INSERT INTO CalibrationPoints
+                    (ProfileId, ImageX, ImageY, BoardXMillimeters, BoardYMillimeters, CreatedAtUtc)
+                VALUES
+                    ($profileId, $imageX, $imageY, $boardXMillimeters, $boardYMillimeters, $createdAtUtc);
+                """;
+            pointCommand.Parameters.AddWithValue("$profileId", profileId);
+            pointCommand.Parameters.AddWithValue("$imageX", point.ImageX);
+            pointCommand.Parameters.AddWithValue("$imageY", point.ImageY);
+            pointCommand.Parameters.AddWithValue("$boardXMillimeters", point.BoardXMillimeters);
+            pointCommand.Parameters.AddWithValue("$boardYMillimeters", point.BoardYMillimeters);
+            pointCommand.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            pointCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        RecordAuditEvent(
+            "CALIBRATION_SAVE",
+            $"2D calibration profile saved: {profileName}; board={boardModel}; view={viewType}; points={points.Count}.",
+            operatorWithRole: operatorId,
+            relatedEntityType: "CalibrationProfile",
+            relatedEntityId: profileId.ToString(CultureInfo.InvariantCulture),
+            relatedPath: sampleImagePath);
+        return profileId;
+    }
+
+    public static IReadOnlyList<CalibrationProfileRecord> GetCalibrationProfiles()
+    {
+        EnsureInitialized();
+
+        var profiles = new List<CalibrationProfileRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ProfileName, BoardModel, ViewType, SampleImagePath, OperatorId, PointCount,
+                   ScaleX, OffsetX, ScaleY, OffsetY, TransformSummary, CreatedAtUtc
+            FROM CalibrationProfiles
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC;
+            """;
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var profileId = reader.GetInt64(0);
+            profiles.Add(ReadCalibrationProfile(reader, GetCalibrationPoints(profileId)));
+        }
+
+        return profiles;
+    }
+
+    public static CalibrationProfileRecord? GetCalibrationProfile(long profileId)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ProfileName, BoardModel, ViewType, SampleImagePath, OperatorId, PointCount,
+                   ScaleX, OffsetX, ScaleY, OffsetY, TransformSummary, CreatedAtUtc
+            FROM CalibrationProfiles
+            WHERE Id = $profileId;
+            """;
+        command.Parameters.AddWithValue("$profileId", profileId);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read()
+            ? ReadCalibrationProfile(reader, GetCalibrationPoints(profileId))
+            : null;
     }
 
     public static IReadOnlyList<DbHealthRow> GetDatabaseHealthRows()
@@ -539,9 +722,13 @@ public static class AoiDatabase
             CountTable(connection, "InspectionResults", "OK"),
             CountTable(connection, "Defects", "OK"),
             CountTable(connection, "ReviewEvents", "OK"),
+            CountTable(connection, "AuditEvents", "OK"),
             CountTable(connection, "RecipeRevisions", "OK"),
+            CountTable(connection, "CalibrationProfiles", "OK"),
+            CountTable(connection, "CalibrationPoints", "OK"),
             CountTable(connection, "BatchTestRuns", "OK"),
             CountTable(connection, "ExportHistory", "OK"),
+            CountTable(connection, "MesUploadAttempts", "OK"),
             CountTable(connection, "LogArchive", "OK"),
         };
     }
@@ -562,6 +749,52 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$operatorId", string.IsNullOrWhiteSpace(operatorId) ? DBNull.Value : operatorId);
         command.Parameters.AddWithValue("$eventTimeUtc", timestamp.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
         command.ExecuteNonQuery();
+    }
+
+    public static long RecordAuditEvent(
+        string actionCategory,
+        string actionDetail,
+        DateTime? timestampLocal = null,
+        string? operatorWithRole = null,
+        string? userId = null,
+        string? userRole = null,
+        string? stationId = null,
+        string relatedEntityType = "",
+        string relatedEntityId = "",
+        string relatedPath = "")
+    {
+        EnsureInitialized();
+
+        var localTimestamp = timestampLocal ?? DateTime.Now;
+        var timestampUtc = localTimestamp.ToUniversalTime();
+        var (parsedUserId, parsedRole) = SplitOperatorWithRole(operatorWithRole);
+        var effectiveUserId = NullIfWhiteSpace(userId) ?? parsedUserId ?? AuditUserIdProvider?.Invoke() ?? "UNKNOWN";
+        var effectiveRole = NullIfWhiteSpace(userRole) ?? parsedRole ?? AuditUserRoleProvider?.Invoke() ?? ExtractRole(AuditOperatorProvider?.Invoke()) ?? "UNKNOWN";
+        var effectiveStation = NullIfWhiteSpace(stationId) ?? AuditStationProvider?.Invoke() ?? "UNKNOWN";
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO AuditEvents
+                (TimestampUtc, LocalTimestamp, UserId, UserRole, StationId,
+                 ActionCategory, ActionDetail, RelatedEntityType, RelatedEntityId, RelatedPath)
+            VALUES
+                ($timestampUtc, $localTimestamp, $userId, $userRole, $stationId,
+                 $actionCategory, $actionDetail, $relatedEntityType, $relatedEntityId, $relatedPath);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$timestampUtc", timestampUtc.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$localTimestamp", localTimestamp.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$userId", effectiveUserId);
+        command.Parameters.AddWithValue("$userRole", effectiveRole);
+        command.Parameters.AddWithValue("$stationId", effectiveStation);
+        command.Parameters.AddWithValue("$actionCategory", string.IsNullOrWhiteSpace(actionCategory) ? "UNKNOWN" : actionCategory);
+        command.Parameters.AddWithValue("$actionDetail", string.IsNullOrWhiteSpace(actionDetail) ? string.Empty : actionDetail);
+        command.Parameters.AddWithValue("$relatedEntityType", relatedEntityType);
+        command.Parameters.AddWithValue("$relatedEntityId", relatedEntityId);
+        command.Parameters.AddWithValue("$relatedPath", relatedPath);
+        return (long)(command.ExecuteScalar() ?? 0L);
     }
 
     public static void RecordTrainingSample(string sourcePath, string label, string notes)
@@ -595,19 +828,94 @@ public static class AoiDatabase
     {
         EnsureInitialized();
 
+        var effectiveOperator = string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId;
+        var auditEventId = RecordAuditEvent(
+            "EXPORT",
+            $"Export recorded: {exportType}; status={status}; path={filePath}.",
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "ExportHistory",
+            relatedPath: filePath);
+
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText =
             """
-            INSERT INTO ExportHistory (ExportType, FilePath, Status, OperatorId, CreatedAtUtc)
-            VALUES ($exportType, $filePath, $status, $operatorId, $createdAtUtc);
+            INSERT INTO ExportHistory (ExportType, FilePath, Status, OperatorId, AuditEventId, CreatedAtUtc)
+            VALUES ($exportType, $filePath, $status, $operatorId, $auditEventId, $createdAtUtc);
             """;
         command.Parameters.AddWithValue("$exportType", exportType);
         command.Parameters.AddWithValue("$filePath", filePath);
         command.Parameters.AddWithValue("$status", status);
-        command.Parameters.AddWithValue("$operatorId", string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId);
+        command.Parameters.AddWithValue("$operatorId", effectiveOperator);
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
         command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         command.ExecuteNonQuery();
+    }
+
+    public static void RecordMesUploadAttempt(
+        string mode,
+        string endpointUrl,
+        string payloadPath,
+        string status,
+        string message,
+        string operatorId,
+        string lotId,
+        string boardModel,
+        string result)
+    {
+        EnsureInitialized();
+
+        var effectiveOperator = string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId;
+        RecordAuditEvent(
+            "MES_MOCK_UPLOAD",
+            $"Mock MES upload attempt: mode={mode}; status={status}; result={result}; message={message}.",
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "MesUploadAttempt",
+            relatedPath: payloadPath);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO MesUploadAttempts
+                (Mode, EndpointUrl, PayloadPath, Status, Message, OperatorId, LotId, BoardModel, Result, CreatedAtUtc)
+            VALUES
+                ($mode, $endpointUrl, $payloadPath, $status, $message, $operatorId, $lotId, $boardModel, $result, $createdAtUtc);
+            """;
+        command.Parameters.AddWithValue("$mode", mode);
+        command.Parameters.AddWithValue("$endpointUrl", endpointUrl);
+        command.Parameters.AddWithValue("$payloadPath", payloadPath);
+        command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$message", message);
+        command.Parameters.AddWithValue("$operatorId", effectiveOperator);
+        command.Parameters.AddWithValue("$lotId", lotId);
+        command.Parameters.AddWithValue("$boardModel", boardModel);
+        command.Parameters.AddWithValue("$result", result);
+        command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.ExecuteNonQuery();
+    }
+
+    public static IReadOnlyList<MesUploadAttemptRecord> GetMesUploadAttempts(int limit = 100)
+    {
+        EnsureInitialized();
+
+        var records = new List<MesUploadAttemptRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, Mode, EndpointUrl, PayloadPath, Status, Message, OperatorId, LotId, BoardModel, Result
+            FROM MesUploadAttempts
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            records.Add(ReadMesUploadAttempt(reader));
+
+        return records;
     }
 
     public static string RunIntegrityCheck()
@@ -722,7 +1030,7 @@ public static class AoiDatabase
             reader.GetString(3),
             reader.GetString(4),
             reader.GetString(5),
-            reader.IsDBNull(17) ? "Pixel Difference" : reader.GetString(17),
+            reader.IsDBNull(17) ? "Pixel Difference Prototype Engine" : reader.GetString(17),
             reader.IsDBNull(18) ? "PIXEL_DIFF_0.1" : reader.GetString(18),
             reader.GetDouble(6),
             reader.GetString(7),
@@ -751,7 +1059,7 @@ public static class AoiDatabase
             ParseDateTime(reader.GetString(1)),
             reader.IsDBNull(2) ? "UNKNOWN" : reader.GetString(2),
             reader.IsDBNull(3) ? "UNKNOWN" : reader.GetString(3),
-            reader.IsDBNull(4) ? "Pixel Difference" : reader.GetString(4),
+            reader.IsDBNull(4) ? "Pixel Difference Prototype Engine" : reader.GetString(4),
             reader.IsDBNull(5) ? "UNKNOWN" : reader.GetString(5),
             reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
             reader.IsDBNull(7) ? 0 : reader.GetDouble(7),
@@ -792,7 +1100,40 @@ public static class AoiDatabase
             reader.GetString(2),
             reader.GetString(3),
             reader.GetString(4),
-            reader.IsDBNull(5) ? "UNKNOWN" : reader.GetString(5));
+            reader.IsDBNull(5) ? "UNKNOWN" : reader.GetString(5),
+            reader.IsDBNull(6) ? null : reader.GetInt64(6));
+    }
+
+    private static AuditEventRecord ReadAuditEvent(SqliteDataReader reader)
+    {
+        return new AuditEventRecord(
+            reader.GetInt64(0),
+            ParseDateTime(reader.GetString(1)),
+            ParseDateTime(reader.GetString(2)),
+            reader.IsDBNull(3) ? "UNKNOWN" : reader.GetString(3),
+            reader.IsDBNull(4) ? "UNKNOWN" : reader.GetString(4),
+            reader.IsDBNull(5) ? "UNKNOWN" : reader.GetString(5),
+            reader.IsDBNull(6) ? "UNKNOWN" : reader.GetString(6),
+            reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+            reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+            reader.IsDBNull(10) ? string.Empty : reader.GetString(10));
+    }
+
+    private static MesUploadAttemptRecord ReadMesUploadAttempt(SqliteDataReader reader)
+    {
+        return new MesUploadAttemptRecord(
+            reader.GetInt64(0),
+            ParseDateTime(reader.GetString(1)),
+            reader.GetString(2),
+            reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetString(6),
+            reader.IsDBNull(7) ? "UNKNOWN" : reader.GetString(7),
+            reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+            reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+            reader.IsDBNull(10) ? string.Empty : reader.GetString(10));
     }
 
     private static RecipeRevisionRecord ReadRecipeRevision(SqliteDataReader reader)
@@ -807,6 +1148,56 @@ public static class AoiDatabase
             reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
             reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
             ParseDateTime(reader.GetString(8)));
+    }
+
+    private static CalibrationProfileRecord ReadCalibrationProfile(
+        SqliteDataReader reader,
+        IReadOnlyList<CalibrationPointRecord> points)
+    {
+        return new CalibrationProfileRecord(
+            reader.GetInt64(0),
+            reader.GetString(1),
+            reader.IsDBNull(2) ? "UNKNOWN" : reader.GetString(2),
+            reader.IsDBNull(3) ? "Top" : reader.GetString(3),
+            reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+            reader.IsDBNull(5) ? "UNKNOWN" : reader.GetString(5),
+            reader.IsDBNull(6) ? points.Count : reader.GetInt32(6),
+            reader.IsDBNull(7) ? 0 : reader.GetDouble(7),
+            reader.IsDBNull(8) ? 0 : reader.GetDouble(8),
+            reader.IsDBNull(9) ? 0 : reader.GetDouble(9),
+            reader.IsDBNull(10) ? 0 : reader.GetDouble(10),
+            reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+            ParseDateTime(reader.GetString(12)),
+            points);
+    }
+
+    private static IReadOnlyList<CalibrationPointRecord> GetCalibrationPoints(long profileId)
+    {
+        var points = new List<CalibrationPointRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ProfileId, ImageX, ImageY, BoardXMillimeters, BoardYMillimeters
+            FROM CalibrationPoints
+            WHERE ProfileId = $profileId
+            ORDER BY Id ASC;
+            """;
+        command.Parameters.AddWithValue("$profileId", profileId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            points.Add(new CalibrationPointRecord(
+                reader.GetInt64(0),
+                reader.GetInt64(1),
+                reader.GetDouble(2),
+                reader.GetDouble(3),
+                reader.GetDouble(4),
+                reader.GetDouble(5)));
+        }
+
+        return points;
     }
 
     private static string BuildInspectionWhere(LogFilter filter, SqliteCommand command)
@@ -861,6 +1252,38 @@ public static class AoiDatabase
         return clauses.Count == 0 ? string.Empty : "WHERE " + string.Join(" AND ", clauses);
     }
 
+    private static string BuildAuditWhere(LogFilter filter, SqliteCommand command)
+    {
+        var clauses = new List<string>();
+        AddDateRangeClauses("TimestampUtc", filter, clauses, command);
+
+        if (!string.IsNullOrWhiteSpace(filter.OperatorId))
+        {
+            clauses.Add("UserId LIKE $auditUserId");
+            command.Parameters.AddWithValue("$auditUserId", $"%{filter.OperatorId}%");
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.UserRole) && filter.UserRole != "ALL")
+        {
+            clauses.Add("UserRole = $auditUserRole");
+            command.Parameters.AddWithValue("$auditUserRole", filter.UserRole);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.ActionCategory) && filter.ActionCategory != "ALL")
+        {
+            clauses.Add("ActionCategory LIKE $auditActionCategory");
+            command.Parameters.AddWithValue("$auditActionCategory", $"%{filter.ActionCategory}%");
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.BoardProgram))
+        {
+            clauses.Add("(ActionDetail LIKE $auditBoard OR RelatedPath LIKE $auditBoard OR RelatedEntityId LIKE $auditBoard)");
+            command.Parameters.AddWithValue("$auditBoard", $"%{filter.BoardProgram}%");
+        }
+
+        return clauses.Count == 0 ? string.Empty : "WHERE " + string.Join(" AND ", clauses);
+    }
+
     private static void AddDateRangeClauses(string columnName, LogFilter filter, List<string> clauses, SqliteCommand command)
     {
         if (filter.FromDate is { } fromDate)
@@ -899,7 +1322,7 @@ public static class AoiDatabase
     {
         AddColumnIfMissing(connection, "InspectionResults", "BoardProgram", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
         AddColumnIfMissing(connection, "InspectionResults", "OperatorId", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
-        AddColumnIfMissing(connection, "InspectionResults", "InspectionEngine", "TEXT NOT NULL DEFAULT 'Pixel Difference'");
+        AddColumnIfMissing(connection, "InspectionResults", "InspectionEngine", "TEXT NOT NULL DEFAULT 'Pixel Difference Prototype Engine'");
         AddColumnIfMissing(connection, "InspectionResults", "ModelFilePath", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "InspectionResults", "ConfidenceThreshold", "REAL NOT NULL DEFAULT 0");
         AddColumnIfMissing(connection, "InspectionResults", "ImageLoadMs", "REAL NOT NULL DEFAULT 0");
@@ -918,7 +1341,7 @@ public static class AoiDatabase
         AddColumnIfMissing(connection, "RecipeRevisions", "BackgroundImagePath", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "RecipeRevisions", "RecipeJson", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "BatchTestRuns", "ModelVersion", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
-        AddColumnIfMissing(connection, "BatchTestResults", "InspectionEngine", "TEXT NOT NULL DEFAULT 'Pixel Difference'");
+        AddColumnIfMissing(connection, "BatchTestResults", "InspectionEngine", "TEXT NOT NULL DEFAULT 'Pixel Difference Prototype Engine'");
         AddColumnIfMissing(connection, "BatchTestResults", "ModelVersion", "TEXT NOT NULL DEFAULT 'PIXEL_DIFF_0.1'");
         AddColumnIfMissing(connection, "BatchTestResults", "Side", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "BatchTestResults", "RefDes", "TEXT NOT NULL DEFAULT ''");
@@ -931,6 +1354,7 @@ public static class AoiDatabase
         AddColumnIfMissing(connection, "BatchTestResults", "OverlayRenderingMs", "REAL NOT NULL DEFAULT 0");
         AddColumnIfMissing(connection, "BatchTestResults", "TotalInspectionMs", "REAL NOT NULL DEFAULT 0");
         AddColumnIfMissing(connection, "ExportHistory", "OperatorId", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
+        AddColumnIfMissing(connection, "ExportHistory", "AuditEventId", "INTEGER NULL");
     }
 
     private static void AutoArchiveOldLogs(SqliteConnection connection)
@@ -953,6 +1377,14 @@ public static class AoiDatabase
             cutoff,
             archivedAt,
             "Auto archive copy-only: source review event remains in ReviewEvents.");
+
+        CopyArchiveRows(
+            connection,
+            "AuditEvents",
+            "TimestampUtc",
+            cutoff,
+            archivedAt,
+            "Auto archive copy-only: source audit event remains in AuditEvents.");
 
         CopyArchiveRows(
             connection,
@@ -1002,6 +1434,35 @@ public static class AoiDatabase
         using var alterCommand = connection.CreateCommand();
         alterCommand.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
         alterCommand.ExecuteNonQuery();
+    }
+
+    private static string? NullIfWhiteSpace(string? text)
+        => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    private static (string? UserId, string? Role) SplitOperatorWithRole(string? operatorWithRole)
+    {
+        if (string.IsNullOrWhiteSpace(operatorWithRole))
+            return (null, null);
+
+        var trimmed = operatorWithRole.Trim();
+        var role = ExtractRole(trimmed);
+        var bracketIndex = trimmed.IndexOf('[', StringComparison.Ordinal);
+        var userId = bracketIndex > 0 ? trimmed[..bracketIndex].Trim() : trimmed;
+        return (string.IsNullOrWhiteSpace(userId) ? null : userId, role);
+    }
+
+    private static string? ExtractRole(string? operatorWithRole)
+    {
+        if (string.IsNullOrWhiteSpace(operatorWithRole))
+            return null;
+
+        var start = operatorWithRole.LastIndexOf("[", StringComparison.Ordinal);
+        var end = operatorWithRole.LastIndexOf("]", StringComparison.Ordinal);
+        if (start < 0 || end <= start)
+            return null;
+
+        var role = operatorWithRole.Substring(start + 1, end - start - 1).Trim();
+        return string.IsNullOrWhiteSpace(role) ? null : role;
     }
 
     private static string ToDefectSeverity(string judgmentStatus)
@@ -1055,7 +1516,7 @@ public static class AoiDatabase
             GoldenImagePath TEXT NULL,
             BoardProgram TEXT NOT NULL DEFAULT 'UNKNOWN',
             OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
-            InspectionEngine TEXT NOT NULL DEFAULT 'Pixel Difference',
+            InspectionEngine TEXT NOT NULL DEFAULT 'Pixel Difference Prototype Engine',
             DifferenceScore REAL NOT NULL,
             MeanBrightness REAL NOT NULL,
             Verdict TEXT NOT NULL,
@@ -1111,6 +1572,21 @@ public static class AoiDatabase
             EventTimeUtc TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS AuditEvents
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            TimestampUtc TEXT NOT NULL,
+            LocalTimestamp TEXT NOT NULL,
+            UserId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            UserRole TEXT NOT NULL DEFAULT 'UNKNOWN',
+            StationId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            ActionCategory TEXT NOT NULL,
+            ActionDetail TEXT NOT NULL,
+            RelatedEntityType TEXT NOT NULL DEFAULT '',
+            RelatedEntityId TEXT NOT NULL DEFAULT '',
+            RelatedPath TEXT NOT NULL DEFAULT ''
+        );
+
         CREATE TABLE IF NOT EXISTS RecipeRevisions
         (
             Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1133,6 +1609,35 @@ public static class AoiDatabase
             Label TEXT NOT NULL,
             Notes TEXT NULL,
             CreatedAtUtc TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS CalibrationProfiles
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ProfileName TEXT NOT NULL,
+            BoardModel TEXT NOT NULL DEFAULT 'UNKNOWN',
+            ViewType TEXT NOT NULL DEFAULT 'Top',
+            SampleImagePath TEXT NOT NULL DEFAULT '',
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            PointCount INTEGER NOT NULL DEFAULT 0,
+            ScaleX REAL NOT NULL DEFAULT 0,
+            OffsetX REAL NOT NULL DEFAULT 0,
+            ScaleY REAL NOT NULL DEFAULT 0,
+            OffsetY REAL NOT NULL DEFAULT 0,
+            TransformSummary TEXT NOT NULL DEFAULT '',
+            CreatedAtUtc TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS CalibrationPoints
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ProfileId INTEGER NOT NULL,
+            ImageX REAL NOT NULL,
+            ImageY REAL NOT NULL,
+            BoardXMillimeters REAL NOT NULL,
+            BoardYMillimeters REAL NOT NULL,
+            CreatedAtUtc TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            FOREIGN KEY (ProfileId) REFERENCES CalibrationProfiles(Id)
         );
 
         CREATE TABLE IF NOT EXISTS BatchTestRuns
@@ -1159,7 +1664,7 @@ public static class AoiDatabase
             ImageName TEXT NOT NULL,
             GroundTruth TEXT NOT NULL,
             EngineResult TEXT NOT NULL,
-            InspectionEngine TEXT NOT NULL DEFAULT 'Pixel Difference',
+            InspectionEngine TEXT NOT NULL DEFAULT 'Pixel Difference Prototype Engine',
             ModelVersion TEXT NOT NULL DEFAULT 'PIXEL_DIFF_0.1',
             Score REAL NOT NULL,
             PassFail TEXT NOT NULL,
@@ -1189,6 +1694,22 @@ public static class AoiDatabase
             FilePath TEXT NOT NULL,
             Status TEXT NOT NULL,
             OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            AuditEventId INTEGER NULL,
+            CreatedAtUtc TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS MesUploadAttempts
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            Mode TEXT NOT NULL,
+            EndpointUrl TEXT NOT NULL DEFAULT '',
+            PayloadPath TEXT NOT NULL,
+            Status TEXT NOT NULL,
+            Message TEXT NOT NULL,
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            LotId TEXT NOT NULL DEFAULT '',
+            BoardModel TEXT NOT NULL DEFAULT '',
+            Result TEXT NOT NULL DEFAULT '',
             CreatedAtUtc TEXT NOT NULL
         );
 
@@ -1210,8 +1731,14 @@ public static class AoiDatabase
         CREATE INDEX IF NOT EXISTS IX_InspectionResults_OperatorId ON InspectionResults(OperatorId);
         CREATE INDEX IF NOT EXISTS IX_InspectionResults_Verdict ON InspectionResults(Verdict);
         CREATE INDEX IF NOT EXISTS IX_ReviewEvents_EventTimeUtc ON ReviewEvents(EventTimeUtc);
+        CREATE INDEX IF NOT EXISTS IX_AuditEvents_TimestampUtc ON AuditEvents(TimestampUtc);
+        CREATE INDEX IF NOT EXISTS IX_AuditEvents_UserRole ON AuditEvents(UserId, UserRole);
+        CREATE INDEX IF NOT EXISTS IX_AuditEvents_ActionCategory ON AuditEvents(ActionCategory);
         CREATE INDEX IF NOT EXISTS IX_RecipeRevisions_BoardProgram_CreatedAtUtc ON RecipeRevisions(BoardProgram, CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_CalibrationProfiles_BoardModel_CreatedAtUtc ON CalibrationProfiles(BoardModel, CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_CalibrationPoints_ProfileId ON CalibrationPoints(ProfileId);
         CREATE INDEX IF NOT EXISTS IX_BatchTestResults_RunId ON BatchTestResults(RunId);
         CREATE INDEX IF NOT EXISTS IX_ExportHistory_CreatedAtUtc ON ExportHistory(CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_MesUploadAttempts_CreatedAtUtc ON MesUploadAttempts(CreatedAtUtc);
         """;
 }

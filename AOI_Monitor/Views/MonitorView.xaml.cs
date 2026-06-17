@@ -20,10 +20,14 @@ public partial class MonitorView : UserControl
     private readonly ObservableCollection<AlarmRow> _alarms = new();
     private readonly Dictionary<CameraViewType, string> _viewFolders = new();
     private readonly List<ImportedImage> _importedQueue = new();
+    private readonly SimulatedRobotController _robotController = new();
+    private readonly SimulatedEmergencyStopMonitor _emergencyStopMonitor;
 
     private ICameraSource _cameraSource = CameraSourceFactory.ActiveSource;
     private bool _isRunning;
     private bool _currentResultSaved;
+    private bool _robotCycleRunning;
+    private bool _updatingCalibrationProfiles;
     private int _importedQueueIndex = -1;
     private string? _currentImagePath;
     private string _currentBoardModel = "TBOX-MAIN";
@@ -31,17 +35,24 @@ public partial class MonitorView : UserControl
     private BitmapSource? _currentBitmap;
     private ImportedImage? _currentImportedImage;
     private AnalysisResult? _currentAnalysis;
+    private CalibrationProfileRecord? _selectedCalibrationProfile;
 
     public MonitorView()
     {
         InitializeComponent();
+        _emergencyStopMonitor = new SimulatedEmergencyStopMonitor(_robotController);
+        IntegrationBoundaryRegistry.RobotController = _robotController;
+        IntegrationBoundaryRegistry.EmergencyStopMonitor = _emergencyStopMonitor;
         DefectGrid.ItemsSource = _defects;
         AlarmGrid.ItemsSource = _alarms;
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged += OnEngineConfigurationChanged;
         Unloaded += OnUnloaded;
         ReloadImportedQueue();
+        RefreshCalibrationProfiles();
         RefreshHeader();
+        UpdateRobotSimulationStatus();
+        LogEvent("ROBOT SIM", "Robot/handler simulation is available. No real robot hardware is connected.");
         LogEvent("READY", "Main Inspection ready. Use folder simulation or Image Library imported images.");
     }
 
@@ -49,6 +60,10 @@ public partial class MonitorView : UserControl
     {
         WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged -= OnEngineConfigurationChanged;
+        if (ReferenceEquals(IntegrationBoundaryRegistry.RobotController, _robotController))
+            IntegrationBoundaryRegistry.RobotController = new NullRobotController();
+        if (ReferenceEquals(IntegrationBoundaryRegistry.EmergencyStopMonitor, _emergencyStopMonitor))
+            IntegrationBoundaryRegistry.EmergencyStopMonitor = new NullEmergencyStopMonitor();
     }
 
     private void OnWorkflowStateChanged() => Dispatcher.Invoke(RefreshFromState);
@@ -147,6 +162,79 @@ public partial class MonitorView : UserControl
         }
     }
 
+    private async void OnRobotLoadClick(object sender, RoutedEventArgs e)
+    {
+        if (_robotCycleRunning)
+        {
+            LogEvent("ROBOT SIM", "Manual load ignored because a simulated robot cycle is already running.");
+            return;
+        }
+
+        if (!_robotController.IsBoardLoaded)
+            LoadNextBoard(runInspection: false);
+
+        if (string.IsNullOrWhiteSpace(_currentImagePath))
+        {
+            LogEvent("ROBOT LOAD", "Manual simulated load stopped because no board image is available.");
+            return;
+        }
+
+        await RunRobotLoadAsync();
+    }
+
+    private async void OnRobotInspectClick(object sender, RoutedEventArgs e)
+    {
+        if (_robotCycleRunning)
+        {
+            LogEvent("ROBOT SIM", "Manual inspect ignored because a simulated robot cycle is already running.");
+            return;
+        }
+
+        var result = await RunRobotInspectAsync();
+        if (result.Accepted && !string.IsNullOrWhiteSpace(_currentImagePath))
+            RunInspection(_currentImagePath);
+    }
+
+    private async void OnRobotUnloadClick(object sender, RoutedEventArgs e)
+    {
+        if (_robotCycleRunning)
+        {
+            LogEvent("ROBOT SIM", "Manual unload ignored because a simulated robot cycle is already running.");
+            return;
+        }
+
+        await RunRobotUnloadAsync();
+    }
+
+    private async void OnRobotResetClick(object sender, RoutedEventArgs e)
+    {
+        if (_robotCycleRunning)
+        {
+            LogEvent("ROBOT SIM", "Manual reset ignored because a simulated robot cycle is already running.");
+            return;
+        }
+
+        await ExecuteRobotCommandAsync("ROBOT RESET", () => _robotController.ResetAsync());
+    }
+
+    private void OnRobotEmergencyStopClick(object sender, RoutedEventArgs e)
+    {
+        _robotController.TriggerEmergencyStop();
+        UpdateRobotSimulationStatus();
+        LogEvent("ROBOT E-STOP", "Emergency stop simulation triggered. No real safety hardware is connected.");
+    }
+
+    private async void OnRobotCycleClick(object sender, RoutedEventArgs e)
+    {
+        if (_robotCycleRunning)
+        {
+            LogEvent("ROBOT CYCLE", "A simulated robot cycle is already running.");
+            return;
+        }
+
+        await RunRobotCycleAsync();
+    }
+
     private void OnViewSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _cameraSource.SelectedView = SelectedCameraView();
@@ -161,7 +249,21 @@ public partial class MonitorView : UserControl
         DefectOverlayCanvas.Visibility = OverlayCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void LoadNextBoard()
+    private void OnCalibrationProfileSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingCalibrationProfiles)
+            return;
+
+        _selectedCalibrationProfile = (CalibrationProfileCombo.SelectedItem as CalibrationProfileListItem)?.Profile;
+        RefreshDefectRows();
+
+        if (_selectedCalibrationProfile is null)
+            LogEvent("CALIBRATION", "No 2D calibration profile selected. Defect coordinates remain image-space only.");
+        else
+            LogEvent("CALIBRATION", $"Selected 2D calibration profile '{_selectedCalibrationProfile.ProfileName}' for approximate board-mm display. Stage 2 preparation only.");
+    }
+
+    private void LoadNextBoard(bool runInspection = true)
     {
         try
         {
@@ -181,7 +283,19 @@ public partial class MonitorView : UserControl
             WorkflowState.Instance.SetSampleImage(nextBoard.ImagePath);
             LoadImage(nextBoard.ImagePath);
             RefreshHeader();
-            RunInspection(nextBoard.ImagePath);
+            if (runInspection)
+            {
+                RunInspection(nextBoard.ImagePath);
+            }
+            else
+            {
+                _currentAnalysis = null;
+                _defects.Clear();
+                DefectOverlayCanvas.Children.Clear();
+                TimingText.Text = "--";
+                SetResultStatus("REVIEW");
+                LogEvent("BOARD READY", "Simulated board image loaded for Simulated Robot cycle. Inspection has not run yet.");
+            }
         }
         catch (Exception ex)
         {
@@ -297,6 +411,7 @@ public partial class MonitorView : UserControl
 
     private void RefreshFromState()
     {
+        RefreshCalibrationProfiles(_selectedCalibrationProfile?.Id);
         RefreshHeader();
         var state = WorkflowState.Instance;
         if (_currentImagePath is null && !string.IsNullOrWhiteSpace(state.SampleImagePath) && File.Exists(state.SampleImagePath))
@@ -329,6 +444,33 @@ public partial class MonitorView : UserControl
         ModelVersionText.Text = engine.Version;
         if (_currentAnalysis is null)
             TimingText.Text = "--";
+        UpdateRobotSimulationStatus();
+    }
+
+    private void RefreshCalibrationProfiles(long? preferredProfileId = null)
+    {
+        try
+        {
+            _updatingCalibrationProfiles = true;
+            var selectedId = preferredProfileId ?? _selectedCalibrationProfile?.Id;
+            var profileItems = AoiDatabase.GetCalibrationProfiles()
+                .Select(profile => new CalibrationProfileListItem(profile.DisplayName, profile))
+                .ToList();
+
+            profileItems.Insert(0, new CalibrationProfileListItem("No 2D profile (Stage 2 prep)", null));
+            CalibrationProfileCombo.ItemsSource = profileItems;
+            CalibrationProfileCombo.SelectedItem = profileItems.FirstOrDefault(item => item.Profile?.Id == selectedId) ?? profileItems[0];
+            _selectedCalibrationProfile = (CalibrationProfileCombo.SelectedItem as CalibrationProfileListItem)?.Profile;
+        }
+        catch (Exception ex)
+        {
+            _selectedCalibrationProfile = null;
+            LogEvent("CALIBRATION ERROR", $"Could not load calibration profiles: {ex.Message}");
+        }
+        finally
+        {
+            _updatingCalibrationProfiles = false;
+        }
     }
 
     private void RefreshDefectRows()
@@ -341,15 +483,40 @@ public partial class MonitorView : UserControl
         var index = 1;
         foreach (var defect in _currentAnalysis.Defects)
         {
+            double? boardXMillimeters = null;
+            double? boardYMillimeters = null;
+            if (TryMapDefectToBoard(defect, out var mappedBoardX, out var mappedBoardY))
+            {
+                boardXMillimeters = mappedBoardX;
+                boardYMillimeters = mappedBoardY;
+            }
+
             _defects.Add(new DefectRow(
                 index++,
                 defect.DefectType,
                 defect.Confidence,
                 string.IsNullOrWhiteSpace(defect.SideOrViewType) || defect.SideOrViewType == "sample" ? side : defect.SideOrViewType,
                 defect.XPosition,
-                defect.YPosition));
+                defect.YPosition,
+                boardXMillimeters,
+                boardYMillimeters));
         }
     }
+
+    private bool TryMapDefectToBoard(DefectResult defect, out double boardXMillimeters, out double boardYMillimeters)
+    {
+        boardXMillimeters = 0;
+        boardYMillimeters = 0;
+        if (_currentBitmap is null)
+            return false;
+
+        var imageX = ToImagePixelCoordinate(defect.XPosition, _currentBitmap.PixelWidth);
+        var imageY = ToImagePixelCoordinate(defect.YPosition, _currentBitmap.PixelHeight);
+        return CalibrationTransformService.TryConvertImageToBoard(_selectedCalibrationProfile, imageX, imageY, out boardXMillimeters, out boardYMillimeters);
+    }
+
+    private static double ToImagePixelCoordinate(double coordinate, int pixelSize)
+        => coordinate is >= 0 and <= 1 ? coordinate * pixelSize : coordinate;
 
     private double RenderOverlay()
     {
@@ -434,6 +601,163 @@ public partial class MonitorView : UserControl
         WorkflowState.Instance.AddEvent("MAIN_INSPECTION", $"{eventName}: {message}");
     }
 
+    private async Task RunRobotCycleAsync()
+    {
+        _robotCycleRunning = true;
+        UpdateRobotSimulationStatus();
+        var cycleWatch = Stopwatch.StartNew();
+
+        try
+        {
+            if (_robotController.IsEmergencyStopActive)
+            {
+                LogEvent("ROBOT CYCLE", "Cycle blocked because emergency stop simulation is active. Press Reset to clear it.");
+                return;
+            }
+
+            LoadNextBoard(runInspection: false);
+            if (string.IsNullOrWhiteSpace(_currentImagePath))
+            {
+                LogEvent("ROBOT CYCLE", "Cycle stopped because no simulated board image is available.");
+                return;
+            }
+
+            var load = await RunRobotLoadAsync();
+            if (!load.Accepted)
+                return;
+
+            var inspect = await RunRobotInspectAsync();
+            if (!inspect.Accepted)
+                return;
+
+            RunInspection(_currentImagePath);
+            if (!SaveCurrentResultFromRobotCycle())
+                return;
+
+            var unload = await RunRobotUnloadAsync();
+            if (!unload.Accepted)
+                return;
+
+            cycleWatch.Stop();
+            LogEvent("ROBOT CYCLE", $"Simulated Load -> Inspect -> Save -> Unload cycle completed in {cycleWatch.Elapsed.TotalMilliseconds:F0} ms.");
+            RobotCycleTimeText.Text = $"Last cycle {cycleWatch.Elapsed.TotalMilliseconds:F0} ms";
+        }
+        catch (Exception ex)
+        {
+            LogEvent("ROBOT ERROR", $"Simulated robot cycle failed: {ex.Message}");
+        }
+        finally
+        {
+            cycleWatch.Stop();
+            _robotCycleRunning = false;
+            UpdateRobotSimulationStatus();
+        }
+    }
+
+    private Task<IntegrationCommandResult> RunRobotLoadAsync()
+        => ExecuteRobotCommandAsync(
+            "ROBOT LOAD",
+            () => _robotController.LoadAsync(new LoadCommand(CurrentBoardId(), BoardModelText.Text, LotText.Text, StationText.Text)));
+
+    private Task<IntegrationCommandResult> RunRobotInspectAsync()
+        => ExecuteRobotCommandAsync(
+            "ROBOT INSPECT",
+            () => _robotController.InspectAsync(new InspectCommand(CurrentBoardId(), BoardModelText.Text, LotText.Text, StationText.Text, SelectedView())));
+
+    private Task<IntegrationCommandResult> RunRobotUnloadAsync()
+        => ExecuteRobotCommandAsync(
+            "ROBOT UNLOAD",
+            () => _robotController.UnloadAsync(new UnloadCommand(CurrentBoardId(), BoardModelText.Text, LotText.Text, StationText.Text, "Simulated output tray")));
+
+    private async Task<IntegrationCommandResult> ExecuteRobotCommandAsync(
+        string eventName,
+        Func<Task<IntegrationCommandResult>> command)
+    {
+        var watch = Stopwatch.StartNew();
+        try
+        {
+            var result = await command();
+            watch.Stop();
+            LogEvent(eventName, $"{result.Message} Status={result.Status}; step time={watch.Elapsed.TotalMilliseconds:F0} ms.");
+            UpdateRobotSimulationStatus();
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            watch.Stop();
+            var result = new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, "Simulated robot command canceled.");
+            LogEvent(eventName, $"{result.Message} Step time={watch.Elapsed.TotalMilliseconds:F0} ms.");
+            UpdateRobotSimulationStatus();
+            return result;
+        }
+        catch (Exception ex)
+        {
+            watch.Stop();
+            var result = new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, $"Simulated robot command failed: {ex.Message}");
+            LogEvent("ROBOT ERROR", $"{result.Message} Step time={watch.Elapsed.TotalMilliseconds:F0} ms.");
+            UpdateRobotSimulationStatus();
+            return result;
+        }
+    }
+
+    private bool SaveCurrentResultFromRobotCycle()
+    {
+        if (_currentAnalysis is null)
+        {
+            LogEvent("ROBOT CYCLE", "Cycle stopped because inspection did not produce a result to save.");
+            return false;
+        }
+
+        if (_currentResultSaved)
+            return true;
+
+        try
+        {
+            WorkflowState.Instance.SetAnalysis(_currentAnalysis, persist: true);
+            _currentResultSaved = true;
+            LogEvent("ROBOT SAVE", $"Simulated cycle saved inspection result to SQLite: {_currentAnalysis.Verdict}.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogEvent("ROBOT ERROR", $"Simulated cycle save failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    private void UpdateRobotSimulationStatus()
+    {
+        if (RobotSimStatusText is null)
+            return;
+
+        RobotSimStatusText.Text = _robotController.IsEmergencyStopActive
+            ? "E-STOP ACTIVE (simulation)"
+            : _robotController.IsBoardLoaded
+                ? $"Loaded: {_robotController.LoadedBoardId}"
+                : "Ready: simulation only";
+        RobotSimStatusText.Foreground = _robotController.IsEmergencyStopActive
+            ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F27777"))
+            : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE5EB"));
+        RobotBoardStateText.Text = _robotController.IsBoardLoaded
+            ? "Simulated board loaded"
+            : "No simulated board loaded";
+        RobotCycleModeText.Text = _robotCycleRunning
+            ? "Cycle running"
+            : "No real robot connected";
+        RunRobotCycleButton.IsEnabled = !_robotCycleRunning;
+    }
+
+    private string CurrentBoardId()
+    {
+        var fileName = string.IsNullOrWhiteSpace(_currentImagePath)
+            ? string.Empty
+            : Path.GetFileNameWithoutExtension(_currentImagePath);
+
+        return string.IsNullOrWhiteSpace(fileName)
+            ? $"SIM-{DateTime.Now:yyyyMMddHHmmss}"
+            : fileName;
+    }
+
     private string SelectedView()
         => (ViewSelector.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Top";
 
@@ -474,14 +798,18 @@ public partial class MonitorView : UserControl
         _ => Colors.Orange,
     };
 
-    public sealed record DefectRow(int No, string Type, double Score, string Side, double X, double Y)
+    public sealed record DefectRow(int No, string Type, double Score, string Side, double X, double Y, double? BoardX, double? BoardY)
     {
         public string ScoreDisplay => Score.ToString("P0", CultureInfo.InvariantCulture);
         public string XDisplay => X.ToString("P0", CultureInfo.InvariantCulture);
         public string YDisplay => Y.ToString("P0", CultureInfo.InvariantCulture);
+        public string BoardXDisplay => BoardX is null ? "--" : BoardX.Value.ToString("F2", CultureInfo.InvariantCulture);
+        public string BoardYDisplay => BoardY is null ? "--" : BoardY.Value.ToString("F2", CultureInfo.InvariantCulture);
     }
 
     public sealed record AlarmRow(string Time, string Event, string Message);
 
     private sealed record BoardImageContext(string ImagePath, ImportedImage? ImportedImage, string BoardModel, string LotId);
+
+    private sealed record CalibrationProfileListItem(string DisplayName, CalibrationProfileRecord? Profile);
 }

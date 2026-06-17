@@ -204,8 +204,8 @@ public partial class LibraryView : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             var message = ex is UnauthorizedAccessException
-                ? "Training candidate copy failed: file access was denied or the image is locked."
-                : $"Training candidate copy failed: {ex.Message}";
+                ? "Training-set candidate copy failed: file access was denied or the image is locked."
+                : $"Training-set candidate copy failed: {ex.Message}";
             ImportStatusText.Text = message;
             WorkflowState.Instance.AddEvent("TRAINING_SET_EXPORT_ERROR", message);
             MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);

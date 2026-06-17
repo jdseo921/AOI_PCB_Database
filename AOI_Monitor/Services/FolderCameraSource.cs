@@ -35,7 +35,7 @@ public sealed class FolderCameraSource : ICameraSource
             : CameraSourceStatus.NotConnected;
     public string StatusMessage => ConnectionStatus switch
     {
-        CameraSourceStatus.Simulated => "Folder camera simulator is ready.",
+        CameraSourceStatus.Simulated => "Folder Camera Simulation is ready.",
         CameraSourceStatus.Error => "One or more configured simulation folders cannot be read or contain no images.",
         _ => "No simulation image folders are configured.",
     };

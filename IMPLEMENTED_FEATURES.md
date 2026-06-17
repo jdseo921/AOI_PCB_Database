@@ -16,10 +16,11 @@ The main window provides a factory-style navigation shell with six top-level mod
 - Recipe Editor
 - AI Model Test
 - Log & Export
+- Calibration
 - 3D Profile Viewer
 - Settings / Guide
 
-Main Inspection is the primary operator workflow and contains contextual access to supporting Disposition, Golden Compare, and Image Library screens. Log & Export contains the former Reports functionality and links to database health. Settings / Guide contains the operator guide, settings, and installation/prototype notes. The 3D Profile Viewer supports CSV sample-data mode only. Live camera, lighting, and live 3D hardware integration are planned Stage 2, robot/handler integration is planned Stage 3, and MES/ERP integration is planned Stage 4.
+Main Inspection is the primary operator workflow and contains contextual access to supporting Disposition, Golden Compare, and Image Library screens. Log & Export contains the former Reports functionality and links to database health. Calibration provides an approximate 2D image-to-board mapping workflow for Stage 2 planning. Settings / Guide contains the operator guide, settings, and installation/prototype notes. The 3D Profile Viewer supports CSV sample-data mode only. Live camera, lighting, and live 3D hardware are Stage 2 Planned Hardware Integration, production robot/handler control is Stage 3 Planned Robot Integration, and production MES/ERP integration is Stage 4 planned. A clearly labeled Simulated Robot / Handler panel is available for Stage 1 workflow evidence only.
 
 The shell keeps a shared workflow summary visible while pages change. It shows the active detection policy, loaded sample image, loaded golden reference image, latest comparison score, and latest verdict. Page instances are cached after first creation, and page transitions use a short fade/slide animation.
 
@@ -42,7 +43,7 @@ Pages subscribe to workflow state changes and update their UI when images, analy
 
 ## Detection and Analysis
 
-Image comparison is implemented through `IInspectionEngine`. The default analysis flow is a deterministic image-difference prototype. A configurable ONNX Runtime path is also available for local offline models; the application does not bundle or validate a production AI model by default.
+Image comparison is implemented through `IInspectionEngine`. The default analysis flow is the deterministic Pixel Difference Prototype Engine. A configurable ONNX ML Model path is also available for local offline models; the application does not bundle or validate a trained production ML model by default.
 
 Implemented behavior:
 
@@ -121,7 +122,27 @@ Disposition events are appended to:
 
 The Main Inspection module is the primary operator screen. It provides a large image/live-feed display area, Top/Side/Bottom view selector, defect overlay layer, defect table, Start/Stop/Next Board/Save Result controls, auto-save option, event log, station and lot context, engine/model display, inspection timing display, 1 second performance warnings, and a large OK/NG/REVIEW result indicator.
 
-It uses imported images or folder-simulated camera frames. It does not poll real camera hardware or a live AOI service.
+It also includes a `Simulated Robot / Handler` panel for software-only Load, Inspect, Unload, Reset, emergency-stop simulation, and one-click Load -> Inspect -> Save -> Unload cycle timing. Simulated robot events are recorded through the existing review/audit event log. The panel is explicitly labeled as simulation and does not connect to real robot, handler, PLC, conveyor, or safety hardware.
+
+It uses imported images or Folder Camera Simulation frames. It does not poll real camera hardware or a live AOI service.
+
+Main Inspection can select a saved `2D Cal Profile` and display approximate board X/Y coordinates in millimeters for detected defect centers. These values are derived from saved Stage 2 preparation profiles and are not robot-ready production coordinates.
+
+### Calibration
+
+The Calibration module is an Engineer/Admin workflow labeled `2D Calibration Profile / Stage 2 Preparation`.
+
+Implemented behavior:
+
+- Load a sample calibration image.
+- Enter image X/Y and board X/Y millimeter point pairs.
+- Click the preview image to populate image X/Y fields.
+- Save calibration profiles and points to SQLite.
+- Reload saved profiles and review point data.
+- Calculate a simple approximate scale/offset transform when at least two points are present.
+- Include saved profile details in the Stage 1 customer package calibration summary.
+
+This workflow does not claim live camera calibration, robot coordinate mapping, fixture calibration, or production machine alignment.
 
 ### Disposition
 
@@ -130,7 +151,7 @@ The Disposition page supports human review of suspected PCBA defects and inspect
 Implemented features:
 
 - Demo-labeled review queue containing possible escapes, verified NG items, and false calls.
-- AI overlay visibility toggle.
+- Defect overlay visibility toggle.
 - Zoom toggle for the review canvas.
 - Navigation to the Golden Compare page.
 - ROI crop export from the currently loaded sample image.
@@ -207,7 +228,7 @@ Implemented behavior:
 - Load an image as the recipe background.
 - Draw, select, move, resize, and delete rectangular ROI.
 - Assign ROI types for Presence, Polarity, Solder Bridge, Height, and Anomaly.
-- Edit AI score threshold, height min/max, and volume min/max parameters.
+- Edit ML score threshold, height min/max, and volume min/max parameters.
 - Save recipe revisions to local SQLite with timestamp, board program, operator ID, and JSON ROI data.
 - Reload the latest saved recipe revision for the active board program on startup.
 - Run a local test inspection against the selected image using the current pixel-difference engine.
@@ -224,13 +245,19 @@ Implemented log behavior:
 - Displays inspection history from SQLite.
 - Displays review/disposition events from SQLite.
 - Displays export history from SQLite.
+- Displays factory-style audit trail records from SQLite.
 - Filters by date range, board/model text, operator, and result.
+- Audit Trail additionally filters by user role and action type.
 - Sortable inspection, review, and export-history grids.
+- Sortable audit trail grid with UTC timestamp, local timestamp, user, role, station, action, related ID, and detail.
 - Exports filtered inspection history CSV and review log CSV.
+- Exports filtered audit trail CSV for QC documentation.
 - Exports annotated image overlays.
 - Exports customer validation packages.
-- Runs an Admin-only local soak test with folder-simulated camera frames, configurable duration/delay/engine/output folder, cancellation, timing and memory estimates, error capture, HTML report generation, and `ExportHistory` recording.
+- Runs an Admin-only local soak test with Folder Camera Simulation frames, configurable duration/delay/engine/output folder, cancellation, timing and memory estimates, error capture, HTML report generation, and `ExportHistory` recording.
+- Provides an Admin-only Mock MES integration mode with traceability payload generation, optional mock REST POST, local JSON fallback, and SQLite `MesUploadAttempts` audit records. This is explicitly labeled as mock integration, not production MES.
 - Records exports in `ExportHistory`.
+- Links new export-history rows to audit events when recorded through the export helper.
 - Includes copy-only archive indexing for older log rows in `LogArchive`; source records remain queryable.
 
 Database health remains available as a secondary screen from Log & Export. It displays SQLite table counts, local health indicators, and SQLite-backed inspection/review/image summary counts. The SPC trend chart remains prototype data and is labeled as such.
@@ -345,8 +372,9 @@ Current boundaries:
 
 - SQLite is local-only PoC persistence, not a production database service.
 - Remaining static UI examples are explicitly labeled as demo/prototype data, including the Review queue, similar-image examples, Golden Compare board illustration, Image Library demo fallback, schema reference rows, and SPC trend chart.
-- The default image-analysis routine is pixel-difference based. ONNX Runtime inference is wired for configured local models, but no production-trained model is included or certified.
-- There is no direct camera, PLC, robot, conveyor, or AOI machine control.
+- The default image-analysis routine uses the Pixel Difference Prototype Engine. ONNX ML Model inference is wired for configured local models, but no production-trained model is included or certified.
+- There is no direct camera, PLC, robot, conveyor, safety-circuit, or AOI machine control. Robot/handler cycling is software simulation only.
+- 2D calibration profiles are approximate planning data only; production camera calibration and robot coordinate validation remain future work.
 - Service hosting and hardware links are marked as planned/documentation only.
 - Main Inspection and Log & Export use local SQLite persistence for imported images, inspections, defects, review events, exports, and recipe revisions; the remaining demo panels are not presented as live factory records.
 - Some workflow state remains session-local, although key events, imports, analysis results, training-set candidates, and exports are persisted locally.

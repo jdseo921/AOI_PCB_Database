@@ -50,7 +50,10 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Contains("InspectionResults", tables);
         Assert.Contains("BatchTestRuns", tables);
         Assert.Contains("RecipeRevisions", tables);
+        Assert.Contains("CalibrationProfiles", tables);
+        Assert.Contains("CalibrationPoints", tables);
         Assert.Contains("ExportHistory", tables);
+        Assert.Contains("AuditEvents", tables);
     }
 
     [Fact]
@@ -465,6 +468,37 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal(@"C:\exports\history.csv", history[0].FilePath);
         Assert.Equal("WARN", history[0].Status);
         Assert.Equal("Admin01 [Admin]", history[0].OperatorId);
+        Assert.NotNull(history[0].AuditEventId);
+
+        var audit = AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "EXPORT", OperatorId = "Admin01" });
+        Assert.Contains(audit, row =>
+            row.Id == history[0].AuditEventId &&
+            row.UserId == "Admin01" &&
+            row.UserRole == "Admin" &&
+            row.RelatedPath == @"C:\exports\history.csv");
+    }
+
+    [Fact]
+    public void RoleChangeWritesFactoryAuditFields()
+    {
+        AoiDatabase.Initialize();
+
+        WorkflowState.Instance.SetCurrentUser("AuditEngineer", UserRole.Engineer);
+
+        var audit = AoiDatabase.GetAuditEvents(new LogFilter
+        {
+            OperatorId = "AuditEngineer",
+            UserRole = "Engineer",
+            ActionCategory = "LOGIN",
+        });
+
+        Assert.Contains(audit, row =>
+            row.UserId == "AuditEngineer" &&
+            row.UserRole == "Engineer" &&
+            row.StationId == WorkflowState.Instance.StationId &&
+            row.TimestampUtc != DateTime.MinValue &&
+            row.LocalTimestamp != DateTime.MinValue &&
+            row.ActionDetail.Contains("MES authentication is Stage 4 planned", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -504,7 +538,45 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Contains("Total cycles", report);
         Assert.Contains("Count over 1 second", report);
         Assert.Contains("Synthetic inspection exception", report);
-        Assert.Contains("folder-simulated camera frames", report);
+        Assert.Contains("Folder Camera Simulation frames", report);
+    }
+
+    [Fact]
+    public async Task TraceabilityMockUploadWritesLocalPayloadAndAuditRecord()
+    {
+        AoiDatabase.Initialize();
+        MesIntegrationSettingsService.Save(new MesIntegrationSettings
+        {
+            Mode = MesIntegrationMode.MockRest,
+            MockEndpointUrl = string.Empty,
+            UploadTimeoutSeconds = 2,
+        });
+
+        var payload = new TraceabilityPayload
+        {
+            LotId = "LOT-99",
+            BoardModel = "TBOX",
+            StationId = "AOI-LIB-01",
+            OperatorId = "Admin01 [Admin]",
+            Result = "NG",
+            TimestampUtc = DateTime.UtcNow,
+            DefectSummary = "Solder Bridge; score=80.0%",
+            ImagePath = @"C:\images\board.png",
+        };
+
+        var outcome = await TraceabilityUploadService.UploadAsync(payload);
+        var attempts = AoiDatabase.GetMesUploadAttempts();
+
+        Assert.True(outcome.Result.Accepted);
+        Assert.Equal(IntegrationConnectionStatus.Simulated, outcome.Result.Status);
+        Assert.True(File.Exists(outcome.PayloadPath));
+        Assert.Single(attempts);
+        Assert.Equal("Mock REST", attempts[0].Mode);
+        Assert.Equal("OK", attempts[0].Status);
+        Assert.Equal("LOT-99", attempts[0].LotId);
+        Assert.Equal("TBOX", attempts[0].BoardModel);
+        Assert.Equal("NG", attempts[0].Result);
+        Assert.Contains("local JSON", attempts[0].Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -654,6 +726,39 @@ public sealed class AoiDatabaseTests : IDisposable
         var loadedDocument = JsonSerializer.Deserialize<RecipeDocument>(loaded.RecipeJson);
         Assert.NotNull(loadedDocument);
         Assert.Equal("ROI-1", loadedDocument.Rois.Single().Id);
+    }
+
+    [Fact]
+    public void SaveCalibrationProfilePersistsPointsAndApproximateTransform()
+    {
+        AoiDatabase.Initialize();
+        var imagePath = Path.Combine(_root, "calibration.png");
+        File.WriteAllText(imagePath, "placeholder path only");
+
+        var id = AoiDatabase.SaveCalibrationProfile(
+            "Unit Test 2D Calibration",
+            "TBOX-MAIN",
+            "Top",
+            imagePath,
+            "Engineer01 [Engineer]",
+            new[]
+            {
+                new CalibrationPointInput(0, 0, 0, 0),
+                new CalibrationPointInput(100, 50, 10, 5),
+                new CalibrationPointInput(200, 100, 20, 10),
+            });
+
+        var loaded = AoiDatabase.GetCalibrationProfile(id);
+
+        Assert.NotNull(loaded);
+        Assert.Equal("Unit Test 2D Calibration", loaded.ProfileName);
+        Assert.Equal(3, loaded.Points.Count);
+        Assert.True(loaded.HasTransform);
+        Assert.Contains("Stage 2 preparation only", loaded.TransformSummary);
+        Assert.True(CalibrationTransformService.TryConvertImageToBoard(loaded, 150, 75, out var boardX, out var boardY));
+        Assert.Equal(15, boardX, precision: 3);
+        Assert.Equal(7.5, boardY, precision: 3);
+        Assert.Contains(AoiDatabase.GetCalibrationProfiles(), profile => profile.Id == id && profile.Points.Count == 3);
     }
 
     [Fact]

@@ -10,9 +10,10 @@ Implemented today:
 - Local user and role selection.
 - Local SQLite database and image vault.
 - Operator-first Main Inspection screen.
-- Folder-based camera simulator.
-- Pixel-difference prototype inspection engine.
+- Folder Camera Simulation.
+- Pixel Difference Prototype Engine.
 - ONNX Runtime path for configured local models, with safe `REVIEW` fallback on missing model, invalid model, or runtime failure.
+- 2D calibration profile workflow for approximate image-to-board mapping in Stage 2 planning.
 - Image import, golden comparison, disposition logging, recipe revision storage, AI Model Test validation, customer package export, and 3D sample-data CSV review.
 
 Not implemented as production integration:
@@ -58,7 +59,9 @@ Main Inspection is the primary operator screen.
 
 The alarm/event log updates as inspection starts, stops, advances to the next board, completes analysis, saves results, or encounters errors.
 
-Main Inspection can use folder-simulated camera frames when configured. If no simulation folder is available, it can use imported images or a current workflow sample image. It does not connect to real camera hardware.
+Main Inspection can use Folder Camera Simulation frames when configured. If no simulation folder is available, it can use imported images or a current workflow sample image. It does not connect to real camera hardware.
+
+The `Simulated Robot / Handler` panel is a software-only Stage 1 demonstration. It can run manual `Load`, `Inspect`, `Unload`, `Reset`, and `E-Stop Sim` actions, or a full `Run Cycle` sequence that loads a simulated board image, runs inspection, saves the result, and unloads the simulated board. Cycle time and every simulated robot event are written to the event/review log. This panel does not control a real robot, handler, PLC, conveyor, or safety circuit.
 
 ## Image Import Workflow
 
@@ -85,15 +88,15 @@ Golden comparison is the Stage 1 prototype inspection path.
 2. Click `Compare Golden`.
 3. Select a golden/reference image.
 4. The app runs the selected inspection engine.
-5. With the default prototype engine, the app performs deterministic pixel-difference comparison.
+5. With the Pixel Difference Prototype Engine, the app performs deterministic image-difference comparison.
 6. Review score, confidence, verdict, suggested defect, decision reason, and evidence.
 7. Review the hotspot/defect overlay.
 
 Important boundary:
 
-- The default engine is a prototype pixel-difference engine.
+- The default engine is the Pixel Difference Prototype Engine.
 - It is useful for workflow validation and evidence generation.
-- It is not a trained production AI model.
+- It is not a trained production ML model.
 - ONNX configuration can be selected, but the app reports `REVIEW` with clear evidence if model loading or inference fails.
 
 ## Disposition Workflow
@@ -122,12 +125,28 @@ Recipe editing is restricted to Engineer and Admin roles.
 3. Draw rectangular ROIs.
 4. Select and adjust ROI position and size.
 5. Choose ROI type, such as Presence, Polarity, Solder Bridge, Height, or Anomaly.
-6. Set AI score threshold and optional height/volume limits.
+6. Set ML score threshold and optional height/volume limits.
 7. Save the recipe revision.
 8. The revision is written to SQLite with board program, operator, role, detection priority, background image path, and JSON ROI data.
 9. Use recipe lock/unlock to prevent accidental edits during evaluation.
 
 The recipe editor is a local Stage 1 recipe proof of concept. It is not yet synchronized with a production recipe server or MES.
+
+## 2D Calibration Profile Workflow
+
+Calibration is restricted to Engineer and Admin roles.
+
+1. Open `Calibration`.
+2. Load a sample calibration image.
+3. Enter point pairs:
+   - image X/Y
+   - board X/Y in millimeters
+4. Add at least two points to calculate an approximate 2D scale/offset transform.
+5. Save the profile to SQLite.
+6. Reopen or reload the profile to confirm the points and transform summary.
+7. In `Main Inspection`, select the saved `2D Cal Profile` to show approximate board-mm coordinates beside detected defect centers.
+
+This is labeled as `2D calibration profile / Stage 2 preparation`. It does not claim live camera calibration, robot coordinate validation, or production machine alignment.
 
 ## AI Model Test Workflow
 
@@ -172,19 +191,26 @@ Common actions:
 2. Review Inspection History.
 3. Review Review/Disposition Events.
 4. Review Export History.
-5. Export inspection history CSV.
-6. Export review log CSV.
-7. Export annotated overlays.
-8. Run DB Integrity.
-9. Rebuild image index.
-10. Run a local Soak Test.
-11. Create Stage 1 Customer Package.
+5. Review Audit Trail.
+6. Export inspection history CSV.
+7. Export review log CSV.
+8. Export audit trail CSV.
+9. Export annotated overlays.
+10. Run DB Integrity.
+11. Rebuild image index.
+12. Upload selected/latest result to Mock MES.
+13. Run a local Soak Test.
+14. Create Stage 1 Customer Package.
 
-The Stage 1 customer package creates a timestamped folder containing an HTML customer validation report, print-to-PDF instructions, a Markdown companion report, batch CSV, sample annotated validation images, annotated inspection overlays, inspection history CSV, review log CSV, engine/model configuration summary, database health summary, recipe revision summary, README, and warnings.
+The Audit Trail tab supports filtering by date, user, role, and action type. The audit CSV includes UTC timestamp, local timestamp, user ID, user role, station ID, action category, action detail, and related record/image/path fields where available.
+
+The Stage 1 customer package creates a timestamped folder containing an HTML customer validation report, print-to-PDF instructions, a Markdown companion report, batch CSV, sample annotated validation images, annotated inspection overlays, inspection history CSV, review log CSV, audit trail CSV, engine/model configuration summary, database health summary, recipe revision summary, calibration profile summary, README, and warnings.
 
 If optional evidence is missing, the app writes a warning instead of failing the package.
 
-The Soak Test tool is Admin-only. It repeatedly inspects images from a selected folder through the folder camera simulator for the requested duration, supports cancellation, and exports an HTML report with cycle counts, success/failure counts, timing, memory estimates, start/end time, and errors. Use a short duration such as 2 minutes before running an 8-hour evidence soak.
+The Soak Test tool is Admin-only. It repeatedly inspects images from a selected folder through Folder Camera Simulation for the requested duration, supports cancellation, and exports an HTML report with cycle counts, success/failure counts, timing, memory estimates, start/end time, and errors. Use a short duration such as 2 minutes before running an 8-hour evidence soak.
+
+The Mock MES upload action is Admin-only and is not production MES/ERP integration. It creates a MES-style traceability payload with lot ID, board model, station, operator, result, timestamp, defect summary, and image path. In `Mock REST` mode the app attempts to POST the payload to the configured mock endpoint; if no endpoint is configured, it writes the payload to local JSON. Each attempt is recorded in SQLite.
 
 ## 3D Sample-Data Workflow
 
@@ -213,16 +239,18 @@ This workflow does not connect to a real 3D camera and does not claim live heigh
 
 ## Settings / Guide
 
-Settings includes local engine, model, label-map, camera source, threshold, and path controls according to role permissions.
+Settings includes local engine, model, label-map, camera source, Mock MES, threshold, and path controls according to role permissions.
 
 Use Settings to:
 
-- Select the prototype engine or a configured ONNX Runtime model.
+- Select the Pixel Difference Prototype Engine or a configured ONNX ML Model.
 - Configure model file path, model version, label map path, confidence threshold, input size, and ONNX tensor names.
 - Use `Test Model Configuration` to verify model file availability, label-map validity, tensor names, ONNX Runtime session creation, and generic detection output compatibility before running AI Model Test.
 - Review the last model-check result and timestamp. `Ready` is shown only after the current configuration passes the readiness check.
-- Configure folder-based camera simulation.
+- Configure Folder Camera Simulation.
 - Review camera status.
+- Configure MES mode as Not Connected, Mock REST, or Future Production planned.
+- Configure a mock endpoint URL and upload timeout for mock REST tests. Leave the endpoint blank to generate local JSON payload evidence only.
 - Change local paths where Admin permissions allow it.
 
-MES authentication is planned for Stage 4 and is not implemented in the local role selector.
+MES authentication and production ERP/MES writeback are planned for Stage 4 and are not implemented in the local role selector or mock upload tool.

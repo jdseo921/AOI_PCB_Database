@@ -14,7 +14,7 @@ public sealed class CustomerValidationReportContext
     public DateTime TestTimestamp { get; init; } = DateTime.Now;
     public string BoardModel { get; init; } = "Not provided";
     public string LotId { get; init; } = "Not provided";
-    public string EngineName { get; init; } = "Pixel Difference";
+    public string EngineName { get; init; } = "Pixel Difference Prototype Engine";
     public string ModelVersion { get; init; } = "PIXEL_DIFF_0.1";
     public string ModelFileName { get; init; } = "Not configured";
     public double ConfidenceThreshold { get; init; }
@@ -30,9 +30,9 @@ public sealed class CustomerValidationReportContext
     public static IReadOnlyList<string> DefaultPrototypeLimitations { get; } =
     [
         "Stage 1 evidence is generated from local files and the local SQLite database.",
-        "The pixel-difference engine is a deterministic prototype inspection engine, not a trained production AI model.",
+        "The Pixel Difference Prototype Engine is deterministic workflow evidence, not a trained production ML model.",
         "ONNX inference is claimed only when a configured local model loads and inference succeeds; no trained model is bundled by default.",
-        "Folder-simulated camera frames may be used for workflow validation. Live AOI camera, 3D camera, lighting, robot, PLC, MES, and ERP integrations remain planned for later stages.",
+        "Folder Camera Simulation frames may be used for workflow validation. Live AOI camera, 3D camera, lighting, production robot, PLC, production MES, and ERP integrations remain planned for later stages.",
         "This report supports customer review of the Stage 1 proof of concept and should be paired with the agreed validation protocol before production acceptance.",
     ];
 }
@@ -77,7 +77,7 @@ public static class CustomerValidationReportService
         sb.AppendLine("<body>");
         sb.AppendLine("  <h1>Stage 1 Customer Validation Report</h1>");
         sb.AppendLine($"  <div class=\"subtitle\">Project: {Html(context.ProjectName)} | Generated: {Html(generatedAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))}</div>");
-        sb.AppendLine("  <div class=\"notice\"><strong>Prototype boundary:</strong> This report documents Stage 1 offline validation evidence. It does not claim live camera, robot, lighting, MES/ERP, or production AI operation unless those items are explicitly configured and verified in the evidence below.</div>");
+        sb.AppendLine("  <div class=\"notice\"><strong>Prototype boundary:</strong> This report documents Stage 1 offline validation evidence. It does not claim live camera, production robot, lighting, production MES/ERP, or ONNX ML Model operation unless those items are explicitly configured and verified in the evidence below.</div>");
 
         sb.AppendLine("  <h2>Run Information</h2>");
         sb.AppendLine("  <table class=\"details\">");

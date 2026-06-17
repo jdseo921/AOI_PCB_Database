@@ -25,6 +25,7 @@ public partial class ReportsView : UserControl
     private readonly ObservableCollection<InspectionLogRow> _inspectionRows = new();
     private readonly ObservableCollection<ReviewLogRow> _reviewRows = new();
     private readonly ObservableCollection<ExportHistoryRow> _exportRows = new();
+    private readonly ObservableCollection<AuditLogRow> _auditRows = new();
     private CancellationTokenSource? _workCts;
 
     public ReportsView()
@@ -33,6 +34,7 @@ public partial class ReportsView : UserControl
         InspectionGrid.ItemsSource = _inspectionRows;
         ReviewGrid.ItemsSource = _reviewRows;
         ExportGrid.ItemsSource = _exportRows;
+        AuditGrid.ItemsSource = _auditRows;
         FromDatePicker.SelectedDate = DateTime.Today.AddDays(-30);
         ToDatePicker.SelectedDate = DateTime.Today;
         LoadLogs();
@@ -49,6 +51,8 @@ public partial class ReportsView : UserControl
         BoardFilterText.Text = string.Empty;
         OperatorFilterText.Text = string.Empty;
         ResultFilterCombo.SelectedIndex = 0;
+        RoleFilterCombo.SelectedIndex = 0;
+        ActionTypeFilterText.Text = string.Empty;
         LoadLogs();
     }
 
@@ -58,12 +62,14 @@ public partial class ReportsView : UserControl
         var inspections = AoiDatabase.GetInspectionHistory(filter).Select(InspectionLogRow.FromRecord).ToArray();
         var reviews = AoiDatabase.GetReviewEvents(filter).Select(ReviewLogRow.FromRecord).ToArray();
         var exports = AoiDatabase.GetExportHistory().Select(ExportHistoryRow.FromRecord).ToArray();
+        var audits = AoiDatabase.GetAuditEvents(filter).Select(AuditLogRow.FromRecord).ToArray();
 
         ReplaceRows(_inspectionRows, inspections);
         ReplaceRows(_reviewRows, reviews);
         ReplaceRows(_exportRows, exports);
+        ReplaceRows(_auditRows, audits);
 
-        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports";
+        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows";
         StatusText.Text = "Loaded real SQLite log records.";
     }
 
@@ -76,6 +82,8 @@ public partial class ReportsView : UserControl
             BoardProgram = NullIfBlank(BoardFilterText.Text),
             OperatorId = NullIfBlank(OperatorFilterText.Text),
             Result = (ResultFilterCombo.SelectedItem as ComboBoxItem)?.Content?.ToString(),
+            UserRole = (RoleFilterCombo.SelectedItem as ComboBoxItem)?.Content?.ToString(),
+            ActionCategory = NullIfBlank(ActionTypeFilterText.Text),
         };
     }
 
@@ -132,6 +140,34 @@ public partial class ReportsView : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             HandleWorkError("Review log CSV export failed", ex, "EXPORT_ERROR");
+        }
+    }
+
+    private void OnExportAuditTrailClick(object sender, RoutedEventArgs e)
+    {
+        if (_auditRows.Count == 0)
+        {
+            MessageBox.Show("No audit trail rows match the current filters.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!ConfirmExport("Export filtered audit trail to CSV for QC documentation?"))
+            return;
+
+        var dialog = SaveCsvDialog("audit_trail");
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, BuildAuditCsv(_auditRows), CsvEncoding);
+            AoiDatabase.RecordExport("AuditTrailCsv", dialog.FileName);
+            WorkflowState.Instance.AddEvent("EXPORT", $"Audit trail CSV exported: {Path.GetFileName(dialog.FileName)}");
+            RefreshAfterExport($"Audit trail CSV exported: {dialog.FileName}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Audit trail CSV export failed", ex, "EXPORT_ERROR");
         }
     }
 
@@ -211,6 +247,7 @@ public partial class ReportsView : UserControl
         var progress = new Progress<WorkProgress>(UpdateProgress);
         var inspectionRows = _inspectionRows.ToArray();
         var reviewRows = _reviewRows.ToArray();
+        var auditRows = _auditRows.ToArray();
         var filter = BuildFilter();
 
         try
@@ -253,6 +290,9 @@ public partial class ReportsView : UserControl
                 ((IProgress<WorkProgress>)progress).Report(new WorkProgress(3, 6, "Writing log CSV files..."));
                 File.WriteAllText(Path.Combine(logsDir, "inspection_history.csv"), BuildInspectionCsv(inspectionRows), CsvEncoding);
                 File.WriteAllText(Path.Combine(logsDir, "review_disposition_log.csv"), BuildReviewCsv(reviewRows), CsvEncoding);
+                File.WriteAllText(Path.Combine(logsDir, "audit_trail.csv"), BuildAuditCsv(auditRows), CsvEncoding);
+                if (auditRows.Length == 0)
+                    warnings.Add("No audit trail rows matched the current filters. logs/audit_trail.csv contains only headers.");
 
                 var overlays = ExportAnnotatedOverlays(
                     inspectionRows.Where(r => File.Exists(r.SampleImagePath)).ToArray(),
@@ -282,6 +322,7 @@ public partial class ReportsView : UserControl
                 File.WriteAllText(Path.Combine(summariesDir, "model_engine_configuration.txt"), BuildModelConfigurationSummary(configuration, warnings), CsvEncoding);
                 File.WriteAllText(Path.Combine(summariesDir, "database_health_summary.txt"), BuildDatabaseHealthSummary(inspectionRows.Length, reviewRows.Length, warnings), CsvEncoding);
                 File.WriteAllText(Path.Combine(summariesDir, "recipe_revision_summary.txt"), BuildRecipeRevisionSummary(warnings), CsvEncoding);
+                File.WriteAllText(Path.Combine(summariesDir, "calibration_profile_summary.txt"), BuildCalibrationProfileSummary(warnings), CsvEncoding);
 
                 cts.Token.ThrowIfCancellationRequested();
                 ((IProgress<WorkProgress>)progress).Report(new WorkProgress(6, 6, "Writing package README..."));
@@ -295,7 +336,7 @@ public partial class ReportsView : UserControl
                     CsvEncoding);
                 File.WriteAllText(
                     Path.Combine(packageDir, "README.md"),
-                    BuildStage1PackageReadme(packageDir, latestRun, validationRows.Length, overlays.Count, inspectionRows.Length, reviewRows.Length, warnings, filter),
+                    BuildStage1PackageReadme(packageDir, latestRun, validationRows.Length, overlays.Count, inspectionRows.Length, reviewRows.Length, auditRows.Length, warnings, filter),
                     CsvEncoding);
                 File.WriteAllText(Path.Combine(packageDir, "warnings.txt"), BuildWarningsText(warnings), CsvEncoding);
 
@@ -516,6 +557,61 @@ public partial class ReportsView : UserControl
         }
     }
 
+    private async void OnUploadMesMockClick(object sender, RoutedEventArgs e)
+    {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Uploading a result to Mock MES integration", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var row = InspectionGrid.SelectedItem as InspectionLogRow ?? _inspectionRows.FirstOrDefault();
+        if (row is null)
+        {
+            MessageBox.Show("No inspection result is available to upload. Run or save an inspection first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var settings = MesIntegrationSettingsService.Load();
+        if (settings.Mode == MesIntegrationMode.FutureProduction)
+        {
+            MessageBox.Show("Future Production mode is a planned Stage 4 boundary. Switch to Mock REST to generate a demonstrable mock upload.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var payload = BuildTraceabilityPayload(row, settings);
+        var cts = BeginWork("Uploading result to Mock MES...");
+        try
+        {
+            var outcome = await TraceabilityUploadService.UploadAsync(payload, cts.Token);
+            var exportStatus = outcome.Result.Accepted ? "OK" : "ERROR";
+            AoiDatabase.RecordExport("MesMockTraceabilityPayload", outcome.PayloadPath, exportStatus);
+            WorkflowState.Instance.AddEvent(
+                outcome.Result.Accepted ? "MES_MOCK" : "MES_MOCK_ERROR",
+                $"Mock MES upload {exportStatus}: {outcome.Result.Message}");
+            RefreshAfterExport($"Mock MES upload {exportStatus}. Payload: {outcome.PayloadPath}");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Mock MES upload canceled.";
+            WorkflowState.Instance.AddEvent("MES_MOCK", "Mock MES upload canceled by user.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Mock MES upload failed", ex, "MES_MOCK_ERROR");
+        }
+        finally
+        {
+            EndWork();
+        }
+    }
+
     private void OnCancelWorkClick(object sender, RoutedEventArgs e)
     {
         _workCts?.Cancel();
@@ -693,6 +789,29 @@ public partial class ReportsView : UserControl
         return sb.ToString();
     }
 
+    private static string BuildAuditCsv(IEnumerable<AuditLogRow> rows)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Id,TimestampUtc,LocalTimestamp,UserId,UserRole,StationId,ActionCategory,ActionDetail,RelatedEntityType,RelatedEntityId,RelatedPath");
+        foreach (var row in rows)
+        {
+            sb.AppendLine(string.Join(",",
+                row.Id,
+                EscapeCsv(row.TimestampUtc.ToString("O", CultureInfo.InvariantCulture)),
+                EscapeCsv(row.LocalTimestamp.ToString("O", CultureInfo.InvariantCulture)),
+                EscapeCsv(row.UserId),
+                EscapeCsv(row.UserRole),
+                EscapeCsv(row.StationId),
+                EscapeCsv(row.ActionCategory),
+                EscapeCsv(row.ActionDetail),
+                EscapeCsv(row.RelatedEntityType),
+                EscapeCsv(row.RelatedEntityId),
+                EscapeCsv(row.RelatedPath)));
+        }
+
+        return sb.ToString();
+    }
+
     private static CustomerValidationReportContext BuildCustomerValidationReportContext(
         BatchTestRunRecord? run,
         IReadOnlyCollection<BatchTestRow> rows,
@@ -718,7 +837,7 @@ public partial class ReportsView : UserControl
             TestTimestamp = timestamp,
             BoardModel = boardModel,
             LotId = CustomerValidationReportService.SummarizeDistinct(rows.Select(row => row.LotId)),
-            EngineName = run?.EngineName ?? (configuration.IsOnnxSelected ? "ONNX Runtime" : "Pixel Difference"),
+            EngineName = run?.EngineName ?? (configuration.IsOnnxSelected ? "ONNX ML Model" : "Pixel Difference Prototype Engine"),
             ModelVersion = run?.ModelVersion ?? configuration.EffectiveModelVersion,
             ModelFileName = string.IsNullOrWhiteSpace(configuration.ModelFilePath)
                 ? "Not configured"
@@ -731,6 +850,31 @@ public partial class ReportsView : UserControl
             Rows = rows.ToArray(),
             SampleAnnotatedImages = sampleImages,
             Warnings = warnings.ToArray(),
+        };
+    }
+
+    private static TraceabilityPayload BuildTraceabilityPayload(InspectionLogRow row, MesIntegrationSettings settings)
+    {
+        var cameraSettings = CameraSourceSettingsService.Load();
+        var lotId = string.IsNullOrWhiteSpace(cameraSettings.LotId) ? "UNKNOWN" : cameraSettings.LotId;
+        var timestamp = row.CreatedAtUtc == DateTime.MinValue ? DateTime.UtcNow : row.CreatedAtUtc.ToUniversalTime();
+        return new TraceabilityPayload
+        {
+            IntegrationMode = TraceabilityUploadService.ToDisplay(settings.Mode),
+            LotId = lotId,
+            BoardModel = string.IsNullOrWhiteSpace(row.BoardProgram) ? cameraSettings.BoardModel : row.BoardProgram,
+            SerialNumber = null,
+            StationId = WorkflowState.Instance.StationId,
+            OperatorId = row.OperatorId,
+            Result = row.Verdict,
+            TimestampUtc = timestamp,
+            DefectSummary = $"{row.SuggestedDefect}; score={row.ScoreDisplay}; confidence={row.ConfidenceDisplay}",
+            ImagePath = row.SampleImagePath,
+            OverlayPath = string.Empty,
+            InspectionEngine = row.InspectionEngine,
+            ModelVersion = row.ModelVersion,
+            Confidence = row.Confidence,
+            Score = row.DifferenceScore,
         };
     }
 
@@ -795,7 +939,7 @@ public partial class ReportsView : UserControl
     {
         var status = InspectionModelConfigurationService.GetStatusText();
         if (!configuration.IsOnnxSelected)
-            warnings.Add("Inspection engine is the deterministic pixel-difference prototype engine, not a trained production ML model.");
+            warnings.Add("Inspection engine is the deterministic Pixel Difference Prototype Engine, not a trained production ML model.");
         if (configuration.IsOnnxSelected && !configuration.HasModelFile)
             warnings.Add($"ONNX engine is selected, but the configured model file is missing: {configuration.ModelFilePath}");
         if (!string.IsNullOrWhiteSpace(configuration.LabelMapPath) && !File.Exists(configuration.LabelMapPath))
@@ -821,7 +965,7 @@ public partial class ReportsView : UserControl
         foreach (var label in configuration.BuiltInLabelMap.OrderBy(kvp => kvp.Key))
             sb.AppendLine($"  {label.Key}: {label.Value}");
         sb.AppendLine();
-        sb.AppendLine("PrototypeNotice: Stage 1 is a local PoC. The default pixel-difference engine is deterministic evidence generation. ONNX inference is claimed only when a configured local model loads and inference succeeds.");
+        sb.AppendLine("PrototypeNotice: Stage 1 is a local PoC. The default Pixel Difference Prototype Engine is deterministic evidence generation. ONNX ML Model inference is claimed only when a configured local model loads and inference succeeds.");
         return sb.ToString();
     }
 
@@ -910,6 +1054,60 @@ public partial class ReportsView : UserControl
         return sb.ToString();
     }
 
+    private static string BuildCalibrationProfileSummary(ICollection<string> warnings)
+    {
+        var profiles = AoiDatabase.GetCalibrationProfiles();
+        if (profiles.Count == 0)
+            warnings.Add("No 2D calibration profile was found. summaries/calibration_profile_summary.txt was generated with no profile details.");
+
+        var sb = new StringBuilder();
+        sb.AppendLine("2D Calibration Profile Summary");
+        sb.AppendLine($"GeneratedLocal: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"ProfileCount: {profiles.Count}");
+        sb.AppendLine("PrototypeNotice: Calibration profiles are approximate 2D image-to-board mapping data for Stage 2 planning. They are not live camera calibration, robot calibration, or production coordinate validation.");
+        sb.AppendLine();
+
+        if (profiles.Count == 0)
+        {
+            sb.AppendLine("Status: No saved calibration profiles are available.");
+            return sb.ToString();
+        }
+
+        foreach (var profile in profiles.Take(20))
+        {
+            sb.AppendLine($"ProfileId: {profile.Id}");
+            sb.AppendLine($"ProfileName: {profile.ProfileName}");
+            sb.AppendLine($"BoardModel: {profile.BoardModel}");
+            sb.AppendLine($"ViewType: {profile.ViewType}");
+            sb.AppendLine($"OperatorId: {profile.OperatorId}");
+            sb.AppendLine($"CreatedUtc: {profile.CreatedAtUtc.ToString("O", CultureInfo.InvariantCulture)}");
+            sb.AppendLine($"SampleImagePath: {NullIfEmpty(profile.SampleImagePath)}");
+            sb.AppendLine($"PointCount: {profile.PointCount}");
+            sb.AppendLine($"HasApproximateTransform: {profile.HasTransform}");
+            sb.AppendLine($"Transform: {profile.TransformSummary}");
+
+            foreach (var point in profile.Points.Take(25))
+            {
+                sb.AppendLine(string.Join(" | ",
+                    $"PointId={point.Id}",
+                    $"ImageX={point.ImageX:F3}",
+                    $"ImageY={point.ImageY:F3}",
+                    $"BoardXmm={point.BoardXMillimeters:F3}",
+                    $"BoardYmm={point.BoardYMillimeters:F3}"));
+            }
+
+            if (profile.Points.Count > 25)
+                sb.AppendLine($"PointListTruncated: true; shown=25; total={profile.Points.Count}");
+
+            sb.AppendLine();
+        }
+
+        if (profiles.Count > 20)
+            sb.AppendLine($"ProfileListTruncated: true; shown=20; total={profiles.Count}");
+
+        return sb.ToString();
+    }
+
     private static string BuildStage1PackageReadme(
         string packageDir,
         BatchTestRunRecord? run,
@@ -917,6 +1115,7 @@ public partial class ReportsView : UserControl
         int overlayCount,
         int inspectionRows,
         int reviewRows,
+        int auditRows,
         IReadOnlyList<string> warnings,
         LogFilter filter)
     {
@@ -935,9 +1134,11 @@ public partial class ReportsView : UserControl
         sb.AppendLine("- `annotated_overlays/` - Generated PNG overlays for filtered inspection rows with accessible sample images.");
         sb.AppendLine("- `logs/inspection_history.csv` - Filtered SQLite inspection history.");
         sb.AppendLine("- `logs/review_disposition_log.csv` - Filtered review and disposition event log.");
+        sb.AppendLine("- `logs/audit_trail.csv` - Filtered QC audit trail with UTC/local timestamps, user, role, station, action type, detail, and related IDs/paths.");
         sb.AppendLine("- `summaries/model_engine_configuration.txt` - Active model/engine configuration and prototype status.");
         sb.AppendLine("- `summaries/database_health_summary.txt` - SQLite health, table counts, and archive policy summary.");
         sb.AppendLine("- `summaries/recipe_revision_summary.txt` - Latest local recipe revision for the active board program, when available.");
+        sb.AppendLine("- `summaries/calibration_profile_summary.txt` - Saved 2D calibration profiles and approximate image-to-board transform details for Stage 2 preparation.");
         sb.AppendLine("- `warnings.txt` - Missing optional items or non-blocking export issues.");
         sb.AppendLine();
         sb.AppendLine("## Package Summary");
@@ -950,6 +1151,7 @@ public partial class ReportsView : UserControl
         sb.AppendLine($"- Annotated overlays: {overlayCount}");
         sb.AppendLine($"- Inspection history rows: {inspectionRows}");
         sb.AppendLine($"- Review/disposition rows: {reviewRows}");
+        sb.AppendLine($"- Audit trail rows: {auditRows}");
         sb.AppendLine($"- Warnings: {warnings.Count}");
         sb.AppendLine();
         sb.AppendLine("## Applied Log Filters");
@@ -959,12 +1161,14 @@ public partial class ReportsView : UserControl
         sb.AppendLine($"- Board/model: {filter.BoardProgram ?? "ALL"}");
         sb.AppendLine($"- Operator: {filter.OperatorId ?? "ALL"}");
         sb.AppendLine($"- Result: {filter.Result ?? "ALL"}");
+        sb.AppendLine($"- User role: {filter.UserRole ?? "ALL"}");
+        sb.AppendLine($"- Audit action type: {filter.ActionCategory ?? "ALL"}");
         sb.AppendLine();
         sb.AppendLine("## Prototype / Planned Scope");
         sb.AppendLine();
-        sb.AppendLine("Implemented in Stage 1: local operator/review workflow, deterministic prototype inspection engine, SQLite persistence, image import/library support, batch validation evidence, annotated overlay export, role-based local access controls, and customer package generation.");
+        sb.AppendLine("Implemented in Stage 1: local operator/review workflow, deterministic prototype inspection engine, SQLite persistence, image import/library support, approximate 2D calibration profile planning data, batch validation evidence, annotated overlay export, role-based local access controls, and customer package generation.");
         sb.AppendLine();
-        sb.AppendLine("Planned for later stages: live AOI hardware, real 3D camera acquisition, lighting control, PLC/robot/handler integration, MES/ERP authentication and traceability, production database integration, and trained ML inference unless separately configured and verified.");
+        sb.AppendLine("Planned for later stages: Stage 2 Planned Hardware Integration for live AOI camera, real 3D camera acquisition, and lighting control; Stage 3 Planned Robot Integration for PLC/robot/handler control; Stage 4 Planned MES/ERP Integration for authentication and traceability; production database integration; and trained ML inference unless separately configured and verified.");
         sb.AppendLine();
         sb.AppendLine("Missing optional inputs, such as absent validation runs or inaccessible image paths, are recorded in `warnings.txt` and do not prevent package creation.");
         return sb.ToString();
@@ -1206,7 +1410,7 @@ public partial class ReportsView : UserControl
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
 
-            AddText(root, "Controlled local soak test using folder-simulated camera frames. This does not connect to real camera hardware.", 0, 0, 3, "#DCE5EB", bold: true);
+            AddText(root, "Controlled local soak test using Folder Camera Simulation frames. This does not connect to real camera hardware.", 0, 0, 3, "#DCE5EB", bold: true);
             AddLabeledFolder(root, "Image folder", _imageFolderText, 1, "Select", OnSelectImageFolder);
             AddLabeledText(root, "Duration (minutes)", _durationMinutesText, 2);
             AddLabeledText(root, "Delay between inspections (ms)", _delayMillisecondsText, 3);
@@ -1234,7 +1438,7 @@ public partial class ReportsView : UserControl
 
         private void ConfigureEngineOptions(string defaultEngineKey)
         {
-            _engineCombo.Items.Add(new ComboBoxItem { Content = "Pixel Difference (prototype)", Tag = InspectionEngineFactory.DefaultEngineKey });
+            _engineCombo.Items.Add(new ComboBoxItem { Content = "Pixel Difference Prototype Engine", Tag = InspectionEngineFactory.DefaultEngineKey });
             _engineCombo.Items.Add(new ComboBoxItem { Content = "ONNX ML Model (configured)", Tag = InspectionEngineFactory.OnnxEngineKey });
             var normalized = InspectionEngineFactory.NormalizeEngineKey(defaultEngineKey);
             _engineCombo.SelectedIndex = normalized == InspectionEngineFactory.OnnxEngineKey ? 1 : 0;
@@ -1375,7 +1579,7 @@ public partial class ReportsView : UserControl
         public string TimestampLocal => CreatedAtUtc == DateTime.MinValue ? "--" : CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm");
         public string BoardProgram { get; init; } = "UNKNOWN";
         public string OperatorId { get; init; } = "UNKNOWN";
-        public string InspectionEngine { get; init; } = "Pixel Difference";
+        public string InspectionEngine { get; init; } = "Pixel Difference Prototype Engine";
         public string ModelVersion { get; init; } = "UNKNOWN";
         public string ModelFilePath { get; init; } = string.Empty;
         public double ConfidenceThreshold { get; init; }
@@ -1465,6 +1669,8 @@ public partial class ReportsView : UserControl
         public string FilePath { get; init; } = string.Empty;
         public string Status { get; init; } = string.Empty;
         public string OperatorId { get; init; } = "UNKNOWN";
+        public long? AuditEventId { get; init; }
+        public string AuditEventDisplay => AuditEventId is null ? "--" : AuditEventId.Value.ToString(CultureInfo.InvariantCulture);
 
         public static ExportHistoryRow FromRecord(ExportHistoryRecord record)
         {
@@ -1476,6 +1682,45 @@ public partial class ReportsView : UserControl
                 FilePath = record.FilePath,
                 Status = record.Status,
                 OperatorId = record.OperatorId,
+                AuditEventId = record.AuditEventId,
+            };
+        }
+    }
+
+    public sealed class AuditLogRow
+    {
+        public long Id { get; init; }
+        public DateTime TimestampUtc { get; init; }
+        public DateTime LocalTimestamp { get; init; }
+        public string TimestampUtcDisplay => TimestampUtc == DateTime.MinValue ? "--" : TimestampUtc.ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        public string LocalTimestampDisplay => LocalTimestamp == DateTime.MinValue ? "--" : LocalTimestamp.ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        public string UserId { get; init; } = "UNKNOWN";
+        public string UserRole { get; init; } = "UNKNOWN";
+        public string StationId { get; init; } = "UNKNOWN";
+        public string ActionCategory { get; init; } = string.Empty;
+        public string ActionDetail { get; init; } = string.Empty;
+        public string RelatedEntityType { get; init; } = string.Empty;
+        public string RelatedEntityId { get; init; } = string.Empty;
+        public string RelatedPath { get; init; } = string.Empty;
+        public string RelatedEntityDisplay => string.IsNullOrWhiteSpace(RelatedEntityType) && string.IsNullOrWhiteSpace(RelatedEntityId)
+            ? "--"
+            : $"{RelatedEntityType}:{RelatedEntityId}";
+
+        public static AuditLogRow FromRecord(AuditEventRecord record)
+        {
+            return new AuditLogRow
+            {
+                Id = record.Id,
+                TimestampUtc = record.TimestampUtc,
+                LocalTimestamp = record.LocalTimestamp,
+                UserId = record.UserId,
+                UserRole = record.UserRole,
+                StationId = record.StationId,
+                ActionCategory = record.ActionCategory,
+                ActionDetail = record.ActionDetail,
+                RelatedEntityType = record.RelatedEntityType,
+                RelatedEntityId = record.RelatedEntityId,
+                RelatedPath = record.RelatedPath,
             };
         }
     }

@@ -10,7 +10,7 @@ namespace AOI_Monitor.Services;
 
 public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
 {
-    public string Name => "Pixel Difference";
+    public string Name => "Pixel Difference Prototype Engine";
     public string Version => "PIXEL_DIFF_0.1";
 
     public AnalysisResult Analyze(string samplePath, string? goldenPath, DetectionPriority priority)

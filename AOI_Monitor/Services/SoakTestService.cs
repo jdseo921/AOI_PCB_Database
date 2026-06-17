@@ -103,7 +103,7 @@ public static class SoakTestService
 
         if (source.ConnectionStatus != CameraSourceStatus.Simulated)
         {
-            result.Errors.Add($"Folder camera simulator is not ready: {source.StatusMessage}");
+            result.Errors.Add($"Folder Camera Simulation is not ready: {source.StatusMessage}");
             CompleteResult(result, process);
             progress?.Report(new SoakTestProgress(0, Math.Max(1, (int)options.Duration.TotalSeconds), "Soak test could not start; no readable simulation images."));
             return result;
@@ -128,7 +128,7 @@ public static class SoakTestService
             if (frame is null)
             {
                 result.FailedCycles++;
-                result.Errors.Add("Folder camera simulator returned no frame.");
+                result.Errors.Add("Folder Camera Simulation returned no frame.");
                 break;
             }
 
@@ -244,7 +244,7 @@ public static class SoakTestService
         <body>
           <h1>AOI Monitor Soak Test Report</h1>
           <p>Run ID: {{Html(result.RunId)}}</p>
-          <div class="notice {{(result.Errors.Count == 0 && !result.WasCanceled ? "ok" : string.Empty)}}">This is controlled local PoC stability evidence using folder-simulated camera frames. It does not indicate live camera, lighting, robot, PLC, MES, or production hardware integration.</div>
+          <div class="notice {{(result.Errors.Count == 0 && !result.WasCanceled ? "ok" : string.Empty)}}">This is controlled local PoC stability evidence using Folder Camera Simulation frames. It does not indicate live camera, lighting, production robot, PLC, production MES, or Stage 2 Planned Hardware Integration completion.</div>
 
           <h2>Run Summary</h2>
           <table>

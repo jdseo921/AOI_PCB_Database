@@ -34,20 +34,25 @@ public sealed class WorkflowState
     private WorkflowState()
     {
         AoiDatabase.AuditOperatorProvider = () => OperatorWithRole;
+        AoiDatabase.AuditUserIdProvider = () => OperatorId;
+        AoiDatabase.AuditUserRoleProvider = () => CurrentRole.ToString();
+        AoiDatabase.AuditStationProvider = () => StationId;
     }
 
     public void SetCurrentUser(string userId, UserRole role)
     {
+        var previousUser = OperatorWithRole;
         CurrentUser.UserId = NormalizeUserId(userId);
         CurrentUser.Role = role;
-        AddEvent("LOGIN", $"Local user set to {OperatorWithRole}. MES authentication is Stage 4 planned.");
+        AddEvent("LOGIN", $"Local user set to {OperatorWithRole}. Previous local user: {previousUser}. MES authentication is Stage 4 planned.");
         Notify();
     }
 
     public void SetRole(UserRole role)
     {
+        var previousRole = CurrentUser.Role;
         CurrentUser.Role = role;
-        AddEvent("ROLE", $"Local role changed to {role}.");
+        AddEvent("ROLE", $"Local role changed from {previousRole} to {role}.");
         Notify();
     }
 
@@ -89,14 +94,20 @@ public sealed class WorkflowState
         result.BoardProgram = BoardProgram;
         result.OperatorId = OperatorWithRole;
         LastAnalysis = result;
+        long? inspectionResultId = null;
         if (persist)
         {
-            AoiDatabase.RecordInspectionResult(result);
+            inspectionResultId = AoiDatabase.RecordInspectionResult(result);
 
             try
             {
                 var path = MachineInterfaceExportService.ExportInspectionDecision(result);
-                AddEvent("INTEGRATION", $"Machine interface JSON exported: {Path.GetFileName(path)}");
+                AddEvent(
+                    "INTEGRATION",
+                    $"Machine interface JSON exported: {Path.GetFileName(path)}",
+                    relatedEntityType: "InspectionResult",
+                    relatedEntityId: inspectionResultId?.ToString() ?? string.Empty,
+                    relatedPath: path);
             }
             catch (Exception ex)
             {
@@ -108,7 +119,10 @@ public sealed class WorkflowState
             "ANALYSIS",
             persist
                 ? $"Inspection saved -> score {result.DifferenceScore:F1}% ({result.Verdict})"
-                : $"Inspection complete -> score {result.DifferenceScore:F1}% ({result.Verdict})");
+                : $"Inspection complete -> score {result.DifferenceScore:F1}% ({result.Verdict})",
+            relatedEntityType: persist ? "InspectionResult" : "AnalysisResult",
+            relatedEntityId: inspectionResultId?.ToString() ?? string.Empty,
+            relatedPath: result.SamplePath);
 
         Notify();
     }
@@ -174,7 +188,12 @@ public sealed class WorkflowState
         Notify();
     }
 
-    public void AddEvent(string category, string message)
+    public void AddEvent(
+        string category,
+        string message,
+        string relatedEntityType = "",
+        string relatedEntityId = "",
+        string relatedPath = "")
     {
         var entry = new WorkflowEvent
         {
@@ -185,6 +204,17 @@ public sealed class WorkflowState
 
         History.Add(entry);
         AoiDatabase.RecordWorkflowEvent(category, message, entry.Timestamp, OperatorWithRole);
+        AoiDatabase.RecordAuditEvent(
+            category,
+            message,
+            entry.Timestamp,
+            operatorWithRole: OperatorWithRole,
+            userId: OperatorId,
+            userRole: CurrentRole.ToString(),
+            stationId: StationId,
+            relatedEntityType: relatedEntityType,
+            relatedEntityId: relatedEntityId,
+            relatedPath: relatedPath);
 
         if (History.Count > MaxHistoryEntries)
             History.RemoveRange(0, History.Count - MaxHistoryEntries);

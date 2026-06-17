@@ -32,6 +32,7 @@ public partial class SettingsView : UserControl
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
         CameraSourceSettingsService.SettingsChanged += OnCameraSourceSettingsChanged;
+        MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
         RefreshWorkflowUi();
         ApplyLanguageVisuals();
         ApplyFontPreset();
@@ -42,11 +43,13 @@ public partial class SettingsView : UserControl
         WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
         CameraSourceSettingsService.SettingsChanged -= OnCameraSourceSettingsChanged;
+        MesIntegrationSettingsService.SettingsChanged -= OnMesIntegrationSettingsChanged;
     }
 
     private void OnWorkflowStateChanged() => Dispatcher.Invoke(RefreshWorkflowUi);
     private void OnInspectionConfigurationChanged() => Dispatcher.Invoke(RefreshInspectionConfigurationUi);
     private void OnCameraSourceSettingsChanged() => Dispatcher.Invoke(RefreshCameraSourceUi);
+    private void OnMesIntegrationSettingsChanged() => Dispatcher.Invoke(RefreshMesIntegrationUi);
 
     private void OnApply(object sender, RoutedEventArgs e)
     {
@@ -55,6 +58,8 @@ public partial class SettingsView : UserControl
         var newConfig = BuildConfigurationFromUi();
         var existingCamera = CameraSourceSettingsService.Load();
         var newCamera = BuildCameraSourceSettingsFromUi();
+        var existingMes = MesIntegrationSettingsService.Load();
+        var newMes = BuildMesIntegrationSettingsFromUi();
         var modelConfigChanged =
             !string.Equals(existingConfig.ModelFilePath, newConfig.ModelFilePath, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingConfig.ModelVersion, newConfig.ModelVersion, StringComparison.OrdinalIgnoreCase) ||
@@ -71,11 +76,15 @@ public partial class SettingsView : UserControl
             !string.Equals(existingCamera.BottomFolder, newCamera.BottomFolder, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingCamera.BoardModel, newCamera.BoardModel, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingCamera.LotId, newCamera.LotId, StringComparison.OrdinalIgnoreCase);
+        var mesConfigChanged =
+            existingMes.Mode != newMes.Mode ||
+            !string.Equals(existingMes.MockEndpointUrl, newMes.MockEndpointUrl, StringComparison.OrdinalIgnoreCase) ||
+            existingMes.UploadTimeoutSeconds != newMes.UploadTimeoutSeconds;
         var thresholdChanged =
             ComboToPriority(DetectionPriorityCombo.SelectedIndex) != state.DetectionPriority ||
             Math.Abs(existingConfig.ConfidenceThreshold - newConfig.ConfidenceThreshold) > 0.0001;
 
-        if ((modelConfigChanged || cameraConfigChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, or camera source"))
+        if ((modelConfigChanged || cameraConfigChanged || mesConfigChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, camera source, or Mock MES settings"))
             return;
 
         if (thresholdChanged && !Authorize(RoleAuthorization.CanChangeThresholds, "Changing inspection thresholds or detection priority"))
@@ -85,6 +94,7 @@ public partial class SettingsView : UserControl
         ApplyFontPreset();
         SaveInspectionConfiguration(newConfig);
         SaveCameraSourceSettings(newCamera);
+        SaveMesIntegrationSettings(newMes);
 
         if (!state.TrySetDetectionPriority(ComboToPriority(DetectionPriorityCombo.SelectedIndex), out var message))
         {
@@ -117,6 +127,10 @@ public partial class SettingsView : UserControl
         InspectionModelConfigurationService.Save(new InspectionModelConfiguration());
         CameraSourceSettingsService.Save(new CameraSourceSettings());
         CameraSourceSettingsService.ApplyActiveSource();
+        MesModeCombo.SelectedIndex = 0;
+        MesEndpointText.Text = string.Empty;
+        MesTimeoutText.Text = "10";
+        MesIntegrationSettingsService.Save(new MesIntegrationSettings());
 
         ApplyLanguageVisuals();
         ApplyFontPreset();
@@ -288,6 +302,7 @@ public partial class SettingsView : UserControl
         RefreshRoleControls();
         RefreshInspectionConfigurationUi();
         RefreshCameraSourceUi();
+        RefreshMesIntegrationUi();
     }
 
     private void RefreshRoleControls()
@@ -304,6 +319,9 @@ public partial class SettingsView : UserControl
         CameraBottomFolderText.IsEnabled = canManageSettings;
         CameraBoardModelText.IsEnabled = canManageSettings;
         CameraLotIdText.IsEnabled = canManageSettings;
+        MesModeCombo.IsEnabled = canManageSettings;
+        MesEndpointText.IsEnabled = canManageSettings;
+        MesTimeoutText.IsEnabled = canManageSettings;
         BrowseCameraTopBtn.IsEnabled = canManageSettings;
         BrowseCameraSideBtn.IsEnabled = canManageSettings;
         BrowseCameraBottomBtn.IsEnabled = canManageSettings;
@@ -371,7 +389,7 @@ public partial class SettingsView : UserControl
             "ENGINE_CONFIG",
             configuration.IsOnnxSelected
                 ? $"Inspection engine set to ONNX ML Model; status {EngineRuntimeStatusText.Text}; version {configuration.EffectiveModelVersion}."
-                : "Inspection engine set to Pixel Difference / Prototype Engine.");
+                : "Inspection engine set to Pixel Difference Prototype Engine.");
     }
 
     private void OnTestModelConfigurationClick(object sender, RoutedEventArgs e)
@@ -475,6 +493,70 @@ public partial class SettingsView : UserControl
             BottomFolder = CameraBottomFolderText.Text.Trim(),
             BoardModel = CameraBoardModelText.Text.Trim(),
             LotId = CameraLotIdText.Text.Trim(),
+        };
+
+    private void SaveMesIntegrationSettings(MesIntegrationSettings? preparedSettings = null)
+    {
+        var settings = preparedSettings ?? BuildMesIntegrationSettingsFromUi();
+        MesIntegrationSettingsService.Save(settings);
+
+        WorkflowState.Instance.AddEvent(
+            "MES_CONFIG",
+            settings.Mode == MesIntegrationMode.MockRest
+                ? $"Mock MES mode set to Mock REST. Endpoint configured: {!string.IsNullOrWhiteSpace(settings.MockEndpointUrl)}. This is not production MES."
+                : $"MES/ERP mode set to {TraceabilityUploadService.ToDisplay(settings.Mode)}.");
+    }
+
+    private void RefreshMesIntegrationUi()
+        => RefreshMesIntegrationUi(MesIntegrationSettingsService.Load());
+
+    private void RefreshMesIntegrationUi(MesIntegrationSettings settings)
+    {
+        MesModeCombo.SelectedIndex = settings.Mode switch
+        {
+            MesIntegrationMode.MockRest => 1,
+            MesIntegrationMode.FutureProduction => 2,
+            _ => 0,
+        };
+        MesEndpointText.Text = settings.MockEndpointUrl;
+        MesTimeoutText.Text = settings.UploadTimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+
+        MesIntegrationSettingsService.ApplyIntegrationBoundary();
+        var status = IntegrationBoundaryRegistry.MesClient.Status;
+        MesMockStatusText.Text = settings.Mode switch
+        {
+            MesIntegrationMode.MockRest => string.IsNullOrWhiteSpace(settings.MockEndpointUrl)
+                ? "Mock MES: Local JSON"
+                : "Mock MES: REST Configured",
+            MesIntegrationMode.FutureProduction => "MES: Future Production Planned",
+            _ => "MES: Not Connected",
+        };
+        MesMockStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
+        {
+            IntegrationConnectionStatus.Simulated => "#E1A334",
+            IntegrationConnectionStatus.Ready => "#50F56E",
+            IntegrationConnectionStatus.Error => "#F27777",
+            _ => "#F27777",
+        }));
+    }
+
+    private MesIntegrationSettings BuildMesIntegrationSettingsFromUi()
+        => new()
+        {
+            Mode = MesModeCombo.SelectedIndex switch
+            {
+                1 => MesIntegrationMode.MockRest,
+                2 => MesIntegrationMode.FutureProduction,
+                _ => MesIntegrationMode.NotConnected,
+            },
+            MockEndpointUrl = MesEndpointText.Text.Trim(),
+            UploadTimeoutSeconds = int.TryParse(
+                MesTimeoutText.Text,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var timeout)
+                ? Math.Clamp(timeout, 1, 300)
+                : 10,
         };
 
     private InspectionModelConfiguration BuildConfigurationFromUi()
@@ -609,6 +691,7 @@ public partial class SettingsView : UserControl
         FontCombo.FontFamily = languageFont;
         DetectionPriorityCombo.FontFamily = languageFont;
         InspectionEngineCombo.FontFamily = languageFont;
+        MesModeCombo.FontFamily = languageFont;
 
         DisplayLanguageHeaderText.Text = TextFor("Display / Language", "\uD654\uBA74 / \uC5B8\uC5B4");
         LanguageLabelText.Text = TextFor("Language", "\uC5B8\uC5B4");

@@ -52,7 +52,8 @@ public class MainViewModel : ViewModelBase
         new NavPage { Key="modeltest",Number="03", Title="AI Model Test",     Subtitle="stage 1 validation" },
         new NavPage { Key="reports",  Number="04", Title="Log & Export",      Subtitle="history/package" },
         new NavPage { Key="profile",  Number="05", Title="3D Profile Viewer", Subtitle="sample CSV mode" },
-        new NavPage { Key="guide",    Number="06", Title="Settings / Guide",  Subtitle="setup/docs" },
+        new NavPage { Key="calibration", Number="06", Title="Calibration",     Subtitle="stage 2 prep" },
+        new NavPage { Key="guide",    Number="07", Title="Settings / Guide",  Subtitle="setup/docs" },
     };
 
     public RelayCommand NavigateCommand { get; }

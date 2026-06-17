@@ -9,10 +9,10 @@ This checklist is for the current local WPF prototype. It separates features tha
 - [ ] Readiness panel shows:
   - Database: `Connected`
   - Image Vault: `Available`
-  - Inspection Engine: `Prototype`
-  - Camera: `Simulated / Not Connected`
-  - Robot: `Not Connected`
-  - MES / ERP: `Not Connected`
+  - Inspection Engine: `Pixel Difference Prototype Engine`
+  - Camera: `Folder Camera Simulation / Not Connected`
+  - Robot: `Simulated Robot / Not Connected`
+  - MES / ERP: `Mock MES / Not Connected`
 - [ ] Demo images are available locally. See [SampleData/README.md](../SampleData/README.md).
 
 ## Implemented Stage 1 Checks
@@ -43,14 +43,14 @@ This checklist is for the current local WPF prototype. It separates features tha
 - [ ] Open `Log & Export`.
 - [ ] Confirm inspection history and/or review events are loaded from SQLite.
 
-### Pixel-Difference / Prototype Inference
+### Pixel Difference Prototype Engine
 
 - [ ] In `Image Library`, select or import a sample image.
 - [ ] Click `Compare Golden`.
 - [ ] Select a golden/reference image.
 - [ ] Confirm analysis completes with an `OK`, `REVIEW`, or `NG` verdict.
 - [ ] Confirm the UI shows score, confidence, suggested defect, and evidence.
-- [ ] Confirm the default path is presented as prototype pixel-difference inference; ONNX is presented as real inference only when a configured model successfully runs.
+- [ ] Confirm the default path is presented as Pixel Difference Prototype Engine inference; ONNX ML Model inference is presented as active only when a configured model successfully runs.
 
 ### Defect Overlay Display
 
@@ -110,13 +110,13 @@ This checklist is for the current local WPF prototype. It separates features tha
 
 These are not implemented in Stage 1 and should remain clearly labeled as planned or not connected:
 
-- [ ] Camera integration is marked `Simulated / Not Connected`.
+- [ ] Camera status is marked `Folder Camera Simulation / Not Connected`; no real camera hardware is implied.
 - [ ] Lighting control is marked planned Stage 2.
 - [ ] Live 3D camera profile inspection is marked planned Stage 2. The current 3D Profile Viewer is sample CSV mode only.
-- [ ] Robot/handler integration is marked `Not Connected` / planned Stage 3.
-- [ ] MES / ERP integration is marked `Not Connected` / planned Stage 4.
+- [ ] Simulated Robot is labeled software-only; production robot/handler control is marked planned Stage 3.
+- [ ] Mock MES is labeled mock/not connected; production MES / ERP integration is marked planned Stage 4.
 - [ ] Training Set Export is local file preparation only; no model training, fine-tuning, or deployment is run.
-- [ ] Inspection Engine reports `Prototype` by default, `ML Model Missing` for absent ONNX files, `Model Not Tested` for unverified ONNX settings, and `Ready` only after the current local ONNX configuration passes the readiness test.
+- [ ] Inspection Engine reports `Pixel Difference Prototype Engine` by default, `ML Model Missing` for absent ONNX files, `Model Not Tested` for unverified ONNX settings, and `Ready` only after the current local ONNX configuration passes the readiness test.
 - [ ] `Test Model Configuration` records a model-check event in the review/audit log.
 
 ## Evidence to Capture

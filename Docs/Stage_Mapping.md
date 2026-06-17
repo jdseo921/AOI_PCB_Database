@@ -9,16 +9,19 @@ Stage 1 currently includes:
 - Windows WPF operator console.
 - Local role selector for Operator, Engineer, and Admin.
 - Main Inspection operator workflow with Start, Stop, Next Board, Save Result, auto-save, result indicator, defect overlay, defect list, and event log.
-- Folder-based camera simulator for Top, Side, and Bottom view images.
+- Folder Camera Simulation for Top, Side, and Bottom view images.
+- Simulated Robot / Handler panel with Load, Inspect, Unload, Reset, emergency-stop simulation, cycle timing, and audit-event logging.
 - Image Library import and batch import.
 - Managed local image vault.
 - Local SQLite database initialization and persistence.
 - Inspection result persistence, including selected engine and model version.
 - Defect result persistence.
 - Review and disposition event persistence.
+- Factory-style audit trail persistence with UTC/local timestamps, user ID, role, station, action category, action detail, and related IDs/paths where available.
 - Recipe editor with ROI drawing, thresholds, recipe revisions, and role restrictions.
-- Default pixel-difference prototype inspection engine.
-- ONNX Runtime inference path with configurable model path, tensor names, input size, confidence threshold, and label map.
+- 2D calibration profile workflow for Stage 2 planning, including sample image loading, image/board point pairs, SQLite persistence, simple scale/offset transform, and approximate board-mm defect display in Main Inspection.
+- Pixel Difference Prototype Engine as the default inspection engine.
+- ONNX ML Model inference path with configurable model path, tensor names, input size, confidence threshold, and label map.
 - Engineer/Admin model configuration readiness test with saved timestamp/result and audit-event recording.
 - Readiness panel for database, image vault, inspection engine, camera, robot, and MES/ERP.
 - AI Model Test batch validation with manifest CSV support.
@@ -27,7 +30,8 @@ Stage 1 currently includes:
 - Customer-facing validation report export with HTML output, sample annotated images, print-to-PDF instructions, prototype limitations, and signature/approval section.
 - Annotated overlay export.
 - Stage 1 customer evidence package export including the strengthened validation report, CSV evidence, overlays, summaries, README, and warnings for missing optional evidence.
-- Admin-only local soak-test mode for repeated folder-simulated inspections with cancellation, timing, memory estimate, error capture, and HTML stability report export.
+- Admin-only local soak-test mode for repeated Folder Camera Simulation inspections with cancellation, timing, memory estimate, error capture, and HTML stability report export.
+- Mock MES integration mode with MES-style traceability payload generation, optional mock REST POST, local JSON fallback, and SQLite upload-attempt audit records.
 - Export history audit records.
 - 3D Profile Viewer Sample Data Mode for `x,y,height` CSV files.
 - Async progress and cancellation for long-running workflows.
@@ -39,17 +43,17 @@ Stage 1 currently includes:
 
 The following items are not complete production functionality in Stage 1:
 
-- No trained production AI model is included by default.
-- No trained production AI model is bundled. ONNX model inference is claimed only when a configured local model loads and inference succeeds.
+- No trained production ML model is included by default.
+- No trained production ML model is bundled. ONNX ML Model inference is claimed only when a configured local model loads and inference succeeds.
 - No real AOI camera hardware acquisition.
 - No real lighting controller.
 - No real 3D camera or live height-map acquisition.
-- No robot, handler, conveyor, or PLC control.
-- No MES/ERP authentication or production traceability.
+- No real robot, handler, conveyor, PLC, or safety-circuit control. The current robot cycle is software simulation only.
+- No MES/ERP authentication or production traceability. The current Mock MES feature is clearly labeled mock mode only.
 - No centralized production database service.
 - No production installer or auto-update mechanism.
 - No hardened cybersecurity model beyond local role separation.
-- No calibration workflow for real optics, lighting, 3D height, or robot coordinates.
+- No production calibration workflow for real optics, lighting, 3D height, or robot coordinates. The current 2D calibration profile feature is approximate Stage 2 preparation only.
 - Remaining placeholder panels are labeled as demo/prototype data; SQLite-backed database health and summary counts use local PoC records where available.
 
 ## Stage 2 Planned Camera Work
@@ -63,12 +67,12 @@ Stage 2 should add real acquisition and optical integration. Planned work includ
 - Trigger synchronization.
 - Exposure, gain, and acquisition settings.
 - Lighting controller integration.
-- Image calibration and coordinate mapping.
+- Production image calibration and coordinate mapping using validated hardware images and calibration fixtures.
 - Real 3D camera integration for live height and coplanarity inspection.
 - 3D profile acquisition, slice measurement, and calibrated height units.
 - Camera error recovery and operator-safe status messaging.
 
-The current folder simulator is intended to keep Stage 1 workflows testable while preserving a clean structure for Stage 2 hardware sources.
+Folder Camera Simulation is intended to keep Stage 1 workflows testable while preserving a clean structure for Stage 2 hardware sources.
 
 The current `ILightingController` contract and `NullLightingController` implementation are boundary placeholders only. They do not control real lighting hardware.
 
@@ -87,7 +91,7 @@ Stage 3 should integrate machine movement and handling. Planned work includes:
 
 Current machine-interface JSON exports are evidence artifacts only. They do not control hardware.
 
-The current `IRobotController` and `IEmergencyStopMonitor` contracts are boundary placeholders only. The null implementations do not send load, inspect, unload, or safety commands to real equipment.
+The current `IRobotController` and `IEmergencyStopMonitor` contracts include null implementations and a clearly labeled software simulator. The simulator can demonstrate Load, Inspect, Unload, Reset, emergency-stop interruption, and cycle timing in Main Inspection, but it does not send load, inspect, unload, or safety commands to real equipment.
 
 ## Stage 4 Planned MES / ERP Work
 
@@ -106,7 +110,7 @@ Stage 4 should connect AOI Monitor to production identity and traceability syste
 
 The current local user/role model records user ID and role in audit rows, but it is not MES authentication.
 
-The current `IMesClient` and `ITraceabilityUploader` contracts are boundary placeholders only. The null implementations do not upload results, images, lots, serials, or dispositions to MES/ERP systems.
+The current `IMesClient` and `ITraceabilityUploader` contracts include null implementations and a mock REST implementation for Stage 1 architecture demonstration. Mock mode can generate local JSON traceability payloads and optionally POST to a configured test endpoint, but it is not production MES/ERP authentication, traceability, or writeback.
 
 ## Boundary Statement
 

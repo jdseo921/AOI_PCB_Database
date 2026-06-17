@@ -85,7 +85,7 @@
 
           <StackPanel Grid.Column="4">
             <TextBlock Text="Engine" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
-            <TextBox x:Name="EngineText" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference / Prototype Engine"/>
+            <TextBox x:Name="EngineText" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference Prototype Engine"/>
             <Button Style="{StaticResource ActionBtnGreen}" Content="Run Batch Inspection" Margin="0,8,0,0" Click="OnRunBatchClick"/>
           </StackPanel>
         </Grid>

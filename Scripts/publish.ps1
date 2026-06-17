@@ -1,0 +1,157 @@
+param(
+    [string]$Configuration = "Release",
+    [string]$Runtime = "win-x64",
+    [string]$OutputRoot = "",
+    [switch]$SelfContained
+)
+
+$ErrorActionPreference = "Stop"
+
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Resolve-Path (Join-Path $scriptRoot "..")
+$projectPath = Join-Path $repoRoot "AOI_Monitor\AOI_Monitor.csproj"
+$solutionPath = Join-Path $repoRoot "AOI_PCB_Database.slnx"
+$docsPath = Join-Path $repoRoot "Docs"
+$featureDocPath = Join-Path $repoRoot "IMPLEMENTED_FEATURES.md"
+$rootReadmePath = Join-Path $repoRoot "README.md"
+$releaseRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    Join-Path $repoRoot "Release"
+} else {
+    $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputRoot)
+}
+
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$releaseName = "AOI_Monitor_PoC_$timestamp"
+$releaseDir = Join-Path $releaseRoot $releaseName
+$publishDir = Join-Path $releaseDir "app"
+$releaseDocsDir = Join-Path $releaseDir "Docs"
+
+function Invoke-Step {
+    param(
+        [string]$Title,
+        [string[]]$Command
+    )
+
+    Write-Host $Title
+    & $Command[0] @($Command[1..($Command.Length - 1)])
+    if ($LASTEXITCODE -ne 0) {
+        throw "Command failed with exit code ${LASTEXITCODE}: $($Command -join ' ')"
+    }
+}
+
+Write-Host "AOI Monitor publish script"
+Write-Host "Repository: $repoRoot"
+Write-Host "Release:    $releaseDir"
+Write-Host "Runtime:    $Runtime"
+Write-Host "Mode:       $(if ($SelfContained) { 'self-contained' } else { 'framework-dependent' })"
+
+if (!(Test-Path $projectPath)) {
+    throw "Project file was not found: $projectPath"
+}
+
+if (!(Test-Path $solutionPath)) {
+    throw "Solution file was not found: $solutionPath"
+}
+
+New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
+Get-ChildItem -LiteralPath $releaseRoot -Directory -Filter "AOI_Monitor_PoC_*" -ErrorAction SilentlyContinue |
+    Remove-Item -Recurse -Force
+
+if (Test-Path $releaseDir) {
+    Remove-Item -LiteralPath $releaseDir -Recurse -Force
+}
+
+New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
+
+Invoke-Step "Cleaning old release build output..." @("dotnet", "clean", $projectPath, "-c", $Configuration)
+Invoke-Step "Running non-UI tests..." @("dotnet", "test", $solutionPath, "-c", $Configuration, "--nologo")
+Invoke-Step "Building release configuration..." @("dotnet", "build", $projectPath, "-c", $Configuration, "--nologo")
+
+Write-Host "Publishing Windows desktop executable..."
+$selfContainedValue = if ($SelfContained) { "true" } else { "false" }
+Invoke-Step "dotnet publish..." @(
+    "dotnet",
+    "publish",
+    $projectPath,
+    "-c",
+    $Configuration,
+    "-r",
+    $Runtime,
+    "--self-contained",
+    $selfContainedValue,
+    "-p:PublishSingleFile=false",
+    "-p:IncludeNativeLibrariesForSelfExtract=true",
+    "-o",
+    $publishDir,
+    "--nologo")
+
+Write-Host "Removing runtime/private data from publish output..."
+$excludedRuntimeItems = @(
+    "data",
+    "exports",
+    "image_vault",
+    "training",
+    "aoi_monitor.sqlite",
+    "aoi_monitor.sqlite-wal",
+    "aoi_monitor.sqlite-shm",
+    "*.db",
+    "*.sqlite",
+    "*.sqlite-wal",
+    "*.sqlite-shm"
+)
+
+foreach ($item in $excludedRuntimeItems) {
+    Get-ChildItem -Path $publishDir -Filter $item -Recurse -Force -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "Copying documentation..."
+Copy-Item -LiteralPath $docsPath -Destination $releaseDocsDir -Recurse -Force
+Copy-Item -LiteralPath $rootReadmePath -Destination (Join-Path $releaseDir "README.md") -Force
+if (Test-Path $featureDocPath) {
+    Copy-Item -LiteralPath $featureDocPath -Destination (Join-Path $releaseDir "IMPLEMENTED_FEATURES.md") -Force
+}
+
+$releaseReadme = @"
+# AOI Monitor Windows Desktop PoC Release
+
+Generated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+Runtime: $Runtime
+Publish mode: $(if ($SelfContained) { "Self-contained" } else { "Framework-dependent" })
+
+## How to Run
+
+1. Open the app folder.
+2. Run AOI_Monitor.exe.
+3. If this is a framework-dependent package, install a .NET Desktop Runtime/SDK that supports the app target framework before launching.
+
+## Included
+
+- app/ - Published Windows desktop application files.
+- Docs/ - Installation guide, user manual, stage mapping, integration boundaries, and acceptance checklist.
+- README.md - Repository-level overview and operating notes.
+- IMPLEMENTED_FEATURES.md - Current PoC feature inventory.
+
+## Not Included
+
+This release intentionally excludes local runtime/customer data:
+
+- Local SQLite databases and WAL/SHM sidecars.
+- Image vaults, training images, customer images, and production images.
+- Generated export folders, customer packages, overlays, CSV reports, and machine-interface JSON.
+- Local %LOCALAPPDATA%\AOI_Monitor data.
+
+The app creates local PoC data on the target machine when it runs.
+
+## Packaging
+
+Zip this release folder for delivery:
+
+Compress-Archive -Path "$releaseName" -DestinationPath "$releaseName.zip"
+"@
+
+Set-Content -LiteralPath (Join-Path $releaseDir "RUN_RELEASE.md") -Value $releaseReadme -Encoding UTF8
+
+Write-Host "Release package created:"
+Write-Host $releaseDir

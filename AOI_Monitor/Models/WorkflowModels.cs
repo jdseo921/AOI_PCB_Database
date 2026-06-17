@@ -15,7 +15,7 @@ public class AnalysisResult
     public string? GoldenPath { get; set; }
     public string BoardProgram { get; set; } = "UNKNOWN";
     public string OperatorId { get; set; } = "UNKNOWN";
-    public string InspectionEngine { get; set; } = "Pixel Difference";
+    public string InspectionEngine { get; set; } = "Pixel Difference Prototype Engine";
     public double DifferenceScore { get; set; }
     public double MeanBrightness { get; set; }
     public double ReviewThreshold { get; set; }

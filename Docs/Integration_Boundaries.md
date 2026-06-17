@@ -1,6 +1,6 @@
 # Hardware, Robot, and MES Integration Boundaries
 
-This document describes the planned integration contracts added to AOI Monitor. These contracts are architecture boundaries only. The current PoC does not control real hardware, write to MES/ERP, or monitor a real emergency-stop circuit.
+This document describes the planned integration contracts added to AOI Monitor. These contracts are architecture boundaries only. The current PoC does not control real hardware, write to production MES/ERP, or monitor a real emergency-stop circuit. A clearly labeled Mock MES REST mode is available only for traceability-flow demonstration.
 
 ## Status Vocabulary
 
@@ -33,7 +33,17 @@ Default safe implementations:
 - `NullTraceabilityUploader`
 - `NullEmergencyStopMonitor`
 
+Mock/demo implementation:
+
+- `MockMesClient`
+- `SimulatedRobotController`
+- `SimulatedEmergencyStopMonitor`
+
 The null implementations always report `NotConnected` and return non-accepted command results. They do not call vendor SDKs, open network connections, write to MES, or control equipment.
+
+`MockMesClient` reports `Simulated`. It can POST a MES-style traceability payload to a configured mock REST endpoint, or write the same payload to local JSON when no endpoint is configured. It is not production MES/ERP authentication or writeback.
+
+`SimulatedRobotController` reports `Simulated` unless the software emergency-stop simulation is active, in which case it reports `Error`. It supports Load, Inspect, Unload, Reset, and emergency-stop simulation for Stage 1 workflow demonstrations. It never calls a vendor SDK, PLC, handler, conveyor, robot, or safety circuit.
 
 ## Placeholder Commands
 
@@ -44,10 +54,11 @@ The current command models are deliberately small so later stages can map them t
 - `UnloadCommand`
 - `UploadResultCommand`
 - `UploadImageCommand`
+- `TraceabilityPayload`
 
-Robot/handler work is expected to use Load, Inspect, and Unload commands in Stage 3.
+Robot/handler work is expected to use Load, Inspect, Unload, and Reset commands in Stage 3. The current simulator uses the same contract to prove the application flow and audit trail without moving hardware.
 
-MES and traceability work is expected to use Upload Result and Upload Image commands in Stage 4.
+MES and traceability work is expected to use Upload Result, Upload Image, and traceability payload commands in Stage 4.
 
 Lighting work is expected to use recipe/view-based lighting program selection in Stage 2.
 
@@ -60,7 +71,7 @@ The app readiness panel displays these planned integration areas:
 - MES / Traceability
 - E-Stop Monitor
 
-In the current PoC these show `Not Connected`. Tooltips explain that they are planned integration boundaries. The UI should not imply that real robot, MES, lighting, PLC, or safety hardware is connected until a future implementation replaces the null services and passes readiness checks.
+In the safe default PoC state these show `Not Connected`. Mock MES REST mode and Simulated Robot / Handler show `Simulated` and are labeled as mock/demo behavior. The UI should not imply that real robot, production MES, lighting, PLC, or safety hardware is connected until a future implementation replaces the null, mock, or simulated services and passes readiness checks.
 
 ## Future Implementation Guidance
 
@@ -79,4 +90,3 @@ Future stage implementations should:
 - Stage 2: lighting controller and live camera/3D hardware sources.
 - Stage 3: robot, handler, PLC, emergency-stop/safety monitoring, and machine action handshakes.
 - Stage 4: MES/ERP authentication, traceability upload, result upload, image upload, and production database integration.
-

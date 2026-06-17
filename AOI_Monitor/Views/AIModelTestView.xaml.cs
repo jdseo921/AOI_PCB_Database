@@ -30,7 +30,7 @@ public partial class AIModelTestView : UserControl
     private string? _groundTruthCsvPath;
     private long? _currentRunId;
     private DateTime? _currentRunCreatedAtUtc;
-    private string _currentEngineDisplay = "Pixel Difference / PIXEL_DIFF_0.1";
+    private string _currentEngineDisplay = "Pixel Difference Prototype Engine / PIXEL_DIFF_0.1";
     private string _lastAnnotatedImageFolder = string.Empty;
     private string _lastReportPath = string.Empty;
     private CancellationTokenSource? _workCts;

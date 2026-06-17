@@ -81,7 +81,7 @@ public static class InspectionModelConfigurationService
         InspectionEngineStatus.MlInvalidLabelMap => "Invalid Label Map",
         InspectionEngineStatus.MlRuntimeError => "ML Runtime Error",
         InspectionEngineStatus.MlUnsupportedOutputFormat => "Unsupported Output Format",
-        _ => "Prototype Engine",
+        _ => "Pixel Difference Prototype Engine",
     };
 
     public static ModelConfigurationTestResult TestAndSave(InspectionModelConfiguration configuration)

@@ -24,7 +24,7 @@ public static class ModelConfigurationValidator
         var fingerprint = ComputeConfigurationHash(configuration);
 
         if (!configuration.IsOnnxSelected)
-            return Result(ModelConfigurationTestStatus.Ready, "Prototype pixel-difference engine selected; no ONNX model is required.", timestamp, fingerprint);
+            return Result(ModelConfigurationTestStatus.Ready, "Pixel Difference Prototype Engine selected; no ONNX ML Model is required.", timestamp, fingerprint);
 
         if (string.IsNullOrWhiteSpace(configuration.ModelFilePath) || !File.Exists(configuration.ModelFilePath))
             return Result(ModelConfigurationTestStatus.MissingModel, $"Model file is missing: {NullIfEmpty(configuration.ModelFilePath)}", timestamp, fingerprint);

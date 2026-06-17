@@ -18,6 +18,10 @@
           <TextBlock Text="Log Filters" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
         </Border>
         <Grid Grid.Row="1" Margin="8">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="120"/>
             <ColumnDefinition Width="6"/>
@@ -60,6 +64,21 @@
             <Button Style="{StaticResource ActionBtnGreen}" Content="Apply Filters" Margin="0,0,6,0" Click="OnApplyFiltersClick"/>
             <Button Style="{StaticResource ActionBtn}" Content="Clear" Click="OnClearFiltersClick"/>
           </WrapPanel>
+          <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,0,0">
+            <TextBlock Text="User Role" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <ComboBox x:Name="RoleFilterCombo" SelectedIndex="0">
+              <ComboBoxItem Content="ALL"/>
+              <ComboBoxItem Content="Operator"/>
+              <ComboBoxItem Content="Engineer"/>
+              <ComboBoxItem Content="Admin"/>
+            </ComboBox>
+          </StackPanel>
+          <StackPanel Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="3" Margin="0,8,0,0">
+            <TextBlock Text="Audit Action Type" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <TextBox x:Name="ActionTypeFilterText" Text="" ToolTip="Examples: LOGIN, EXPORT, MAIN_INSPECTION, ENGINE_CONFIG, CALIBRATION"/>
+          </StackPanel>
+          <TextBlock Grid.Row="1" Grid.Column="6" Grid.ColumnSpan="5" Text="Audit Trail filters apply user, role, date, and action type for QC documentation."
+                     Foreground="#8B969E" FontSize="10.5" TextWrapping="Wrap" VerticalAlignment="Bottom" Margin="0,8,0,3"/>
         </Grid>
       </Grid>
     </Border>
@@ -107,7 +126,22 @@
                 <DataGridTextColumn Header="Type" Binding="{Binding ExportType}" Width="160"/>
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="70"/>
                 <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="130"/>
+                <DataGridTextColumn Header="Audit ID" Binding="{Binding AuditEventDisplay}" Width="80"/>
                 <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </TabItem>
+          <TabItem Header="Audit Trail">
+            <DataGrid x:Name="AuditGrid" CanUserSortColumns="True">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="UTC Time" Binding="{Binding TimestampUtcDisplay}" SortMemberPath="TimestampUtc" Width="140"/>
+                <DataGridTextColumn Header="Local Time" Binding="{Binding LocalTimestampDisplay}" Width="140"/>
+                <DataGridTextColumn Header="User" Binding="{Binding UserId}" Width="105"/>
+                <DataGridTextColumn Header="Role" Binding="{Binding UserRole}" Width="80"/>
+                <DataGridTextColumn Header="Station" Binding="{Binding StationId}" Width="95"/>
+                <DataGridTextColumn Header="Action" Binding="{Binding ActionCategory}" Width="140"/>
+                <DataGridTextColumn Header="Related ID" Binding="{Binding RelatedEntityDisplay}" Width="145"/>
+                <DataGridTextColumn Header="Detail" Binding="{Binding ActionDetail}" Width="*"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -137,12 +171,14 @@
         <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
           <Button Style="{StaticResource ActionBtnGreen}" Content="Inspection History CSV" Margin="0,0,6,6" Click="OnExportInspectionHistoryClick"/>
           <Button Style="{StaticResource ActionBtnGreen}" Content="Review Log CSV" Margin="0,0,6,6" Click="OnExportReviewLogClick"/>
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Audit Trail CSV" Margin="0,0,6,6" Click="OnExportAuditTrailClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Annotated Overlays" Margin="0,0,6,6" Click="OnExportAnnotatedOverlaysClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Create Stage 1 Customer Package" Margin="0,0,6,6" Click="OnExportCustomerPackageClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="DB Integrity" Margin="0,0,6,0" Click="OnRunDbIntegrityCheckClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Database Health" Margin="0,0,6,0" Click="OnOpenDatabaseHealthClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Verify Paths" Margin="0,0,6,0" Click="OnVerifyImagePathsClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Rebuild Image Index" Margin="0,0,6,0" Click="OnRebuildImageIndexClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Upload Result to Mock MES" Margin="0,0,6,0" Click="OnUploadMesMockClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Soak Test" Margin="0,0,6,0" Click="OnRunSoakTestClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Recipe" Click="OnLockActiveRecipeClick"/>
         </WrapPanel>

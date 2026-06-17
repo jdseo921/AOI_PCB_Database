@@ -28,6 +28,7 @@ public partial class MainWindow : Window
         ["reports"]  = "LOG & EXPORT / TRACEABILITY PACKAGE",
         ["spc"]      = "LOG & EXPORT / DATABASE HEALTH",
         ["profile"]  = "3D PROFILE VIEWER / SAMPLE DATA MODE",
+        ["calibration"] = "2D CALIBRATION PROFILE / STAGE 2 PREPARATION",
         ["settings"] = "SETTINGS",
         ["install"]  = "SETTINGS / GUIDE / INSTALLATION NOTES",
         ["guide"]    = "SETTINGS / GUIDE",
@@ -45,6 +46,7 @@ public partial class MainWindow : Window
         {
             AoiDatabase.Initialize();
             CameraSourceSettingsService.ApplyActiveSource();
+            MesIntegrationSettingsService.ApplyIntegrationBoundary();
             WorkflowState.Instance.AddEvent("STORAGE", $"SQLite ready: {AoiDatabase.DatabasePath}");
             UpdateReadinessPanel(databaseConnected: File.Exists(AoiDatabase.DatabasePath), vaultAvailable: Directory.Exists(AoiDatabase.ImageVaultPath));
             UpdateFooterStatus();
@@ -75,9 +77,11 @@ public partial class MainWindow : Window
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
         CameraSourceFactory.ActiveSourceChanged += OnCameraSourceChanged;
+        MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
         Closed += (_, _) => WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         Closed += (_, _) => InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
         Closed += (_, _) => CameraSourceFactory.ActiveSourceChanged -= OnCameraSourceChanged;
+        Closed += (_, _) => MesIntegrationSettingsService.SettingsChanged -= OnMesIntegrationSettingsChanged;
 
         SwitchPage("monitor");
         UpdateWorkflowPanel();
@@ -99,6 +103,7 @@ public partial class MainWindow : Window
                 "recipe"   => new RecipeView(),
                 "modeltest" => new AIModelTestView(),
                 "profile"  => new ProfileView(),
+                "calibration" => new CalibrationView(),
                 "spc"      => new SpcView(),
                 "reports"  => new ReportsView(),
                 "install"  => new InstallView(),
@@ -167,6 +172,10 @@ public partial class MainWindow : Window
         else if (PageContent.Content is SpcView spc)
         {
             spc.RefreshFromState();
+        }
+        else if (PageContent.Content is CalibrationView calibration)
+        {
+            calibration.RefreshFromState();
         }
 
         UpdateFooterStatus();
@@ -317,6 +326,11 @@ public partial class MainWindow : Window
     private void OnCameraSourceChanged()
     {
         Dispatcher.Invoke(UpdateCameraStatus);
+    }
+
+    private void OnMesIntegrationSettingsChanged()
+    {
+        Dispatcher.Invoke(UpdateIntegrationBoundaryStatus);
     }
 
     private void UpdateWorkflowPanel()

@@ -107,6 +107,8 @@ public sealed class LogFilter
     public string? BoardProgram { get; set; }
     public string? OperatorId { get; set; }
     public string? Result { get; set; }
+    public string? UserRole { get; set; }
+    public string? ActionCategory { get; set; }
 }
 
 public record InspectionHistoryRecord(
@@ -149,7 +151,21 @@ public record ExportHistoryRecord(
     string ExportType,
     string FilePath,
     string Status,
-    string OperatorId);
+    string OperatorId,
+    long? AuditEventId);
+
+public record AuditEventRecord(
+    long Id,
+    DateTime TimestampUtc,
+    DateTime LocalTimestamp,
+    string UserId,
+    string UserRole,
+    string StationId,
+    string ActionCategory,
+    string ActionDetail,
+    string RelatedEntityType,
+    string RelatedEntityId,
+    string RelatedPath);
 
 public record RecipeRevisionRecord(
     long Id,
@@ -161,6 +177,49 @@ public record RecipeRevisionRecord(
     string BackgroundImagePath,
     string RecipeJson,
     DateTime CreatedAtUtc);
+
+public record CalibrationPointInput(
+    double ImageX,
+    double ImageY,
+    double BoardXMillimeters,
+    double BoardYMillimeters);
+
+public record CalibrationPointRecord(
+    long Id,
+    long ProfileId,
+    double ImageX,
+    double ImageY,
+    double BoardXMillimeters,
+    double BoardYMillimeters);
+
+public record CalibrationProfileRecord(
+    long Id,
+    string ProfileName,
+    string BoardModel,
+    string ViewType,
+    string SampleImagePath,
+    string OperatorId,
+    int PointCount,
+    double ScaleX,
+    double OffsetX,
+    double ScaleY,
+    double OffsetY,
+    string TransformSummary,
+    DateTime CreatedAtUtc,
+    IReadOnlyList<CalibrationPointRecord> Points)
+{
+    public bool HasTransform => PointCount >= 2;
+    public string DisplayName => $"{ProfileName} | {BoardModel} | {ViewType} | {PointCount} pt";
+}
+
+public record CalibrationTransform(
+    bool IsAvailable,
+    int PointCount,
+    double ScaleX,
+    double OffsetX,
+    double ScaleY,
+    double OffsetY,
+    string Summary);
 
 public sealed class RecipeDocument
 {

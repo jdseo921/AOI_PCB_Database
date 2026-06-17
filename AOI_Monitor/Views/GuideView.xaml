@@ -17,6 +17,7 @@
         </StackPanel>
         <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
           <Button Style="{StaticResource ActionBtnGreen}" Content="Open Settings" Margin="0,0,6,0" Click="OnOpenSettingsClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Calibration" Margin="0,0,6,0" Click="OnOpenCalibrationClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Installation Notes" Click="OnOpenInstallClick"/>
         </WrapPanel>
       </Grid>
@@ -56,7 +57,7 @@
           <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
             <StackPanel>
               <TextBlock Text="Primary Evidence" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/>
-              <TextBlock Text="Image + ROI + GT + AI Result" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
+              <TextBlock Text="Image + ROI + GT + Inspection Result" FontWeight="Bold" FontSize="12" TextWrapping="Wrap"/>
             </StackPanel>
           </Border>
           <Border Style="{StaticResource FieldBox}">

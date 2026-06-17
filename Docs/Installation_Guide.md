@@ -4,7 +4,7 @@ This guide describes how to install, build, run, and troubleshoot the current AO
 
 ## Scope
 
-AOI Monitor is a local Windows WPF desktop application for PCBA AOI review workflows. The current build uses local files, a local SQLite database, a managed image vault, a folder-based camera simulator, and a prototype inspection engine. It does not install real camera SDKs, robot/PLC drivers, or MES/ERP connectors.
+AOI Monitor is a local Windows WPF desktop application for PCBA AOI review workflows. The current build uses local files, a local SQLite database, a managed image vault, Folder Camera Simulation, and the Pixel Difference Prototype Engine by default. It does not install real camera SDKs, robot/PLC drivers, or MES/ERP connectors.
 
 ## Requirements
 
@@ -84,7 +84,7 @@ The managed image vault path is:
 %LOCALAPPDATA%\AOI_Monitor\image_vault\
 ```
 
-Training candidate images are copied under:
+Training-set candidate images are copied under:
 
 ```text
 %LOCALAPPDATA%\AOI_Monitor\image_vault\training\
@@ -104,7 +104,7 @@ Admin users can change selected local paths in Settings. In this PoC, those sett
 
 1. Start the application.
 2. Confirm the readiness panel shows local database and image vault availability.
-3. Confirm Inspection Engine status is clearly marked as either Prototype Engine or an ML configuration status.
+3. Confirm Inspection Engine status is clearly marked as either Pixel Difference Prototype Engine or an ONNX ML Model configuration status.
 4. Confirm Camera status is either Simulated, Not Connected, or Error. The UI should not imply real camera hardware is connected.
 5. Select a local user and role from the shell.
 6. Use small non-confidential PNG/JPG/JPEG images for evaluation.
@@ -162,4 +162,3 @@ The Stage 2 camera hardware connection is not implemented. For demo use, configu
 
 - This is expected in the current PoC.
 - MES authentication and production traceability are planned for Stage 4.
-

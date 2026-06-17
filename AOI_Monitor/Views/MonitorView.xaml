@@ -19,7 +19,7 @@
         </Grid.ColumnDefinitions>
         <StackPanel>
           <TextBlock Text="Main Inspection" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-          <TextBlock Text="Operator inspection flow using imported or folder-simulated images. Camera, lighting, robot, and MES remain planned integrations."
+          <TextBlock Text="Operator inspection flow using imported images or Folder Camera Simulation. Live camera, lighting, production robot, and production MES are planned integrations."
                      Foreground="#8B969E" FontSize="10.5" TextWrapping="Wrap" Margin="0,3,0,0"/>
         </StackPanel>
         <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -41,6 +41,7 @@
         <Grid>
           <Grid.RowDefinitions>
             <RowDefinition Height="25"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -78,7 +79,35 @@
             </StackPanel>
           </Grid>
 
-          <Border Grid.Row="2" Margin="8,0,8,8" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
+          <Border Grid.Row="2" Margin="8,0,8,8" Background="#11161A" BorderBrush="#343D44" BorderThickness="1" Padding="8">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="Simulated Robot / Handler" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+                <TextBlock Text="Simulation only. No real robot, handler, PLC, or safety hardware is connected."
+                           Foreground="#8B969E" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                <WrapPanel Margin="0,5,0,0">
+                  <TextBlock x:Name="RobotSimStatusText" Text="Ready: simulation only" Foreground="#DCE5EB" FontWeight="Bold" FontSize="11" Margin="0,0,14,0"/>
+                  <TextBlock x:Name="RobotBoardStateText" Text="No simulated board loaded" Foreground="#9AA6AF" FontSize="11" Margin="0,0,14,0"/>
+                  <TextBlock x:Name="RobotCycleModeText" Text="No real robot connected" Foreground="#9AA6AF" FontSize="11" Margin="0,0,14,0"/>
+                  <TextBlock x:Name="RobotCycleTimeText" Text="Last cycle --" Foreground="#9AA6AF" FontSize="11"/>
+                </WrapPanel>
+              </StackPanel>
+              <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12,0,0,0">
+                <Button Style="{StaticResource MiniBtn}" Content="Load" Margin="0,0,5,0" Click="OnRobotLoadClick"/>
+                <Button Style="{StaticResource MiniBtn}" Content="Inspect" Margin="0,0,5,0" Click="OnRobotInspectClick"/>
+                <Button Style="{StaticResource MiniBtn}" Content="Unload" Margin="0,0,5,0" Click="OnRobotUnloadClick"/>
+                <Button Style="{StaticResource MiniBtn}" Content="Reset" Margin="0,0,5,0" Click="OnRobotResetClick"/>
+                <Button Style="{StaticResource MiniBtn}" Content="E-Stop Sim" Margin="0,0,5,0" Click="OnRobotEmergencyStopClick"/>
+                <Button x:Name="RunRobotCycleButton" Style="{StaticResource MiniBtn}" Content="Run Cycle" Click="OnRobotCycleClick"/>
+              </WrapPanel>
+            </Grid>
+          </Border>
+
+          <Border Grid.Row="3" Margin="8,0,8,8" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
             <Grid ClipToBounds="True">
               <TextBlock x:Name="EmptyImageText" Text="Select a folder or load an image from Image Library, then press Start / Next Board."
                          Foreground="#68757D" FontSize="13" TextWrapping="Wrap" TextAlignment="Center"
@@ -92,7 +121,7 @@
             </Grid>
           </Border>
 
-          <UniformGrid Grid.Row="3" Columns="4" Margin="8,0,8,8">
+          <UniformGrid Grid.Row="4" Columns="4" Margin="8,0,8,8">
             <Button Style="{StaticResource ActionBtnGreen}" Content="Start" Margin="0,0,6,0" Click="OnStartClick"/>
             <Button Style="{StaticResource ActionBtnRed}" Content="Stop" Margin="0,0,6,0" Click="OnStopClick"/>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Next Board" Margin="0,0,6,0" Click="OnNextBoardClick"/>
@@ -130,6 +159,7 @@
                 <RowDefinition Height="28"/>
                 <RowDefinition Height="28"/>
                 <RowDefinition Height="28"/>
+                <RowDefinition Height="32"/>
                 <RowDefinition Height="68"/>
               </Grid.RowDefinitions>
               <TextBlock Text="Station" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
@@ -141,13 +171,17 @@
               <TextBlock Grid.Row="3" Text="Operator" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
               <TextBlock Grid.Row="3" Grid.Column="1" x:Name="OperatorText" Text="Engineer01" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
               <TextBlock Grid.Row="4" Text="Engine" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="4" Grid.Column="1" x:Name="EngineText" Text="Pixel Difference" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+              <TextBlock Grid.Row="4" Grid.Column="1" x:Name="EngineText" Text="Pixel Difference Prototype Engine" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
               <TextBlock Grid.Row="5" Text="Model Version" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
               <TextBlock Grid.Row="5" Grid.Column="1" x:Name="ModelVersionText" Text="PIXEL_DIFF_0.1" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-              <TextBlock Grid.Row="6" Text="Timing" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="6" Grid.Column="1" x:Name="TimingText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-              <TextBlock Grid.Row="7" Text="Result" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-              <Border Grid.Row="7" Grid.Column="1" x:Name="ResultStatusBorder" Background="#372914" BorderBrush="#8C6C35" BorderThickness="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="10,6">
+              <TextBlock Grid.Row="6" Text="2D Cal Profile" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <ComboBox Grid.Row="6" Grid.Column="1" x:Name="CalibrationProfileCombo" MinHeight="26" DisplayMemberPath="DisplayName"
+                        SelectionChanged="OnCalibrationProfileSelectionChanged"
+                        ToolTip="2D calibration profile / Stage 2 preparation only. Approximate board-mm coordinates are not robot-ready."/>
+              <TextBlock Grid.Row="7" Text="Timing" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="7" Grid.Column="1" x:Name="TimingText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+              <TextBlock Grid.Row="8" Text="Result" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <Border Grid.Row="8" Grid.Column="1" x:Name="ResultStatusBorder" Background="#372914" BorderBrush="#8C6C35" BorderThickness="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="10,6">
                 <TextBlock x:Name="ResultStatusText" Text="REVIEW" FontWeight="ExtraBold" FontSize="28" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Border>
             </Grid>
@@ -171,6 +205,8 @@
                 <DataGridTextColumn Header="Side" Binding="{Binding Side}" Width="70"/>
                 <DataGridTextColumn Header="X" Binding="{Binding XDisplay}" Width="58"/>
                 <DataGridTextColumn Header="Y" Binding="{Binding YDisplay}" Width="58"/>
+                <DataGridTextColumn Header="Board X mm" Binding="{Binding BoardXDisplay}" Width="88"/>
+                <DataGridTextColumn Header="Board Y mm" Binding="{Binding BoardYDisplay}" Width="88"/>
               </DataGrid.Columns>
             </DataGrid>
           </Grid>

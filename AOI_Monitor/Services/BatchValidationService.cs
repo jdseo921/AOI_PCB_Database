@@ -48,7 +48,7 @@ public static class BatchValidationService
         string imagePath,
         GroundTruthEntry manifest,
         string message,
-        string inspectionEngine = "Pixel Difference",
+        string inspectionEngine = "Pixel Difference Prototype Engine",
         string modelVersion = "PIXEL_DIFF_0.1")
     {
         return new BatchTestRow
@@ -393,7 +393,7 @@ public sealed class BatchTestRow
     public string Image { get; set; } = string.Empty;
     public string GroundTruth { get; set; } = "UNKNOWN";
     public string EngineResult { get; set; } = "REVIEW";
-    public string InspectionEngine { get; set; } = "Pixel Difference";
+    public string InspectionEngine { get; set; } = "Pixel Difference Prototype Engine";
     public string ModelVersion { get; set; } = "PIXEL_DIFF_0.1";
     public double Score { get; set; }
     public string ScoreDisplay => $"{Score:F1}%";

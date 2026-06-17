@@ -142,7 +142,7 @@
               <Button Style="{StaticResource MiniBtn}" Content="Sync Zoom" Margin="0,0,5,5" Click="OnSyncZoomClick"/>
               <Button Style="{StaticResource MiniBtn}" Content="Sync Pan" Margin="0,0,5,5" Click="OnSyncPanClick"/>
               <Button Style="{StaticResource MiniBtnAmber}" Content="Show Difference" Margin="0,0,5,5" Click="OnShowDifferenceClick"/>
-              <Button Style="{StaticResource MiniBtn}" Content="AI Overlay" Margin="0,0,5,5" Click="OnAiOverlayClick"/>
+              <Button Style="{StaticResource MiniBtn}" Content="Defect Overlay" Margin="0,0,5,5" Click="OnAiOverlayClick"/>
               <Button Style="{StaticResource MiniBtn}" Content="GT Overlay" Margin="0,0,5,5" Click="OnGtOverlayClick"/>
               <Button Style="{StaticResource MiniBtnGreen}" Content="Export Pair" Click="OnExportPairClick"/>
             </WrapPanel>

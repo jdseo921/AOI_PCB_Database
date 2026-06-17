@@ -140,7 +140,7 @@
                 <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <TextBlock Text="Selected Engine" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
                 <ComboBox x:Name="InspectionEngineCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pixel Difference / Prototype Engine"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pixel Difference Prototype Engine"/>
                   <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="ONNX ML Model"/>
                 </ComboBox>
               </Grid>
@@ -184,7 +184,7 @@
               </Grid>
               <UniformGrid Columns="2">
                 <TextBlock Text="Runtime status" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="EngineRuntimeStatusText" Text="Prototype Engine" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
+                <TextBlock x:Name="EngineRuntimeStatusText" Text="Pixel Difference Prototype Engine" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
                 <TextBlock Text="Saved version" Foreground="#9AA6AF" FontSize="11"/>
                 <TextBlock x:Name="EngineVersionText" Text="PIXEL_DIFF_0.1" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
                 <TextBlock Text="Last model check" Foreground="#9AA6AF" FontSize="11"/>
@@ -259,6 +259,36 @@
               <UniformGrid Columns="2">
                 <TextBlock Text="Source status" Foreground="#9AA6AF" FontSize="11"/>
                 <TextBlock x:Name="CameraSourceStatusText" Text="Not Connected" FontWeight="Bold" FontSize="11.5" Foreground="#F27777" HorizontalAlignment="Right"/>
+              </UniformGrid>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
+            <StackPanel>
+              <TextBlock Text="MES / ERP Mock Integration" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="MES Mode" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <ComboBox x:Name="MesModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Not Connected"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Mock REST"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Future Production"/>
+                </ComboBox>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Mock Endpoint" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="MesEndpointText" Grid.Column="1" MinHeight="28" ToolTip="Optional. If blank, mock uploads are written to local JSON."/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Timeout Sec" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="MesTimeoutText" Grid.Column="1" MinHeight="28" Text="10"/>
+              </Grid>
+              <TextBlock Text="Mock mode is for Stage 4 traceability flow demonstration only. It is not production MES/ERP authentication or writeback."
+                         Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,6"/>
+              <UniformGrid Columns="2">
+                <TextBlock Text="MES status" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock x:Name="MesMockStatusText" Text="MES: Not Connected" FontWeight="Bold" FontSize="11.5" Foreground="#F27777" HorizontalAlignment="Right"/>
               </UniformGrid>
             </StackPanel>
           </Border>

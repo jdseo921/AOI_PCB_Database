@@ -1,3 +1,5 @@
+using AOI_Monitor.Models;
+
 namespace AOI_Monitor.Services;
 
 public enum IntegrationConnectionStatus
@@ -81,10 +83,17 @@ public interface IRobotController : IIntegrationEndpoint
     Task<IntegrationCommandResult> UnloadAsync(
         UnloadCommand command,
         CancellationToken cancellationToken = default);
+
+    Task<IntegrationCommandResult> ResetAsync(
+        CancellationToken cancellationToken = default);
 }
 
 public interface IMesClient : IIntegrationEndpoint
 {
+    Task<IntegrationCommandResult> UploadTraceabilityAsync(
+        TraceabilityPayload payload,
+        CancellationToken cancellationToken = default);
+
     Task<IntegrationCommandResult> UploadResultAsync(
         UploadResultCommand command,
         CancellationToken cancellationToken = default);
@@ -96,6 +105,10 @@ public interface IMesClient : IIntegrationEndpoint
 
 public interface ITraceabilityUploader : IIntegrationEndpoint
 {
+    Task<IntegrationCommandResult> UploadTraceabilityAsync(
+        TraceabilityPayload payload,
+        CancellationToken cancellationToken = default);
+
     Task<IntegrationCommandResult> UploadResultAsync(
         UploadResultCommand command,
         CancellationToken cancellationToken = default);
@@ -127,7 +140,7 @@ public sealed class NullRobotController : IRobotController
 {
     public string Name => "Null Robot Controller";
     public IntegrationConnectionStatus Status => IntegrationConnectionStatus.NotConnected;
-    public string StatusMessage => "Stage 3 robot/handler integration boundary only. No robot commands are sent.";
+    public string StatusMessage => "Stage 3 Planned Robot Integration boundary only. No robot commands are sent.";
 
     public Task<IntegrationCommandResult> LoadAsync(
         LoadCommand command,
@@ -143,13 +156,172 @@ public sealed class NullRobotController : IRobotController
         UnloadCommand command,
         CancellationToken cancellationToken = default)
         => Task.FromResult(IntegrationCommandResult.NotConnected(StatusMessage));
+
+    public Task<IntegrationCommandResult> ResetAsync(
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(IntegrationCommandResult.NotConnected(StatusMessage));
+}
+
+public sealed class SimulatedRobotController : IRobotController
+{
+    private const int SimulatedStepDelayMilliseconds = 150;
+    private bool _isBoardLoaded;
+    private bool _isEmergencyStopActive;
+    private string _loadedBoardId = string.Empty;
+
+    public string Name => "Simulated Robot / Handler";
+    public IntegrationConnectionStatus Status => _isEmergencyStopActive
+        ? IntegrationConnectionStatus.Error
+        : IntegrationConnectionStatus.Simulated;
+
+    public string StatusMessage => _isEmergencyStopActive
+        ? "Simulated emergency stop is active. No real robot hardware is connected."
+        : "Robot/handler simulation only. No real robot hardware is connected or controlled.";
+
+    public bool IsBoardLoaded => _isBoardLoaded;
+    public bool IsEmergencyStopActive => _isEmergencyStopActive;
+    public string LoadedBoardId => _loadedBoardId;
+
+    public async Task<IntegrationCommandResult> LoadAsync(
+        LoadCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var blocked = BlockIfUnavailable("Load");
+        if (blocked is not null)
+            return blocked;
+
+        if (_isBoardLoaded)
+            return new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, $"Simulated load rejected. Board {_loadedBoardId} is already loaded.");
+
+        await SimulateStepDelayAsync(cancellationToken);
+
+        blocked = BlockIfUnavailable("Load");
+        if (blocked is not null)
+            return blocked;
+
+        _isBoardLoaded = true;
+        _loadedBoardId = string.IsNullOrWhiteSpace(command.BoardId) ? "SIM-BOARD" : command.BoardId;
+
+        return new IntegrationCommandResult(
+            true,
+            IntegrationConnectionStatus.Simulated,
+            $"Simulated load complete for board {_loadedBoardId}. No real robot command was sent.");
+    }
+
+    public async Task<IntegrationCommandResult> InspectAsync(
+        InspectCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var blocked = BlockIfUnavailable("Inspect");
+        if (blocked is not null)
+            return blocked;
+
+        if (!_isBoardLoaded)
+            return new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, "Simulated inspect rejected. No simulated board is loaded.");
+
+        await SimulateStepDelayAsync(cancellationToken);
+
+        blocked = BlockIfUnavailable("Inspect");
+        if (blocked is not null)
+            return blocked;
+
+        return new IntegrationCommandResult(
+            true,
+            IntegrationConnectionStatus.Simulated,
+            $"Simulated inspect position reached for board {_loadedBoardId} on {command.ViewType}. No real robot command was sent.");
+    }
+
+    public async Task<IntegrationCommandResult> UnloadAsync(
+        UnloadCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var blocked = BlockIfUnavailable("Unload");
+        if (blocked is not null)
+            return blocked;
+
+        if (!_isBoardLoaded)
+            return new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, "Simulated unload rejected. No simulated board is loaded.");
+
+        await SimulateStepDelayAsync(cancellationToken);
+
+        blocked = BlockIfUnavailable("Unload");
+        if (blocked is not null)
+            return blocked;
+
+        var boardId = _loadedBoardId;
+        _isBoardLoaded = false;
+        _loadedBoardId = string.Empty;
+
+        return new IntegrationCommandResult(
+            true,
+            IntegrationConnectionStatus.Simulated,
+            $"Simulated unload complete for board {boardId} to {command.Destination}. No real robot command was sent.");
+    }
+
+    public Task<IntegrationCommandResult> ResetAsync(
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _isBoardLoaded = false;
+        _loadedBoardId = string.Empty;
+        _isEmergencyStopActive = false;
+
+        return Task.FromResult(new IntegrationCommandResult(
+            true,
+            IntegrationConnectionStatus.Simulated,
+            "Simulated robot reset complete. Emergency stop simulation cleared. No real robot command was sent."));
+    }
+
+    public void TriggerEmergencyStop() => _isEmergencyStopActive = true;
+
+    public void ClearEmergencyStop() => _isEmergencyStopActive = false;
+
+    private IntegrationCommandResult? BlockIfUnavailable(string commandName)
+    {
+        if (!_isEmergencyStopActive)
+            return null;
+
+        return new IntegrationCommandResult(
+            false,
+            IntegrationConnectionStatus.Error,
+            $"Simulated {commandName} interrupted by emergency stop simulation. No real robot command was sent.");
+    }
+
+    private static Task SimulateStepDelayAsync(CancellationToken cancellationToken)
+        => Task.Delay(SimulatedStepDelayMilliseconds, cancellationToken);
+}
+
+public sealed class SimulatedEmergencyStopMonitor : IEmergencyStopMonitor
+{
+    private readonly SimulatedRobotController _robotController;
+
+    public SimulatedEmergencyStopMonitor(SimulatedRobotController robotController)
+    {
+        _robotController = robotController;
+    }
+
+    public string Name => "Simulated Emergency Stop Monitor";
+    public IntegrationConnectionStatus Status => _robotController.IsEmergencyStopActive
+        ? IntegrationConnectionStatus.Error
+        : IntegrationConnectionStatus.Simulated;
+
+    public string StatusMessage => _robotController.IsEmergencyStopActive
+        ? "Simulated emergency stop is active. No real safety circuit is monitored."
+        : "Emergency-stop simulation only. No real safety circuit is monitored.";
+
+    public bool IsEmergencyStopActive => _robotController.IsEmergencyStopActive;
 }
 
 public sealed class NullMesClient : IMesClient
 {
     public string Name => "Null MES Client";
     public IntegrationConnectionStatus Status => IntegrationConnectionStatus.NotConnected;
-    public string StatusMessage => "Stage 4 MES/ERP integration boundary only. No production MES writeback is performed.";
+    public string StatusMessage => "Stage 4 Planned MES/ERP Integration boundary only. No production MES writeback is performed.";
+
+    public Task<IntegrationCommandResult> UploadTraceabilityAsync(
+        TraceabilityPayload payload,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(IntegrationCommandResult.NotConnected(StatusMessage));
 
     public Task<IntegrationCommandResult> UploadResultAsync(
         UploadResultCommand command,
@@ -167,6 +339,11 @@ public sealed class NullTraceabilityUploader : ITraceabilityUploader
     public string Name => "Null Traceability Uploader";
     public IntegrationConnectionStatus Status => IntegrationConnectionStatus.NotConnected;
     public string StatusMessage => "Stage 4 traceability upload boundary only. Results and images remain local.";
+
+    public Task<IntegrationCommandResult> UploadTraceabilityAsync(
+        TraceabilityPayload payload,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(IntegrationCommandResult.NotConnected(StatusMessage));
 
     public Task<IntegrationCommandResult> UploadResultAsync(
         UploadResultCommand command,

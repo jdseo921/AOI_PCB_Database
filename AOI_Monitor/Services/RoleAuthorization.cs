@@ -10,6 +10,7 @@ public enum UserRole
 public static class RoleAuthorization
 {
     public static bool CanEditRecipes(UserRole role) => role >= UserRole.Engineer;
+    public static bool CanEditCalibration(UserRole role) => role >= UserRole.Engineer;
     public static bool CanRunModelTests(UserRole role) => role >= UserRole.Engineer;
     public static bool CanTestModelConfiguration(UserRole role) => role >= UserRole.Engineer;
     public static bool CanChangeThresholds(UserRole role) => role >= UserRole.Engineer;
@@ -22,6 +23,7 @@ public static class RoleAuthorization
         return pageKey switch
         {
             "recipe" => CanEditRecipes(role),
+            "calibration" => CanEditCalibration(role),
             "modeltest" => CanRunModelTests(role),
             "reports" or "spc" => CanExportLogs(role),
             "settings" => role >= UserRole.Engineer,

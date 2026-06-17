@@ -6,6 +6,7 @@ using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
 using Microsoft.Data.Sqlite;
+using Microsoft.ML.OnnxRuntime.Tensors;
 using Xunit;
 
 namespace AOI_Monitor.Tests;
@@ -119,8 +120,18 @@ public sealed class AoiDatabaseTests : IDisposable
             SuggestedDefect = "Bridge",
             PolicyName = "Balanced",
             ModelVersion = "TEST-1",
+            ModelFilePath = @"C:\models\unit-test.onnx",
+            ConfidenceThreshold = 0.73,
             DecisionReason = "Synthetic test result",
             Hotspot = new Rect(0.1, 0.2, 0.3, 0.4),
+            Timing = new InspectionTiming
+            {
+                ImageLoadMilliseconds = 12,
+                PreprocessingMilliseconds = 23,
+                InferenceMilliseconds = 34,
+                OverlayRenderingMilliseconds = 5,
+                TotalInspectionMilliseconds = 74,
+            },
             Defects =
             {
                 new DefectResult
@@ -144,7 +155,15 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal("TBOX-MAIN", history[0].BoardProgram);
         Assert.Equal("NG", history[0].Verdict);
         Assert.Equal("Unit Test Engine", history[0].InspectionEngine);
+        Assert.Equal("TEST-1", history[0].ModelVersion);
+        Assert.Equal(@"C:\models\unit-test.onnx", history[0].ModelFilePath);
+        Assert.Equal(0.73, history[0].ConfidenceThreshold, precision: 3);
         Assert.Equal(18.5, history[0].DifferenceScore, precision: 3);
+        Assert.Equal(12, history[0].ImageLoadMilliseconds, precision: 3);
+        Assert.Equal(23, history[0].PreprocessingMilliseconds, precision: 3);
+        Assert.Equal(34, history[0].InferenceMilliseconds, precision: 3);
+        Assert.Equal(5, history[0].OverlayRenderingMilliseconds, precision: 3);
+        Assert.Equal(74, history[0].TotalInspectionMilliseconds, precision: 3);
     }
 
     [Fact]
@@ -240,6 +259,101 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal(2, metrics.OkCount);
         Assert.Equal(3, metrics.NgCount);
         Assert.Equal(0, metrics.ReviewCount);
+
+        rows[0].TotalInspectionMilliseconds = 850;
+        rows[1].TotalInspectionMilliseconds = 1250;
+        rows[2].TotalInspectionMilliseconds = 500;
+        rows[3].TotalInspectionMilliseconds = 0;
+        rows[4].TotalInspectionMilliseconds = 0;
+        var performance = BatchValidationService.CalculatePerformanceSummary(rows);
+        Assert.Equal(866.666, performance.AverageMilliseconds, precision: 2);
+        Assert.Equal(1250, performance.MaxMilliseconds, precision: 3);
+        Assert.Equal(500, performance.MinMilliseconds, precision: 3);
+        Assert.Equal(1, performance.CountOverOneSecond);
+    }
+
+    [Fact]
+    public void GenericDetectionOutputParserParsesDetectionRows()
+    {
+        var tensor = new DenseTensor<float>(new[] { 2, 6 });
+        tensor[0, 0] = 1;
+        tensor[0, 1] = 0.91f;
+        tensor[0, 2] = 0.10f;
+        tensor[0, 3] = 0.20f;
+        tensor[0, 4] = 0.30f;
+        tensor[0, 5] = 0.40f;
+        tensor[1, 0] = 6;
+        tensor[1, 1] = 0.20f;
+        tensor[1, 2] = 10;
+        tensor[1, 3] = 20;
+        tensor[1, 4] = 30;
+        tensor[1, 5] = 40;
+
+        var parser = new GenericDetectionOutputParser();
+        var detections = parser.Parse(
+            tensor,
+            new Dictionary<int, string>
+            {
+                [1] = "Solder Bridge",
+                [6] = "Anomaly",
+            },
+            0.65,
+            100,
+            100);
+
+        Assert.Single(detections);
+        Assert.Equal("Solder Bridge", detections[0].Label);
+        Assert.Equal(0.91, detections[0].Confidence, precision: 2);
+        Assert.Equal(0.10, detections[0].BoundingBox.X, precision: 2);
+        Assert.Equal(0.20, detections[0].BoundingBox.Y, precision: 2);
+        Assert.Equal(0.30, detections[0].BoundingBox.Width, precision: 2);
+        Assert.Equal(0.40, detections[0].BoundingBox.Height, precision: 2);
+    }
+
+    [Fact]
+    public void OnnxEngineWithoutModelReturnsFriendlyReviewResult()
+    {
+        var engine = new OnnxInspectionEngine(new InspectionModelConfiguration
+        {
+            SelectedEngineKey = InspectionEngineFactory.OnnxEngineKey,
+            ModelFilePath = Path.Combine(_root, "missing.onnx"),
+            ModelVersion = "UNIT-ONNX",
+            ConfidenceThreshold = 0.7,
+            InputTensorName = "images",
+            OutputTensorName = "detections",
+        });
+
+        var result = engine.Analyze(Path.Combine(_root, "missing-sample.png"), null, DetectionPriority.Balanced);
+
+        Assert.Equal("REVIEW", result.Verdict);
+        Assert.Equal("ONNX ML Model", result.InspectionEngine);
+        Assert.Equal("UNIT-ONNX", result.ModelVersion);
+        Assert.Equal(0.7, result.ConfidenceThreshold, precision: 3);
+        Assert.Equal(Path.Combine(_root, "missing.onnx"), result.ModelFilePath);
+        Assert.Contains(result.Evidence, line => line.Contains("No ML inference", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Defects, defect => defect.DefectType == "ML Model Missing");
+    }
+
+    [Fact]
+    public void OnnxEngineInvalidModelReturnsFriendlyReviewResult()
+    {
+        var samplePath = WriteTinyPng("onnx-sample.png");
+        var modelPath = Path.Combine(_root, "invalid.onnx");
+        File.WriteAllText(modelPath, "not an onnx model");
+        var engine = new OnnxInspectionEngine(new InspectionModelConfiguration
+        {
+            SelectedEngineKey = InspectionEngineFactory.OnnxEngineKey,
+            ModelFilePath = modelPath,
+            ModelVersion = "INVALID-ONNX",
+            ConfidenceThreshold = 0.65,
+        });
+
+        var result = engine.Analyze(samplePath, null, DetectionPriority.Balanced);
+
+        Assert.Equal("REVIEW", result.Verdict);
+        Assert.Equal("ML Runtime Error", result.SuggestedDefect);
+        Assert.Equal(modelPath, result.ModelFilePath);
+        Assert.Contains(result.Evidence, line => line.Contains("Error type", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -354,6 +468,46 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
+    public void SoakTestReportCanBeWrittenWithStabilityMetrics()
+    {
+        var result = new SoakTestResult
+        {
+            ImageFolder = @"C:\soak\images",
+            OutputFolder = _root,
+            EngineName = "Unit Test Engine",
+            EngineVersion = "TEST-1",
+            OperatorId = "Admin01 [Admin]",
+            RequestedDuration = TimeSpan.FromMinutes(2),
+            DelayBetweenInspections = TimeSpan.FromMilliseconds(250),
+            TotalCycles = 3,
+            SuccessfulCycles = 2,
+            FailedCycles = 1,
+            AverageInspectionMilliseconds = 740,
+            MinInspectionMilliseconds = 610,
+            MaxInspectionMilliseconds = 1205,
+            CountOverOneSecond = 1,
+            StartManagedMemoryMegabytes = 20,
+            EndManagedMemoryMegabytes = 22,
+            StartWorkingSetMegabytes = 80,
+            EndWorkingSetMegabytes = 85,
+            PeakWorkingSetMegabytes = 90,
+        };
+        result.Errors.Add("Synthetic inspection exception");
+        result.Cycles.Add(new SoakTestCycleRecord(1, "Top-000001", @"C:\soak\images\board.png", "REVIEW", 740, true, "Synthetic cycle"));
+
+        var reportPath = SoakTestService.WriteHtmlReport(result, _root);
+        var report = File.ReadAllText(reportPath);
+
+        Assert.True(File.Exists(reportPath));
+        Assert.Contains("AOI Monitor Soak Test Report", report);
+        Assert.Contains("Stability Metrics", report);
+        Assert.Contains("Total cycles", report);
+        Assert.Contains("Count over 1 second", report);
+        Assert.Contains("Synthetic inspection exception", report);
+        Assert.Contains("folder-simulated camera frames", report);
+    }
+
+    [Fact]
     public void LocalRolesEnforceExpectedPageAndActionPermissions()
     {
         WorkflowState.Instance.SetCurrentUser("Operator01", UserRole.Operator);
@@ -361,11 +515,13 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal("Operator01 [Operator]", WorkflowState.Instance.OperatorWithRole);
         Assert.False(RoleAuthorization.CanEditRecipes(WorkflowState.Instance.CurrentRole));
         Assert.False(RoleAuthorization.CanRunModelTests(WorkflowState.Instance.CurrentRole));
+        Assert.False(RoleAuthorization.CanTestModelConfiguration(WorkflowState.Instance.CurrentRole));
         Assert.True(RoleAuthorization.CanAccessPage(WorkflowState.Instance.CurrentRole, "guide"));
 
         WorkflowState.Instance.SetCurrentUser("Engineer01", UserRole.Engineer);
         Assert.True(RoleAuthorization.CanEditRecipes(WorkflowState.Instance.CurrentRole));
         Assert.True(RoleAuthorization.CanRunModelTests(WorkflowState.Instance.CurrentRole));
+        Assert.True(RoleAuthorization.CanTestModelConfiguration(WorkflowState.Instance.CurrentRole));
         Assert.True(RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole));
         Assert.False(RoleAuthorization.CanExportLogs(WorkflowState.Instance.CurrentRole));
 
@@ -373,6 +529,87 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.True(RoleAuthorization.CanExportLogs(WorkflowState.Instance.CurrentRole));
         Assert.True(RoleAuthorization.CanManageSettings(WorkflowState.Instance.CurrentRole));
         Assert.True(RoleAuthorization.CanUseMaintenanceActions(WorkflowState.Instance.CurrentRole));
+    }
+
+    [Fact]
+    public void ModelConfigurationValidatorReportsMissingModel()
+    {
+        var config = new InspectionModelConfiguration
+        {
+            SelectedEngineKey = InspectionEngineFactory.OnnxEngineKey,
+            ModelFilePath = Path.Combine(_root, "missing.onnx"),
+            InputTensorName = "images",
+            OutputTensorName = "detections",
+        };
+
+        var result = ModelConfigurationValidator.Test(config);
+
+        Assert.Equal(ModelConfigurationTestStatus.MissingModel, result.Status);
+        Assert.Contains("missing", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ModelConfigurationValidatorReportsInvalidLabelMapBeforeRuntime()
+    {
+        Directory.CreateDirectory(_root);
+        var modelPath = Path.Combine(_root, "invalid.onnx");
+        File.WriteAllText(modelPath, "not an onnx model");
+        var config = new InspectionModelConfiguration
+        {
+            SelectedEngineKey = InspectionEngineFactory.OnnxEngineKey,
+            ModelFilePath = modelPath,
+            LabelMapPath = Path.Combine(_root, "missing-labels.json"),
+            InputTensorName = "images",
+            OutputTensorName = "detections",
+        };
+
+        var result = ModelConfigurationValidator.Test(config);
+
+        Assert.Equal(ModelConfigurationTestStatus.InvalidLabelMap, result.Status);
+    }
+
+    [Fact]
+    public void ModelConfigurationValidatorRequiresTensorNames()
+    {
+        Directory.CreateDirectory(_root);
+        var modelPath = Path.Combine(_root, "invalid.onnx");
+        File.WriteAllText(modelPath, "not an onnx model");
+        var config = new InspectionModelConfiguration
+        {
+            SelectedEngineKey = InspectionEngineFactory.OnnxEngineKey,
+            ModelFilePath = modelPath,
+        };
+
+        var result = ModelConfigurationValidator.Test(config);
+
+        Assert.Equal(ModelConfigurationTestStatus.RuntimeError, result.Status);
+        Assert.Contains("tensor names", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TestAndSavePersistsRuntimeErrorReadiness()
+    {
+        Directory.CreateDirectory(_root);
+        var modelPath = Path.Combine(_root, "invalid.onnx");
+        File.WriteAllText(modelPath, "not an onnx model");
+        var labelMapPath = Path.Combine(_root, "labels.txt");
+        File.WriteAllLines(labelMapPath, new[] { "OK", "Solder Bridge" });
+        var config = new InspectionModelConfiguration
+        {
+            SelectedEngineKey = InspectionEngineFactory.OnnxEngineKey,
+            ModelFilePath = modelPath,
+            LabelMapPath = labelMapPath,
+            InputTensorName = "images",
+            OutputTensorName = "detections",
+        };
+
+        var result = InspectionModelConfigurationService.TestAndSave(config);
+        var loaded = InspectionModelConfigurationService.Load();
+
+        Assert.Equal(ModelConfigurationTestStatus.RuntimeError, result.Status);
+        Assert.Equal(ModelConfigurationTestStatus.RuntimeError, loaded.LastModelCheckResult);
+        Assert.NotNull(loaded.LastModelCheckTimestampUtc);
+        Assert.Equal(InspectionEngineStatus.MlRuntimeError, InspectionModelConfigurationService.GetStatus(loaded));
     }
 
     [Fact]
@@ -454,6 +691,11 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal("Unit Test Engine", persistedRows[0].InspectionEngine);
         Assert.Equal("TEST-1", persistedRows[0].ModelVersion);
         Assert.Equal("Synthetic note", persistedRows[0].Notes);
+        Assert.Equal(11, persistedRows[0].ImageLoadMilliseconds, precision: 3);
+        Assert.Equal(22, persistedRows[0].PreprocessingMilliseconds, precision: 3);
+        Assert.Equal(33, persistedRows[0].InferenceMilliseconds, precision: 3);
+        Assert.Equal(4, persistedRows[0].OverlayRenderingMilliseconds, precision: 3);
+        Assert.Equal(70, persistedRows[0].TotalInspectionMilliseconds, precision: 3);
     }
 
     [Fact]
@@ -520,6 +762,7 @@ public sealed class AoiDatabaseTests : IDisposable
 
     private string WriteTinyPng(string fileName)
     {
+        Directory.CreateDirectory(_root);
         var path = Path.Combine(_root, fileName);
         File.WriteAllBytes(path, TinyPngBytes());
         return path;
@@ -548,6 +791,11 @@ public sealed class AoiDatabaseTests : IDisposable
             RoiY = 0.2,
             RoiWidth = 0.3,
             RoiHeight = 0.4,
+            ImageLoadMilliseconds = 11,
+            PreprocessingMilliseconds = 22,
+            InferenceMilliseconds = 33,
+            OverlayRenderingMilliseconds = 4,
+            TotalInspectionMilliseconds = 70,
         };
     }
 

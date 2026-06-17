@@ -12,7 +12,7 @@ Implemented today:
 - Operator-first Main Inspection screen.
 - Folder-based camera simulator.
 - Pixel-difference prototype inspection engine.
-- ONNX-ready adapter that safely reports missing model/runtime conditions.
+- ONNX Runtime path for configured local models, with safe `REVIEW` fallback on missing model, invalid model, or runtime failure.
 - Image import, golden comparison, disposition logging, recipe revision storage, AI Model Test validation, customer package export, and 3D sample-data CSV review.
 
 Not implemented as production integration:
@@ -22,7 +22,7 @@ Not implemented as production integration:
 - PLC, robot, handler, conveyor, or line-stop control.
 - MES/ERP authentication and traceability.
 - Production database service.
-- Trained production ML inference unless a future model/runtime integration proves successful.
+- A bundled trained production ML model. ONNX inference is available only when a valid local model is configured and successfully runs.
 
 ## Roles And Permissions
 
@@ -94,7 +94,7 @@ Important boundary:
 - The default engine is a prototype pixel-difference engine.
 - It is useful for workflow validation and evidence generation.
 - It is not a trained production AI model.
-- ONNX configuration can be selected, but the app must not claim a real model is running unless inference succeeds.
+- ONNX configuration can be selected, but the app reports `REVIEW` with clear evidence if model loading or inference fails.
 
 ## Disposition Workflow
 
@@ -145,9 +145,12 @@ AI Model Test is restricted to Engineer and Admin roles.
    - False call rate
    - TP, TN, FP, FN
    - OK, NG, REVIEW, false call, possible escape, unknown/unlabeled counts
+   - Average, max, and min inspection time, plus count over the 1 second target
 7. Export CSV results if needed.
 8. Export annotated images if needed.
 9. Generate a customer validation report.
+
+The customer validation report export creates a browser-readable HTML report, a small folder of sample annotated images, and a text file explaining how to print the HTML report to PDF. The report includes project/station information, operator role, model configuration, validation metrics, inspection performance summary, confusion matrix, failed samples, prototype limitations, and a signature/approval section.
 
 The richer manifest format supports:
 
@@ -174,11 +177,14 @@ Common actions:
 7. Export annotated overlays.
 8. Run DB Integrity.
 9. Rebuild image index.
-10. Create Stage 1 Customer Package.
+10. Run a local Soak Test.
+11. Create Stage 1 Customer Package.
 
-The Stage 1 customer package creates a timestamped folder containing validation report, batch CSV, annotated overlays, inspection history CSV, review log CSV, engine/model configuration summary, database health summary, recipe revision summary, README, and warnings.
+The Stage 1 customer package creates a timestamped folder containing an HTML customer validation report, print-to-PDF instructions, a Markdown companion report, batch CSV, sample annotated validation images, annotated inspection overlays, inspection history CSV, review log CSV, engine/model configuration summary, database health summary, recipe revision summary, README, and warnings.
 
 If optional evidence is missing, the app writes a warning instead of failing the package.
+
+The Soak Test tool is Admin-only. It repeatedly inspects images from a selected folder through the folder camera simulator for the requested duration, supports cancellation, and exports an HTML report with cycle counts, success/failure counts, timing, memory estimates, start/end time, and errors. Use a short duration such as 2 minutes before running an 8-hour evidence soak.
 
 ## 3D Sample-Data Workflow
 
@@ -211,11 +217,12 @@ Settings includes local engine, model, label-map, camera source, threshold, and 
 
 Use Settings to:
 
-- Select prototype engine or ONNX adapter.
-- Configure model file path, model version, label map path, confidence threshold, and input size.
+- Select the prototype engine or a configured ONNX Runtime model.
+- Configure model file path, model version, label map path, confidence threshold, input size, and ONNX tensor names.
+- Use `Test Model Configuration` to verify model file availability, label-map validity, tensor names, ONNX Runtime session creation, and generic detection output compatibility before running AI Model Test.
+- Review the last model-check result and timestamp. `Ready` is shown only after the current configuration passes the readiness check.
 - Configure folder-based camera simulation.
 - Review camera status.
 - Change local paths where Admin permissions allow it.
 
 MES authentication is planned for Stage 4 and is not implemented in the local role selector.
-

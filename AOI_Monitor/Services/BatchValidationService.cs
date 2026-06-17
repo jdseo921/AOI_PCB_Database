@@ -36,6 +36,11 @@ public static class BatchValidationService
             RoiY = roi.Y,
             RoiWidth = roi.Width,
             RoiHeight = roi.Height,
+            ImageLoadMilliseconds = analysis.Timing.ImageLoadMilliseconds,
+            PreprocessingMilliseconds = analysis.Timing.PreprocessingMilliseconds,
+            InferenceMilliseconds = analysis.Timing.InferenceMilliseconds,
+            OverlayRenderingMilliseconds = analysis.Timing.OverlayRenderingMilliseconds,
+            TotalInspectionMilliseconds = analysis.Timing.TotalInspectionMilliseconds,
         };
     }
 
@@ -92,6 +97,24 @@ public static class BatchValidationService
         var falseCallRate = fp + tn == 0 ? 0 : fp / (double)(fp + tn);
         var unknown = rows.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "UNKNOWN");
         return new BatchMetrics(accuracy, precision, recall, falseCallRate, tp, tn, fp, fn, fp, fn, tp, unknown, CountResult(rows, "OK"), CountResult(rows, "NG"), CountResult(rows, "REVIEW"));
+    }
+
+    public static BatchPerformanceSummary CalculatePerformanceSummary(IReadOnlyCollection<BatchTestRow> rows)
+    {
+        var timings = rows
+            .Select(row => row.TotalInspectionMilliseconds)
+            .Where(value => value > 0)
+            .ToArray();
+
+        if (timings.Length == 0)
+            return new BatchPerformanceSummary(0, 0, 0, 0, 0);
+
+        return new BatchPerformanceSummary(
+            timings.Average(),
+            timings.Max(),
+            timings.Min(),
+            timings.Count(value => value > 1000.0),
+            timings.Length);
     }
 
     private static int CountResult(IEnumerable<BatchTestRow> rows, string result)
@@ -204,7 +227,7 @@ public static class BatchValidationService
     public static string BuildResultsCsv(IEnumerable<BatchTestRow> rows)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Image,Ground Truth,AI/Engine Result,Inspection Engine,Model Version,Score,Pass/Fail,Defect Type,Side,RefDes,LotId,BoardModel,Notes,Image Path,RoiX,RoiY,RoiWidth,RoiHeight");
+        sb.AppendLine("Image,Ground Truth,AI/Engine Result,Inspection Engine,Model Version,Score,Pass/Fail,Defect Type,Side,RefDes,LotId,BoardModel,Notes,Image Path,RoiX,RoiY,RoiWidth,RoiHeight,ImageLoadMs,PreprocessingMs,InferenceMs,OverlayRenderingMs,TotalInspectionMs");
         foreach (var row in rows)
         {
             sb.AppendLine(string.Join(",",
@@ -225,7 +248,12 @@ public static class BatchValidationService
                 row.RoiX.ToString("F4", CultureInfo.InvariantCulture),
                 row.RoiY.ToString("F4", CultureInfo.InvariantCulture),
                 row.RoiWidth.ToString("F4", CultureInfo.InvariantCulture),
-                row.RoiHeight.ToString("F4", CultureInfo.InvariantCulture)));
+                row.RoiHeight.ToString("F4", CultureInfo.InvariantCulture),
+                row.ImageLoadMilliseconds.ToString("F1", CultureInfo.InvariantCulture),
+                row.PreprocessingMilliseconds.ToString("F1", CultureInfo.InvariantCulture),
+                row.InferenceMilliseconds.ToString("F1", CultureInfo.InvariantCulture),
+                row.OverlayRenderingMilliseconds.ToString("F1", CultureInfo.InvariantCulture),
+                row.TotalInspectionMilliseconds.ToString("F1", CultureInfo.InvariantCulture)));
         }
 
         return sb.ToString();
@@ -331,6 +359,13 @@ public sealed record BatchMetrics(
     int NgCount,
     int ReviewCount);
 
+public sealed record BatchPerformanceSummary(
+    double AverageMilliseconds,
+    double MaxMilliseconds,
+    double MinMilliseconds,
+    int CountOverOneSecond,
+    int TimedImageCount);
+
 public sealed record ValidationManifest(
     IReadOnlyDictionary<string, GroundTruthEntry> ByImageName,
     IReadOnlyList<GroundTruthEntry> OrderedEntries,
@@ -374,6 +409,15 @@ public sealed class BatchTestRow
     public double RoiY { get; set; }
     public double RoiWidth { get; set; }
     public double RoiHeight { get; set; }
+    public double ImageLoadMilliseconds { get; set; }
+    public double PreprocessingMilliseconds { get; set; }
+    public double InferenceMilliseconds { get; set; }
+    public double OverlayRenderingMilliseconds { get; set; }
+    public double TotalInspectionMilliseconds { get; set; }
+    public bool IsOverOneSecond => TotalInspectionMilliseconds > 1000.0;
+    public string TotalTimeDisplay => TotalInspectionMilliseconds <= 0
+        ? "--"
+        : $"{TotalInspectionMilliseconds:F0} ms";
 
     public BatchTestResultRecord ToRecord()
     {
@@ -398,6 +442,11 @@ public sealed class BatchTestRow
             LotId,
             BoardModel,
             Notes,
+            ImageLoadMilliseconds,
+            PreprocessingMilliseconds,
+            InferenceMilliseconds,
+            OverlayRenderingMilliseconds,
+            TotalInspectionMilliseconds,
             DateTime.UtcNow);
     }
 
@@ -419,6 +468,11 @@ public sealed class BatchTestRow
             LotId = record.LotId,
             BoardModel = record.BoardModel,
             Notes = record.Notes,
+            ImageLoadMilliseconds = record.ImageLoadMilliseconds,
+            PreprocessingMilliseconds = record.PreprocessingMilliseconds,
+            InferenceMilliseconds = record.InferenceMilliseconds,
+            OverlayRenderingMilliseconds = record.OverlayRenderingMilliseconds,
+            TotalInspectionMilliseconds = record.TotalInspectionMilliseconds,
             RoiX = record.RoiX,
             RoiY = record.RoiY,
             RoiWidth = record.RoiWidth,

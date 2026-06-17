@@ -11,6 +11,7 @@ public static class RoleAuthorization
 {
     public static bool CanEditRecipes(UserRole role) => role >= UserRole.Engineer;
     public static bool CanRunModelTests(UserRole role) => role >= UserRole.Engineer;
+    public static bool CanTestModelConfiguration(UserRole role) => role >= UserRole.Engineer;
     public static bool CanChangeThresholds(UserRole role) => role >= UserRole.Engineer;
     public static bool CanExportLogs(UserRole role) => role >= UserRole.Admin;
     public static bool CanManageSettings(UserRole role) => role >= UserRole.Admin;

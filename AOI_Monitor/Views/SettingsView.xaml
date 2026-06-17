@@ -166,16 +166,38 @@
                 <TextBlock Text="Confidence" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
                 <TextBox x:Name="ConfidenceThresholdText" Grid.Column="1" MinHeight="28" Text="0.65"/>
               </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Input Size" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="InputWidthText" Grid.Column="1" MinHeight="28" Text="640"/>
+                <TextBox x:Name="InputHeightText" Grid.Column="3" MinHeight="28" Text="640"/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Input Tensor" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="InputTensorNameText" Grid.Column="1" MinHeight="28" ToolTip="Required for model readiness test."/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Output Tensor" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="OutputTensorNameText" Grid.Column="1" MinHeight="28" ToolTip="Required for model readiness test."/>
+              </Grid>
               <UniformGrid Columns="2">
                 <TextBlock Text="Runtime status" Foreground="#9AA6AF" FontSize="11"/>
                 <TextBlock x:Name="EngineRuntimeStatusText" Text="Prototype Engine" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
                 <TextBlock Text="Saved version" Foreground="#9AA6AF" FontSize="11"/>
                 <TextBlock x:Name="EngineVersionText" Text="PIXEL_DIFF_0.1" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
+                <TextBlock Text="Last model check" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock x:Name="ModelCheckResultText" Text="Not Tested" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
+                <TextBlock Text="Checked at" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock x:Name="ModelCheckTimestampText" Text="--" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
               </UniformGrid>
+              <TextBlock x:Name="ModelCheckMessageText" Text="No model configuration test has been run." Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
             </StackPanel>
           </Border>
           <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
             <Button x:Name="ApplyBtn" Style="{StaticResource ActionBtnGreen}" Content="Apply" Click="OnApply" Margin="0,0,8,0"/>
+            <Button x:Name="TestModelBtn" Style="{StaticResource ActionBtnBlue}" Content="Test Model Configuration" Click="OnTestModelConfigurationClick" Margin="0,0,8,0"/>
             <Button x:Name="ResetBtn" Style="{StaticResource ActionBtn}"      Content="Reset" Click="OnReset"/>
           </StackPanel>
         </StackPanel>

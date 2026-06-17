@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
@@ -14,9 +15,18 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
 
     public AnalysisResult Analyze(string samplePath, string? goldenPath, DetectionPriority priority)
     {
+        var timing = new InspectionTiming();
+        var loadWatch = Stopwatch.StartNew();
         var sample = LoadBgra32(samplePath);
+        loadWatch.Stop();
+        timing.ImageLoadMilliseconds += loadWatch.Elapsed.TotalMilliseconds;
         if (sample is null)
             throw new InvalidOperationException("Unable to load sample image.");
+
+        var preprocessingWatch = Stopwatch.StartNew();
+        var meanBrightness = CalculateBrightness(sample);
+        preprocessingWatch.Stop();
+        timing.PreprocessingMilliseconds += preprocessingWatch.Elapsed.TotalMilliseconds;
 
         var result = new AnalysisResult
         {
@@ -24,7 +34,7 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
             GoldenPath = goldenPath,
             InspectionEngine = Name,
             ModelVersion = Version,
-            MeanBrightness = CalculateBrightness(sample),
+            MeanBrightness = meanBrightness,
             Timestamp = DateTime.Now,
             SuggestedDefect = "Solder Bridge",
             Verdict = "REVIEW",
@@ -41,22 +51,33 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
                 "No golden image was supplied; decision remains REVIEW by policy.",
                 "Run comparison against a verified golden image for actionable classification.",
             },
+            Timing = timing,
         };
 
         if (string.IsNullOrWhiteSpace(goldenPath))
         {
             result.Defects.Add(CreateDefectResult(result, "Reference Missing", "ROI-REFERENCE"));
+            result.Timing.RecalculateTotal();
             return result;
         }
 
+        loadWatch.Restart();
         var golden = LoadBgra32(goldenPath);
+        loadWatch.Stop();
+        timing.ImageLoadMilliseconds += loadWatch.Elapsed.TotalMilliseconds;
         if (golden is null)
             throw new InvalidOperationException("Unable to load golden image.");
 
+        preprocessingWatch.Restart();
         var sampleNorm = Resize(sample, 384, 384);
         var goldenNorm = Resize(golden, 384, 384);
+        preprocessingWatch.Stop();
+        timing.PreprocessingMilliseconds += preprocessingWatch.Elapsed.TotalMilliseconds;
 
+        var inferenceWatch = Stopwatch.StartNew();
         var diff = Compare(sampleNorm, goldenNorm, out var hotspot);
+        inferenceWatch.Stop();
+        timing.InferenceMilliseconds = inferenceWatch.Elapsed.TotalMilliseconds;
         result.DifferenceScore = diff;
         result.Hotspot = hotspot;
 
@@ -89,6 +110,7 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         result.Confidence = ComputeConfidence(result.Verdict, diff, reviewThreshold, ngThreshold);
         result.Evidence = BuildEvidence(result, priority);
         result.Defects.Add(CreateDefectResult(result, result.SuggestedDefect, "ROI-HOTSPOT-001"));
+        result.Timing.RecalculateTotal();
 
         return result;
     }

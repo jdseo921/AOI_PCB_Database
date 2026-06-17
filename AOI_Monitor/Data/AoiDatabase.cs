@@ -184,12 +184,12 @@ public static class AoiDatabase
             """
             INSERT INTO InspectionResults
                 (SampleImagePath, GoldenImagePath, BoardProgram, OperatorId, InspectionEngine, DifferenceScore, MeanBrightness, Verdict, Confidence,
-                 SuggestedDefect, PolicyName, ModelVersion, DecisionReason, HotspotX, HotspotY, HotspotWidth,
-                 HotspotHeight, CreatedAtUtc)
+                 SuggestedDefect, PolicyName, ModelVersion, ModelFilePath, ConfidenceThreshold, DecisionReason, HotspotX, HotspotY, HotspotWidth,
+                 HotspotHeight, ImageLoadMs, PreprocessingMs, InferenceMs, OverlayRenderingMs, TotalInspectionMs, CreatedAtUtc)
             VALUES
                 ($sampleImagePath, $goldenImagePath, $boardProgram, $operatorId, $inspectionEngine, $differenceScore, $meanBrightness, $verdict, $confidence,
-                 $suggestedDefect, $policyName, $modelVersion, $decisionReason, $hotspotX, $hotspotY, $hotspotWidth,
-                 $hotspotHeight, $createdAtUtc);
+                 $suggestedDefect, $policyName, $modelVersion, $modelFilePath, $confidenceThreshold, $decisionReason, $hotspotX, $hotspotY, $hotspotWidth,
+                 $hotspotHeight, $imageLoadMs, $preprocessingMs, $inferenceMs, $overlayRenderingMs, $totalInspectionMs, $createdAtUtc);
             SELECT last_insert_rowid();
             """;
 
@@ -205,11 +205,18 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$suggestedDefect", result.SuggestedDefect);
         command.Parameters.AddWithValue("$policyName", result.PolicyName);
         command.Parameters.AddWithValue("$modelVersion", result.ModelVersion);
+        command.Parameters.AddWithValue("$modelFilePath", result.ModelFilePath);
+        command.Parameters.AddWithValue("$confidenceThreshold", result.ConfidenceThreshold);
         command.Parameters.AddWithValue("$decisionReason", result.DecisionReason);
         command.Parameters.AddWithValue("$hotspotX", result.Hotspot.X);
         command.Parameters.AddWithValue("$hotspotY", result.Hotspot.Y);
         command.Parameters.AddWithValue("$hotspotWidth", result.Hotspot.Width);
         command.Parameters.AddWithValue("$hotspotHeight", result.Hotspot.Height);
+        command.Parameters.AddWithValue("$imageLoadMs", result.Timing.ImageLoadMilliseconds);
+        command.Parameters.AddWithValue("$preprocessingMs", result.Timing.PreprocessingMilliseconds);
+        command.Parameters.AddWithValue("$inferenceMs", result.Timing.InferenceMilliseconds);
+        command.Parameters.AddWithValue("$overlayRenderingMs", result.Timing.OverlayRenderingMilliseconds);
+        command.Parameters.AddWithValue("$totalInspectionMs", result.Timing.TotalInspectionMilliseconds);
         command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         var inspectionResultId = (long)(command.ExecuteScalar() ?? 0L);
 
@@ -299,10 +306,12 @@ public static class AoiDatabase
                 """
                 INSERT INTO BatchTestResults
                     (RunId, ImagePath, ImageName, GroundTruth, EngineResult, InspectionEngine, ModelVersion, Score, PassFail,
-                     DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel, Notes, CreatedAtUtc)
+                     DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel, Notes,
+                     ImageLoadMs, PreprocessingMs, InferenceMs, OverlayRenderingMs, TotalInspectionMs, CreatedAtUtc)
                 VALUES
                     ($runId, $imagePath, $imageName, $groundTruth, $engineResult, $inspectionEngine, $modelVersion, $score, $passFail,
-                     $defectType, $roiX, $roiY, $roiWidth, $roiHeight, $side, $refDes, $lotId, $boardModel, $notes, $createdAtUtc);
+                     $defectType, $roiX, $roiY, $roiWidth, $roiHeight, $side, $refDes, $lotId, $boardModel, $notes,
+                     $imageLoadMs, $preprocessingMs, $inferenceMs, $overlayRenderingMs, $totalInspectionMs, $createdAtUtc);
                 """;
 
             resultCommand.Parameters.AddWithValue("$runId", runId);
@@ -324,6 +333,11 @@ public static class AoiDatabase
             resultCommand.Parameters.AddWithValue("$lotId", result.LotId);
             resultCommand.Parameters.AddWithValue("$boardModel", result.BoardModel);
             resultCommand.Parameters.AddWithValue("$notes", result.Notes);
+            resultCommand.Parameters.AddWithValue("$imageLoadMs", result.ImageLoadMilliseconds);
+            resultCommand.Parameters.AddWithValue("$preprocessingMs", result.PreprocessingMilliseconds);
+            resultCommand.Parameters.AddWithValue("$inferenceMs", result.InferenceMilliseconds);
+            resultCommand.Parameters.AddWithValue("$overlayRenderingMs", result.OverlayRenderingMilliseconds);
+            resultCommand.Parameters.AddWithValue("$totalInspectionMs", result.TotalInspectionMilliseconds);
             resultCommand.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
             resultCommand.ExecuteNonQuery();
         }
@@ -362,7 +376,8 @@ public static class AoiDatabase
             """
             SELECT Id, RunId, ImagePath, ImageName, GroundTruth, EngineResult, Score, PassFail,
                    DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel,
-                   InspectionEngine, ModelVersion, Notes, CreatedAtUtc
+                   InspectionEngine, ModelVersion, Notes, ImageLoadMs, PreprocessingMs, InferenceMs,
+                   OverlayRenderingMs, TotalInspectionMs, CreatedAtUtc
             FROM BatchTestResults
             WHERE RunId = $runId
             ORDER BY Id ASC;
@@ -388,9 +403,10 @@ public static class AoiDatabase
         var where = BuildInspectionWhere(filter, command);
         command.CommandText =
             $"""
-            SELECT Id, CreatedAtUtc, BoardProgram, OperatorId, InspectionEngine, ModelVersion,
+            SELECT Id, CreatedAtUtc, BoardProgram, OperatorId, InspectionEngine, ModelVersion, ModelFilePath, ConfidenceThreshold,
                    SampleImagePath, GoldenImagePath, Verdict, DifferenceScore, Confidence,
-                   SuggestedDefect, DecisionReason, HotspotX, HotspotY, HotspotWidth, HotspotHeight
+                   SuggestedDefect, DecisionReason, HotspotX, HotspotY, HotspotWidth, HotspotHeight,
+                   ImageLoadMs, PreprocessingMs, InferenceMs, OverlayRenderingMs, TotalInspectionMs
             FROM InspectionResults
             {where}
             ORDER BY datetime(CreatedAtUtc) DESC, Id DESC;
@@ -720,7 +736,12 @@ public static class AoiDatabase
             reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
             reader.IsDBNull(16) ? string.Empty : reader.GetString(16),
             reader.IsDBNull(19) ? string.Empty : reader.GetString(19),
-            ParseDateTime(reader.GetString(20)));
+            reader.IsDBNull(20) ? 0 : reader.GetDouble(20),
+            reader.IsDBNull(21) ? 0 : reader.GetDouble(21),
+            reader.IsDBNull(22) ? 0 : reader.GetDouble(22),
+            reader.IsDBNull(23) ? 0 : reader.GetDouble(23),
+            reader.IsDBNull(24) ? 0 : reader.GetDouble(24),
+            ParseDateTime(reader.GetString(25)));
     }
 
     private static InspectionHistoryRecord ReadInspectionHistory(SqliteDataReader reader)
@@ -732,17 +753,24 @@ public static class AoiDatabase
             reader.IsDBNull(3) ? "UNKNOWN" : reader.GetString(3),
             reader.IsDBNull(4) ? "Pixel Difference" : reader.GetString(4),
             reader.IsDBNull(5) ? "UNKNOWN" : reader.GetString(5),
-            reader.GetString(6),
-            reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            reader.IsDBNull(7) ? 0 : reader.GetDouble(7),
             reader.GetString(8),
-            reader.GetDouble(9),
-            reader.GetDouble(10),
-            reader.GetString(11),
-            reader.GetString(12),
-            reader.GetDouble(13),
-            reader.GetDouble(14),
+            reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+            reader.GetString(10),
+            reader.GetDouble(11),
+            reader.GetDouble(12),
+            reader.GetString(13),
+            reader.GetString(14),
             reader.GetDouble(15),
-            reader.GetDouble(16));
+            reader.GetDouble(16),
+            reader.GetDouble(17),
+            reader.GetDouble(18),
+            reader.IsDBNull(19) ? 0 : reader.GetDouble(19),
+            reader.IsDBNull(20) ? 0 : reader.GetDouble(20),
+            reader.IsDBNull(21) ? 0 : reader.GetDouble(21),
+            reader.IsDBNull(22) ? 0 : reader.GetDouble(22),
+            reader.IsDBNull(23) ? 0 : reader.GetDouble(23));
     }
 
     private static ReviewEventRecord ReadReviewEvent(SqliteDataReader reader)
@@ -872,6 +900,13 @@ public static class AoiDatabase
         AddColumnIfMissing(connection, "InspectionResults", "BoardProgram", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
         AddColumnIfMissing(connection, "InspectionResults", "OperatorId", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
         AddColumnIfMissing(connection, "InspectionResults", "InspectionEngine", "TEXT NOT NULL DEFAULT 'Pixel Difference'");
+        AddColumnIfMissing(connection, "InspectionResults", "ModelFilePath", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, "InspectionResults", "ConfidenceThreshold", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "InspectionResults", "ImageLoadMs", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "InspectionResults", "PreprocessingMs", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "InspectionResults", "InferenceMs", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "InspectionResults", "OverlayRenderingMs", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "InspectionResults", "TotalInspectionMs", "REAL NOT NULL DEFAULT 0");
         AddColumnIfMissing(connection, "Defects", "Confidence", "REAL NOT NULL DEFAULT 0");
         AddColumnIfMissing(connection, "Defects", "XPosition", "REAL NULL");
         AddColumnIfMissing(connection, "Defects", "YPosition", "REAL NULL");
@@ -890,6 +925,11 @@ public static class AoiDatabase
         AddColumnIfMissing(connection, "BatchTestResults", "LotId", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "BatchTestResults", "BoardModel", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, "BatchTestResults", "Notes", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, "BatchTestResults", "ImageLoadMs", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "BatchTestResults", "PreprocessingMs", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "BatchTestResults", "InferenceMs", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "BatchTestResults", "OverlayRenderingMs", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "BatchTestResults", "TotalInspectionMs", "REAL NOT NULL DEFAULT 0");
         AddColumnIfMissing(connection, "ExportHistory", "OperatorId", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
     }
 
@@ -1023,11 +1063,18 @@ public static class AoiDatabase
             SuggestedDefect TEXT NOT NULL,
             PolicyName TEXT NOT NULL,
             ModelVersion TEXT NOT NULL,
+            ModelFilePath TEXT NOT NULL DEFAULT '',
+            ConfidenceThreshold REAL NOT NULL DEFAULT 0,
             DecisionReason TEXT NOT NULL,
             HotspotX REAL NOT NULL,
             HotspotY REAL NOT NULL,
             HotspotWidth REAL NOT NULL,
             HotspotHeight REAL NOT NULL,
+            ImageLoadMs REAL NOT NULL DEFAULT 0,
+            PreprocessingMs REAL NOT NULL DEFAULT 0,
+            InferenceMs REAL NOT NULL DEFAULT 0,
+            OverlayRenderingMs REAL NOT NULL DEFAULT 0,
+            TotalInspectionMs REAL NOT NULL DEFAULT 0,
             CreatedAtUtc TEXT NOT NULL
         );
 
@@ -1126,6 +1173,11 @@ public static class AoiDatabase
             LotId TEXT NOT NULL DEFAULT '',
             BoardModel TEXT NOT NULL DEFAULT '',
             Notes TEXT NOT NULL DEFAULT '',
+            ImageLoadMs REAL NOT NULL DEFAULT 0,
+            PreprocessingMs REAL NOT NULL DEFAULT 0,
+            InferenceMs REAL NOT NULL DEFAULT 0,
+            OverlayRenderingMs REAL NOT NULL DEFAULT 0,
+            TotalInspectionMs REAL NOT NULL DEFAULT 0,
             CreatedAtUtc TEXT NOT NULL,
             FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
         );

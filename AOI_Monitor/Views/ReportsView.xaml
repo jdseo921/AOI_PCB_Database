@@ -128,6 +128,7 @@
                      TextWrapping="Wrap" FontSize="11.5" Foreground="#DCE5EB"/>
           <TextBlock x:Name="StatusText" Text="Ready." Foreground="#9AA6AF" FontSize="11" Margin="0,6,0,0"/>
           <TextBlock x:Name="PackagePathText" Text="Latest customer package: --" Foreground="#DCE5EB" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+          <TextBlock x:Name="SoakReportPathText" Text="Latest soak-test report: --" Foreground="#DCE5EB" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
           <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
             <ProgressBar x:Name="WorkProgressBar" Width="190" Height="12" Minimum="0" Maximum="100" Value="0" Margin="0,0,8,0" VerticalAlignment="Center"/>
             <Button x:Name="CancelWorkButton" Style="{StaticResource MiniBtn}" Content="Cancel" IsEnabled="False" Click="OnCancelWorkClick"/>
@@ -142,6 +143,7 @@
           <Button Style="{StaticResource ActionBtn}" Content="Database Health" Margin="0,0,6,0" Click="OnOpenDatabaseHealthClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Verify Paths" Margin="0,0,6,0" Click="OnVerifyImagePathsClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Rebuild Image Index" Margin="0,0,6,0" Click="OnRebuildImageIndexClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Soak Test" Margin="0,0,6,0" Click="OnRunSoakTestClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Recipe" Click="OnLockActiveRecipeClick"/>
         </WrapPanel>
       </Grid>

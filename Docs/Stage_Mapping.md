@@ -18,13 +18,16 @@ Stage 1 currently includes:
 - Review and disposition event persistence.
 - Recipe editor with ROI drawing, thresholds, recipe revisions, and role restrictions.
 - Default pixel-difference prototype inspection engine.
-- ONNX-ready adapter that safely validates configuration and reports missing model/runtime status without crashing.
+- ONNX Runtime inference path with configurable model path, tensor names, input size, confidence threshold, and label map.
+- Engineer/Admin model configuration readiness test with saved timestamp/result and audit-event recording.
 - Readiness panel for database, image vault, inspection engine, camera, robot, and MES/ERP.
 - AI Model Test batch validation with manifest CSV support.
 - Confusion matrix and category counts.
-- Customer validation report export.
+- Per-image timing capture for image load, preprocessing, inference/comparison, overlay rendering, and total inspection time, with 1 second target warnings.
+- Customer-facing validation report export with HTML output, sample annotated images, print-to-PDF instructions, prototype limitations, and signature/approval section.
 - Annotated overlay export.
-- Stage 1 customer evidence package export.
+- Stage 1 customer evidence package export including the strengthened validation report, CSV evidence, overlays, summaries, README, and warnings for missing optional evidence.
+- Admin-only local soak-test mode for repeated folder-simulated inspections with cancellation, timing, memory estimate, error capture, and HTML stability report export.
 - Export history audit records.
 - 3D Profile Viewer Sample Data Mode for `x,y,height` CSV files.
 - Async progress and cancellation for long-running workflows.
@@ -37,7 +40,7 @@ Stage 1 currently includes:
 The following items are not complete production functionality in Stage 1:
 
 - No trained production AI model is included by default.
-- ONNX runtime/model inference is not claimed unless future integration succeeds.
+- No trained production AI model is bundled. ONNX model inference is claimed only when a configured local model loads and inference succeeds.
 - No real AOI camera hardware acquisition.
 - No real lighting controller.
 - No real 3D camera or live height-map acquisition.

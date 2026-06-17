@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows;
@@ -276,13 +277,19 @@ public partial class MonitorView : UserControl
 
         _currentAnalysis = analysis;
         var autoSave = AutoSaveCheck.IsChecked == true;
+        RefreshDefectRows();
+        var overlayMs = RenderOverlay();
+        analysis.Timing.OverlayRenderingMilliseconds = overlayMs;
+        analysis.Timing.RecalculateTotal();
+        UpdateTimingDisplay(analysis.Timing);
+        SetResultStatus(analysis.Verdict);
+        if (analysis.Timing.IsOverOneSecond)
+            LogEvent("PERFORMANCE WARNING", $"Visualization target exceeded: {analysis.Timing.TotalInspectionMilliseconds:F0} ms (limit 1000 ms).");
+
         state.SetAnalysis(analysis, persist: autoSave);
         _currentResultSaved = autoSave;
 
-        RefreshDefectRows();
-        RenderOverlay();
-        SetResultStatus(analysis.Verdict);
-        LogEvent("INSPECTION COMPLETE", $"{analysis.Verdict}: {analysis.SuggestedDefect}, score {analysis.DifferenceScore:F1}%, confidence {analysis.Confidence:P0}.");
+        LogEvent("INSPECTION COMPLETE", $"{analysis.Verdict}: {analysis.SuggestedDefect}, score {analysis.DifferenceScore:F1}%, confidence {analysis.Confidence:P0}, total {analysis.Timing.TotalInspectionMilliseconds:F0} ms.");
 
         if (autoSave)
             LogEvent("SAVE", "Auto-save wrote inspection result to SQLite.");
@@ -304,6 +311,7 @@ public partial class MonitorView : UserControl
             _currentResultSaved = true;
             RefreshDefectRows();
             RenderOverlay();
+            UpdateTimingDisplay(state.LastAnalysis.Timing);
             SetResultStatus(state.LastAnalysis.Verdict);
         }
     }
@@ -319,6 +327,8 @@ public partial class MonitorView : UserControl
         OperatorText.Text = state.OperatorWithRole;
         EngineText.Text = $"{engine.Name} | Camera: {CameraStatusText()}";
         ModelVersionText.Text = engine.Version;
+        if (_currentAnalysis is null)
+            TimingText.Text = "--";
     }
 
     private void RefreshDefectRows()
@@ -341,11 +351,12 @@ public partial class MonitorView : UserControl
         }
     }
 
-    private void RenderOverlay()
+    private double RenderOverlay()
     {
+        var watch = Stopwatch.StartNew();
         DefectOverlayCanvas.Children.Clear();
         if (_currentAnalysis is null || _currentBitmap is null)
-            return;
+            return StopElapsed(watch);
 
         var imageArea = CalculateImageArea(_currentBitmap.PixelWidth, _currentBitmap.PixelHeight, 1000, 700);
         foreach (var defect in _currentAnalysis.Defects)
@@ -379,6 +390,16 @@ public partial class MonitorView : UserControl
             Canvas.SetTop(text, Math.Max(0, imageArea.Y + box.Y * imageArea.Height - 30));
             DefectOverlayCanvas.Children.Add(text);
         }
+
+        return StopElapsed(watch);
+    }
+
+    private void UpdateTimingDisplay(InspectionTiming timing)
+    {
+        TimingText.Text = $"Total {timing.TotalInspectionMilliseconds:F0} ms | load {timing.ImageLoadMilliseconds:F0}, prep {timing.PreprocessingMilliseconds:F0}, inspect {timing.InferenceMilliseconds:F0}, overlay {timing.OverlayRenderingMilliseconds:F0}";
+        TimingText.Foreground = timing.IsOverOneSecond
+            ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"))
+            : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE5EB"));
     }
 
     private void SetResultStatus(string verdict)
@@ -438,6 +459,12 @@ public partial class MonitorView : UserControl
         var width = imageWidth * scale;
         var height = imageHeight * scale;
         return new Rect((hostWidth - width) / 2.0, (hostHeight - height) / 2.0, width, height);
+    }
+
+    private static double StopElapsed(Stopwatch watch)
+    {
+        watch.Stop();
+        return watch.Elapsed.TotalMilliseconds;
     }
 
     private static Color ToVerdictColor(string verdict) => verdict.ToUpperInvariant() switch

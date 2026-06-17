@@ -50,7 +50,7 @@ This checklist is for the current local WPF prototype. It separates features tha
 - [ ] Select a golden/reference image.
 - [ ] Confirm analysis completes with an `OK`, `REVIEW`, or `NG` verdict.
 - [ ] Confirm the UI shows score, confidence, suggested defect, and evidence.
-- [ ] Confirm this is presented as prototype pixel-difference inference, not a trained ML model.
+- [ ] Confirm the default path is presented as prototype pixel-difference inference; ONNX is presented as real inference only when a configured model successfully runs.
 
 ### Defect Overlay Display
 
@@ -116,7 +116,8 @@ These are not implemented in Stage 1 and should remain clearly labeled as planne
 - [ ] Robot/handler integration is marked `Not Connected` / planned Stage 3.
 - [ ] MES / ERP integration is marked `Not Connected` / planned Stage 4.
 - [ ] Training Set Export is local file preparation only; no model training, fine-tuning, or deployment is run.
-- [ ] Inspection Engine reports `Prototype`, not `ML Model`, unless a real ML model is integrated later.
+- [ ] Inspection Engine reports `Prototype` by default, `ML Model Missing` for absent ONNX files, `Model Not Tested` for unverified ONNX settings, and `Ready` only after the current local ONNX configuration passes the readiness test.
+- [ ] `Test Model Configuration` records a model-check event in the review/audit log.
 
 ## Evidence to Capture
 

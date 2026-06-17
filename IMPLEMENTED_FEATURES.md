@@ -42,7 +42,7 @@ Pages subscribe to workflow state changes and update their UI when images, analy
 
 ## Detection and Analysis
 
-Image comparison is implemented in `ImageAnalysisService`. The current analysis flow is a deterministic image-difference prototype, not a trained production inspection model.
+Image comparison is implemented through `IInspectionEngine`. The default analysis flow is a deterministic image-difference prototype. A configurable ONNX Runtime path is also available for local offline models; the application does not bundle or validate a production AI model by default.
 
 Implemented behavior:
 
@@ -57,6 +57,17 @@ Implemented behavior:
 - Applies threshold bands based on the active detection priority.
 - Produces a verdict of `OK`, `REVIEW`, or `NG`.
 - Adds a suggested defect label, confidence score, decision margin, decision reason, policy name, thresholds, hotspot, timestamp, and human-readable evidence lines.
+
+ONNX Runtime behavior:
+
+- Loads a configured local `.onnx` model when the ONNX engine is selected.
+- Resolves configured input and output tensor names, or auto-selects the first model input/output when those fields are blank.
+- Loads and resizes the sample image to the configured input width and height.
+- Normalizes RGB pixels to `0..1` and builds an `NCHW` float tensor.
+- Parses generic detection rows shaped as `class_id, confidence, x, y, width, height`.
+- Loads labels from a configured label-map file, with built-in AOI fallback labels.
+- Provides a Settings-based model configuration test that requires explicit input/output tensor names, validates label-map readability, opens an ONNX Runtime inference session, checks generic output compatibility, saves the last check timestamp/result, and records an audit event.
+- Returns `REVIEW` with clear evidence if the model path is missing, the model is invalid, tensor names are wrong, the output shape is unsupported, or runtime inference fails.
 
 If no golden image is supplied, the result remains `REVIEW` because the program does not have enough reference data for differential judgment.
 
@@ -108,7 +119,7 @@ Disposition events are appended to:
 
 ### Main Inspection
 
-The Main Inspection module is the primary operator screen. It provides a large image/live-feed display area, Top/Side/Bottom view selector, defect overlay layer, defect table, Start/Stop/Next Board/Save Result controls, auto-save option, event log, station and lot context, engine/model display, and a large OK/NG/REVIEW result indicator.
+The Main Inspection module is the primary operator screen. It provides a large image/live-feed display area, Top/Side/Bottom view selector, defect overlay layer, defect table, Start/Stop/Next Board/Save Result controls, auto-save option, event log, station and lot context, engine/model display, inspection timing display, 1 second performance warnings, and a large OK/NG/REVIEW result indicator.
 
 It uses imported images or folder-simulated camera frames. It does not poll real camera hardware or a live AOI service.
 
@@ -218,6 +229,7 @@ Implemented log behavior:
 - Exports filtered inspection history CSV and review log CSV.
 - Exports annotated image overlays.
 - Exports customer validation packages.
+- Runs an Admin-only local soak test with folder-simulated camera frames, configurable duration/delay/engine/output folder, cancellation, timing and memory estimates, error capture, HTML report generation, and `ExportHistory` recording.
 - Records exports in `ExportHistory`.
 - Includes copy-only archive indexing for older log rows in `LogArchive`; source records remain queryable.
 
@@ -272,6 +284,8 @@ Implemented features:
   - Balanced
   - Maximize Defect Recall
 - Recipe-lock enforcement for detection-priority changes.
+- Model configuration readiness test for Engineer/Admin roles with results `Ready`, `Missing Model`, `Invalid Label Map`, `Runtime Error`, or `Unsupported Output Format`.
+- Last model-check timestamp and result display.
 - Training Set Export controls:
   - Prepare export
   - Validate list
@@ -331,7 +345,7 @@ Current boundaries:
 
 - SQLite is local-only PoC persistence, not a production database service.
 - Remaining static UI examples are explicitly labeled as demo/prototype data, including the Review queue, similar-image examples, Golden Compare board illustration, Image Library demo fallback, schema reference rows, and SPC trend chart.
-- The image-analysis routine is pixel-difference based, not a production ML inference pipeline.
+- The default image-analysis routine is pixel-difference based. ONNX Runtime inference is wired for configured local models, but no production-trained model is included or certified.
 - There is no direct camera, PLC, robot, conveyor, or AOI machine control.
 - Service hosting and hardware links are marked as planned/documentation only.
 - Main Inspection and Log & Export use local SQLite persistence for imported images, inspections, defects, review events, exports, and recipe revisions; the remaining demo panels are not presented as live factory records.

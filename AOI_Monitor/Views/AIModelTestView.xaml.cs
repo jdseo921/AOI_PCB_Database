@@ -171,6 +171,9 @@ public partial class AIModelTestView : UserControl
                             string.IsNullOrWhiteSpace(item.Manifest.GoldenPath) ? null : item.Manifest.GoldenPath,
                             WorkflowState.Instance.DetectionPriority);
 
+                        if (analysis.Timing.IsOverOneSecond)
+                            errors.Add($"Performance warning: {Path.GetFileName(item.ImagePath)} took {analysis.Timing.TotalInspectionMilliseconds:F0} ms, above the 1 second target.");
+
                         rows.Add(BatchValidationService.ToRow(item.ImagePath, item.Manifest, analysis));
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException)
@@ -228,11 +231,17 @@ public partial class AIModelTestView : UserControl
 
             ApplyMetrics(batch.Metrics);
             RunSummaryText.Text = $"{batch.Rows.Count} images / {batch.Rows.Count(r => r.IsFailed)} failed / run {(_currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "not saved")}";
-            StatusText.Text = batch.IsFormalManifest
+            var performance = BatchValidationService.CalculatePerformanceSummary(batch.Rows);
+            var performanceSuffix = performance.CountOverOneSecond > 0
+                ? $" Performance warning: {performance.CountOverOneSecond} image(s) exceeded 1 second."
+                : string.Empty;
+            StatusText.Text = (batch.IsFormalManifest
                 ? $"Formal manifest validation complete. {_rows.Count} row(s), {batch.Errors.Count} issue(s)."
-                : $"Batch inspection complete. {_rows.Count} row(s), {batch.Errors.Count} issue(s).";
+                : $"Batch inspection complete. {_rows.Count} row(s), {batch.Errors.Count} issue(s).") + performanceSuffix;
             ReportPathText.Text = "Report: not generated";
             WorkflowState.Instance.AddEvent("MODEL_TEST", $"Stage 1 validation run {_currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "not saved"}: {_rows.Count} images, {_rows.Count(r => r.IsFailed)} failed, {batch.Errors.Count} issue(s).");
+            if (performance.CountOverOneSecond > 0)
+                WorkflowState.Instance.AddEvent("PERFORMANCE_WARNING", $"Stage 1 validation run had {performance.CountOverOneSecond} image(s) over 1 second. Max={performance.MaxMilliseconds:F0} ms.");
             foreach (var error in batch.Errors.Take(20))
                 WorkflowState.Instance.AddEvent("MODEL_TEST_ERROR", error);
 
@@ -259,7 +268,7 @@ public partial class AIModelTestView : UserControl
     private void OnResultSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ResultsGrid.SelectedItem is BatchTestRow row)
-            StatusText.Text = $"{row.Image}: {row.EngineResult}, score {row.ScoreDisplay}, {row.PassFail}.";
+            StatusText.Text = $"{row.Image}: {row.EngineResult}, score {row.ScoreDisplay}, {row.PassFail}, time {row.TotalTimeDisplay}.";
     }
 
     private void OnInspectionConfigurationChanged() => Dispatcher.Invoke(RefreshEngineText);
@@ -424,27 +433,35 @@ public partial class AIModelTestView : UserControl
         var dialog = new SaveFileDialog
         {
             Title = "Generate customer validation report",
-            Filter = "Markdown report|*.md|HTML report|*.html",
-            FileName = $"customer_validation_run_{_currentRunId}_{DateTime.Now:yyyyMMdd_HHmmss}.md",
+            Filter = "HTML report|*.html",
+            FileName = $"customer_validation_run_{_currentRunId}_{DateTime.Now:yyyyMMdd_HHmmss}.html",
         };
 
         if (dialog.ShowDialog() != true)
             return;
 
         var metrics = BatchValidationService.CalculateMetrics(_rows);
-        var extension = Path.GetExtension(dialog.FileName);
-        var report = string.Equals(extension, ".html", StringComparison.OrdinalIgnoreCase)
-            ? BuildHtmlReport(metrics)
-            : BuildMarkdownReport(metrics);
 
         try
         {
-            File.WriteAllText(dialog.FileName, report, Encoding.UTF8);
-            AoiDatabase.RecordExport("CustomerValidationReport", dialog.FileName);
+            var reportPath = dialog.FileName;
+            var reportDir = Path.GetDirectoryName(reportPath) ?? Environment.CurrentDirectory;
+            var assetFolderName = $"{Path.GetFileNameWithoutExtension(reportPath)}_assets";
+            var assetFolder = Path.Combine(reportDir, assetFolderName);
+            var assetResult = ValidationReportAssetService.ExportSampleAnnotatedImages(_rows.ToArray(), assetFolder, assetFolderName);
+            var context = BuildCustomerValidationReportContext(metrics, assetResult.Images, assetResult.Warnings);
+            var instructionsPath = Path.Combine(reportDir, $"{Path.GetFileNameWithoutExtension(reportPath)}_print_to_pdf.txt");
+
+            File.WriteAllText(reportPath, CustomerValidationReportService.BuildHtml(context), Encoding.UTF8);
+            File.WriteAllText(instructionsPath, CustomerValidationReportService.BuildPrintToPdfInstructions(reportPath), Encoding.UTF8);
+            AoiDatabase.RecordExport("CustomerValidationHtmlReport", reportPath, assetResult.Warnings.Count == 0 ? "OK" : "WARN");
+            AoiDatabase.RecordExport("CustomerValidationPrintInstructions", instructionsPath);
             _lastReportPath = dialog.FileName;
-            ReportPathText.Text = $"Report: {dialog.FileName}";
-            StatusText.Text = $"Customer validation report saved: {dialog.FileName}";
-            WorkflowState.Instance.AddEvent("EXPORT", $"Customer validation report exported for run {_currentRunId}: {Path.GetFileName(dialog.FileName)}");
+            ReportPathText.Text = $"Report: {reportPath}";
+            StatusText.Text = $"Customer validation report saved: {reportPath}. Print-to-PDF instructions were generated beside it.";
+            WorkflowState.Instance.AddEvent("EXPORT", $"Customer validation HTML report exported for run {_currentRunId}: {Path.GetFileName(reportPath)}");
+            foreach (var warning in assetResult.Warnings)
+                WorkflowState.Instance.AddEvent("EXPORT_WARNING", warning);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -455,6 +472,45 @@ public partial class AIModelTestView : UserControl
             WorkflowState.Instance.AddEvent("EXPORT_ERROR", message);
             MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private CustomerValidationReportContext BuildCustomerValidationReportContext(
+        BatchMetrics metrics,
+        IReadOnlyList<ReportImageReference> sampleImages,
+        IReadOnlyList<string> warnings)
+    {
+        var configuration = InspectionModelConfigurationService.Load();
+        var state = WorkflowState.Instance;
+        var testTimestamp = _currentRunCreatedAtUtc is { } runTime
+            ? (runTime.Kind == DateTimeKind.Utc ? runTime.ToLocalTime() : runTime)
+            : DateTime.Now;
+        var boardModel = CustomerValidationReportService.SummarizeDistinct(_rows.Select(row => row.BoardModel));
+        if (string.Equals(boardModel, "Not provided", StringComparison.OrdinalIgnoreCase))
+            boardModel = state.BoardProgram;
+
+        return new CustomerValidationReportContext
+        {
+            StationId = state.StationId,
+            UserId = state.CurrentUser.UserId,
+            UserRole = state.CurrentRole.ToString(),
+            RunId = _currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "Not available",
+            TestTimestamp = testTimestamp,
+            BoardModel = boardModel,
+            LotId = CustomerValidationReportService.SummarizeDistinct(_rows.Select(row => row.LotId)),
+            EngineName = GetEngineNamePart(),
+            ModelVersion = GetEngineVersionPart(),
+            ModelFileName = string.IsNullOrWhiteSpace(configuration.ModelFilePath)
+                ? "Not configured"
+                : Path.GetFileName(configuration.ModelFilePath),
+            ConfidenceThreshold = configuration.ConfidenceThreshold,
+            DatasetFolder = string.IsNullOrWhiteSpace(_selectedFolder) ? "Not available" : _selectedFolder,
+            GroundTruthFile = string.IsNullOrWhiteSpace(_groundTruthCsvPath) ? "Not selected" : _groundTruthCsvPath,
+            Metrics = metrics,
+            PerformanceSummary = BatchValidationService.CalculatePerformanceSummary(_rows),
+            Rows = _rows.ToArray(),
+            SampleAnnotatedImages = sampleImages,
+            Warnings = warnings,
+        };
     }
 
     private void LoadLatestRun()
@@ -501,6 +557,18 @@ public partial class AIModelTestView : UserControl
         PossibleEscapeText.Text = metrics.PossibleEscape.ToString(CultureInfo.InvariantCulture);
         VerifiedNgText.Text = metrics.VerifiedNg.ToString(CultureInfo.InvariantCulture);
         UnknownText.Text = metrics.Unknown.ToString(CultureInfo.InvariantCulture);
+        ApplyPerformance(BatchValidationService.CalculatePerformanceSummary(_rows));
+    }
+
+    private void ApplyPerformance(BatchPerformanceSummary performance)
+    {
+        AverageTimeText.Text = FormatMilliseconds(performance.AverageMilliseconds);
+        MaxTimeText.Text = FormatMilliseconds(performance.MaxMilliseconds);
+        MinTimeText.Text = FormatMilliseconds(performance.MinMilliseconds);
+        OverOneSecondText.Text = performance.CountOverOneSecond.ToString(CultureInfo.InvariantCulture);
+        OverOneSecondText.Foreground = performance.CountOverOneSecond > 0
+            ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"))
+            : Brushes.White;
     }
 
     private string BuildMarkdownReport(BatchMetrics metrics)
@@ -742,6 +810,9 @@ public partial class AIModelTestView : UserControl
 
     private static string FormatPercent(double value)
         => double.IsNaN(value) ? "--" : value.ToString("P1", CultureInfo.InvariantCulture);
+
+    private static string FormatMilliseconds(double value)
+        => value <= 0 ? "--" : $"{value:F0} ms";
 
     private static string EscapeCsv(string value)
         => $"\"{value.Replace("\"", "\"\"")}\"";

@@ -430,8 +430,12 @@ public partial class MainWindow : Window
         HeaderEngineText.Text = statusText;
         InspectionEngineStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
         {
-            Models.InspectionEngineStatus.MlModelConfigured => "#50F56E",
+            Models.InspectionEngineStatus.MlModelReady => "#50F56E",
+            Models.InspectionEngineStatus.MlModelMissing => "#E1A334",
+            Models.InspectionEngineStatus.MlModelNotTested => "#E1A334",
             Models.InspectionEngineStatus.MlRuntimeError => "#F27777",
+            Models.InspectionEngineStatus.MlInvalidLabelMap => "#F27777",
+            Models.InspectionEngineStatus.MlUnsupportedOutputFormat => "#F27777",
             _ => "#E1A334",
         }));
     }

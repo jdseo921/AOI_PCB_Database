@@ -59,7 +59,11 @@ public partial class SettingsView : UserControl
             !string.Equals(existingConfig.ModelFilePath, newConfig.ModelFilePath, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingConfig.ModelVersion, newConfig.ModelVersion, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingConfig.LabelMapPath, newConfig.LabelMapPath, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(existingConfig.SelectedEngineKey, newConfig.SelectedEngineKey, StringComparison.OrdinalIgnoreCase);
+            !string.Equals(existingConfig.SelectedEngineKey, newConfig.SelectedEngineKey, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingConfig.InputTensorName, newConfig.InputTensorName, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingConfig.OutputTensorName, newConfig.OutputTensorName, StringComparison.OrdinalIgnoreCase) ||
+            existingConfig.InputImageWidth != newConfig.InputImageWidth ||
+            existingConfig.InputImageHeight != newConfig.InputImageHeight;
         var cameraConfigChanged =
             !string.Equals(existingCamera.SourceKey, newCamera.SourceKey, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingCamera.TopFolder, newCamera.TopFolder, StringComparison.OrdinalIgnoreCase) ||
@@ -106,6 +110,10 @@ public partial class SettingsView : UserControl
         ModelVersionText.Text = "UNCONFIGURED";
         LabelMapPathText.Text = string.Empty;
         ConfidenceThresholdText.Text = "0.65";
+        InputWidthText.Text = "640";
+        InputHeightText.Text = "640";
+        InputTensorNameText.Text = string.Empty;
+        OutputTensorNameText.Text = string.Empty;
         InspectionModelConfigurationService.Save(new InspectionModelConfiguration());
         CameraSourceSettingsService.Save(new CameraSourceSettings());
         CameraSourceSettingsService.ApplyActiveSource();
@@ -302,9 +310,14 @@ public partial class SettingsView : UserControl
         ModelPathText.IsEnabled = canManageSettings;
         ModelVersionText.IsEnabled = canManageSettings;
         LabelMapPathText.IsEnabled = canManageSettings;
+        InputWidthText.IsEnabled = canManageSettings;
+        InputHeightText.IsEnabled = canManageSettings;
+        InputTensorNameText.IsEnabled = canManageSettings;
+        OutputTensorNameText.IsEnabled = canManageSettings;
         BrowseModelBtn.IsEnabled = canManageSettings;
         BrowseLabelMapBtn.IsEnabled = canManageSettings;
         ConfidenceThresholdText.IsEnabled = canChangeThresholds;
+        TestModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
     }
 
     private void RefreshInspectionConfigurationUi()
@@ -317,24 +330,40 @@ public partial class SettingsView : UserControl
         ModelVersionText.Text = configuration.ModelVersion;
         LabelMapPathText.Text = configuration.LabelMapPath;
         ConfidenceThresholdText.Text = configuration.ConfidenceThreshold.ToString("0.###", CultureInfo.InvariantCulture);
+        InputWidthText.Text = configuration.InputImageWidth.ToString(CultureInfo.InvariantCulture);
+        InputHeightText.Text = configuration.InputImageHeight.ToString(CultureInfo.InvariantCulture);
+        InputTensorNameText.Text = configuration.InputTensorName;
+        OutputTensorNameText.Text = configuration.OutputTensorName;
 
-        var status = GetStatus(configuration);
-        EngineRuntimeStatusText.Text = status switch
-        {
-            InspectionEngineStatus.MlModelConfigured => "ML Model Configured",
-            InspectionEngineStatus.MlModelMissing => "ML Model Missing",
-            InspectionEngineStatus.MlRuntimeError => "ML Runtime Error",
-            _ => "Prototype Engine",
-        };
+        var status = InspectionModelConfigurationService.GetStatus(configuration);
+        EngineRuntimeStatusText.Text = InspectionModelConfigurationService.GetStatusText(status);
         EngineRuntimeStatusText.Foreground = StatusBrush(status);
         EngineVersionText.Text = configuration.IsOnnxSelected
             ? configuration.EffectiveModelVersion
             : "PIXEL_DIFF_0.1";
+        ModelCheckResultText.Text = ModelConfigurationValidator.ToDisplay(configuration.LastModelCheckResult);
+        ModelCheckResultText.Foreground = StatusBrush(configuration.LastModelCheckResult);
+        ModelCheckTimestampText.Text = configuration.LastModelCheckTimestampUtc is { } timestamp
+            ? timestamp.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture)
+            : "--";
+        ModelCheckMessageText.Text = configuration.LastModelCheckMessage;
     }
 
     private void SaveInspectionConfiguration(InspectionModelConfiguration? preparedConfiguration = null)
     {
         var configuration = preparedConfiguration ?? BuildConfigurationFromUi();
+        var existing = InspectionModelConfigurationService.Load();
+        if (string.Equals(
+                ModelConfigurationValidator.ComputeConfigurationHash(existing),
+                ModelConfigurationValidator.ComputeConfigurationHash(configuration),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            configuration.LastModelCheckTimestampUtc = existing.LastModelCheckTimestampUtc;
+            configuration.LastModelCheckResult = existing.LastModelCheckResult;
+            configuration.LastModelCheckMessage = existing.LastModelCheckMessage;
+            configuration.LastModelCheckConfigurationHash = existing.LastModelCheckConfigurationHash;
+        }
+
         InspectionModelConfigurationService.Save(configuration);
 
         var state = WorkflowState.Instance;
@@ -343,6 +372,56 @@ public partial class SettingsView : UserControl
             configuration.IsOnnxSelected
                 ? $"Inspection engine set to ONNX ML Model; status {EngineRuntimeStatusText.Text}; version {configuration.EffectiveModelVersion}."
                 : "Inspection engine set to Pixel Difference / Prototype Engine.");
+    }
+
+    private void OnTestModelConfigurationClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanTestModelConfiguration, "Testing model configuration"))
+            return;
+
+        var configuration = BuildConfigurationFromUi();
+        var existing = InspectionModelConfigurationService.Load();
+        if (!RoleAuthorization.CanManageSettings(WorkflowState.Instance.CurrentRole) &&
+            HasAdminOnlyModelConfigurationChange(existing, configuration))
+        {
+            MessageBox.Show(
+                "Only Admin can test unsaved model path, tensor, label-map, or input-size changes. Apply or ask an Admin to save the model configuration first.",
+                "Permission Denied",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        var numericError = ValidateRawModelCheckFields();
+        ModelConfigurationTestResult result;
+        if (numericError is not null)
+        {
+            result = new ModelConfigurationTestResult(
+                ModelConfigurationTestStatus.RuntimeError,
+                DateTime.UtcNow,
+                numericError,
+                ModelConfigurationValidator.ComputeConfigurationHash(configuration));
+            configuration.LastModelCheckTimestampUtc = result.TimestampUtc;
+            configuration.LastModelCheckResult = result.Status;
+            configuration.LastModelCheckMessage = result.Message;
+            configuration.LastModelCheckConfigurationHash = result.ConfigurationHash;
+            InspectionModelConfigurationService.Save(configuration);
+        }
+        else
+        {
+            result = InspectionModelConfigurationService.TestAndSave(configuration);
+        }
+
+        WorkflowState.Instance.AddEvent(
+            "MODEL_CHECK",
+            $"Model configuration test: {result.DisplayStatus}. {result.Message}");
+
+        RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
+        MessageBox.Show(
+            $"{result.DisplayStatus}\n\n{result.Message}",
+            "Model Configuration Test",
+            MessageBoxButton.OK,
+            result.Status == ModelConfigurationTestStatus.Ready ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
 
     private void SaveCameraSourceSettings(CameraSourceSettings? preparedSettings = null)
@@ -420,6 +499,22 @@ public partial class SettingsView : UserControl
             ModelFilePath = modelPath,
             ModelVersion = version,
             LabelMapPath = LabelMapPathText.Text.Trim(),
+            InputImageWidth = int.TryParse(
+                InputWidthText.Text,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var inputWidth)
+                ? Math.Clamp(inputWidth, 32, 8192)
+                : 640,
+            InputImageHeight = int.TryParse(
+                InputHeightText.Text,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var inputHeight)
+                ? Math.Clamp(inputHeight, 32, 8192)
+                : 640,
+            InputTensorName = InputTensorNameText.Text.Trim(),
+            OutputTensorName = OutputTensorNameText.Text.Trim(),
             ConfidenceThreshold = double.TryParse(
                 ConfidenceThresholdText.Text,
                 NumberStyles.Float,
@@ -430,31 +525,70 @@ public partial class SettingsView : UserControl
         };
     }
 
-    private static InspectionEngineStatus GetStatus(InspectionModelConfiguration configuration)
-    {
-        if (!configuration.IsOnnxSelected)
-            return InspectionEngineStatus.PrototypeEngine;
-
-        if (!configuration.HasModelFile)
-            return InspectionEngineStatus.MlModelMissing;
-
-        return OnnxInspectionEngine.RuntimeAvailable
-            ? InspectionEngineStatus.MlModelConfigured
-            : InspectionEngineStatus.MlRuntimeError;
-    }
-
     private static Brush StatusBrush(InspectionEngineStatus status)
     {
         var color = status switch
         {
-            InspectionEngineStatus.MlModelConfigured => "#50F56E",
+            InspectionEngineStatus.MlModelReady => "#50F56E",
             InspectionEngineStatus.MlModelMissing => "#E1A334",
+            InspectionEngineStatus.MlModelNotTested => "#E1A334",
+            InspectionEngineStatus.MlInvalidLabelMap => "#F27777",
             InspectionEngineStatus.MlRuntimeError => "#F27777",
+            InspectionEngineStatus.MlUnsupportedOutputFormat => "#F27777",
             _ => "#E1A334",
         };
 
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
     }
+
+    private static Brush StatusBrush(ModelConfigurationTestStatus status)
+    {
+        var color = status switch
+        {
+            ModelConfigurationTestStatus.Ready => "#50F56E",
+            ModelConfigurationTestStatus.MissingModel => "#E1A334",
+            ModelConfigurationTestStatus.InvalidLabelMap => "#F27777",
+            ModelConfigurationTestStatus.RuntimeError => "#F27777",
+            ModelConfigurationTestStatus.UnsupportedOutputFormat => "#F27777",
+            _ => "#E1A334",
+        };
+
+        return new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+    }
+
+    private string? ValidateRawModelCheckFields()
+    {
+        if (!int.TryParse(InputWidthText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var width) ||
+            !int.TryParse(InputHeightText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var height) ||
+            width < 32 ||
+            width > 8192 ||
+            height < 32 ||
+            height > 8192)
+        {
+            return "Input width and height must be whole numbers between 32 and 8192.";
+        }
+
+        if (!double.TryParse(ConfidenceThresholdText.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var threshold) ||
+            threshold < 0 ||
+            threshold > 1)
+        {
+            return "Confidence threshold must be a number between 0 and 1.";
+        }
+
+        return null;
+    }
+
+    private static bool HasAdminOnlyModelConfigurationChange(
+        InspectionModelConfiguration existing,
+        InspectionModelConfiguration candidate)
+        => !string.Equals(existing.SelectedEngineKey, candidate.SelectedEngineKey, StringComparison.OrdinalIgnoreCase) ||
+           !string.Equals(existing.ModelFilePath, candidate.ModelFilePath, StringComparison.OrdinalIgnoreCase) ||
+           !string.Equals(existing.ModelVersion, candidate.ModelVersion, StringComparison.OrdinalIgnoreCase) ||
+           !string.Equals(existing.LabelMapPath, candidate.LabelMapPath, StringComparison.OrdinalIgnoreCase) ||
+           !string.Equals(existing.InputTensorName, candidate.InputTensorName, StringComparison.OrdinalIgnoreCase) ||
+           !string.Equals(existing.OutputTensorName, candidate.OutputTensorName, StringComparison.OrdinalIgnoreCase) ||
+           existing.InputImageWidth != candidate.InputImageWidth ||
+           existing.InputImageHeight != candidate.InputImageHeight;
 
     private void ApplyLanguageVisuals()
     {

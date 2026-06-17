@@ -46,26 +46,54 @@ public static class InspectionModelConfigurationService
         => Save(configuration, notify: true);
 
     public static InspectionEngineStatus GetStatus()
+        => GetStatus(Load());
+
+    public static InspectionEngineStatus GetStatus(InspectionModelConfiguration configuration)
     {
-        var configuration = Load();
         if (!configuration.IsOnnxSelected)
             return InspectionEngineStatus.PrototypeEngine;
 
         if (!configuration.HasModelFile)
             return InspectionEngineStatus.MlModelMissing;
 
-        return OnnxInspectionEngine.RuntimeAvailable
-            ? InspectionEngineStatus.MlModelConfigured
-            : InspectionEngineStatus.MlRuntimeError;
+        var currentHash = ModelConfigurationValidator.ComputeConfigurationHash(configuration);
+        if (!string.Equals(configuration.LastModelCheckConfigurationHash, currentHash, StringComparison.OrdinalIgnoreCase))
+            return InspectionEngineStatus.MlModelNotTested;
+
+        return configuration.LastModelCheckResult switch
+        {
+            ModelConfigurationTestStatus.Ready => InspectionEngineStatus.MlModelReady,
+            ModelConfigurationTestStatus.MissingModel => InspectionEngineStatus.MlModelMissing,
+            ModelConfigurationTestStatus.InvalidLabelMap => InspectionEngineStatus.MlInvalidLabelMap,
+            ModelConfigurationTestStatus.UnsupportedOutputFormat => InspectionEngineStatus.MlUnsupportedOutputFormat,
+            ModelConfigurationTestStatus.RuntimeError => InspectionEngineStatus.MlRuntimeError,
+            _ => InspectionEngineStatus.MlModelNotTested,
+        };
     }
 
-    public static string GetStatusText() => GetStatus() switch
+    public static string GetStatusText() => GetStatusText(GetStatus());
+
+    public static string GetStatusText(InspectionEngineStatus status) => status switch
     {
-        InspectionEngineStatus.MlModelConfigured => "ML Model Configured",
+        InspectionEngineStatus.MlModelReady => "Ready",
+        InspectionEngineStatus.MlModelNotTested => "Model Not Tested",
         InspectionEngineStatus.MlModelMissing => "ML Model Missing",
+        InspectionEngineStatus.MlInvalidLabelMap => "Invalid Label Map",
         InspectionEngineStatus.MlRuntimeError => "ML Runtime Error",
+        InspectionEngineStatus.MlUnsupportedOutputFormat => "Unsupported Output Format",
         _ => "Prototype Engine",
     };
+
+    public static ModelConfigurationTestResult TestAndSave(InspectionModelConfiguration configuration)
+    {
+        var result = ModelConfigurationValidator.Test(configuration);
+        configuration.LastModelCheckTimestampUtc = result.TimestampUtc;
+        configuration.LastModelCheckResult = result.Status;
+        configuration.LastModelCheckMessage = result.Message;
+        configuration.LastModelCheckConfigurationHash = result.ConfigurationHash;
+        Save(configuration);
+        return result;
+    }
 
     private static void Save(InspectionModelConfiguration configuration, bool notify)
     {
@@ -89,6 +117,18 @@ public static class InspectionModelConfigurationService
             ? "UNCONFIGURED"
             : configuration.ModelVersion.Trim();
         configuration.LabelMapPath = configuration.LabelMapPath?.Trim() ?? string.Empty;
+        configuration.InputTensorName = configuration.InputTensorName?.Trim() ?? string.Empty;
+        configuration.OutputTensorName = configuration.OutputTensorName?.Trim() ?? string.Empty;
+        configuration.LastModelCheckMessage = string.IsNullOrWhiteSpace(configuration.LastModelCheckMessage)
+            ? "Not tested."
+            : configuration.LastModelCheckMessage.Trim();
+        configuration.LastModelCheckConfigurationHash = configuration.LastModelCheckConfigurationHash?.Trim() ?? string.Empty;
+        if (configuration.BuiltInLabelMap is null ||
+            configuration.BuiltInLabelMap.Count < 7 ||
+            !configuration.BuiltInLabelMap.Values.Contains("Insufficient Solder", StringComparer.OrdinalIgnoreCase))
+        {
+            configuration.BuiltInLabelMap = new InspectionModelConfiguration().BuiltInLabelMap;
+        }
     }
 
     private static InspectionModelConfiguration Clone(InspectionModelConfiguration source)
@@ -99,8 +139,14 @@ public static class InspectionModelConfigurationService
             ModelVersion = source.ModelVersion,
             InputImageWidth = source.InputImageWidth,
             InputImageHeight = source.InputImageHeight,
+            InputTensorName = source.InputTensorName,
+            OutputTensorName = source.OutputTensorName,
             ConfidenceThreshold = source.ConfidenceThreshold,
             LabelMapPath = source.LabelMapPath,
+            LastModelCheckTimestampUtc = source.LastModelCheckTimestampUtc,
+            LastModelCheckResult = source.LastModelCheckResult,
+            LastModelCheckMessage = source.LastModelCheckMessage,
+            LastModelCheckConfigurationHash = source.LastModelCheckConfigurationHash,
             BuiltInLabelMap = new Dictionary<int, string>(source.BuiltInLabelMap),
         };
 }

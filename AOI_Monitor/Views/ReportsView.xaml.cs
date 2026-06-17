@@ -238,12 +238,11 @@ public partial class ReportsView : UserControl
                     : AoiDatabase.GetBatchTestResults(latestRun.Id).Select(BatchTestRow.FromRecord).ToArray();
 
                 if (latestRun is null)
-                    warnings.Add("No Stage 1 validation batch run was found. validation/customer_validation_report.md and validation/validation_results.csv were generated with no validation rows.");
+                    warnings.Add("No Stage 1 validation batch run was found. validation/customer_validation_report.html and validation/validation_results.csv were generated with no validation rows.");
                 else if (validationRows.Length == 0)
                     warnings.Add($"Latest Stage 1 validation run {latestRun.Id} has no persisted result rows.");
 
                 ((IProgress<WorkProgress>)progress).Report(new WorkProgress(2, 6, "Writing validation artifacts..."));
-                File.WriteAllText(Path.Combine(validationDir, "customer_validation_report.md"), BuildStage1ValidationReport(latestRun, validationRows, warnings), CsvEncoding);
                 File.WriteAllText(Path.Combine(validationDir, "validation_results.csv"), BatchValidationService.BuildResultsCsv(validationRows), CsvEncoding);
 
                 if (inspectionRows.Length == 0)
@@ -267,6 +266,17 @@ public partial class ReportsView : UserControl
                     warnings.Add("No annotated overlay images were generated. This usually means no filtered inspection rows had accessible sample image paths.");
 
                 cts.Token.ThrowIfCancellationRequested();
+                ((IProgress<WorkProgress>)progress).Report(new WorkProgress(4, 6, "Preparing validation report sample images..."));
+                var sampleImageDir = Path.Combine(validationDir, "sample_annotated_images");
+                var sampleImages = ValidationReportAssetService.ExportSampleAnnotatedImages(
+                    validationRows,
+                    sampleImageDir,
+                    "sample_annotated_images",
+                    maxCount: 8,
+                    cts.Token);
+                warnings.AddRange(sampleImages.Warnings);
+
+                cts.Token.ThrowIfCancellationRequested();
                 ((IProgress<WorkProgress>)progress).Report(new WorkProgress(5, 6, "Writing configuration and database summaries..."));
                 var configuration = InspectionModelConfigurationService.Load();
                 File.WriteAllText(Path.Combine(summariesDir, "model_engine_configuration.txt"), BuildModelConfigurationSummary(configuration, warnings), CsvEncoding);
@@ -275,17 +285,25 @@ public partial class ReportsView : UserControl
 
                 cts.Token.ThrowIfCancellationRequested();
                 ((IProgress<WorkProgress>)progress).Report(new WorkProgress(6, 6, "Writing package README..."));
-                File.WriteAllText(Path.Combine(validationDir, "customer_validation_report.md"), BuildStage1ValidationReport(latestRun, validationRows, warnings), CsvEncoding);
+                var reportPath = Path.Combine(validationDir, "customer_validation_report.html");
+                var reportContext = BuildCustomerValidationReportContext(latestRun, validationRows, sampleImages.Images, warnings);
+                File.WriteAllText(reportPath, CustomerValidationReportService.BuildHtml(reportContext), CsvEncoding);
+                File.WriteAllText(Path.Combine(validationDir, "customer_validation_report.md"), CustomerValidationReportService.BuildMarkdown(reportContext), CsvEncoding);
+                File.WriteAllText(
+                    Path.Combine(validationDir, "customer_validation_report_print_to_pdf.txt"),
+                    CustomerValidationReportService.BuildPrintToPdfInstructions(reportPath),
+                    CsvEncoding);
                 File.WriteAllText(
                     Path.Combine(packageDir, "README.md"),
                     BuildStage1PackageReadme(packageDir, latestRun, validationRows.Length, overlays.Count, inspectionRows.Length, reviewRows.Length, warnings, filter),
                     CsvEncoding);
                 File.WriteAllText(Path.Combine(packageDir, "warnings.txt"), BuildWarningsText(warnings), CsvEncoding);
 
-                return new PackageOutcome(packageDir, overlays.Count, warnings);
+                return new PackageOutcome(packageDir, reportPath, overlays.Count, warnings);
             }, cts.Token);
 
             AoiDatabase.RecordExport("Stage1CustomerPackage", result.PackageDir, result.Warnings.Count == 0 ? "OK" : "WARN");
+            AoiDatabase.RecordExport("CustomerValidationHtmlReport", result.ReportPath, result.Warnings.Count == 0 ? "OK" : "WARN");
             WorkflowState.Instance.AddEvent("EXPORT", $"Stage 1 customer package exported: {Path.GetFileName(result.PackageDir)}, overlays={result.OverlayCount}, warnings={result.Warnings.Count}.");
             LogErrors("EXPORT_WARNING", result.Warnings);
             PackagePathText.Text = $"Latest customer package: {result.PackageDir}";
@@ -440,6 +458,64 @@ public partial class ReportsView : UserControl
         }
     }
 
+    private async void OnRunSoakTestClick(object sender, RoutedEventArgs e)
+    {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanUseMaintenanceActions, "Running the local soak-test mode", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var defaultEngine = InspectionModelConfigurationService.Load().SelectedEngineKey;
+        var dialog = new SoakTestDialog(EnsureExportsDir(), defaultEngine)
+        {
+            Owner = Window.GetWindow(this),
+        };
+
+        if (dialog.ShowDialog() != true || dialog.Options is null)
+            return;
+
+        var state = WorkflowState.Instance;
+        var options = dialog.Options with
+        {
+            OperatorId = state.OperatorWithRole,
+            BoardModel = state.BoardProgram,
+            LotId = "SOAK-TEST",
+        };
+
+        var cts = BeginWork("Running soak test...");
+        var progress = new Progress<SoakTestProgress>(p => UpdateProgress(new WorkProgress(p.ElapsedSeconds, p.TotalSeconds, p.Message)));
+
+        try
+        {
+            var result = await SoakTestService.RunAsync(options, progress, cts.Token);
+            var reportPath = SoakTestService.WriteHtmlReport(result, options.OutputFolder);
+            var status = result.WasCanceled
+                ? "CANCELED"
+                : result.Errors.Count == 0 ? "OK" : "WARN";
+
+            AoiDatabase.RecordExport("SoakTestReport", reportPath, status);
+            WorkflowState.Instance.AddEvent("SOAK_TEST", $"Soak test {status}: cycles={result.TotalCycles}, success={result.SuccessfulCycles}, failed={result.FailedCycles}, report={Path.GetFileName(reportPath)}.");
+            LogErrors("SOAK_TEST_ERROR", result.Errors);
+            SoakReportPathText.Text = $"Latest soak-test report: {reportPath}";
+            RefreshAfterExport($"Soak test {status}. Cycles={result.TotalCycles}, failed={result.FailedCycles}. Report: {reportPath}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Soak test failed", ex, "SOAK_TEST_ERROR");
+        }
+        finally
+        {
+            EndWork();
+        }
+    }
+
     private void OnCancelWorkClick(object sender, RoutedEventArgs e)
     {
         _workCts?.Cancel();
@@ -570,7 +646,7 @@ public partial class ReportsView : UserControl
     private static string BuildInspectionCsv(IEnumerable<InspectionLogRow> rows)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Id,TimestampUtc,BoardProgram,Operator,Result,Score,Confidence,Engine,ModelVersion,Defect,SampleImage,GoldenImage,DecisionReason");
+        sb.AppendLine("Id,TimestampUtc,BoardProgram,Operator,Result,Score,Confidence,Engine,ModelVersion,ConfidenceThreshold,ModelPath,Defect,SampleImage,GoldenImage,DecisionReason,ImageLoadMs,PreprocessingMs,InferenceMs,OverlayRenderingMs,TotalInspectionMs");
         foreach (var row in rows)
         {
             sb.AppendLine(string.Join(",",
@@ -583,10 +659,17 @@ public partial class ReportsView : UserControl
                 row.Confidence.ToString("F4", CultureInfo.InvariantCulture),
                 EscapeCsv(row.InspectionEngine),
                 EscapeCsv(row.ModelVersion),
+                row.ConfidenceThreshold.ToString("F4", CultureInfo.InvariantCulture),
+                EscapeCsv(row.ModelFilePath),
                 EscapeCsv(row.SuggestedDefect),
                 EscapeCsv(row.SampleImagePath),
                 EscapeCsv(row.GoldenImagePath),
-                EscapeCsv(row.DecisionReason)));
+                EscapeCsv(row.DecisionReason),
+                row.ImageLoadMilliseconds.ToString("F1", CultureInfo.InvariantCulture),
+                row.PreprocessingMilliseconds.ToString("F1", CultureInfo.InvariantCulture),
+                row.InferenceMilliseconds.ToString("F1", CultureInfo.InvariantCulture),
+                row.OverlayRenderingMilliseconds.ToString("F1", CultureInfo.InvariantCulture),
+                row.TotalInspectionMilliseconds.ToString("F1", CultureInfo.InvariantCulture)));
         }
 
         return sb.ToString();
@@ -608,6 +691,47 @@ public partial class ReportsView : UserControl
         }
 
         return sb.ToString();
+    }
+
+    private static CustomerValidationReportContext BuildCustomerValidationReportContext(
+        BatchTestRunRecord? run,
+        IReadOnlyCollection<BatchTestRow> rows,
+        IReadOnlyList<ReportImageReference> sampleImages,
+        IReadOnlyList<string> warnings)
+    {
+        var configuration = InspectionModelConfigurationService.Load();
+        var state = WorkflowState.Instance;
+        var boardModel = CustomerValidationReportService.SummarizeDistinct(rows.Select(row => row.BoardModel));
+        if (string.Equals(boardModel, "Not provided", StringComparison.OrdinalIgnoreCase))
+            boardModel = state.BoardProgram;
+
+        var timestamp = run?.CreatedAtUtc ?? DateTime.Now;
+        if (timestamp.Kind == DateTimeKind.Utc)
+            timestamp = timestamp.ToLocalTime();
+
+        return new CustomerValidationReportContext
+        {
+            StationId = state.StationId,
+            UserId = state.CurrentUser.UserId,
+            UserRole = state.CurrentRole.ToString(),
+            RunId = run is null ? "Not available" : run.Id.ToString(CultureInfo.InvariantCulture),
+            TestTimestamp = timestamp,
+            BoardModel = boardModel,
+            LotId = CustomerValidationReportService.SummarizeDistinct(rows.Select(row => row.LotId)),
+            EngineName = run?.EngineName ?? (configuration.IsOnnxSelected ? "ONNX Runtime" : "Pixel Difference"),
+            ModelVersion = run?.ModelVersion ?? configuration.EffectiveModelVersion,
+            ModelFileName = string.IsNullOrWhiteSpace(configuration.ModelFilePath)
+                ? "Not configured"
+                : Path.GetFileName(configuration.ModelFilePath),
+            ConfidenceThreshold = configuration.ConfidenceThreshold,
+            DatasetFolder = string.IsNullOrWhiteSpace(run?.ImageFolder) ? "Not available" : run.ImageFolder,
+            GroundTruthFile = string.IsNullOrWhiteSpace(run?.GroundTruthCsvPath) ? "Not selected" : run.GroundTruthCsvPath,
+            Metrics = BatchValidationService.CalculateMetrics(rows),
+            PerformanceSummary = BatchValidationService.CalculatePerformanceSummary(rows),
+            Rows = rows.ToArray(),
+            SampleAnnotatedImages = sampleImages,
+            Warnings = warnings.ToArray(),
+        };
     }
 
     private static string BuildStage1ValidationReport(BatchTestRunRecord? run, IReadOnlyCollection<BatchTestRow> rows, IReadOnlyList<string> warnings)
@@ -687,14 +811,17 @@ public partial class ReportsView : UserControl
         sb.AppendLine($"ModelFileExists: {configuration.HasModelFile}");
         sb.AppendLine($"InputImageWidth: {configuration.InputImageWidth}");
         sb.AppendLine($"InputImageHeight: {configuration.InputImageHeight}");
+        sb.AppendLine($"InputTensorName: {NullIfEmpty(configuration.InputTensorName)}");
+        sb.AppendLine($"OutputTensorName: {NullIfEmpty(configuration.OutputTensorName)}");
         sb.AppendLine($"ConfidenceThreshold: {configuration.ConfidenceThreshold.ToString("F3", CultureInfo.InvariantCulture)}");
         sb.AppendLine($"LabelMapPath: {NullIfEmpty(configuration.LabelMapPath)}");
         sb.AppendLine($"LabelMapFileExists: {!string.IsNullOrWhiteSpace(configuration.LabelMapPath) && File.Exists(configuration.LabelMapPath)}");
+        sb.AppendLine("OutputParser: Generic Detection [class,confidence,x,y,width,height]");
         sb.AppendLine("BuiltInLabelMap:");
         foreach (var label in configuration.BuiltInLabelMap.OrderBy(kvp => kvp.Key))
             sb.AppendLine($"  {label.Key}: {label.Value}");
         sb.AppendLine();
-        sb.AppendLine("PrototypeNotice: Stage 1 is a local PoC. The default pixel-difference engine is deterministic evidence generation, not production ML inference.");
+        sb.AppendLine("PrototypeNotice: Stage 1 is a local PoC. The default pixel-difference engine is deterministic evidence generation. ONNX inference is claimed only when a configured local model loads and inference succeeds.");
         return sb.ToString();
     }
 
@@ -800,7 +927,10 @@ public partial class ReportsView : UserControl
         sb.AppendLine();
         sb.AppendLine("## Contents");
         sb.AppendLine();
-        sb.AppendLine("- `validation/customer_validation_report.md` - Summary report for the latest persisted Stage 1 validation run.");
+        sb.AppendLine("- `validation/customer_validation_report.html` - Customer-facing Stage 1 validation report with summary metrics, failed samples, sample annotated images, prototype limitations, and signature/approval section.");
+        sb.AppendLine("- `validation/customer_validation_report_print_to_pdf.txt` - Instructions for creating a PDF from the HTML report with a browser print workflow.");
+        sb.AppendLine("- `validation/customer_validation_report.md` - Markdown companion copy of the validation report.");
+        sb.AppendLine("- `validation/sample_annotated_images/` - Sample annotated images referenced by the validation report.");
         sb.AppendLine("- `validation/validation_results.csv` - Row-level validation results from the latest persisted Stage 1 validation run.");
         sb.AppendLine("- `annotated_overlays/` - Generated PNG overlays for filtered inspection rows with accessible sample images.");
         sb.AppendLine("- `logs/inspection_history.csv` - Filtered SQLite inspection history.");
@@ -1036,11 +1166,203 @@ public partial class ReportsView : UserControl
         }
     }
 
+    private sealed class SoakTestDialog : Window
+    {
+        private readonly TextBox _imageFolderText = new();
+        private readonly TextBox _durationMinutesText = new() { Text = "2" };
+        private readonly TextBox _delayMillisecondsText = new() { Text = "250" };
+        private readonly ComboBox _engineCombo = new();
+        private readonly TextBox _outputFolderText = new();
+
+        public SoakTestOptions? Options { get; private set; }
+
+        public SoakTestDialog(string defaultOutputFolder, string defaultEngineKey)
+        {
+            Title = "Run Local Soak Test";
+            Width = 640;
+            Height = 390;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            ResizeMode = ResizeMode.NoResize;
+            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#11161A"));
+            Foreground = Brushes.White;
+
+            _outputFolderText.Text = defaultOutputFolder;
+            ConfigureEngineOptions(defaultEngineKey);
+            Content = BuildContent();
+        }
+
+        private Grid BuildContent()
+        {
+            var root = new Grid { Margin = new Thickness(16) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
+
+            AddText(root, "Controlled local soak test using folder-simulated camera frames. This does not connect to real camera hardware.", 0, 0, 3, "#DCE5EB", bold: true);
+            AddLabeledFolder(root, "Image folder", _imageFolderText, 1, "Select", OnSelectImageFolder);
+            AddLabeledText(root, "Duration (minutes)", _durationMinutesText, 2);
+            AddLabeledText(root, "Delay between inspections (ms)", _delayMillisecondsText, 3);
+            AddLabeledControl(root, "Selected engine", _engineCombo, 4);
+            AddLabeledFolder(root, "Output folder", _outputFolderText, 5, "Select", OnSelectOutputFolder);
+            AddText(root, "Recommended short proof run: 2 minutes. For acceptance soak evidence, use 480 minutes for 8 hours and confirm the output folder has enough free space.", 6, 0, 3, "#9AA6AF");
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 16, 0, 0),
+            };
+            var cancel = new Button { Content = "Cancel", Width = 92, Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
+            var run = new Button { Content = "Run", Width = 92, IsDefault = true };
+            run.Click += OnRunClick;
+            buttons.Children.Add(cancel);
+            buttons.Children.Add(run);
+            Grid.SetRow(buttons, 7);
+            Grid.SetColumnSpan(buttons, 3);
+            root.Children.Add(buttons);
+
+            return root;
+        }
+
+        private void ConfigureEngineOptions(string defaultEngineKey)
+        {
+            _engineCombo.Items.Add(new ComboBoxItem { Content = "Pixel Difference (prototype)", Tag = InspectionEngineFactory.DefaultEngineKey });
+            _engineCombo.Items.Add(new ComboBoxItem { Content = "ONNX ML Model (configured)", Tag = InspectionEngineFactory.OnnxEngineKey });
+            var normalized = InspectionEngineFactory.NormalizeEngineKey(defaultEngineKey);
+            _engineCombo.SelectedIndex = normalized == InspectionEngineFactory.OnnxEngineKey ? 1 : 0;
+        }
+
+        private void OnSelectImageFolder(object sender, RoutedEventArgs e)
+        {
+            if (SelectFolder("Select soak-test image folder") is { } folder)
+                _imageFolderText.Text = folder;
+        }
+
+        private void OnSelectOutputFolder(object sender, RoutedEventArgs e)
+        {
+            if (SelectFolder("Select soak-test report output folder") is { } folder)
+                _outputFolderText.Text = folder;
+        }
+
+        private void OnRunClick(object sender, RoutedEventArgs e)
+        {
+            if (!Directory.Exists(_imageFolderText.Text))
+            {
+                MessageBox.Show("Select a valid image folder.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!double.TryParse(_durationMinutesText.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var durationMinutes) || durationMinutes <= 0)
+            {
+                MessageBox.Show("Enter a duration greater than 0 minutes.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!double.TryParse(_delayMillisecondsText.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var delayMs) || delayMs < 0)
+            {
+                MessageBox.Show("Enter a delay of 0 ms or greater.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(_outputFolderText.Text))
+            {
+                MessageBox.Show("Select an output folder.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var engineKey = ((_engineCombo.SelectedItem as ComboBoxItem)?.Tag as string)
+                ?? InspectionEngineFactory.DefaultEngineKey;
+            Options = new SoakTestOptions(
+                _imageFolderText.Text.Trim(),
+                TimeSpan.FromMinutes(durationMinutes),
+                TimeSpan.FromMilliseconds(delayMs),
+                engineKey,
+                _outputFolderText.Text.Trim(),
+                "UNKNOWN",
+                "TBOX-MAIN",
+                "SOAK-TEST");
+            DialogResult = true;
+        }
+
+        private static string? SelectFolder(string title)
+        {
+            var dialog = new OpenFolderDialog
+            {
+                Title = title,
+                Multiselect = false,
+            };
+
+            return dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName)
+                ? dialog.FolderName
+                : null;
+        }
+
+        private static void AddLabeledFolder(Grid root, string label, TextBox box, int row, string buttonText, RoutedEventHandler handler)
+        {
+            AddLabeledText(root, label, box, row);
+            var button = new Button { Content = buttonText, Margin = new Thickness(6, 4, 0, 4), MinHeight = 28 };
+            button.Click += handler;
+            Grid.SetRow(button, row);
+            Grid.SetColumn(button, 2);
+            root.Children.Add(button);
+        }
+
+        private static void AddLabeledText(Grid root, string label, TextBox box, int row)
+        {
+            box.Margin = new Thickness(0, 4, 0, 4);
+            box.MinHeight = 28;
+            AddLabeledControl(root, label, box, row);
+        }
+
+        private static void AddLabeledControl(Grid root, string label, Control control, int row)
+        {
+            var labelBlock = new TextBlock
+            {
+                Text = label,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9AA6AF")),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 4, 8, 4),
+            };
+            control.Margin = new Thickness(0, 4, 0, 4);
+            control.MinHeight = 28;
+            Grid.SetRow(labelBlock, row);
+            Grid.SetColumn(labelBlock, 0);
+            Grid.SetRow(control, row);
+            Grid.SetColumn(control, 1);
+            root.Children.Add(labelBlock);
+            root.Children.Add(control);
+        }
+
+        private static void AddText(Grid root, string text, int row, int column, int columnSpan, string color, bool bold = false)
+        {
+            var block = new TextBlock
+            {
+                Text = text,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color)),
+                FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
+                Margin = new Thickness(0, 0, 0, 12),
+            };
+            Grid.SetRow(block, row);
+            Grid.SetColumn(block, column);
+            Grid.SetColumnSpan(block, columnSpan);
+            root.Children.Add(block);
+        }
+    }
+
     private sealed record WorkProgress(int Completed, int Total, string Message);
 
     private sealed record ExportOutcome(int Count, IReadOnlyList<string> Errors);
 
-    private sealed record PackageOutcome(string PackageDir, int OverlayCount, IReadOnlyList<string> Warnings);
+    private sealed record PackageOutcome(string PackageDir, string ReportPath, int OverlayCount, IReadOnlyList<string> Warnings);
 
     private sealed record IntegrityOutcome(string ReportPath, string Integrity, string Status);
 
@@ -1055,6 +1377,8 @@ public partial class ReportsView : UserControl
         public string OperatorId { get; init; } = "UNKNOWN";
         public string InspectionEngine { get; init; } = "Pixel Difference";
         public string ModelVersion { get; init; } = "UNKNOWN";
+        public string ModelFilePath { get; init; } = string.Empty;
+        public double ConfidenceThreshold { get; init; }
         public string SampleImagePath { get; init; } = string.Empty;
         public string GoldenImagePath { get; init; } = string.Empty;
         public string ImageName => string.IsNullOrWhiteSpace(SampleImagePath) ? "--" : Path.GetFileName(SampleImagePath);
@@ -1069,6 +1393,12 @@ public partial class ReportsView : UserControl
         public double HotspotY { get; init; }
         public double HotspotWidth { get; init; }
         public double HotspotHeight { get; init; }
+        public double ImageLoadMilliseconds { get; init; }
+        public double PreprocessingMilliseconds { get; init; }
+        public double InferenceMilliseconds { get; init; }
+        public double OverlayRenderingMilliseconds { get; init; }
+        public double TotalInspectionMilliseconds { get; init; }
+        public string TotalTimeDisplay => $"{TotalInspectionMilliseconds:F0} ms";
 
         public static InspectionLogRow FromRecord(InspectionHistoryRecord record)
         {
@@ -1080,6 +1410,8 @@ public partial class ReportsView : UserControl
                 OperatorId = record.OperatorId,
                 InspectionEngine = record.InspectionEngine,
                 ModelVersion = record.ModelVersion,
+                ModelFilePath = record.ModelFilePath,
+                ConfidenceThreshold = record.ConfidenceThreshold,
                 SampleImagePath = record.SampleImagePath,
                 GoldenImagePath = record.GoldenImagePath,
                 Verdict = record.Verdict,
@@ -1091,6 +1423,11 @@ public partial class ReportsView : UserControl
                 HotspotY = record.HotspotY,
                 HotspotWidth = record.HotspotWidth,
                 HotspotHeight = record.HotspotHeight,
+                ImageLoadMilliseconds = record.ImageLoadMilliseconds,
+                PreprocessingMilliseconds = record.PreprocessingMilliseconds,
+                InferenceMilliseconds = record.InferenceMilliseconds,
+                OverlayRenderingMilliseconds = record.OverlayRenderingMilliseconds,
+                TotalInspectionMilliseconds = record.TotalInspectionMilliseconds,
             };
         }
     }

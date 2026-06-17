@@ -24,13 +24,36 @@ public class AnalysisResult
     public double DecisionMargin { get; set; }
     public string DecisionReason { get; set; } = "Not enough data.";
     public string ModelVersion { get; set; } = "PIXEL_DIFF_0.1";
+    public string ModelFilePath { get; set; } = string.Empty;
+    public double ConfidenceThreshold { get; set; }
     public string PolicyName { get; set; } = "Minimize False Positives";
     public List<string> Evidence { get; set; } = new();
     public List<DefectResult> Defects { get; set; } = new();
+    public InspectionTiming Timing { get; set; } = new();
     public string Verdict { get; set; } = "REVIEW";
     public string SuggestedDefect { get; set; } = "Unknown";
     public Rect Hotspot { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.Now;
+}
+
+public class InspectionTiming
+{
+    public double ImageLoadMilliseconds { get; set; }
+    public double PreprocessingMilliseconds { get; set; }
+    public double InferenceMilliseconds { get; set; }
+    public double OverlayRenderingMilliseconds { get; set; }
+    public double TotalInspectionMilliseconds { get; set; }
+
+    public bool IsOverOneSecond => TotalInspectionMilliseconds > 1000.0;
+
+    public void RecalculateTotal()
+    {
+        TotalInspectionMilliseconds =
+            ImageLoadMilliseconds +
+            PreprocessingMilliseconds +
+            InferenceMilliseconds +
+            OverlayRenderingMilliseconds;
+    }
 }
 
 public class DefectResult

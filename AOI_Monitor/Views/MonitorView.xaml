@@ -129,6 +129,7 @@
                 <RowDefinition Height="28"/>
                 <RowDefinition Height="28"/>
                 <RowDefinition Height="28"/>
+                <RowDefinition Height="28"/>
                 <RowDefinition Height="68"/>
               </Grid.RowDefinitions>
               <TextBlock Text="Station" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
@@ -143,8 +144,10 @@
               <TextBlock Grid.Row="4" Grid.Column="1" x:Name="EngineText" Text="Pixel Difference" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
               <TextBlock Grid.Row="5" Text="Model Version" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
               <TextBlock Grid.Row="5" Grid.Column="1" x:Name="ModelVersionText" Text="PIXEL_DIFF_0.1" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-              <TextBlock Grid.Row="6" Text="Result" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
-              <Border Grid.Row="6" Grid.Column="1" x:Name="ResultStatusBorder" Background="#372914" BorderBrush="#8C6C35" BorderThickness="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="10,6">
+              <TextBlock Grid.Row="6" Text="Timing" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="6" Grid.Column="1" x:Name="TimingText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+              <TextBlock Grid.Row="7" Text="Result" Foreground="#9AA6AF" FontSize="11.5" VerticalAlignment="Center"/>
+              <Border Grid.Row="7" Grid.Column="1" x:Name="ResultStatusBorder" Background="#372914" BorderBrush="#8C6C35" BorderThickness="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="10,6">
                 <TextBlock x:Name="ResultStatusText" Text="REVIEW" FontWeight="ExtraBold" FontSize="28" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Border>
             </Grid>

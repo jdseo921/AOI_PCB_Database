@@ -93,6 +93,11 @@ public record BatchTestResultRecord(
     string LotId,
     string BoardModel,
     string Notes,
+    double ImageLoadMilliseconds,
+    double PreprocessingMilliseconds,
+    double InferenceMilliseconds,
+    double OverlayRenderingMilliseconds,
+    double TotalInspectionMilliseconds,
     DateTime CreatedAtUtc);
 
 public sealed class LogFilter
@@ -111,6 +116,8 @@ public record InspectionHistoryRecord(
     string OperatorId,
     string InspectionEngine,
     string ModelVersion,
+    string ModelFilePath,
+    double ConfidenceThreshold,
     string SampleImagePath,
     string GoldenImagePath,
     string Verdict,
@@ -121,7 +128,12 @@ public record InspectionHistoryRecord(
     double HotspotX,
     double HotspotY,
     double HotspotWidth,
-    double HotspotHeight);
+    double HotspotHeight,
+    double ImageLoadMilliseconds,
+    double PreprocessingMilliseconds,
+    double InferenceMilliseconds,
+    double OverlayRenderingMilliseconds,
+    double TotalInspectionMilliseconds);
 
 public record ReviewEventRecord(
     long Id,

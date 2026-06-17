@@ -12,6 +12,10 @@
         <DataTrigger Binding="{Binding PassFail}" Value="N/A">
           <Setter Property="Background" Value="#252417"/>
         </DataTrigger>
+        <DataTrigger Binding="{Binding IsOverOneSecond}" Value="True">
+          <Setter Property="Background" Value="#372914"/>
+          <Setter Property="Foreground" Value="#FFE1A3"/>
+        </DataTrigger>
       </Style.Triggers>
     </Style>
     <Style x:Key="ResultStatusChipBorder" TargetType="Border" BasedOn="{StaticResource Chip}">
@@ -130,6 +134,12 @@
         <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Verified NG" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="VerifiedNgText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
         <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Unknown / Unlabeled" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="UnknownText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
       </UniformGrid>
+      <UniformGrid Columns="4" Margin="0,6,0,0">
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Avg Time / Image" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="AverageTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Max Time" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="MaxTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Min Time" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="MinTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Over 1 Second" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="OverOneSecondText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+      </UniformGrid>
     </StackPanel>
 
     <Border Grid.Row="4" Style="{StaticResource Panel}">
@@ -147,6 +157,7 @@
             <DataGridTextColumn Header="Ground Truth" Binding="{Binding GroundTruth}" Width="110"/>
             <DataGridTextColumn Header="AI/Engine Result" Binding="{Binding EngineResult}" Width="120"/>
             <DataGridTextColumn Header="Score" Binding="{Binding ScoreDisplay}" Width="70"/>
+            <DataGridTextColumn Header="Time" Binding="{Binding TotalTimeDisplay}" Width="80"/>
             <DataGridTemplateColumn Header="Pass/Fail" Width="90">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>

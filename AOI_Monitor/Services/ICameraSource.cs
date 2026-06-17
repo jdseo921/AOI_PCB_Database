@@ -20,12 +20,6 @@ public interface ITriggerSynchronizer
     void Disarm();
 }
 
-public interface ILightingController
-{
-    bool IsAvailable { get; }
-    void SetProgram(string viewType, string programName);
-}
-
 public interface ICameraStatusDiagnostics
 {
     CameraSourceStatus GetStatus();

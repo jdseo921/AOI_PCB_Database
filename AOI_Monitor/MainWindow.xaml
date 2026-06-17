@@ -150,7 +150,7 @@
       <!-- â•â• ROW 2: Status strip â•â• -->
       <Grid Grid.Row="2" Background="#1B2024" MinHeight="106">
         <Border BorderBrush="#3C444B" BorderThickness="0,0,0,1">
-          <UniformGrid Columns="3" Rows="2">
+          <UniformGrid Columns="4" Rows="2">
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
               <StackPanel>
                 <TextBlock Text="Database" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
@@ -177,14 +177,26 @@
             </Border>
             <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
               <StackPanel>
+                <TextBlock Text="Lighting" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+                <TextBlock x:Name="LightingStatusText" Text="Not Connected" Foreground="#F27777" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+            <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
+              <StackPanel>
                 <TextBlock Text="Robot" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
                 <TextBlock x:Name="RobotStatusText" Text="Not Connected" Foreground="#F27777" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
+            <Border BorderBrush="#3B434A" BorderThickness="0,0,1,0" Padding="10,6">
+              <StackPanel>
+                <TextBlock Text="MES / Traceability" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+                <TextBlock x:Name="MesStatusText" Text="Not Connected" Foreground="#F27777" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
             <Border Padding="10,6">
               <StackPanel>
-                <TextBlock Text="MES / ERP" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
-                <TextBlock x:Name="MesStatusText" Text="Not Connected" Foreground="#F27777" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
+                <TextBlock Text="E-Stop Monitor" Foreground="#8B969E" FontSize="10.5" Margin="0,0,0,3"/>
+                <TextBlock x:Name="EmergencyStopStatusText" Text="Not Connected" Foreground="#F27777" FontWeight="Bold" FontSize="13" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
           </UniformGrid>
@@ -337,29 +349,29 @@
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
               <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
                 <TextBlock Text="Station " Foreground="#8D99A1" FontSize="11.5"/>
-                <TextBlock Text="AOI-LIB-01" FontWeight="Bold" Foreground="#D4DDE3" FontSize="11.5"/>
+                <TextBlock x:Name="FooterStationText" Text="AOI-LIB-01" FontWeight="Bold" Foreground="#D4DDE3" FontSize="11.5"/>
               </StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
                 <TextBlock Text="Index " Foreground="#8D99A1" FontSize="11.5"/>
-                <TextBlock Text="READY" FontWeight="Bold" Foreground="#50F56E" FontSize="11.5"/>
+                <TextBlock x:Name="FooterIndexText" Text="SQLite" FontWeight="Bold" Foreground="#50F56E" FontSize="11.5"/>
               </StackPanel>
               <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Last Backup " Foreground="#8D99A1" FontSize="11.5"/>
-                <TextBlock Text="08:30" FontWeight="Bold" Foreground="#D4DDE3" FontSize="11.5"/>
+                <TextBlock Text="DB Updated " Foreground="#8D99A1" FontSize="11.5"/>
+                <TextBlock x:Name="FooterDbUpdatedText" Text="--" FontWeight="Bold" Foreground="#D4DDE3" FontSize="11.5"/>
               </StackPanel>
             </StackPanel>
             <StackPanel Orientation="Horizontal">
               <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
                 <TextBlock Text="REC " Foreground="#8D99A1" FontSize="11.5"/>
-                <TextBlock Text="23,932" FontWeight="Bold" Foreground="#D4DDE3" FontSize="11.5"/>
+                <TextBlock x:Name="FooterRecordCountText" Text="0" FontWeight="Bold" Foreground="#D4DDE3" FontSize="11.5"/>
               </StackPanel>
               <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
                 <TextBlock Text="IMG LINK " Foreground="#8D99A1" FontSize="11.5"/>
-                <TextBlock Text="23,711" FontWeight="Bold" Foreground="#D4DDE3" FontSize="11.5"/>
+                <TextBlock x:Name="FooterImageLinkText" Text="0/0" FontWeight="Bold" Foreground="#D4DDE3" FontSize="11.5"/>
               </StackPanel>
               <StackPanel Orientation="Horizontal">
                 <TextBlock Text="DB REV " Foreground="#8D99A1" FontSize="11.5"/>
-                <TextBlock Text="2026.01.28.1840" FontWeight="Bold" Foreground="#D4DDE3" FontSize="11.5"/>
+                <TextBlock x:Name="FooterDbRevText" Text="local" FontWeight="Bold" Foreground="#D4DDE3" FontSize="11.5"/>
               </StackPanel>
             </StackPanel>
           </DockPanel>

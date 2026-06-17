@@ -2,6 +2,7 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AOI_Monitor.Data;
 using AOI_Monitor.Models;
@@ -292,6 +293,10 @@ public partial class LibraryView : UserControl
         var records = images.Select(ToLibraryRecord).ToArray();
 
         RecordsGrid.ItemsSource = records.Length > 0 ? records : DemoRecords;
+        RecordsSourceText.Text = records.Length > 0 ? "SQLite Records" : "Demo Data";
+        RecordsSourceText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(records.Length > 0 ? "#C6FFD0" : "#FFE0A7"));
+        RecordsSourceChip.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(records.Length > 0 ? "#14311D" : "#372914"));
+        RecordsSourceChip.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(records.Length > 0 ? "#377849" : "#8C6C35"));
 
         if (selectedImageId is not null)
             RecordsGrid.SelectedItem = records.FirstOrDefault(r => r.ImageLink == selectedImageId.Value.ToString());

@@ -1,12 +1,20 @@
 # AOI Monitor
 
-AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspection review workflows. It gives operators a simplified local console organized around Main Inspection, Recipe Editor, AI Model Test, Log & Export, a planned 3D Profile Viewer, and Settings / Guide.
+AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspection review workflows. It gives operators a simplified local console organized around Main Inspection, Recipe Editor, AI Model Test, Log & Export, a 3D Profile Viewer in Sample Data Mode, and Settings / Guide.
 
-The application currently demonstrates the review loop with local files and static prototype data. It can load a sample PCB image and a golden reference image, run a deterministic pixel-difference comparison, produce an `OK`, `REVIEW`, or `NG` verdict, record disposition actions, collect candidate samples for future training review, and write local export artifacts. It is not yet connected to live AOI hardware, cameras, PLCs, robots, conveyors, a production database, or a trained ML inference pipeline.
+The application currently demonstrates the review loop with local files, local SQLite records, and clearly labeled demo placeholders where production data sources are not yet implemented. It can load a sample PCB image and a golden reference image, run a deterministic pixel-difference comparison, produce an `OK`, `REVIEW`, or `NG` verdict, record disposition actions, collect candidate samples for future training review, and write local export artifacts. It is not yet connected to live AOI hardware, cameras, PLCs, robots, conveyors, a centralized production database, or a trained ML inference pipeline.
 
-The main window includes an explicit readiness panel for Database, Image Vault, Inspection Engine, Camera, Robot, and MES/ERP. Camera, lighting, 3D profile workflows, robot/handler integration, MES/ERP integration, and real ML model training are marked as planned Stage 2/3/4 work unless a future implementation backs them.
+The main window includes an explicit readiness panel for Database, Image Vault, Inspection Engine, Camera, Robot, and MES/ERP. Camera hardware, lighting, live 3D profile acquisition, robot/handler integration, MES/ERP integration, and real ML model training are marked as planned Stage 2/3/4 work unless a future implementation backs them.
 
 For the detailed feature inventory, see [IMPLEMENTED_FEATURES.md](IMPLEMENTED_FEATURES.md).
+
+Client/evaluator documents:
+
+- [Installation Guide](Docs/Installation_Guide.md)
+- [User Manual](Docs/User_Manual.md)
+- [Stage Mapping](Docs/Stage_Mapping.md)
+- [Integration Boundaries](Docs/Integration_Boundaries.md)
+- [Stage 1 Acceptance Checklist](Docs/Stage1_Acceptance_Checklist.md)
 
 ## Project Layout
 
@@ -16,7 +24,7 @@ For the detailed feature inventory, see [IMPLEMENTED_FEATURES.md](IMPLEMENTED_FE
 - `AOI_Monitor/Services/` - shared workflow state, image analysis, and machine-interface exports.
 - `AOI_Monitor/Models/` - AOI workflow and export contract models.
 - `AOI_Monitor/Data/` - local SQLite initialization and image-vault persistence.
-- `Docs/` - acceptance checklists and implementation notes.
+- `Docs/` - installation guide, user manual, stage mapping, acceptance checklists, and implementation notes.
 - `SampleData/` - instructions for placing small local demo images.
 - `AOI_Monitor/bin/` and `AOI_Monitor/obj/` - local build outputs.
 
@@ -67,8 +75,10 @@ The repository includes `AOI_Monitor.Tests/` for non-UI logic. The tests use tem
 From the repository root:
 
 ```powershell
-dotnet test
+dotnet test AOI_PCB_Database.slnx
 ```
+
+The test fixture configures `AoiDatabase` with an isolated temp folder per test run, so tests do not write into the real `%LOCALAPPDATA%\AOI_Monitor` image vault or SQLite database.
 
 ## Basic Workflow
 
@@ -88,7 +98,7 @@ AOI_Monitor/bin/Debug/net10.0-windows/exports/
 
 ## Stage 1 Demo Workflow
 
-Use [Docs/Stage1_Acceptance_Checklist.md](Docs/Stage1_Acceptance_Checklist.md) as the formal verification script. Use [SampleData/README.md](SampleData/README.md) to prepare small, non-confidential demo images.
+Use [Docs/Stage1_Acceptance_Checklist.md](Docs/Stage1_Acceptance_Checklist.md) as the formal verification script. Use [Docs/User_Manual.md](Docs/User_Manual.md) for operating steps, [Docs/Installation_Guide.md](Docs/Installation_Guide.md) for setup, and [SampleData/README.md](SampleData/README.md) to prepare small, non-confidential demo images.
 
 Short walkthrough:
 
@@ -137,9 +147,9 @@ The database is initialized with tables for images, inspection results, defects,
 - If images do not compare, make sure both the sample image and golden reference image are readable local image files.
 - If exports are missing, check the `exports/` folder under the executable directory, not necessarily the repository root.
 - If recipe or detection-priority controls seem locked, use the recipe lock/unlock action in the application shell or Log & Export page.
-- If generated reports look sparse, remember that station metrics and several dashboard records are static prototype data.
-- The 3D Profile Viewer is intentionally marked as planned; no 3D height-map workflow is implemented yet.
+- If generated reports look sparse, confirm images, inspections, and review events have been imported or saved into the local SQLite database. Remaining placeholder panels are labeled `Demo Data` or `Prototype Data`.
+- The 3D Profile Viewer supports Sample Data Mode only. Live 3D camera integration is planned Stage 2 work.
 
 ## Current State
 
-This is a functional local prototype focused on operator review flows and file-based evidence export. The main production gaps are live database integration, real machine/hardware integration, persistent workflow storage, and a production-grade inspection model.
+This is a functional local prototype focused on operator review flows, local SQLite-backed evidence, and file-based exports. The main production gaps are centralized production database integration, real machine/hardware integration, expanded persistent workflow storage, and a production-grade inspection model.

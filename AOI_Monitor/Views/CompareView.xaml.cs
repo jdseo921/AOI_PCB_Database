@@ -59,6 +59,18 @@ public partial class CompareView : UserControl
                 new { Region = "Evidence 2", Defect = topEvidence.Length > 1 ? topEvidence[1] : "-", Golden = "", Judgement = judgement },
                 new { Region = "Evidence 3", Defect = topEvidence.Length > 2 ? topEvidence[2] : "-", Golden = "", Judgement = judgement },
             };
+
+            FindingsSourceText.Text = "Analysis Result";
+            FindingsSourceText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#C6FFD0"));
+            FindingsSourceChip.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#14311D"));
+            FindingsSourceChip.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#377849"));
+        }
+        else
+        {
+            FindingsSourceText.Text = "Demo Data";
+            FindingsSourceText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFE0A7"));
+            FindingsSourceChip.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#372914"));
+            FindingsSourceChip.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8C6C35"));
         }
     }
 

@@ -97,13 +97,22 @@ This checklist is for the current local WPF prototype. It separates features tha
 - [ ] Export CSV and annotated images if needed.
 - [ ] Open `Log & Export` and create a `Customer Package` using filtered logs.
 
+### 3D Profile Sample Data
+
+- [ ] Open `3D Profile Viewer`.
+- [ ] Confirm the page clearly shows `Sample Data Mode` and `3D Camera Not Connected`.
+- [ ] Load a CSV with columns `x,y,height`.
+- [ ] Confirm the 2D height map, height legend, min/max height, selected point height, and slice/profile line update.
+- [ ] Accept or reject a selected sample-data defect.
+- [ ] Confirm the action is recorded in review/disposition events.
+
 ## Planned Stage 2 / 3 / 4 Checks
 
 These are not implemented in Stage 1 and should remain clearly labeled as planned or not connected:
 
 - [ ] Camera integration is marked `Simulated / Not Connected`.
 - [ ] Lighting control is marked planned Stage 2.
-- [ ] 3D Profile Viewer is disabled/planned Stage 2.
+- [ ] Live 3D camera profile inspection is marked planned Stage 2. The current 3D Profile Viewer is sample CSV mode only.
 - [ ] Robot/handler integration is marked `Not Connected` / planned Stage 3.
 - [ ] MES / ERP integration is marked `Not Connected` / planned Stage 4.
 - [ ] Training Set Export is local file preparation only; no model training, fine-tuning, or deployment is run.

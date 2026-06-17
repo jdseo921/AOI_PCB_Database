@@ -84,6 +84,24 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
+    public void TryImportImageCopiesImageIntoConfiguredVault()
+    {
+        AoiDatabase.Initialize();
+        var source = WriteTinyPng("vault-copy.png");
+
+        var result = AoiDatabase.TryImportImage(source, "TBOX", "LOT-1", "top");
+
+        Assert.True(result.Imported);
+        Assert.NotNull(result.Image);
+        Assert.True(File.Exists(source));
+        Assert.True(File.Exists(result.Image.VaultPath));
+        Assert.NotEqual(Path.GetFullPath(source), Path.GetFullPath(result.Image.VaultPath));
+        Assert.StartsWith(Path.GetFullPath(AoiDatabase.ImageVaultPath), Path.GetFullPath(result.Image.VaultPath), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(File.ReadAllBytes(source), File.ReadAllBytes(result.Image.VaultPath));
+        Assert.Equal(source, result.Image.OriginalPath);
+    }
+
+    [Fact]
     public void RecordInspectionResultPersistsHistory()
     {
         AoiDatabase.Initialize();
@@ -127,6 +145,73 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal("NG", history[0].Verdict);
         Assert.Equal("Unit Test Engine", history[0].InspectionEngine);
         Assert.Equal(18.5, history[0].DifferenceScore, precision: 3);
+    }
+
+    [Fact]
+    public void RecordInspectionResultPersistsDefectRows()
+    {
+        AoiDatabase.Initialize();
+        var result = new AnalysisResult
+        {
+            SamplePath = @"C:\temp\sample.png",
+            GoldenPath = @"C:\temp\golden.png",
+            BoardProgram = "TBOX-MAIN",
+            OperatorId = "Engineer01 [Engineer]",
+            InspectionEngine = "Unit Test Engine",
+            DifferenceScore = 18.5,
+            MeanBrightness = 112.25,
+            Verdict = "NG",
+            Confidence = 0.91,
+            SuggestedDefect = "Bridge",
+            PolicyName = "Balanced",
+            ModelVersion = "TEST-1",
+            DecisionReason = "Synthetic test result",
+            Hotspot = new Rect(0.1, 0.2, 0.3, 0.4),
+            Defects =
+            {
+                new DefectResult
+                {
+                    DefectType = "Bridge",
+                    Confidence = 0.88,
+                    BoundingBox = new Rect(0.1, 0.2, 0.3, 0.4),
+                    XPosition = 12,
+                    YPosition = 34,
+                    SideOrViewType = "top",
+                    RoiId = "R1",
+                    JudgmentStatus = "NG",
+                },
+            },
+        };
+
+        AoiDatabase.RecordInspectionResult(result);
+
+        using var connection = new SqliteConnection($"Data Source={AoiDatabase.DatabasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT d.DefectType, d.Confidence, d.RoiX, d.RoiY, d.RoiWidth, d.RoiHeight,
+                   d.XPosition, d.YPosition, d.SideOrViewType, d.RoiId, d.JudgmentStatus,
+                   r.Verdict
+            FROM Defects d
+            INNER JOIN InspectionResults r ON r.Id = d.InspectionResultId;
+            """;
+
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal("Bridge", reader.GetString(0));
+        Assert.Equal(0.88, reader.GetDouble(1), precision: 3);
+        Assert.Equal(0.1, reader.GetDouble(2), precision: 3);
+        Assert.Equal(0.2, reader.GetDouble(3), precision: 3);
+        Assert.Equal(0.3, reader.GetDouble(4), precision: 3);
+        Assert.Equal(0.4, reader.GetDouble(5), precision: 3);
+        Assert.Equal(12, reader.GetDouble(6), precision: 3);
+        Assert.Equal(34, reader.GetDouble(7), precision: 3);
+        Assert.Equal("top", reader.GetString(8));
+        Assert.Equal("R1", reader.GetString(9));
+        Assert.Equal("NG", reader.GetString(10));
+        Assert.Equal("NG", reader.GetString(11));
+        Assert.False(reader.Read());
     }
 
     [Fact]
@@ -369,6 +454,54 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal("Unit Test Engine", persistedRows[0].InspectionEngine);
         Assert.Equal("TEST-1", persistedRows[0].ModelVersion);
         Assert.Equal("Synthetic note", persistedRows[0].Notes);
+    }
+
+    [Fact]
+    public void FolderCameraSourceReturnsFramesInSortedOrderAndCyclesByView()
+    {
+        var topFolder = Path.Combine(_root, "camera", "top");
+        var sideFolder = Path.Combine(_root, "camera", "side");
+        Directory.CreateDirectory(topFolder);
+        Directory.CreateDirectory(sideFolder);
+        File.WriteAllBytes(Path.Combine(topFolder, "002_top.png"), TinyPngBytes());
+        File.WriteAllBytes(Path.Combine(topFolder, "001_top.png"), TinyPngBytes());
+        File.WriteAllBytes(Path.Combine(sideFolder, "001_side.png"), TinyPngBytes());
+
+        var source = new FolderCameraSource(
+            new Dictionary<CameraViewType, string>
+            {
+                [CameraViewType.Top] = topFolder,
+                [CameraViewType.Side] = sideFolder,
+            },
+            "BOARD-X",
+            "LOT-42");
+
+        Assert.Equal(CameraSourceStatus.Simulated, source.ConnectionStatus);
+        source.StartAcquisition();
+
+        source.SelectedView = CameraViewType.Top;
+        var firstTop = source.GetNextFrame();
+        var secondTop = source.GetNextFrame();
+        var cycledTop = source.GetNextFrame();
+
+        source.SelectedView = CameraViewType.Side;
+        var firstSide = source.GetNextFrame();
+
+        Assert.NotNull(firstTop);
+        Assert.NotNull(secondTop);
+        Assert.NotNull(cycledTop);
+        Assert.NotNull(firstSide);
+        Assert.EndsWith("001_top.png", firstTop.SourcePath);
+        Assert.EndsWith("002_top.png", secondTop.SourcePath);
+        Assert.Equal(firstTop.SourcePath, cycledTop.SourcePath);
+        Assert.EndsWith("001_side.png", firstSide.SourcePath);
+        Assert.Equal(CameraViewType.Top, firstTop.ViewType);
+        Assert.Equal(CameraViewType.Side, firstSide.ViewType);
+        Assert.Equal("BOARD-X", firstTop.BoardModel);
+        Assert.Equal("LOT-42", firstTop.LotId);
+
+        source.StopAcquisition();
+        Assert.Null(source.GetNextFrame());
     }
 
     private IReadOnlySet<string> ReadTableNames()

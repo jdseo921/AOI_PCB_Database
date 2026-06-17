@@ -48,7 +48,12 @@
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-            <TextBlock Text="SPC Preview" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            <DockPanel>
+              <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
+                <TextBlock Text="Prototype Trend" Foreground="#FFE0A7" FontWeight="Bold" FontSize="9.5"/>
+              </Border>
+              <TextBlock Text="SPC / SQLite Summary" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            </DockPanel>
           </Border>
           <StackPanel Grid.Row="1" Margin="8">
             <c:LineChart/>
@@ -59,12 +64,12 @@
             </StackPanel>
             <!-- Stats grid -->
             <UniformGrid Columns="3" Margin="0,10,0,0" Rows="2">
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,6"><StackPanel><TextBlock Text="First Pass Yield"     Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="94.8%" FontWeight="Bold" FontSize="13"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,6"><StackPanel><TextBlock Text="False Call Ratio"     Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="2.7%"  FontWeight="Bold" FontSize="13"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="Escape-Risk Rate"     Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="0.42%" FontWeight="Bold" Foreground="#F13B3F" FontSize="13"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Annotation Coverage"  Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="91.6%" FontWeight="Bold" FontSize="13"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Broken Image Links"   Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="17"    FontWeight="Bold" Foreground="#F13B3F" FontSize="13"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0"><StackPanel><TextBlock Text="Missing RefDes"        Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock Text="84"    FontWeight="Bold" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,6"><StackPanel><TextBlock Text="SQLite Inspections" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock x:Name="InspectionCountText" Text="0" FontWeight="Bold" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,6"><StackPanel><TextBlock Text="OK / NG / REVIEW" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock x:Name="VerdictBreakdownText" Text="0 / 0 / 0" FontWeight="Bold" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="SQLite Yield" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock x:Name="YieldText" Text="--" FontWeight="Bold" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Review Events" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock x:Name="ReviewEventCountText" Text="0" FontWeight="Bold" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Imported Images" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock x:Name="ImportedImageCountText" Text="0" FontWeight="Bold" FontSize="13"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0"><StackPanel><TextBlock Text="Broken Vault Links" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,2"/><TextBlock x:Name="BrokenImageLinksText" Text="0" FontWeight="Bold" FontSize="13"/></StackPanel></Border>
             </UniformGrid>
           </StackPanel>
         </Grid>
@@ -98,7 +103,7 @@
 
     <!-- Bottom alarm -->
     <Border Background="#14080A" BorderBrush="#4B2325" BorderThickness="1" Padding="7,10">
-      <TextBlock Text="Database warning: 36 unresolved AI/GT conflicts require disposition before customer export."
+      <TextBlock x:Name="DatabaseWarningText" Text="SQLite summary loaded from local PoC database."
                  Foreground="#F27777" FontWeight="ExtraBold" TextAlignment="Center" FontSize="12"/>
     </Border>
   </StackPanel>

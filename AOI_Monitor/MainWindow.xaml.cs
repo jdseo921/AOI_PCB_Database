@@ -2,6 +2,7 @@
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Globalization;
 using System.IO;
 using System.Diagnostics;
 using AOI_Monitor.Data;
@@ -46,10 +47,12 @@ public partial class MainWindow : Window
             CameraSourceSettingsService.ApplyActiveSource();
             WorkflowState.Instance.AddEvent("STORAGE", $"SQLite ready: {AoiDatabase.DatabasePath}");
             UpdateReadinessPanel(databaseConnected: File.Exists(AoiDatabase.DatabasePath), vaultAvailable: Directory.Exists(AoiDatabase.ImageVaultPath));
+            UpdateFooterStatus();
         }
         catch (Exception ex)
         {
             UpdateReadinessPanel(databaseConnected: false, vaultAvailable: false);
+            UpdateFooterStatus();
             MessageBox.Show($"Local database initialization failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
@@ -166,6 +169,7 @@ public partial class MainWindow : Window
             spc.RefreshFromState();
         }
 
+        UpdateFooterStatus();
         MessageBox.Show("View refreshed.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -232,6 +236,7 @@ public partial class MainWindow : Window
             _vm.RefreshRolePermissions(WorkflowState.Instance.CurrentRole);
             RefreshRoleUi();
             UpdateWorkflowPanel();
+            UpdateFooterStatus();
         });
     }
 
@@ -317,6 +322,7 @@ public partial class MainWindow : Window
     private void UpdateWorkflowPanel()
     {
         var state = WorkflowState.Instance;
+        FooterStationText.Text = state.StationId;
 
         WorkflowSampleText.Text = string.IsNullOrWhiteSpace(state.SampleImagePath)
             ? "none"
@@ -359,6 +365,45 @@ public partial class MainWindow : Window
         }
     }
 
+    private void UpdateFooterStatus()
+    {
+        FooterStationText.Text = WorkflowState.Instance.StationId;
+
+        try
+        {
+            var inspections = AoiDatabase.GetInspectionHistory(new Models.LogFilter());
+            var images = AoiDatabase.GetImportedImages();
+            var linkedImages = images.Count(image => File.Exists(image.VaultPath));
+            var brokenLinks = images.Count - linkedImages;
+
+            FooterRecordCountText.Text = inspections.Count.ToString("N0", CultureInfo.InvariantCulture);
+            FooterImageLinkText.Text = $"{linkedImages:N0}/{images.Count:N0}";
+            FooterIndexText.Text = brokenLinks == 0 ? "Images OK" : $"{brokenLinks:N0} Missing";
+            FooterIndexText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(brokenLinks == 0 ? "#50F56E" : "#F27777"));
+
+            if (File.Exists(AoiDatabase.DatabasePath))
+            {
+                var dbWriteTime = File.GetLastWriteTime(AoiDatabase.DatabasePath);
+                FooterDbUpdatedText.Text = dbWriteTime.ToString("MM-dd HH:mm", CultureInfo.InvariantCulture);
+                FooterDbRevText.Text = "SQLite";
+            }
+            else
+            {
+                FooterDbUpdatedText.Text = "--";
+                FooterDbRevText.Text = "missing";
+            }
+        }
+        catch
+        {
+            FooterRecordCountText.Text = "--";
+            FooterImageLinkText.Text = "--";
+            FooterIndexText.Text = "Unavailable";
+            FooterIndexText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F27777"));
+            FooterDbUpdatedText.Text = "--";
+            FooterDbRevText.Text = "local";
+        }
+    }
+
     private void UpdateReadinessPanel(bool databaseConnected, bool vaultAvailable)
     {
         DatabaseStatusText.Text = databaseConnected ? "Connected" : "Not Connected";
@@ -371,11 +416,7 @@ public partial class MainWindow : Window
 
         UpdateCameraStatus();
 
-        RobotStatusText.Text = "Not Connected";
-        RobotStatusText.Foreground = StatusBrush(false);
-
-        MesStatusText.Text = "Stage 4 Planned";
-        MesStatusText.Foreground = StatusBrush(false);
+        UpdateIntegrationBoundaryStatus();
     }
 
     private static Brush StatusBrush(bool ok)
@@ -411,4 +452,59 @@ public partial class MainWindow : Window
             _ => "#F27777",
         }));
     }
+
+    private void UpdateIntegrationBoundaryStatus()
+    {
+        SetIntegrationStatus(LightingStatusText, IntegrationBoundaryRegistry.LightingController);
+        SetIntegrationStatus(RobotStatusText, IntegrationBoundaryRegistry.RobotController);
+        SetIntegrationStatus(
+            MesStatusText,
+            "MES / Traceability Boundary",
+            CombineStatuses(
+                IntegrationBoundaryRegistry.MesClient.Status,
+                IntegrationBoundaryRegistry.TraceabilityUploader.Status),
+            $"{IntegrationBoundaryRegistry.MesClient.StatusMessage} {IntegrationBoundaryRegistry.TraceabilityUploader.StatusMessage}");
+        SetIntegrationStatus(EmergencyStopStatusText, IntegrationBoundaryRegistry.EmergencyStopMonitor);
+    }
+
+    private static void SetIntegrationStatus(TextBlock target, IIntegrationEndpoint endpoint)
+        => SetIntegrationStatus(target, endpoint.Name, endpoint.Status, endpoint.StatusMessage);
+
+    private static void SetIntegrationStatus(
+        TextBlock target,
+        string name,
+        IntegrationConnectionStatus status,
+        string statusMessage)
+    {
+        target.Text = ToStatusDisplay(status);
+        target.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
+        {
+            IntegrationConnectionStatus.Ready => "#50F56E",
+            IntegrationConnectionStatus.Simulated => "#E1A334",
+            IntegrationConnectionStatus.Error => "#F27777",
+            _ => "#F27777",
+        }));
+        target.ToolTip = $"{name}: {statusMessage}";
+    }
+
+    private static IntegrationConnectionStatus CombineStatuses(
+        IntegrationConnectionStatus first,
+        IntegrationConnectionStatus second)
+    {
+        if (first == IntegrationConnectionStatus.Error || second == IntegrationConnectionStatus.Error)
+            return IntegrationConnectionStatus.Error;
+        if (first == IntegrationConnectionStatus.Ready && second == IntegrationConnectionStatus.Ready)
+            return IntegrationConnectionStatus.Ready;
+        if (first == IntegrationConnectionStatus.Simulated || second == IntegrationConnectionStatus.Simulated)
+            return IntegrationConnectionStatus.Simulated;
+        return IntegrationConnectionStatus.NotConnected;
+    }
+
+    private static string ToStatusDisplay(IntegrationConnectionStatus status) => status switch
+    {
+        IntegrationConnectionStatus.Ready => "Ready",
+        IntegrationConnectionStatus.Simulated => "Simulated",
+        IntegrationConnectionStatus.Error => "Error",
+        _ => "Not Connected",
+    };
 }

@@ -50,7 +50,12 @@
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Database Filter Console" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <DockPanel>
+            <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
+              <TextBlock Text="Prototype Filters" Foreground="#FFE0A7" FontWeight="Bold" FontSize="9.5"/>
+            </Border>
+            <TextBlock Text="Database Filter Console" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          </DockPanel>
         </Border>
         <StackPanel Grid.Row="1" Margin="8">
           <Grid>
@@ -114,7 +119,12 @@
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Inspection Records" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <DockPanel>
+            <Border DockPanel.Dock="Right" x:Name="RecordsSourceChip" Style="{StaticResource Chip}" Padding="6,1">
+              <TextBlock x:Name="RecordsSourceText" Text="SQLite Records" Foreground="#DCE5EB" FontWeight="Bold" FontSize="9.5"/>
+            </Border>
+            <TextBlock Text="Inspection Records" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          </DockPanel>
         </Border>
         <DataGrid Grid.Row="1" x:Name="RecordsGrid" SelectionChanged="OnRecordsSelectionChanged">
           <DataGrid.Columns>
@@ -146,7 +156,12 @@
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Database Transparency" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <DockPanel>
+            <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
+              <TextBlock Text="Static Schema Reference" Foreground="#FFE0A7" FontWeight="Bold" FontSize="9.5"/>
+            </Border>
+            <TextBlock Text="Database Transparency" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          </DockPanel>
         </Border>
         <DataGrid Grid.Row="1" x:Name="SchemaGrid" MaxHeight="120">
           <DataGrid.Columns>

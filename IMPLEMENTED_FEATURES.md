@@ -6,7 +6,7 @@ AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspec
 
 The application is framed around PCBA production and quality workflows for a board program named `TBOX-MAIN`, station `AOI-LIB-01`, and model version `AOI_AI_0.8.1`. It uses defect concepts such as solder bridge, insufficient solder, polarity error, tombstone, pin-height error, false call, possible escape, verified NG, reference designator, FOV, ROI crop, AI result, ground truth, and review disposition.
 
-This document describes the features currently implemented in the codebase. Static dashboard rows and prototype tables are documented as static prototype data, not as live factory or database integrations.
+This document describes the features currently implemented in the codebase. SQLite-backed screens are identified as local PoC persistence, and remaining placeholder/demo rows are labeled as demo or prototype data rather than live factory records.
 
 ## Application Shell
 
@@ -19,7 +19,7 @@ The main window provides a factory-style navigation shell with six top-level mod
 - 3D Profile Viewer
 - Settings / Guide
 
-Main Inspection contains contextual access to the former Station Monitor, Disposition, Golden Compare, and Image Library workflows. Log & Export contains the former Reports functionality and links to database health. Settings / Guide contains the operator guide, settings, and installation/prototype notes. The 3D Profile Viewer is displayed as a disabled planned Stage 2 module. Camera and lighting integration are planned Stage 2, robot/handler integration is planned Stage 3, and MES/ERP integration is planned Stage 4.
+Main Inspection is the primary operator workflow and contains contextual access to supporting Disposition, Golden Compare, and Image Library screens. Log & Export contains the former Reports functionality and links to database health. Settings / Guide contains the operator guide, settings, and installation/prototype notes. The 3D Profile Viewer supports CSV sample-data mode only. Live camera, lighting, and live 3D hardware integration are planned Stage 2, robot/handler integration is planned Stage 3, and MES/ERP integration is planned Stage 4.
 
 The shell keeps a shared workflow summary visible while pages change. It shows the active detection policy, loaded sample image, loaded golden reference image, latest comparison score, and latest verdict. Page instances are cached after first creation, and page transitions use a short fade/slide animation.
 
@@ -108,9 +108,9 @@ Disposition events are appended to:
 
 ### Main Inspection
 
-The Main Inspection module opens on the former Station Monitor dashboard and provides shortcuts to Disposition, Golden Compare, and Image Library. The dashboard renders static FOV/review cells, not live camera connections. Each cell displays sample count, review count, waiting count, yield gauge, detected percentage, false count, and status styling.
+The Main Inspection module is the primary operator screen. It provides a large image/live-feed display area, Top/Side/Bottom view selector, defect overlay layer, defect table, Start/Stop/Next Board/Save Result controls, auto-save option, event log, station and lot context, engine/model display, and a large OK/NG/REVIEW result indicator.
 
-This page is currently a dashboard mockup backed by static station records. It does not poll hardware or a live AOI service.
+It uses imported images or folder-simulated camera frames. It does not poll real camera hardware or a live AOI service.
 
 ### Disposition
 
@@ -118,7 +118,7 @@ The Disposition page supports human review of suspected PCBA defects and inspect
 
 Implemented features:
 
-- Static review queue containing possible escapes, verified NG items, and false calls.
+- Demo-labeled review queue containing possible escapes, verified NG items, and false calls.
 - AI overlay visibility toggle.
 - Zoom toggle for the review canvas.
 - Navigation to the Golden Compare page.
@@ -159,17 +159,19 @@ Implemented features:
 - Toggles AI/defect overlay opacity.
 - Toggles golden/ground-truth overlay opacity.
 - Exports a PNG snapshot of the comparison page.
+- Labels the built-in PCB illustration as a demo board while filenames, score, verdict, and findings update from the loaded workflow images and latest analysis result.
 
 Comparison snapshot export uses a save dialog and renders the current WPF view to PNG.
 
 ### Image Library
 
-The Image Library page provides a prototype browser for defect records and schema rows.
+The Image Library page provides a browser for imported SQLite image records with a clearly labeled demo fallback and static schema reference.
 
 Implemented features:
 
-- Static defect records with sample ID, board, RefDes, defect type, severity, AI result, ground truth, risk, image link, and update time.
-- Static schema table for `samples`, `annotations`, `ai_results`, `review_events`, and `image_index`.
+- Imported image records loaded from the local SQLite image table.
+- Demo records are shown only when no imported image records exist and are labeled `Demo Data`.
+- Static schema reference rows for `samples`, `annotations`, `ai_results`, `review_events`, and `image_index` are labeled as a schema reference rather than production data.
 - Open Record action for selecting a sample PCB image from disk.
 - Image preview window for selected sample and golden images.
 - Compare Golden action for selecting a golden reference image.
@@ -219,7 +221,7 @@ Implemented log behavior:
 - Records exports in `ExportHistory`.
 - Includes copy-only archive indexing for older log rows in `LogArchive`; source records remain queryable.
 
-Database health remains available as a secondary screen from Log & Export. It displays SQLite table counts and local health indicators. Some dashboard/SPC values remain static prototype data.
+Database health remains available as a secondary screen from Log & Export. It displays SQLite table counts, local health indicators, and SQLite-backed inspection/review/image summary counts. The SPC trend chart remains prototype data and is labeled as such.
 
 Additional local utilities:
 
@@ -238,7 +240,9 @@ Exports are local filesystem artifacts generated under the application `exports`
 
 ### 3D Profile Viewer
 
-The 3D Profile Viewer is visible in the top-level navigation as a disabled planned Stage 2 module. It does not currently import height maps, render 3D surfaces, measure slices, or export profiles.
+The 3D Profile Viewer is available in Sample Data Mode. It can load a CSV height map with `x,y,height` columns, render a 2D color-coded height map, show min/max and selected-point height, draw a simple slice/profile line, and record accept/reject review events for selected sample-data defects.
+
+It clearly displays `Sample Data Mode`, `3D Camera Not Connected`, and the Stage 2 hardware requirement. It does not connect to a real 3D camera or claim live 3D profile inspection.
 
 ### Settings / Guide
 
@@ -279,7 +283,7 @@ Training Set Export prepares local candidate files only. No production training,
 
 ## Data Handling Summary
 
-The current implementation combines in-memory workflow state, static prototype records, user-selected image files copied into an app-data image vault, a local SQLite PoC database, and local filesystem exports.
+The current implementation combines in-memory workflow state, user-selected image files copied into an app-data image vault, a local SQLite PoC database, local filesystem exports, and clearly labeled demo/reference rows where a full production data source is not yet implemented.
 
 In-memory data:
 
@@ -288,7 +292,6 @@ In-memory data:
 - Detection priority and recipe lock
 - Training-set export status/counters
 - Workflow history
-- Static dashboard, library, recipe, SPC, installation, and guide rows
 
 User-selected file inputs:
 
@@ -327,11 +330,11 @@ The implemented application is a functional desktop prototype, but several produ
 Current boundaries:
 
 - SQLite is local-only PoC persistence, not a production database service.
-- Several UI tables and health rows are still static prototype data.
+- Remaining static UI examples are explicitly labeled as demo/prototype data, including the Review queue, similar-image examples, Golden Compare board illustration, Image Library demo fallback, schema reference rows, and SPC trend chart.
 - The image-analysis routine is pixel-difference based, not a production ML inference pipeline.
 - There is no direct camera, PLC, robot, conveyor, or AOI machine control.
 - Service hosting and hardware links are marked as planned/documentation only.
-- Defect records and station metrics are static sample data.
+- Main Inspection and Log & Export use local SQLite persistence for imported images, inspections, defects, review events, exports, and recipe revisions; the remaining demo panels are not presented as live factory records.
 - Some workflow state remains session-local, although key events, imports, analysis results, training-set candidates, and exports are persisted locally.
 - Training Set Export is local file preparation only; no model training pipeline is run.
 
@@ -342,7 +345,7 @@ Despite these boundaries, the code already implements the core review loop: load
 Key implementation areas:
 
 - `AOI_Monitor/MainWindow.xaml.cs`: navigation, global workflow summary, refresh/export/recipe-lock actions
-- `AOI_Monitor/ViewModels/MainViewModel.cs`: navigation items and static dashboard seed data
+- `AOI_Monitor/ViewModels/MainViewModel.cs`: navigation items and current page state
 - `AOI_Monitor/Services/WorkflowState.cs`: shared workflow state, event history, policy changes, training-set export state
 - `AOI_Monitor/Services/ImageAnalysisService.cs`: image loading, comparison, thresholds, verdict/evidence generation
 - `AOI_Monitor/Services/MachineInterfaceExportService.cs`: JSON/NDJSON machine-interface exports

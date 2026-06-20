@@ -24,6 +24,9 @@ coverage/
 *.coverage
 *.coveragexml
 Release/
+**/Release/
+publish/
+artifacts/
 
 # Local SQLite databases and sidecar files
 *.sqlite
@@ -41,9 +44,25 @@ exports/
 image_vault/
 **/image_vault/
 training/
+training_set/
+training_sets/
+**/training_set/
+**/training_sets/
 **/image_vault/training/
 data/
 AOI_Monitor/data/
+model_registry/
+**/model_registry/
+
+# AOI local settings/configuration
+first_run_settings.json
+storage_root_settings.json
+inspection_model_config.json
+camera_source_settings.json
+lighting_settings.json
+mes_integration_settings.json
+local.settings.json
+appsettings.Development.json
 
 # Sample/customer image data
 # Keep README/instructions in SampleData, but do not commit image payloads by default.
@@ -62,6 +81,10 @@ SampleData/**/*.gz
 CustomerData/
 customer_data/
 customer_images/
+customer-datasets/
+customer_datasets/
+datasets/customer/
+large_datasets/
 *.heic
 *.raw
 

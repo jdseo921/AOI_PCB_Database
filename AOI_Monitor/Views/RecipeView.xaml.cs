@@ -345,6 +345,7 @@ public partial class RecipeView : UserControl
             WorkflowState.ToDisplay(state.DetectionPriority),
             _backgroundImagePath,
             json);
+        RecipeService.Invalidate(state.BoardProgram);
 
         foreach (var roi in _rois)
             roi.IsSaved = true;
@@ -550,6 +551,7 @@ public partial class RecipeView : UserControl
     public sealed class RecipeRoiRow
     {
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Name { get; set; } = string.Empty;
         public string RoiType { get; set; } = "Presence";
         public double X { get; set; }
         public double Y { get; set; }
@@ -561,12 +563,14 @@ public partial class RecipeView : UserControl
         public double VolumeMin { get; set; }
         public double VolumeMax { get; set; }
         public bool IsSaved { get; set; }
+        public bool Enabled { get; set; } = true;
 
         public static RecipeRoiRow FromDocument(RecipeRoiDocument doc, bool isSaved)
         {
             return new RecipeRoiRow
             {
                 Id = doc.Id,
+                Name = doc.Name,
                 RoiType = doc.RoiType,
                 X = doc.X,
                 Y = doc.Y,
@@ -577,6 +581,7 @@ public partial class RecipeView : UserControl
                 HeightMax = doc.HeightMax,
                 VolumeMin = doc.VolumeMin,
                 VolumeMax = doc.VolumeMax,
+                Enabled = doc.Enabled,
                 IsSaved = isSaved,
             };
         }
@@ -586,6 +591,7 @@ public partial class RecipeView : UserControl
             return new RecipeRoiDocument
             {
                 Id = Id,
+                Name = string.IsNullOrWhiteSpace(Name) ? Id : Name,
                 RoiType = RoiType,
                 X = X,
                 Y = Y,
@@ -596,6 +602,7 @@ public partial class RecipeView : UserControl
                 HeightMax = HeightMax,
                 VolumeMin = VolumeMin,
                 VolumeMax = VolumeMax,
+                Enabled = Enabled,
             };
         }
     }

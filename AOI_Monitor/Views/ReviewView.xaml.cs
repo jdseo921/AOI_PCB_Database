@@ -199,7 +199,7 @@ public partial class ReviewView : UserControl
                 EscapeCsv(analysis.ModelVersion),
                 EscapeCsv(analysis.DecisionReason),
                 EscapeCsv(action)) + Environment.NewLine);
-        AoiDatabase.RecordExport("ReviewDispositionLog", file);
+        ExportVerificationService.RecordVerifiedExport("ReviewDispositionLog", file);
 
         try
         {

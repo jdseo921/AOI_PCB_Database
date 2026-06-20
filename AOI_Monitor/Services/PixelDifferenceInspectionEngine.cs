@@ -16,47 +16,37 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
     public AnalysisResult Analyze(string samplePath, string? goldenPath, DetectionPriority priority)
     {
         var timing = new InspectionTiming();
+        var timestamp = DateTime.Now;
+        var result = CreateBaseResult(samplePath, goldenPath, priority, timing, timestamp);
+
         var loadWatch = Stopwatch.StartNew();
         var sample = LoadBgra32(samplePath);
         loadWatch.Stop();
         timing.ImageLoadMilliseconds += loadWatch.Elapsed.TotalMilliseconds;
         if (sample is null)
-            throw new InvalidOperationException("Unable to load sample image.");
+        {
+            result.ErrorCode = "SAMPLE_IMAGE_LOAD_FAILED";
+            result.ErrorMessage = $"Unable to load sample image: {samplePath}";
+            result.DecisionReason = result.ErrorMessage;
+            result.Evidence = new List<string>
+            {
+                "Sample image could not be loaded; decision remains REVIEW by policy.",
+                result.ErrorMessage,
+            };
+            result.Defects.Add(CreateDefectResult(result, "Sample Image Load Failed", "ROI-SAMPLE-ERROR", 1, 0, 0));
+            result.Timing.RecalculateTotal();
+            return result;
+        }
 
         var preprocessingWatch = Stopwatch.StartNew();
         var meanBrightness = CalculateBrightness(sample);
         preprocessingWatch.Stop();
         timing.PreprocessingMilliseconds += preprocessingWatch.Elapsed.TotalMilliseconds;
-
-        var result = new AnalysisResult
-        {
-            SamplePath = samplePath,
-            GoldenPath = goldenPath,
-            InspectionEngine = Name,
-            ModelVersion = Version,
-            MeanBrightness = meanBrightness,
-            Timestamp = DateTime.Now,
-            SuggestedDefect = "Solder Bridge",
-            Verdict = "REVIEW",
-            DifferenceScore = 0,
-            ReviewThreshold = 0,
-            NgThreshold = 0,
-            Confidence = 0.55,
-            DecisionMargin = 0,
-            DecisionReason = "Golden reference is required for differential judgement.",
-            PolicyName = ToPolicyDisplay(priority),
-            Hotspot = new Rect(0.45, 0.4, 0.14, 0.12),
-            Evidence = new List<string>
-            {
-                "No golden image was supplied; decision remains REVIEW by policy.",
-                "Run comparison against a verified golden image for actionable classification.",
-            },
-            Timing = timing,
-        };
+        result.MeanBrightness = meanBrightness;
 
         if (string.IsNullOrWhiteSpace(goldenPath))
         {
-            result.Defects.Add(CreateDefectResult(result, "Reference Missing", "ROI-REFERENCE"));
+            result.Defects.Add(CreateDefectResult(result, "Reference Missing", "ROI-REFERENCE", 1, sample.PixelWidth, sample.PixelHeight));
             result.Timing.RecalculateTotal();
             return result;
         }
@@ -66,13 +56,37 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         loadWatch.Stop();
         timing.ImageLoadMilliseconds += loadWatch.Elapsed.TotalMilliseconds;
         if (golden is null)
-            throw new InvalidOperationException("Unable to load golden image.");
+        {
+            result.ErrorCode = "GOLDEN_IMAGE_LOAD_FAILED";
+            result.ErrorMessage = $"Unable to load golden image: {goldenPath}";
+            result.SuggestedDefect = "Golden Reference Load Failed";
+            result.DecisionReason = result.ErrorMessage;
+            result.Evidence = new List<string>
+            {
+                "Golden reference could not be loaded; decision remains REVIEW by policy.",
+                result.ErrorMessage,
+            };
+            result.Defects.Add(CreateDefectResult(result, "Golden Reference Load Failed", "ROI-GOLDEN-ERROR", 1, sample.PixelWidth, sample.PixelHeight));
+            result.Timing.RecalculateTotal();
+            return result;
+        }
 
         preprocessingWatch.Restart();
         var sampleNorm = Resize(sample, 384, 384);
         var goldenNorm = Resize(golden, 384, 384);
         preprocessingWatch.Stop();
         timing.PreprocessingMilliseconds += preprocessingWatch.Elapsed.TotalMilliseconds;
+
+        var recipeLoad = RecipeService.LoadLatestRecipe(result.BoardProgram);
+        if (recipeLoad.HasEnabledRois)
+        {
+            var recipeWatch = Stopwatch.StartNew();
+            ApplyRecipeRoiAnalysis(result, sampleNorm, goldenNorm, priority, recipeLoad);
+            recipeWatch.Stop();
+            timing.InferenceMilliseconds = recipeWatch.Elapsed.TotalMilliseconds;
+            result.Timing.RecalculateTotal();
+            return result;
+        }
 
         var inferenceWatch = Stopwatch.StartNew();
         var diff = Compare(sampleNorm, goldenNorm, out var hotspot);
@@ -109,27 +123,210 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
 
         result.Confidence = ComputeConfidence(result.Verdict, diff, reviewThreshold, ngThreshold);
         result.Evidence = BuildEvidence(result, priority);
-        result.Defects.Add(CreateDefectResult(result, result.SuggestedDefect, "ROI-HOTSPOT-001"));
+        AppendRecipeWarnings(result, recipeLoad);
+        result.Defects.Add(CreateDefectResult(result, result.SuggestedDefect, "ROI-HOTSPOT-001", 1, sampleNorm.PixelWidth, sampleNorm.PixelHeight));
         result.Timing.RecalculateTotal();
 
         return result;
     }
 
-    private static DefectResult CreateDefectResult(AnalysisResult result, string defectType, string roiId)
+    private static void ApplyRecipeRoiAnalysis(
+        AnalysisResult result,
+        BitmapSource sample,
+        BitmapSource golden,
+        DetectionPriority priority,
+        RecipeLoadResult recipeLoad)
     {
-        var box = result.Hotspot;
+        var recipe = recipeLoad.Recipe!;
+        var rois = recipe.Rois.Where(roi => roi.Enabled).ToArray();
+        var (defaultNgThreshold, defaultReviewThreshold) = GetThresholds(priority);
+        result.RecipeName = recipe.RecipeName;
+        result.RecipeRevision = recipe.Revision;
+        result.NgThreshold = defaultNgThreshold;
+        result.ReviewThreshold = defaultReviewThreshold;
+        result.Defects.Clear();
+        result.Evidence.Clear();
+        AppendRecipeWarnings(result, recipeLoad);
+
+        var checkedCount = 0;
+        double maxScore = 0;
+        RecipeRoi? maxRoi = null;
+        var sequence = 1;
+
+        foreach (var roi in rois)
+        {
+            checkedCount++;
+            var score = CompareRegion(sample, golden, new Rect(roi.X, roi.Y, roi.Width, roi.Height));
+            if (score > maxScore)
+            {
+                maxScore = score;
+                maxRoi = roi;
+            }
+
+            var (roiNgThreshold, roiReviewThreshold) = GetRoiThresholds(priority, roi);
+            if (score < roiReviewThreshold)
+                continue;
+
+            var judgment = score >= roiNgThreshold ? "NG" : "REVIEW";
+            var confidence = ComputeConfidence(judgment, score, roiReviewThreshold, roiNgThreshold);
+            var defect = CreateDefectResult(
+                result,
+                $"{roi.RoiType} ROI Difference",
+                roi.RoiId,
+                sequence++,
+                sample.PixelWidth,
+                sample.PixelHeight,
+                new Rect(roi.X, roi.Y, roi.Width, roi.Height),
+                confidence,
+                judgment);
+            defect.RoiName = roi.DisplayName;
+            defect.RoiType = roi.RoiType;
+            defect.SourceRoiId = roi.RoiId;
+            result.Defects.Add(defect);
+        }
+
+        result.DifferenceScore = maxScore;
+        if (maxRoi is not null)
+            result.Hotspot = new Rect(maxRoi.X, maxRoi.Y, maxRoi.Width, maxRoi.Height);
+
+        result.Evidence.Add($"Recipe '{recipe.RecipeName}' revision {recipe.Revision} applied.");
+        result.Evidence.Add($"Checked {checkedCount} enabled recipe ROI(s).");
+        result.Evidence.Add($"Maximum ROI difference score: {maxScore:F1}%.");
+
+        if (result.Defects.Count == 0)
+        {
+            result.Verdict = "OK";
+            result.SuggestedDefect = "No Recipe ROI Difference Above Threshold";
+            result.Confidence = ComputeConfidence("OK", maxScore, defaultReviewThreshold, defaultNgThreshold);
+            result.DecisionMargin = defaultReviewThreshold - maxScore;
+            result.DecisionReason = $"All {checkedCount} enabled recipe ROI(s) were below review threshold.";
+            return;
+        }
+
+        var topDefect = result.Defects.OrderByDescending(defect => defect.Confidence).First();
+        result.Verdict = result.Defects.Any(defect => defect.JudgmentStatus == "NG") ? "NG" : "REVIEW";
+        result.SuggestedDefect = topDefect.DefectType;
+        result.Confidence = result.Defects.Max(defect => defect.Confidence);
+        result.DecisionMargin = result.Defects.Count;
+        result.DecisionReason = $"{result.Defects.Count} recipe ROI(s) crossed review/NG threshold.";
+        result.Evidence.Add($"Recipe ROI findings: {string.Join("; ", result.Defects.Select(d => $"{d.RoiId}/{d.RoiType}={d.JudgmentStatus} {d.Confidence:P0}"))}.");
+    }
+
+    private AnalysisResult CreateBaseResult(
+        string samplePath,
+        string? goldenPath,
+        DetectionPriority priority,
+        InspectionTiming timing,
+        DateTime timestamp)
+    {
+        var result = new AnalysisResult
+        {
+            SchemaVersion = AnalysisResult.CurrentSchemaVersion,
+            InspectionId = InspectionContractIds.NewInspectionId(timestamp.ToUniversalTime()),
+            SamplePath = samplePath,
+            GoldenPath = goldenPath,
+            InspectionEngine = Name,
+            ModelVersion = Version,
+            MeanBrightness = 0,
+            Timestamp = timestamp,
+            SuggestedDefect = "Solder Bridge",
+            Verdict = "REVIEW",
+            DifferenceScore = 0,
+            ReviewThreshold = 0,
+            NgThreshold = 0,
+            Confidence = 0.55,
+            DecisionMargin = 0,
+            DecisionReason = "Golden reference is required for differential judgement.",
+            PolicyName = ToPolicyDisplay(priority),
+            Hotspot = new Rect(0.45, 0.4, 0.14, 0.12),
+            SourceKind = "File",
+            SourceFrameId = Path.GetFileName(samplePath),
+            IsSimulatedSource = false,
+            Evidence = new List<string>
+            {
+                "No golden image was supplied; decision remains REVIEW by policy.",
+                "Run comparison against a verified golden image for actionable classification.",
+            },
+            Timing = timing,
+        };
+
+        ApplyWorkflowContext(result);
+        return result;
+    }
+
+    private static void ApplyWorkflowContext(AnalysisResult result)
+    {
+        try
+        {
+            var state = WorkflowState.Instance;
+            result.StationId = state.StationId;
+            result.BoardProgram = state.BoardProgram;
+            result.BoardId = state.BoardProgram;
+            result.OperatorId = state.OperatorWithRole;
+        }
+        catch
+        {
+        }
+    }
+
+    private static DefectResult CreateDefectResult(
+        AnalysisResult result,
+        string defectType,
+        string roiId,
+        int sequence,
+        double imageWidthPixels,
+        double imageHeightPixels)
+        => CreateDefectResult(
+            result,
+            defectType,
+            roiId,
+            sequence,
+            imageWidthPixels,
+            imageHeightPixels,
+            result.Hotspot,
+            result.Confidence,
+            result.Verdict);
+
+    private static DefectResult CreateDefectResult(
+        AnalysisResult result,
+        string defectType,
+        string roiId,
+        int sequence,
+        double imageWidthPixels,
+        double imageHeightPixels,
+        Rect boundingBox,
+        double confidence,
+        string judgmentStatus)
+    {
+        var box = boundingBox;
+        var widthPixels = imageWidthPixels > 0 ? box.Width * imageWidthPixels : 0;
+        var heightPixels = imageHeightPixels > 0 ? box.Height * imageHeightPixels : 0;
         return new DefectResult
         {
+            DefectId = InspectionContractIds.NewDefectId(result.InspectionId, sequence),
             DefectType = defectType,
-            Confidence = result.Confidence,
+            Confidence = confidence,
             BoundingBox = box,
             XPosition = box.X + box.Width / 2.0,
             YPosition = box.Y + box.Height / 2.0,
-            SideOrViewType = "sample",
+            WidthPixels = widthPixels,
+            HeightPixels = heightPixels,
+            AreaPixels = widthPixels * heightPixels,
+            Severity = ToDefectSeverity(judgmentStatus),
+            SourceRoiId = roiId,
+            SideOrViewType = result.ViewType,
             RoiId = roiId,
-            JudgmentStatus = result.Verdict,
+            JudgmentStatus = judgmentStatus,
         };
     }
+
+    private static string ToDefectSeverity(string judgmentStatus)
+        => judgmentStatus.ToUpperInvariant() switch
+        {
+            "NG" => "Major",
+            "OK" => "Info",
+            _ => "Review",
+        };
 
     private static string ToPolicyDisplay(DetectionPriority priority) => priority switch
     {
@@ -180,6 +377,24 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
             DetectionPriority.MaximizeDefectRecall => (14, 5),
             _ => (18, 8),
         };
+    }
+
+    private static (double ngThreshold, double reviewThreshold) GetRoiThresholds(DetectionPriority priority, RecipeRoi roi)
+    {
+        var (defaultNgThreshold, defaultReviewThreshold) = GetThresholds(priority);
+        if (roi.Thresholds.AiScoreThreshold <= 0)
+            return (defaultNgThreshold, defaultReviewThreshold);
+
+        var roiReviewThreshold = Math.Clamp(roi.Thresholds.AiScoreThreshold * 100.0, 0.1, 100.0);
+        roiReviewThreshold = Math.Min(defaultReviewThreshold, roiReviewThreshold);
+        var roiNgThreshold = Math.Min(defaultNgThreshold, Math.Max(roiReviewThreshold, roiReviewThreshold * 2.0));
+        return (roiNgThreshold, roiReviewThreshold);
+    }
+
+    private static void AppendRecipeWarnings(AnalysisResult result, RecipeLoadResult recipeLoad)
+    {
+        foreach (var warning in recipeLoad.Warnings)
+            result.Evidence.Add($"Recipe warning: {warning}");
     }
 
     private static BitmapSource? LoadBgra32(string path)
@@ -308,6 +523,56 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
                 1.0 / gridY);
 
             var mad = total / (w * h);
+            return Math.Min(100.0, mad / 255.0 * 100.0);
+        }
+        finally
+        {
+            pool.Return(pa);
+            pool.Return(pb);
+        }
+    }
+
+    private static double CompareRegion(BitmapSource a, BitmapSource b, Rect normalizedRegion)
+    {
+        var w = Math.Min(a.PixelWidth, b.PixelWidth);
+        var h = Math.Min(a.PixelHeight, b.PixelHeight);
+        if (w <= 0 || h <= 0)
+            return 0;
+
+        var left = Math.Clamp((int)Math.Floor(normalizedRegion.X * w), 0, w - 1);
+        var top = Math.Clamp((int)Math.Floor(normalizedRegion.Y * h), 0, h - 1);
+        var right = Math.Clamp((int)Math.Ceiling((normalizedRegion.X + normalizedRegion.Width) * w), left + 1, w);
+        var bottom = Math.Clamp((int)Math.Ceiling((normalizedRegion.Y + normalizedRegion.Height) * h), top + 1, h);
+        var regionWidth = right - left;
+        var regionHeight = bottom - top;
+        var fullStride = w * 4;
+        var count = fullStride * h;
+        var pool = ArrayPool<byte>.Shared;
+        var pa = pool.Rent(count);
+        var pb = pool.Rent(count);
+
+        try
+        {
+            var ra = new CroppedBitmap(a, new Int32Rect(0, 0, w, h));
+            var rb = new CroppedBitmap(b, new Int32Rect(0, 0, w, h));
+            ra.CopyPixels(pa, fullStride, 0);
+            rb.CopyPixels(pb, fullStride, 0);
+
+            double total = 0;
+            for (var y = top; y < bottom; y++)
+            {
+                var row = y * fullStride;
+                for (var x = left; x < right; x++)
+                {
+                    var i = row + x * 4;
+                    var dr = Math.Abs(pa[i + 2] - pb[i + 2]);
+                    var dg = Math.Abs(pa[i + 1] - pb[i + 1]);
+                    var db = Math.Abs(pa[i] - pb[i]);
+                    total += (dr + dg + db) / 3.0;
+                }
+            }
+
+            var mad = total / (regionWidth * regionHeight);
             return Math.Min(100.0, mad / 255.0 * 100.0);
         }
         finally

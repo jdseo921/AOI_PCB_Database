@@ -11,6 +11,7 @@ public static class MesIntegrationSettingsService
     private static MesIntegrationSettings? _cached;
 
     public static event Action? SettingsChanged;
+    public static Func<MesIntegrationSettings, MesRestClient>? RestClientFactory { get; set; }
 
     public static string SettingsPath => Path.Combine(AoiDatabase.StorageRoot, "mes_integration_settings.json");
 
@@ -55,8 +56,68 @@ public static class MesIntegrationSettingsService
             return;
         }
 
+        if (settings.Mode == MesIntegrationMode.Rest)
+        {
+            var client = RestClientFactory?.Invoke(settings) ?? new MesRestClient(settings);
+            IntegrationBoundaryRegistry.MesClient = client;
+            IntegrationBoundaryRegistry.TraceabilityUploader = client;
+            return;
+        }
+
         IntegrationBoundaryRegistry.MesClient = new NullMesClient();
         IntegrationBoundaryRegistry.TraceabilityUploader = new NullTraceabilityUploader();
+    }
+
+    public static IReadOnlyList<string> Validate(MesIntegrationSettings settings)
+    {
+        Normalize(settings);
+        var errors = new List<string>();
+
+        if (settings.Mode == MesIntegrationMode.Rest)
+        {
+            if (!Uri.TryCreate(settings.BaseUrl, UriKind.Absolute, out var uri) ||
+                uri.Scheme is not ("http" or "https"))
+            {
+                errors.Add("MES REST base URL must be an absolute http/https URL.");
+            }
+
+            if (string.IsNullOrWhiteSpace(settings.UploadResultPath))
+                errors.Add("MES REST result path is required.");
+            if (string.IsNullOrWhiteSpace(settings.UploadImagePath))
+                errors.Add("MES REST image path is required.");
+
+            if (settings.AuthMode == MesRestAuthMode.ApiKey &&
+                (string.IsNullOrWhiteSpace(settings.ApiKeyHeaderName) || string.IsNullOrWhiteSpace(settings.ApiKey)))
+            {
+                errors.Add("MES REST API-key auth requires a header name and API key.");
+            }
+
+            if (settings.AuthMode == MesRestAuthMode.Bearer && string.IsNullOrWhiteSpace(settings.BearerToken))
+                errors.Add("MES REST bearer auth requires a token.");
+
+            if (settings.AuthMode == MesRestAuthMode.Basic &&
+                (string.IsNullOrWhiteSpace(settings.Username) || string.IsNullOrWhiteSpace(settings.Password)))
+            {
+                errors.Add("MES REST basic auth requires username and password.");
+            }
+        }
+
+        return errors;
+    }
+
+    public static string RedactedSummary(MesIntegrationSettings settings)
+    {
+        Normalize(settings);
+        return settings.Mode switch
+        {
+            MesIntegrationMode.Rest =>
+                $"REST endpoint={settings.BaseUrl}; resultPath={settings.UploadResultPath}; imagePath={settings.UploadImagePath}; auth={settings.AuthMode}; autoUpload={settings.AutoUploadEnabled}; retries={settings.MaxRetryCount}; secrets={RedactedSecretMarker(settings)}",
+            MesIntegrationMode.MockRest => string.IsNullOrWhiteSpace(settings.MockEndpointUrl)
+                ? $"Mock local JSON; autoUpload={settings.AutoUploadEnabled}"
+                : $"Mock REST endpoint={settings.MockEndpointUrl}; autoUpload={settings.AutoUploadEnabled}",
+            MesIntegrationMode.FutureProduction => "Future Production Planned; OPC UA adapter TODO for Stage 4.",
+            _ => "Not Connected",
+        };
     }
 
     private static void Save(MesIntegrationSettings settings, bool notify)
@@ -75,9 +136,23 @@ public static class MesIntegrationSettingsService
     {
         if (!Enum.IsDefined(settings.Mode))
             settings.Mode = MesIntegrationMode.NotConnected;
+        if (!Enum.IsDefined(settings.AuthMode))
+            settings.AuthMode = MesRestAuthMode.None;
 
         settings.MockEndpointUrl = settings.MockEndpointUrl?.Trim() ?? string.Empty;
         settings.UploadTimeoutSeconds = Math.Clamp(settings.UploadTimeoutSeconds, 1, 300);
+        settings.BaseUrl = settings.BaseUrl?.Trim() ?? string.Empty;
+        settings.UploadResultPath = NormalizePath(settings.UploadResultPath, "/api/aoi/results");
+        settings.UploadImagePath = NormalizePath(settings.UploadImagePath, "/api/aoi/images");
+        settings.ApiKeyHeaderName = string.IsNullOrWhiteSpace(settings.ApiKeyHeaderName) ? "X-API-Key" : settings.ApiKeyHeaderName.Trim();
+        settings.ApiKey = settings.ApiKey ?? string.Empty;
+        settings.BearerToken = settings.BearerToken ?? string.Empty;
+        settings.Username = settings.Username?.Trim() ?? string.Empty;
+        settings.Password = settings.Password ?? string.Empty;
+        settings.TimeoutSeconds = Math.Clamp(settings.TimeoutSeconds <= 0 ? settings.UploadTimeoutSeconds : settings.TimeoutSeconds, 1, 300);
+        settings.UploadTimeoutSeconds = settings.TimeoutSeconds;
+        settings.MaxRetryCount = Math.Clamp(settings.MaxRetryCount, 0, 20);
+        settings.RetryBackoffMs = Math.Clamp(settings.RetryBackoffMs <= 0 ? 500 : settings.RetryBackoffMs, 0, 600000);
     }
 
     private static MesIntegrationSettings Clone(MesIntegrationSettings source)
@@ -86,5 +161,33 @@ public static class MesIntegrationSettingsService
             Mode = source.Mode,
             MockEndpointUrl = source.MockEndpointUrl,
             UploadTimeoutSeconds = source.UploadTimeoutSeconds,
+            AutoUploadEnabled = source.AutoUploadEnabled,
+            BaseUrl = source.BaseUrl,
+            UploadResultPath = source.UploadResultPath,
+            UploadImagePath = source.UploadImagePath,
+            AuthMode = source.AuthMode,
+            ApiKeyHeaderName = source.ApiKeyHeaderName,
+            ApiKey = source.ApiKey,
+            BearerToken = source.BearerToken,
+            Username = source.Username,
+            Password = source.Password,
+            TimeoutSeconds = source.TimeoutSeconds,
+            MaxRetryCount = source.MaxRetryCount,
+            RetryBackoffMs = source.RetryBackoffMs,
+        };
+
+    private static string NormalizePath(string? path, string fallback)
+    {
+        var value = string.IsNullOrWhiteSpace(path) ? fallback : path.Trim();
+        return value.StartsWith("/", StringComparison.Ordinal) ? value : $"/{value}";
+    }
+
+    private static string RedactedSecretMarker(MesIntegrationSettings settings)
+        => settings.AuthMode switch
+        {
+            MesRestAuthMode.ApiKey => string.IsNullOrWhiteSpace(settings.ApiKey) ? "not configured" : "***",
+            MesRestAuthMode.Bearer => string.IsNullOrWhiteSpace(settings.BearerToken) ? "not configured" : "***",
+            MesRestAuthMode.Basic => string.IsNullOrWhiteSpace(settings.Password) ? "not configured" : "***",
+            _ => "none",
         };
 }

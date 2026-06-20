@@ -6,6 +6,7 @@ public static class CameraSourceFactory
 {
     public const string NullSourceKey = "none";
     public const string FolderSimulationSourceKey = "folder-simulation";
+    public const string GenericVisionAdapterSourceKey = "generic-vision-adapter";
 
     private static ICameraSource _activeSource = new NullCameraSource();
 
@@ -18,9 +19,19 @@ public static class CameraSourceFactory
     public static FolderCameraSource CreateFolder(IReadOnlyDictionary<CameraViewType, string> folders)
         => new(folders);
 
+    public static GenericVisionCameraSource CreateGeneric(CameraSourceSettings settings, IVisionCameraAdapter? adapter = null)
+        => new(settings, adapter ?? new NullVisionCameraAdapter());
+
     public static ICameraSource Create(CameraSourceSettings settings)
+        => Create(settings, null);
+
+    public static ICameraSource Create(CameraSourceSettings settings, IVisionCameraAdapter? adapter)
     {
-        if (NormalizeSourceKey(settings.SourceKey) != FolderSimulationSourceKey)
+        var sourceKey = NormalizeSourceKey(settings.SourceKey);
+        if (sourceKey == GenericVisionAdapterSourceKey)
+            return CreateGeneric(settings, adapter);
+
+        if (sourceKey != FolderSimulationSourceKey)
             return CreateNull();
 
         var folders = new Dictionary<CameraViewType, string>();
@@ -40,6 +51,7 @@ public static class CameraSourceFactory
             : sourceKey.Trim().ToLowerInvariant() switch
             {
                 FolderSimulationSourceKey or "folder" or "simulation" => FolderSimulationSourceKey,
+                GenericVisionAdapterSourceKey or "generic" or "generic-vision" or "vision" => GenericVisionAdapterSourceKey,
                 _ => NullSourceKey,
             };
 

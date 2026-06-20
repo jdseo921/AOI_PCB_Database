@@ -2,7 +2,9 @@ param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
     [string]$OutputRoot = "",
-    [switch]$SelfContained
+    [switch]$SelfContained,
+    [switch]$ValidationOnly,
+    [switch]$NoRestore
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,7 +17,11 @@ $docsPath = Join-Path $repoRoot "Docs"
 $featureDocPath = Join-Path $repoRoot "IMPLEMENTED_FEATURES.md"
 $rootReadmePath = Join-Path $repoRoot "README.md"
 $releaseRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    Join-Path $repoRoot "Release"
+    if ($ValidationOnly) {
+        Join-Path ([System.IO.Path]::GetTempPath()) "AOI_Monitor_PublishValidation"
+    } else {
+        Join-Path $repoRoot "Release"
+    }
 } else {
     $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputRoot)
 }
@@ -44,6 +50,8 @@ Write-Host "Repository: $repoRoot"
 Write-Host "Release:    $releaseDir"
 Write-Host "Runtime:    $Runtime"
 Write-Host "Mode:       $(if ($SelfContained) { 'self-contained' } else { 'framework-dependent' })"
+Write-Host "Validation: $(if ($ValidationOnly) { 'yes' } else { 'no' })"
+Write-Host "Restore:    $(if ($NoRestore) { 'skip; use existing restore assets' } else { 'allow dotnet commands to restore as needed' })"
 
 if (!(Test-Path $projectPath)) {
     throw "Project file was not found: $projectPath"
@@ -64,13 +72,19 @@ if (Test-Path $releaseDir) {
 New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
 
-Invoke-Step "Cleaning old release build output..." @("dotnet", "clean", $projectPath, "-c", $Configuration)
-Invoke-Step "Running non-UI tests..." @("dotnet", "test", $solutionPath, "-c", $Configuration, "--nologo")
-Invoke-Step "Building release configuration..." @("dotnet", "build", $projectPath, "-c", $Configuration, "--nologo")
+$restoreOption = if ($NoRestore) { @("--no-restore") } else { @() }
+
+if ($NoRestore) {
+    Write-Host "Skipping dotnet clean because -NoRestore is set; clean can remove assets needed for offline validation."
+} else {
+    Invoke-Step "Cleaning old release build output..." @("dotnet", "clean", $projectPath, "-c", $Configuration)
+}
+Invoke-Step "Running non-UI tests..." (@("dotnet", "test", $solutionPath, "-c", $Configuration, "--nologo") + $restoreOption)
+Invoke-Step "Building release configuration..." (@("dotnet", "build", $projectPath, "-c", $Configuration, "--nologo") + $restoreOption)
 
 Write-Host "Publishing Windows desktop executable..."
 $selfContainedValue = if ($SelfContained) { "true" } else { "false" }
-Invoke-Step "dotnet publish..." @(
+Invoke-Step "dotnet publish..." (@(
     "dotnet",
     "publish",
     $projectPath,
@@ -84,7 +98,7 @@ Invoke-Step "dotnet publish..." @(
     "-p:IncludeNativeLibrariesForSelfExtract=true",
     "-o",
     $publishDir,
-    "--nologo")
+    "--nologo") + $restoreOption)
 
 Write-Host "Removing runtime/private data from publish output..."
 $excludedRuntimeItems = @(
@@ -155,3 +169,7 @@ Set-Content -LiteralPath (Join-Path $releaseDir "RUN_RELEASE.md") -Value $releas
 
 Write-Host "Release package created:"
 Write-Host $releaseDir
+
+if ($ValidationOnly) {
+    Write-Host "Validation-only publish completed. Output was written outside the repository unless -OutputRoot was provided."
+}

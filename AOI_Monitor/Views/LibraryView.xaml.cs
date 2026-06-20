@@ -262,9 +262,9 @@ public partial class LibraryView : UserControl
         try
         {
             File.WriteAllText(dialog.FileName, sb.ToString());
-            AoiDatabase.RecordExport("LibraryRecord", dialog.FileName);
+            var verified = ExportVerificationService.RecordVerifiedExport("LibraryRecord", dialog.FileName);
             WorkflowState.Instance.AddEvent("EXPORT", $"Library record exported: {Path.GetFileName(dialog.FileName)}");
-            ImportStatusText.Text = $"Library record exported: {dialog.FileName}";
+            ImportStatusText.Text = $"Library record exported: {dialog.FileName}. Verification: {verified.Verification.Status}.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {

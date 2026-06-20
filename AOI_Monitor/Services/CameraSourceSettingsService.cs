@@ -64,6 +64,13 @@ public static class CameraSourceSettingsService
         settings.TopFolder = settings.TopFolder?.Trim() ?? string.Empty;
         settings.SideFolder = settings.SideFolder?.Trim() ?? string.Empty;
         settings.BottomFolder = settings.BottomFolder?.Trim() ?? string.Empty;
+        settings.TopDeviceId = settings.TopDeviceId?.Trim() ?? string.Empty;
+        settings.SideDeviceId = settings.SideDeviceId?.Trim() ?? string.Empty;
+        settings.BottomDeviceId = settings.BottomDeviceId?.Trim() ?? string.Empty;
+        settings.ExposureMs = Math.Clamp(settings.ExposureMs <= 0 ? 5.0 : settings.ExposureMs, 0.001, 10000.0);
+        settings.Gain = Math.Clamp(settings.Gain < 0 ? 1.0 : settings.Gain, 0.0, 1000.0);
+        settings.TriggerTimeoutMs = Math.Clamp(settings.TriggerTimeoutMs <= 0 ? 250 : settings.TriggerTimeoutMs, 1, 60000);
+        settings.FrameTimeoutMs = Math.Clamp(settings.FrameTimeoutMs <= 0 ? 1000 : settings.FrameTimeoutMs, 1, 60000);
         settings.BoardModel = string.IsNullOrWhiteSpace(settings.BoardModel) ? "TBOX-MAIN" : settings.BoardModel.Trim();
         settings.LotId = string.IsNullOrWhiteSpace(settings.LotId) ? "POC-LOT" : settings.LotId.Trim();
     }
@@ -75,6 +82,14 @@ public static class CameraSourceSettingsService
             TopFolder = source.TopFolder,
             SideFolder = source.SideFolder,
             BottomFolder = source.BottomFolder,
+            TopDeviceId = source.TopDeviceId,
+            SideDeviceId = source.SideDeviceId,
+            BottomDeviceId = source.BottomDeviceId,
+            AcquisitionMode = source.AcquisitionMode,
+            ExposureMs = source.ExposureMs,
+            Gain = source.Gain,
+            TriggerTimeoutMs = source.TriggerTimeoutMs,
+            FrameTimeoutMs = source.FrameTimeoutMs,
             BoardModel = source.BoardModel,
             LotId = source.LotId,
         };

@@ -16,6 +16,7 @@ Client/evaluator documents:
 - [Requirements Traceability Matrix](Docs/Requirements_Traceability_Matrix.md)
 - [Integration Boundaries](Docs/Integration_Boundaries.md)
 - [Stage 1 Acceptance Checklist](Docs/Stage1_Acceptance_Checklist.md)
+- [Developer CI and Release Checks](Docs/Developer_CI.md)
 
 ## Project Layout
 
@@ -42,6 +43,12 @@ This repository should contain source code, XAML, docs, and small non-confidenti
 - Customer images, production images, or large sample datasets.
 
 Local runtime data is generated automatically when the app starts or when imports/exports are run. Place small demo-image instructions in `SampleData/`; keep large or private datasets outside the repository.
+
+Before committing, run the local hygiene check:
+
+```powershell
+pwsh Scripts/check-repo-hygiene.ps1
+```
 
 ## Run
 

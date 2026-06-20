@@ -1,3 +1,4 @@
+using AOI_Monitor.Models;
 using AOI_Monitor.Services;
 using Xunit;
 
@@ -71,5 +72,192 @@ public sealed class IntegrationContractsTests
         var recovered = await robot.LoadAsync(new LoadCommand("B3", "TBOX", "LOT-1", "AOI-LIB-01"));
         Assert.True(recovered.Accepted);
         Assert.True(robot.IsBoardLoaded);
+    }
+
+    [Fact]
+    public async Task RobotCycleServiceRunsValidTransitionSequence()
+    {
+        await WithSimulatedRobotCycleServiceAsync(async service =>
+        {
+            var load = await service.LoadAsync(new LoadCommand("B1", "TBOX", "LOT-1", "AOI-LIB-01"));
+            var move = await service.MoveToInspectAsync(new InspectCommand("B1", "TBOX", "LOT-1", "AOI-LIB-01", "Top"));
+            var analysis = await service.RunInspectionStepAsync(_ => Task.FromResult<AnalysisResult?>(new AnalysisResult { Verdict = "OK" }));
+            var unload = await service.UnloadAsync(new UnloadCommand("B1", "TBOX", "LOT-1", "AOI-LIB-01", "Review"));
+
+            Assert.True(load.Accepted);
+            Assert.True(move.Accepted);
+            Assert.NotNull(analysis);
+            Assert.True(unload.Accepted);
+            Assert.Equal(RobotCycleState.Completed, service.CurrentState);
+            Assert.Equal(
+                new[]
+                {
+                    RobotCycleState.Loading,
+                    RobotCycleState.Loaded,
+                    RobotCycleState.MovingToInspect,
+                    RobotCycleState.ReadyToInspect,
+                    RobotCycleState.Inspecting,
+                    RobotCycleState.Unloading,
+                    RobotCycleState.Completed,
+                },
+                service.Transitions.Select(transition => transition.To).ToArray());
+        });
+    }
+
+    [Fact]
+    public async Task RobotCycleServiceRejectsUnloadBeforeLoadAndKeepsIdleState()
+    {
+        await WithSimulatedRobotCycleServiceAsync(async service =>
+        {
+            var result = await service.UnloadAsync(new UnloadCommand("B1", "TBOX", "LOT-1", "AOI-LIB-01", "Review"));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(RobotCycleState.Idle, service.CurrentState);
+            Assert.Contains("Cannot unload", result.Message);
+        });
+    }
+
+    [Fact]
+    public async Task RobotCycleServiceEmergencyStopMovesToEmergencyStoppedAndBlocksCommands()
+    {
+        await WithSimulatedRobotCycleServiceAsync(async service =>
+        {
+            ((SimulatedRobotController)IntegrationBoundaryRegistry.RobotController).TriggerEmergencyStop();
+
+            var result = await service.LoadAsync(new LoadCommand("B1", "TBOX", "LOT-1", "AOI-LIB-01"));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(RobotCycleState.EmergencyStopped, service.CurrentState);
+            Assert.Contains("emergency stop", service.LastError, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    [Fact]
+    public async Task RobotCycleServiceResetClearsSimulatedEmergencyStop()
+    {
+        await WithSimulatedRobotCycleServiceAsync(async service =>
+        {
+            var robot = (SimulatedRobotController)IntegrationBoundaryRegistry.RobotController;
+            robot.TriggerEmergencyStop();
+            await service.LoadAsync(new LoadCommand("B1", "TBOX", "LOT-1", "AOI-LIB-01"));
+
+            var reset = await service.ResetAsync();
+
+            Assert.True(reset.Accepted);
+            Assert.Equal(RobotCycleState.Idle, service.CurrentState);
+            Assert.False(robot.IsEmergencyStopActive);
+            Assert.True(string.IsNullOrWhiteSpace(service.LastError));
+        });
+    }
+
+    [Fact]
+    public async Task SimulatedLightingControllerRecordsProgramPerView()
+    {
+        var settings = new LightingSettings
+        {
+            Mode = LightingModes.Simulated,
+            TopProgram = "TOP-BRIGHT",
+            BottomProgram = "BOTTOM-LOW",
+            CommandTemplate = "SET {view} {program}\\n",
+        };
+        var controller = new SimulatedLightingController(settings);
+
+        var result = await controller.SetProgramAsync("Bottom", string.Empty);
+
+        Assert.True(result.Accepted);
+        Assert.Equal(IntegrationConnectionStatus.Simulated, result.Status);
+        Assert.Equal("BOTTOM-LOW", controller.SelectedPrograms["Bottom"]);
+        Assert.Equal("SET Bottom BOTTOM-LOW\n", controller.LastCommand);
+    }
+
+    [Fact]
+    public void LightingControllerFactoryReturnsNullAndSimulatedControllers()
+    {
+        var none = LightingControllerFactory.Create(new LightingSettings { Mode = LightingModes.None });
+        var simulated = LightingControllerFactory.Create(new LightingSettings { Mode = LightingModes.Simulated });
+
+        Assert.IsType<NullLightingController>(none);
+        Assert.IsType<SimulatedLightingController>(simulated);
+        Assert.Equal(IntegrationConnectionStatus.NotConnected, none.Status);
+        Assert.Equal(IntegrationConnectionStatus.Simulated, simulated.Status);
+    }
+
+    [Fact]
+    public void LightingCommandTemplateSubstitutionWorks()
+    {
+        var command = LightingCommandFormatter.BuildCommand(
+            "LIGHT {view}:{program}\\r\\n",
+            "Side",
+            "SIDE-AOI");
+
+        Assert.Equal("LIGHT Side:SIDE-AOI\r\n", command);
+    }
+
+    [Fact]
+    public void LightingSettingsValidationRejectsInvalidExplicitEndpoint()
+    {
+        var settings = new LightingSettings
+        {
+            Mode = LightingModes.TcpText,
+            TcpHost = string.Empty,
+            TcpPort = 70000,
+            ResponseTimeoutMs = 0,
+        };
+
+        var errors = LightingSettingsService.Validate(settings);
+
+        Assert.Contains(errors, error => error.Contains("host", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, error => error.Contains("port", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(errors, error => error.Contains("timeout", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task LightingSynchronizationServiceReturnsErrorWithoutCrashingOnFailure()
+    {
+        var settings = new LightingSettings
+        {
+            Mode = LightingModes.Simulated,
+            TopProgram = "TOP",
+            ResponseTimeoutMs = 100,
+        };
+
+        var result = await LightingSynchronizationService.SynchronizeAsync(new ThrowingLightingController(), settings, "Top");
+
+        Assert.False(result.Accepted);
+        Assert.Equal(IntegrationConnectionStatus.Error, result.Status);
+        Assert.Contains("failed safely", result.Message);
+    }
+
+    private sealed class ThrowingLightingController : ILightingController
+    {
+        public string Name => "Throwing Lighting Controller";
+        public IntegrationConnectionStatus Status => IntegrationConnectionStatus.Error;
+        public string StatusMessage => "Test failure";
+
+        public Task<IntegrationCommandResult> SetProgramAsync(
+            string viewType,
+            string programName,
+            CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("Simulated lighting failure");
+    }
+
+    private static async Task WithSimulatedRobotCycleServiceAsync(Func<RobotCycleService, Task> action)
+    {
+        var previousRobot = IntegrationBoundaryRegistry.RobotController;
+        var previousEmergencyStop = IntegrationBoundaryRegistry.EmergencyStopMonitor;
+        var robot = new SimulatedRobotController();
+
+        try
+        {
+            IntegrationBoundaryRegistry.RobotController = robot;
+            IntegrationBoundaryRegistry.EmergencyStopMonitor = new SimulatedEmergencyStopMonitor(robot);
+            var service = new RobotCycleService((_, _) => { });
+            await action(service);
+        }
+        finally
+        {
+            IntegrationBoundaryRegistry.RobotController = previousRobot;
+            IntegrationBoundaryRegistry.EmergencyStopMonitor = previousEmergencyStop;
+        }
     }
 }

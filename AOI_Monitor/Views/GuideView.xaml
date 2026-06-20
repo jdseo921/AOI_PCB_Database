@@ -18,6 +18,8 @@
         <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
           <Button Style="{StaticResource ActionBtnGreen}" Content="Open Settings" Margin="0,0,6,0" Click="OnOpenSettingsClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Calibration" Margin="0,0,6,0" Click="OnOpenCalibrationClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Run Setup Wizard Again" Margin="0,0,6,0" Click="OnRunSetupWizardClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Export Diagnostics Report" Margin="0,0,6,0" Click="OnExportDiagnosticsClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Installation Notes" Click="OnOpenInstallClick"/>
         </WrapPanel>
       </Grid>

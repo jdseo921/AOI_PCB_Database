@@ -125,6 +125,8 @@
                 <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
                 <DataGridTextColumn Header="Type" Binding="{Binding ExportType}" Width="160"/>
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="70"/>
+                <DataGridTextColumn Header="Verify" Binding="{Binding VerificationStatus}" Width="70"/>
+                <DataGridTextColumn Header="SHA-256" Binding="{Binding VerificationShaDisplay}" Width="100"/>
                 <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="130"/>
                 <DataGridTextColumn Header="Audit ID" Binding="{Binding AuditEventDisplay}" Width="80"/>
                 <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
@@ -142,6 +144,21 @@
                 <DataGridTextColumn Header="Action" Binding="{Binding ActionCategory}" Width="140"/>
                 <DataGridTextColumn Header="Related ID" Binding="{Binding RelatedEntityDisplay}" Width="145"/>
                 <DataGridTextColumn Header="Detail" Binding="{Binding ActionDetail}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </TabItem>
+          <TabItem Header="MES Spool">
+            <DataGrid x:Name="MesSpoolGrid" CanUserSortColumns="True">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding PayloadType}" Width="135"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
+                <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="75"/>
+                <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="70"/>
+                <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100"/>
+                <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
+                <DataGridTextColumn Header="Endpoint" Binding="{Binding EndpointUrl}" Width="210"/>
+                <DataGridTextColumn Header="Last Error" Binding="{Binding LastError}" Width="*"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -177,8 +194,10 @@
           <Button Style="{StaticResource ActionBtn}" Content="DB Integrity" Margin="0,0,6,0" Click="OnRunDbIntegrityCheckClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Database Health" Margin="0,0,6,0" Click="OnOpenDatabaseHealthClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Verify Paths" Margin="0,0,6,0" Click="OnVerifyImagePathsClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Verify Selected Export" Margin="0,0,6,0" Click="OnVerifySelectedExportClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Rebuild Image Index" Margin="0,0,6,0" Click="OnRebuildImageIndexClick"/>
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Upload Result to Mock MES" Margin="0,0,6,0" Click="OnUploadMesMockClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Upload Result to MES" Margin="0,0,6,0" Click="OnUploadMesMockClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Retry MES Spool" Margin="0,0,6,0" Click="OnRetryMesSpoolClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Soak Test" Margin="0,0,6,0" Click="OnRunSoakTestClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Recipe" Click="OnLockActiveRecipeClick"/>
         </WrapPanel>

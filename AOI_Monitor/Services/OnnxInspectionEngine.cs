@@ -37,10 +37,22 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
         var timing = new InspectionTiming();
         var threshold = Math.Clamp(_configuration.ConfidenceThreshold, 0.0, 1.0);
         if (!_configuration.HasModelFile)
-            return BuildUnavailableResult(samplePath, goldenPath, "ML Model Missing", "Configured ONNX model file is missing. Pixel-difference remains the safe fallback.", timing: timing);
+            return BuildUnavailableResult(samplePath, goldenPath, "ML_MODEL_MISSING", "ML Model Missing", "Configured ONNX model file is missing. Pixel-difference remains the safe fallback.", timing: timing);
+
+        if (!string.IsNullOrWhiteSpace(_configuration.ActiveModelId) &&
+            _configuration.LastModelCheckResult != ModelConfigurationTestStatus.Ready)
+        {
+            return BuildUnavailableResult(
+                samplePath,
+                goldenPath,
+                "MODEL_REGISTRY_NOT_READY",
+                "ML Model Not Ready",
+                $"Active registry model '{_configuration.ActiveModelId}' is not validated as Ready. Current status: {_configuration.LastModelCheckResult}.",
+                timing: timing);
+        }
 
         if (!File.Exists(samplePath))
-            return BuildUnavailableResult(samplePath, goldenPath, "ML Runtime Error", $"Sample image file is missing: {samplePath}", timing: timing);
+            return BuildUnavailableResult(samplePath, goldenPath, "SAMPLE_IMAGE_MISSING", "ML Runtime Error", $"Sample image file is missing: {samplePath}", timing: timing);
 
         var inferenceWatch = new Stopwatch();
         try
@@ -98,6 +110,7 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
             return BuildUnavailableResult(
                 samplePath,
                 goldenPath,
+                "ML_RUNTIME_ERROR",
                 "ML Runtime Error",
                 $"ONNX model loading or inference failed: {ex.Message}",
                 ex.GetType().Name,
@@ -126,9 +139,12 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
         var suggestedDefect = nonOkDetections.Length > 0
             ? topDetection?.Label ?? "Anomaly"
             : "OK";
+        var timestamp = DateTime.Now;
 
         var result = new AnalysisResult
         {
+            SchemaVersion = AnalysisResult.CurrentSchemaVersion,
+            InspectionId = InspectionContractIds.NewInspectionId(timestamp.ToUniversalTime()),
             SamplePath = samplePath,
             GoldenPath = goldenPath,
             InspectionEngine = Name,
@@ -136,7 +152,7 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
             ModelFilePath = _configuration.ModelFilePath,
             ConfidenceThreshold = threshold,
             MeanBrightness = brightness,
-            Timestamp = DateTime.Now,
+            Timestamp = timestamp,
             SuggestedDefect = suggestedDefect,
             Verdict = verdict,
             DifferenceScore = confidence * 100.0,
@@ -149,9 +165,15 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
                 : "ONNX model completed inference with no non-OK detections above the configured confidence threshold.",
             PolicyName = $"ML confidence >= {threshold:P0}",
             Hotspot = hotspot,
+            SourceKind = "File",
+            SourceFrameId = Path.GetFileName(samplePath),
+            IsSimulatedSource = false,
             Evidence = new List<string>
             {
                 "ONNX Runtime inference executed successfully.",
+                $"Registry model ID: {RegistryValue(_configuration.ActiveModelId)}.",
+                $"Registry validation status: {RegistryValue(_configuration.ActiveModelValidationStatus)}.",
+                $"Model SHA-256: {RegistryValue(_configuration.ActiveModelSha256)}.",
                 $"Model: {_configuration.ModelFilePath}.",
                 $"Model version: {Version}.",
                 $"Input tensor: {inputName}, size {_configuration.InputImageWidth}x{_configuration.InputImageHeight}, layout NCHW RGB normalized 0..1.",
@@ -163,19 +185,48 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
             },
             Timing = timing,
         };
+        ApplyWorkflowContext(result);
+        var recipeLoad = RecipeService.LoadLatestRecipe(result.BoardProgram);
+        if (recipeLoad.Recipe is { } recipe)
+        {
+            result.RecipeName = recipe.RecipeName;
+            result.RecipeRevision = recipe.Revision;
+            foreach (var warning in recipeLoad.Warnings)
+                result.Evidence.Add($"Recipe warning: {warning}");
+        }
+        else
+        {
+            foreach (var warning in recipeLoad.Warnings)
+                result.Evidence.Add($"Recipe warning: {warning}");
+        }
 
+        var sequence = 1;
         foreach (var detection in detections)
         {
+            var judgment = IsOkLabel(detection.Label) ? "OK" : "NG";
+            var widthPixels = detection.BoundingBox.Width * _configuration.InputImageWidth;
+            var heightPixels = detection.BoundingBox.Height * _configuration.InputImageHeight;
+            var matchingRoi = FindIntersectingRoi(recipeLoad.Recipe, detection.BoundingBox);
+            var roiId = matchingRoi?.RoiId ?? "UNASSIGNED";
             result.Defects.Add(new DefectResult
             {
+                DefectId = InspectionContractIds.NewDefectId(result.InspectionId, sequence++),
+                ClassId = detection.ClassId,
                 DefectType = detection.Label,
                 Confidence = detection.Confidence,
                 BoundingBox = detection.BoundingBox,
                 XPosition = detection.BoundingBox.X + detection.BoundingBox.Width / 2.0,
                 YPosition = detection.BoundingBox.Y + detection.BoundingBox.Height / 2.0,
-                SideOrViewType = "sample",
-                RoiId = $"ONNX-CLASS-{detection.ClassId}",
-                JudgmentStatus = IsOkLabel(detection.Label) ? "OK" : "NG",
+                WidthPixels = widthPixels,
+                HeightPixels = heightPixels,
+                AreaPixels = widthPixels * heightPixels,
+                Severity = ToDefectSeverity(judgment),
+                SourceRoiId = roiId,
+                RoiName = matchingRoi?.DisplayName ?? string.Empty,
+                RoiType = matchingRoi?.RoiType ?? string.Empty,
+                SideOrViewType = result.ViewType,
+                RoiId = roiId,
+                JudgmentStatus = judgment,
             });
         }
 
@@ -185,6 +236,7 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
     private AnalysisResult BuildUnavailableResult(
         string samplePath,
         string? goldenPath,
+        string errorCode,
         string defectType,
         string reason,
         string? errorType = null,
@@ -194,9 +246,12 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
         var confidence = Math.Clamp(_configuration.ConfidenceThreshold, 0.0, 1.0);
         timing ??= new InspectionTiming();
         timing.RecalculateTotal();
+        var timestamp = DateTime.Now;
 
         var result = new AnalysisResult
         {
+            SchemaVersion = AnalysisResult.CurrentSchemaVersion,
+            InspectionId = InspectionContractIds.NewInspectionId(timestamp.ToUniversalTime()),
             SamplePath = samplePath,
             GoldenPath = goldenPath,
             InspectionEngine = Name,
@@ -204,7 +259,7 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
             ModelFilePath = _configuration.ModelFilePath,
             ConfidenceThreshold = confidence,
             MeanBrightness = CalculateBrightness(samplePath),
-            Timestamp = DateTime.Now,
+            Timestamp = timestamp,
             SuggestedDefect = defectType,
             Verdict = "REVIEW",
             DifferenceScore = 0,
@@ -215,9 +270,17 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
             DecisionReason = reason,
             PolicyName = $"ML confidence >= {confidence:P0}",
             Hotspot = hotspot,
+            SourceKind = "File",
+            SourceFrameId = Path.GetFileName(samplePath),
+            IsSimulatedSource = false,
+            ErrorCode = errorCode,
+            ErrorMessage = reason,
             Evidence = new List<string>
             {
                 $"Selected engine: {Name}.",
+                $"Registry model ID: {RegistryValue(_configuration.ActiveModelId)}.",
+                $"Registry validation status: {RegistryValue(_configuration.ActiveModelValidationStatus)}.",
+                $"Model SHA-256: {RegistryValue(_configuration.ActiveModelSha256)}.",
                 $"Configured model: {(_configuration.HasModelFile ? _configuration.ModelFilePath : "missing")}.",
                 $"Model version: {Version}.",
                 $"Confidence threshold: {confidence:P0}.",
@@ -229,20 +292,79 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
             },
             Timing = timing,
         };
+        ApplyWorkflowContext(result);
 
+        var widthPixels = hotspot.Width * Math.Max(1, _configuration.InputImageWidth);
+        var heightPixels = hotspot.Height * Math.Max(1, _configuration.InputImageHeight);
         result.Defects.Add(new DefectResult
         {
+            DefectId = InspectionContractIds.NewDefectId(result.InspectionId, 1),
             DefectType = defectType,
             Confidence = result.Confidence,
             BoundingBox = hotspot,
             XPosition = hotspot.X + hotspot.Width / 2.0,
             YPosition = hotspot.Y + hotspot.Height / 2.0,
-            SideOrViewType = "sample",
+            WidthPixels = widthPixels,
+            HeightPixels = heightPixels,
+            AreaPixels = widthPixels * heightPixels,
+            Severity = ToDefectSeverity(result.Verdict),
+            SourceRoiId = "ROI-ML-ERROR",
+            SideOrViewType = result.ViewType,
             RoiId = "ROI-ML-ERROR",
             JudgmentStatus = result.Verdict,
         });
 
         return result;
+    }
+
+    private static void ApplyWorkflowContext(AnalysisResult result)
+    {
+        try
+        {
+            var state = WorkflowState.Instance;
+            result.StationId = state.StationId;
+            result.BoardProgram = state.BoardProgram;
+            result.BoardId = state.BoardProgram;
+            result.OperatorId = state.OperatorWithRole;
+        }
+        catch
+        {
+        }
+    }
+
+    private static string ToDefectSeverity(string judgmentStatus)
+        => judgmentStatus.ToUpperInvariant() switch
+        {
+            "NG" => "Major",
+            "OK" => "Info",
+            _ => "Review",
+        };
+
+    private static RecipeRoi? FindIntersectingRoi(RecipeDefinition? recipe, Rect detectionBox)
+    {
+        if (recipe is null)
+            return null;
+
+        return recipe.Rois
+            .Where(roi => roi.Enabled)
+            .Select(roi => new
+            {
+                Roi = roi,
+                Area = IntersectionArea(new Rect(roi.X, roi.Y, roi.Width, roi.Height), detectionBox),
+            })
+            .Where(candidate => candidate.Area > 0)
+            .OrderByDescending(candidate => candidate.Area)
+            .Select(candidate => candidate.Roi)
+            .FirstOrDefault();
+    }
+
+    private static double IntersectionArea(Rect first, Rect second)
+    {
+        var left = Math.Max(first.Left, second.Left);
+        var top = Math.Max(first.Top, second.Top);
+        var right = Math.Min(first.Right, second.Right);
+        var bottom = Math.Min(first.Bottom, second.Bottom);
+        return right <= left || bottom <= top ? 0 : (right - left) * (bottom - top);
     }
 
     private DenseTensor<float> PreprocessImage(string path, int width, int height, InspectionTiming timing, out double brightness)
@@ -406,6 +528,9 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
             ? _configuration.LabelMapPath
             : $"missing ({_configuration.LabelMapPath})";
     }
+
+    private static string RegistryValue(string value)
+        => string.IsNullOrWhiteSpace(value) ? "not selected" : value;
 
     private static string TensorDisplay(string configuredName)
         => string.IsNullOrWhiteSpace(configuredName) ? "auto-detect first tensor" : configuredName;

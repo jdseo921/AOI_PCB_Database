@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows.Media.Imaging;
 
 namespace AOI_Monitor.Services;
 
@@ -88,9 +89,38 @@ public sealed class FolderCameraSource : ICameraSource
         _indices[SelectedView] = index;
 
         var frameId = $"{SelectedView}-{Interlocked.Increment(ref _frameSequence):000000}";
-        return new CameraFrame(frameId, frames[index], SelectedView, DateTime.Now, Name, BoardModel, LotId);
+        var capturedAtUtc = DateTime.UtcNow;
+        var metadata = TryReadImageMetadata(frames[index]);
+        return new CameraFrame(
+            frameId,
+            frames[index],
+            SelectedView,
+            capturedAtUtc.ToLocalTime(),
+            Name,
+            BoardModel,
+            LotId,
+            CameraId: $"{SelectedView}-FolderSimulation",
+            CapturedAtUtc: capturedAtUtc,
+            Width: metadata.Width,
+            Height: metadata.Height,
+            PixelFormat: metadata.PixelFormat,
+            SourceKind: "FolderCameraSimulation",
+            IsSimulated: true);
     }
 
     private bool HasAnyFrames => _frames.Values.Any(frames => frames.Count > 0);
     private bool MissingConfiguredFolder => _folders.Count > 0 && !HasAnyFrames;
+
+    private static (int Width, int Height, string PixelFormat) TryReadImageMetadata(string path)
+    {
+        try
+        {
+            var frame = BitmapFrame.Create(new Uri(path, UriKind.Absolute), BitmapCreateOptions.DelayCreation, BitmapCacheOption.OnLoad);
+            return (frame.PixelWidth, frame.PixelHeight, frame.Format.ToString());
+        }
+        catch
+        {
+            return (0, 0, string.Empty);
+        }
+    }
 }

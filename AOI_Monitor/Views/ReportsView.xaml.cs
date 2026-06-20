@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -26,6 +27,7 @@ public partial class ReportsView : UserControl
     private readonly ObservableCollection<ReviewLogRow> _reviewRows = new();
     private readonly ObservableCollection<ExportHistoryRow> _exportRows = new();
     private readonly ObservableCollection<AuditLogRow> _auditRows = new();
+    private readonly ObservableCollection<MesSpoolQueueRow> _mesSpoolRows = new();
     private CancellationTokenSource? _workCts;
 
     public ReportsView()
@@ -35,6 +37,7 @@ public partial class ReportsView : UserControl
         ReviewGrid.ItemsSource = _reviewRows;
         ExportGrid.ItemsSource = _exportRows;
         AuditGrid.ItemsSource = _auditRows;
+        MesSpoolGrid.ItemsSource = _mesSpoolRows;
         FromDatePicker.SelectedDate = DateTime.Today.AddDays(-30);
         ToDatePicker.SelectedDate = DateTime.Today;
         LoadLogs();
@@ -61,15 +64,19 @@ public partial class ReportsView : UserControl
         var filter = BuildFilter();
         var inspections = AoiDatabase.GetInspectionHistory(filter).Select(InspectionLogRow.FromRecord).ToArray();
         var reviews = AoiDatabase.GetReviewEvents(filter).Select(ReviewLogRow.FromRecord).ToArray();
-        var exports = AoiDatabase.GetExportHistory().Select(ExportHistoryRow.FromRecord).ToArray();
+        var exports = AoiDatabase.GetExportHistory()
+            .Select(record => ExportHistoryRow.FromRecord(record, AoiDatabase.GetLatestExportVerification(record.Id)))
+            .ToArray();
         var audits = AoiDatabase.GetAuditEvents(filter).Select(AuditLogRow.FromRecord).ToArray();
+        var mesSpool = AoiDatabase.GetMesSpoolQueue().Select(MesSpoolQueueRow.FromRecord).ToArray();
 
         ReplaceRows(_inspectionRows, inspections);
         ReplaceRows(_reviewRows, reviews);
         ReplaceRows(_exportRows, exports);
         ReplaceRows(_auditRows, audits);
+        ReplaceRows(_mesSpoolRows, mesSpool);
 
-        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows";
+        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows / {mesSpool.Length} MES spool";
         StatusText.Text = "Loaded real SQLite log records.";
     }
 
@@ -105,9 +112,9 @@ public partial class ReportsView : UserControl
         try
         {
             File.WriteAllText(dialog.FileName, BuildInspectionCsv(_inspectionRows), CsvEncoding);
-            AoiDatabase.RecordExport("InspectionHistoryCsv", dialog.FileName);
+            var verified = ExportVerificationService.RecordVerifiedExport("InspectionHistoryCsv", dialog.FileName);
             WorkflowState.Instance.AddEvent("EXPORT", $"Inspection history CSV exported: {Path.GetFileName(dialog.FileName)}");
-            RefreshAfterExport($"Inspection history CSV exported: {dialog.FileName}");
+            RefreshAfterExport($"Inspection history CSV exported: {dialog.FileName}. Verification: {verified.Verification.Status}.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -133,9 +140,9 @@ public partial class ReportsView : UserControl
         try
         {
             File.WriteAllText(dialog.FileName, BuildReviewCsv(_reviewRows), CsvEncoding);
-            AoiDatabase.RecordExport("ReviewLogCsv", dialog.FileName);
+            var verified = ExportVerificationService.RecordVerifiedExport("ReviewLogCsv", dialog.FileName);
             WorkflowState.Instance.AddEvent("EXPORT", $"Review log CSV exported: {Path.GetFileName(dialog.FileName)}");
-            RefreshAfterExport($"Review log CSV exported: {dialog.FileName}");
+            RefreshAfterExport($"Review log CSV exported: {dialog.FileName}. Verification: {verified.Verification.Status}.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -161,9 +168,9 @@ public partial class ReportsView : UserControl
         try
         {
             File.WriteAllText(dialog.FileName, BuildAuditCsv(_auditRows), CsvEncoding);
-            AoiDatabase.RecordExport("AuditTrailCsv", dialog.FileName);
+            var verified = ExportVerificationService.RecordVerifiedExport("AuditTrailCsv", dialog.FileName);
             WorkflowState.Instance.AddEvent("EXPORT", $"Audit trail CSV exported: {Path.GetFileName(dialog.FileName)}");
-            RefreshAfterExport($"Audit trail CSV exported: {dialog.FileName}");
+            RefreshAfterExport($"Audit trail CSV exported: {dialog.FileName}. Verification: {verified.Verification.Status}.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -203,10 +210,13 @@ public partial class ReportsView : UserControl
         try
         {
             var result = await Task.Run(() => ExportAnnotatedOverlays(rows, dialog.FolderName, cts.Token, progress), cts.Token);
-            AoiDatabase.RecordExport("AnnotatedImageOverlays", dialog.FolderName, result.Errors.Count == 0 ? "OK" : "WARN");
+            var verified = ExportVerificationService.RecordVerifiedExport(
+                "AnnotatedImageOverlays",
+                dialog.FolderName,
+                result.Errors.Count == 0 ? "OK" : "WARN");
             WorkflowState.Instance.AddEvent("EXPORT", $"Annotated overlays exported: {result.Count} image(s), {result.Errors.Count} issue(s).");
             LogErrors("EXPORT_ERROR", result.Errors);
-            RefreshAfterExport($"Annotated overlays exported: {result.Count} image(s), {result.Errors.Count} issue(s) to {dialog.FolderName}");
+            RefreshAfterExport($"Annotated overlays exported: {result.Count} image(s), {result.Errors.Count} issue(s) to {dialog.FolderName}. Verification: {verified.Verification.Status}.");
         }
         catch (OperationCanceledException)
         {
@@ -339,16 +349,23 @@ public partial class ReportsView : UserControl
                     BuildStage1PackageReadme(packageDir, latestRun, validationRows.Length, overlays.Count, inspectionRows.Length, reviewRows.Length, auditRows.Length, warnings, filter),
                     CsvEncoding);
                 File.WriteAllText(Path.Combine(packageDir, "warnings.txt"), BuildWarningsText(warnings), CsvEncoding);
+                WritePackageManifest(packageDir, warnings);
 
                 return new PackageOutcome(packageDir, reportPath, overlays.Count, warnings);
             }, cts.Token);
 
-            AoiDatabase.RecordExport("Stage1CustomerPackage", result.PackageDir, result.Warnings.Count == 0 ? "OK" : "WARN");
-            AoiDatabase.RecordExport("CustomerValidationHtmlReport", result.ReportPath, result.Warnings.Count == 0 ? "OK" : "WARN");
+            var packageVerification = ExportVerificationService.RecordVerifiedExport(
+                "Stage1CustomerPackage",
+                result.PackageDir,
+                result.Warnings.Count == 0 ? "OK" : "WARN");
+            var reportVerification = ExportVerificationService.RecordVerifiedExport(
+                "CustomerValidationHtmlReport",
+                result.ReportPath,
+                result.Warnings.Count == 0 ? "OK" : "WARN");
             WorkflowState.Instance.AddEvent("EXPORT", $"Stage 1 customer package exported: {Path.GetFileName(result.PackageDir)}, overlays={result.OverlayCount}, warnings={result.Warnings.Count}.");
             LogErrors("EXPORT_WARNING", result.Warnings);
             PackagePathText.Text = $"Latest customer package: {result.PackageDir}";
-            RefreshAfterExport($"Stage 1 customer package exported: {result.PackageDir}. Warnings: {result.Warnings.Count}.");
+            RefreshAfterExport($"Stage 1 customer package exported: {result.PackageDir}. Warnings: {result.Warnings.Count}. Package verification: {packageVerification.Verification.Status}; report verification: {reportVerification.Verification.Status}.");
         }
         catch (OperationCanceledException)
         {
@@ -391,9 +408,35 @@ public partial class ReportsView : UserControl
         sb.AppendLine($"Issues: {inaccessible}");
         File.WriteAllText(reportPath, sb.ToString());
 
-        AoiDatabase.RecordExport("ImagePathVerification", reportPath, inaccessible == 0 ? "OK" : "WARN");
+        var verified = ExportVerificationService.RecordVerifiedExport("ImagePathVerification", reportPath, inaccessible == 0 ? "OK" : "WARN");
         WorkflowState.Instance.AddEvent("UTILITY", $"Image path verification completed. Issues={inaccessible}.");
-        RefreshAfterExport($"Image path verification complete. Issues={inaccessible}. Report: {reportPath}");
+        RefreshAfterExport($"Image path verification complete. Issues={inaccessible}. Report: {reportPath}. Verification: {verified.Verification.Status}.");
+    }
+
+    private void OnVerifySelectedExportClick(object sender, RoutedEventArgs e)
+    {
+        if (ExportGrid.SelectedItem is not ExportHistoryRow row)
+        {
+            MessageBox.Show("Select an export history row first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var result = ExportVerificationService.Verify(row.FilePath, row.ExportType, row.Id, persist: true);
+            var reportFolder = Path.Combine(EnsureExportsDir(), "export_verification");
+            var report = ExportVerificationService.ExportReport(result, reportFolder);
+            ExportVerificationService.RecordVerifiedExport("ExportVerificationJsonReport", report.JsonPath);
+            ExportVerificationService.RecordVerifiedExport("ExportVerificationTextReport", report.TextPath);
+            WorkflowState.Instance.AddEvent(
+                result.Status == ExportVerificationStatus.OK ? "EXPORT_VERIFY" : "EXPORT_VERIFY_WARN",
+                $"Export verification {result.Status}: {row.ExportType}; sha256={result.Sha256}; path={row.FilePath}");
+            RefreshAfterExport($"Export verification {result.Status}. SHA-256: {ShortHash(result.Sha256)}. Report: {report.JsonPath}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException)
+        {
+            HandleWorkError("Export verification failed", ex, "EXPORT_VERIFY_ERROR");
+        }
     }
 
     private async void OnRunDbIntegrityCheckClick(object sender, RoutedEventArgs e)
@@ -436,9 +479,9 @@ public partial class ReportsView : UserControl
                 return new IntegrityOutcome(reportPath, integrity, status);
             }, cts.Token);
 
-            AoiDatabase.RecordExport("DatabaseIntegrityReport", result.ReportPath, result.Status);
+            var verified = ExportVerificationService.RecordVerifiedExport("DatabaseIntegrityReport", result.ReportPath, result.Status);
             WorkflowState.Instance.AddEvent("UTILITY", $"DB integrity check result: {result.Integrity}.");
-            RefreshAfterExport($"DB integrity check complete: {result.Integrity}. Report: {result.ReportPath}");
+            RefreshAfterExport($"DB integrity check complete: {result.Integrity}. Report: {result.ReportPath}. Verification: {verified.Verification.Status}.");
         }
         catch (OperationCanceledException)
         {
@@ -479,10 +522,10 @@ public partial class ReportsView : UserControl
         try
         {
             var result = await Task.Run(() => RebuildImageIndex(rows, cts.Token, progress), cts.Token);
-            AoiDatabase.RecordExport("ImageIndex", result.Path, result.Errors.Count == 0 ? "OK" : "WARN");
+            var verified = ExportVerificationService.RecordVerifiedExport("ImageIndex", result.Path, result.Errors.Count == 0 ? "OK" : "WARN");
             WorkflowState.Instance.AddEvent("UTILITY", $"Image index rebuilt with {result.Count} entries and {result.Errors.Count} issue(s).");
             LogErrors("UTILITY_ERROR", result.Errors);
-            RefreshAfterExport($"Image index rebuilt with {result.Count} entries: {result.Path}");
+            RefreshAfterExport($"Image index rebuilt with {result.Count} entries: {result.Path}. Verification: {verified.Verification.Status}.");
         }
         catch (OperationCanceledException)
         {
@@ -541,11 +584,11 @@ public partial class ReportsView : UserControl
                 ? "CANCELED"
                 : result.Errors.Count == 0 ? "OK" : "WARN";
 
-            AoiDatabase.RecordExport("SoakTestReport", reportPath, status);
+            var verified = ExportVerificationService.RecordVerifiedExport("SoakTestReport", reportPath, status);
             WorkflowState.Instance.AddEvent("SOAK_TEST", $"Soak test {status}: cycles={result.TotalCycles}, success={result.SuccessfulCycles}, failed={result.FailedCycles}, report={Path.GetFileName(reportPath)}.");
             LogErrors("SOAK_TEST_ERROR", result.Errors);
             SoakReportPathText.Text = $"Latest soak-test report: {reportPath}";
-            RefreshAfterExport($"Soak test {status}. Cycles={result.TotalCycles}, failed={result.FailedCycles}. Report: {reportPath}");
+            RefreshAfterExport($"Soak test {status}. Cycles={result.TotalCycles}, failed={result.FailedCycles}. Report: {reportPath}. Verification: {verified.Verification.Status}.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -565,7 +608,7 @@ public partial class ReportsView : UserControl
             return;
         }
 
-        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Uploading a result to Mock MES integration", out var permissionMessage))
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Uploading a result to MES integration", out var permissionMessage))
         {
             MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
@@ -581,30 +624,71 @@ public partial class ReportsView : UserControl
         var settings = MesIntegrationSettingsService.Load();
         if (settings.Mode == MesIntegrationMode.FutureProduction)
         {
-            MessageBox.Show("Future Production mode is a planned Stage 4 boundary. Switch to Mock REST to generate a demonstrable mock upload.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Future Production mode is a planned Stage 4 boundary. Use Mock Local/REST or REST mode for upload testing. OPC UA remains a Stage 4 adapter TODO.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         var payload = BuildTraceabilityPayload(row, settings);
-        var cts = BeginWork("Uploading result to Mock MES...");
+        var cts = BeginWork("Uploading result to MES boundary...");
         try
         {
             var outcome = await TraceabilityUploadService.UploadAsync(payload, cts.Token);
             var exportStatus = outcome.Result.Accepted ? "OK" : "ERROR";
-            AoiDatabase.RecordExport("MesMockTraceabilityPayload", outcome.PayloadPath, exportStatus);
+            var verified = ExportVerificationService.Verify(outcome.PayloadPath, "MesTraceabilityPayload");
             WorkflowState.Instance.AddEvent(
-                outcome.Result.Accepted ? "MES_MOCK" : "MES_MOCK_ERROR",
-                $"Mock MES upload {exportStatus}: {outcome.Result.Message}");
-            RefreshAfterExport($"Mock MES upload {exportStatus}. Payload: {outcome.PayloadPath}");
+                outcome.Result.Accepted ? "MES_UPLOAD" : "MES_UPLOAD_ERROR",
+                $"MES upload {exportStatus}: {outcome.Result.Message}");
+            RefreshAfterExport($"MES upload {exportStatus}. Payload: {outcome.PayloadPath}. Verification: {verified.Status}.");
         }
         catch (OperationCanceledException)
         {
-            StatusText.Text = "Mock MES upload canceled.";
-            WorkflowState.Instance.AddEvent("MES_MOCK", "Mock MES upload canceled by user.");
+            StatusText.Text = "MES upload canceled.";
+            WorkflowState.Instance.AddEvent("MES_UPLOAD", "MES upload canceled by user.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            HandleWorkError("Mock MES upload failed", ex, "MES_MOCK_ERROR");
+            HandleWorkError("MES upload failed", ex, "MES_UPLOAD_ERROR");
+        }
+        finally
+        {
+            EndWork();
+        }
+    }
+
+    private async void OnRetryMesSpoolClick(object sender, RoutedEventArgs e)
+    {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Retrying MES spool uploads", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var pending = AoiDatabase.GetPendingMesSpoolItems();
+        if (pending.Count == 0)
+        {
+            MessageBox.Show("No pending MES spool items are ready for retry.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            LoadLogs();
+            return;
+        }
+
+        var cts = BeginWork("Retrying pending MES spool uploads...");
+        try
+        {
+            var summary = await TraceabilityUploadService.RetryPendingMesUploadsAsync(100, cts.Token);
+            var message = $"MES spool retry complete: attempted={summary.Attempted}, succeeded={summary.Succeeded}, failed={summary.Failed}.";
+            WorkflowState.Instance.AddEvent("MES_SPOOL", message);
+            RefreshAfterExport(message);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "MES spool retry canceled.";
+            WorkflowState.Instance.AddEvent("MES_SPOOL", "MES spool retry canceled by user.");
         }
         finally
         {
@@ -1174,6 +1258,61 @@ public partial class ReportsView : UserControl
         return sb.ToString();
     }
 
+    private static void WritePackageManifest(string packageDir, IReadOnlyList<string> warnings)
+    {
+        var manifestPath = Path.Combine(packageDir, "package_manifest.json");
+        WritePackageManifestFile(packageDir, manifestPath, warnings);
+        WritePackageManifestFile(packageDir, manifestPath, warnings);
+    }
+
+    private static void WritePackageManifestFile(string packageDir, string manifestPath, IReadOnlyList<string> warnings)
+    {
+        var manifest = new
+        {
+            schemaVersion = "stage1-customer-package/v1",
+            packageId = Path.GetFileName(packageDir),
+            generatedAtUtc = DateTime.UtcNow,
+            generatedBy = WorkflowState.Instance.OperatorWithRole,
+            includedFiles = Directory.EnumerateFiles(packageDir, "*", SearchOption.AllDirectories)
+                .OrderBy(path => Path.GetRelativePath(packageDir, path), StringComparer.OrdinalIgnoreCase)
+                .Select(path => new ValidationIncludedFile
+                {
+                    RelativePath = Path.GetRelativePath(packageDir, path).Replace('\\', '/'),
+                    FileType = ClassifyPackageFile(packageDir, path),
+                    Bytes = new FileInfo(path).Length,
+                })
+                .ToList(),
+            warnings = warnings.ToArray(),
+        };
+        File.WriteAllText(
+            manifestPath,
+            JsonSerializer.Serialize(manifest, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            }),
+            CsvEncoding);
+    }
+
+    private static string ClassifyPackageFile(string packageDir, string path)
+    {
+        var relative = Path.GetRelativePath(packageDir, path).Replace('\\', '/');
+        var fileName = Path.GetFileName(path);
+        if (fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            return "CSV";
+        if (fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+            return "Annotated image";
+        if (fileName.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+            return "HTML report";
+        if (fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            return "Markdown";
+        if (fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            return "Manifest";
+        if (relative.StartsWith("summaries/", StringComparison.OrdinalIgnoreCase))
+            return "Summary";
+        return "Package evidence";
+    }
+
     private static string BuildWarningsText(IReadOnlyList<string> warnings)
     {
         if (warnings.Count == 0)
@@ -1225,6 +1364,9 @@ public partial class ReportsView : UserControl
 
     private static string NullIfEmpty(string value)
         => string.IsNullOrWhiteSpace(value) ? "(not configured)" : value;
+
+    private static string ShortHash(string hash)
+        => string.IsNullOrWhiteSpace(hash) || hash.Length <= 12 ? hash : hash[..12];
 
     private static string FormatPercent(double value)
         => value.ToString("P1", CultureInfo.InvariantCulture);
@@ -1671,8 +1813,11 @@ public partial class ReportsView : UserControl
         public string OperatorId { get; init; } = "UNKNOWN";
         public long? AuditEventId { get; init; }
         public string AuditEventDisplay => AuditEventId is null ? "--" : AuditEventId.Value.ToString(CultureInfo.InvariantCulture);
+        public string VerificationStatus { get; init; } = "--";
+        public string VerificationSha256 { get; init; } = string.Empty;
+        public string VerificationShaDisplay => string.IsNullOrWhiteSpace(VerificationSha256) ? "--" : ShortHash(VerificationSha256);
 
-        public static ExportHistoryRow FromRecord(ExportHistoryRecord record)
+        public static ExportHistoryRow FromRecord(ExportHistoryRecord record, ExportVerificationRecord? verification = null)
         {
             return new ExportHistoryRow
             {
@@ -1683,6 +1828,43 @@ public partial class ReportsView : UserControl
                 Status = record.Status,
                 OperatorId = record.OperatorId,
                 AuditEventId = record.AuditEventId,
+                VerificationStatus = verification?.Status ?? "--",
+                VerificationSha256 = verification?.Sha256 ?? string.Empty,
+            };
+        }
+    }
+
+    public sealed class MesSpoolQueueRow
+    {
+        public long Id { get; init; }
+        public DateTime CreatedAtUtc { get; init; }
+        public string CreatedLocal => CreatedAtUtc == DateTime.MinValue ? "--" : CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm");
+        public string PayloadType { get; init; } = string.Empty;
+        public string EndpointUrl { get; init; } = string.Empty;
+        public int RetryCount { get; init; }
+        public int MaxRetryCount { get; init; }
+        public string RetryDisplay => $"{RetryCount}/{MaxRetryCount}";
+        public string Status { get; init; } = string.Empty;
+        public string LastError { get; init; } = string.Empty;
+        public string LotId { get; init; } = string.Empty;
+        public string BoardModel { get; init; } = string.Empty;
+        public string Result { get; init; } = string.Empty;
+
+        public static MesSpoolQueueRow FromRecord(MesSpoolQueueRecord record)
+        {
+            return new MesSpoolQueueRow
+            {
+                Id = record.Id,
+                CreatedAtUtc = record.CreatedAtUtc,
+                PayloadType = record.PayloadType,
+                EndpointUrl = record.EndpointUrl,
+                RetryCount = record.RetryCount,
+                MaxRetryCount = record.MaxRetryCount,
+                Status = record.Status,
+                LastError = record.LastError,
+                LotId = record.LotId,
+                BoardModel = record.BoardModel,
+                Result = record.Result,
             };
         }
     }

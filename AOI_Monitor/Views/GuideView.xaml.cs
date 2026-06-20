@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using System.Windows;
+using System.IO;
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
 
@@ -28,6 +29,49 @@ public partial class GuideView : UserControl
     private void OnOpenSettingsClick(object sender, System.Windows.RoutedEventArgs e) => Navigate("settings");
     private void OnOpenCalibrationClick(object sender, System.Windows.RoutedEventArgs e) => Navigate("calibration");
     private void OnOpenInstallClick(object sender, System.Windows.RoutedEventArgs e) => Navigate("install");
+
+    private void OnRunSetupWizardClick(object sender, RoutedEventArgs e)
+    {
+        if (!AuthorizeSettingsAction("Running setup wizard"))
+            return;
+
+        var wizard = new FirstRunWizardView
+        {
+            Owner = Window.GetWindow(this),
+        };
+        wizard.ShowDialog();
+    }
+
+    private void OnExportDiagnosticsClick(object sender, RoutedEventArgs e)
+    {
+        if (!AuthorizeSettingsAction("Exporting diagnostics report"))
+            return;
+
+        try
+        {
+            var report = SystemDiagnosticService.RunDiagnostics();
+            var export = SystemDiagnosticService.ExportReport(report);
+            WorkflowState.Instance.AddEvent("DIAGNOSTICS", $"Diagnostics report exported from Guide: {Path.GetFileName(export.JsonPath)}");
+            MessageBox.Show(
+                $"Diagnostics exported.\n\nJSON: {export.JsonPath}\nHTML: {export.HtmlPath}\nText: {export.TextPath}",
+                "AOI Monitor Diagnostics",
+                MessageBoxButton.OK,
+                report.ErrorCount == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            MessageBox.Show($"Diagnostics export failed:\n{ex.Message}", "AOI Monitor Diagnostics", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static bool AuthorizeSettingsAction(string action)
+    {
+        if (WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanManageSettings, action, out var message))
+            return true;
+
+        MessageBox.Show(message, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+        return false;
+    }
 
     private void Navigate(string key)
     {

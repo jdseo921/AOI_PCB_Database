@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Text;
+using AOI_Monitor.Models;
 
 namespace AOI_Monitor.Services;
 
@@ -14,6 +15,9 @@ public sealed class CustomerValidationReportContext
     public DateTime TestTimestamp { get; init; } = DateTime.Now;
     public string BoardModel { get; init; } = "Not provided";
     public string LotId { get; init; } = "Not provided";
+    public string ModelId { get; init; } = "Not selected";
+    public string ModelSha256 { get; init; } = "Not available";
+    public string ModelValidationStatus { get; init; } = "Not Tested";
     public string EngineName { get; init; } = "Pixel Difference Prototype Engine";
     public string ModelVersion { get; init; } = "PIXEL_DIFF_0.1";
     public string ModelFileName { get; init; } = "Not configured";
@@ -22,6 +26,9 @@ public sealed class CustomerValidationReportContext
     public string GroundTruthFile { get; init; } = "Not available";
     public BatchMetrics Metrics { get; init; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     public BatchPerformanceSummary PerformanceSummary { get; init; } = new(0, 0, 0, 0, 0);
+    public string AcceptanceStatus { get; init; } = "CONDITIONAL";
+    public IReadOnlyList<string> AcceptanceMessages { get; init; } = Array.Empty<string>();
+    public ValidationAcceptanceCriteria AcceptanceCriteria { get; init; } = new();
     public IReadOnlyCollection<BatchTestRow> Rows { get; init; } = Array.Empty<BatchTestRow>();
     public IReadOnlyList<ReportImageReference> SampleAnnotatedImages { get; init; } = Array.Empty<ReportImageReference>();
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
@@ -90,12 +97,31 @@ public static class CustomerValidationReportService
         AppendDetailRow(sb, "Board model", context.BoardModel);
         AppendDetailRow(sb, "Lot ID", context.LotId);
         AppendDetailRow(sb, "Engine name", context.EngineName);
+        AppendDetailRow(sb, "Model ID", context.ModelId);
         AppendDetailRow(sb, "Model version", context.ModelVersion);
+        AppendDetailRow(sb, "Model SHA-256", context.ModelSha256);
+        AppendDetailRow(sb, "Model validation status", context.ModelValidationStatus);
         AppendDetailRow(sb, "Model file name", context.ModelFileName);
         AppendDetailRow(sb, "Confidence threshold", FormatThreshold(context.ConfidenceThreshold));
         AppendDetailRow(sb, "Dataset folder", context.DatasetFolder);
         AppendDetailRow(sb, "Ground truth file", context.GroundTruthFile);
+        AppendDetailRow(sb, "Acceptance status", context.AcceptanceStatus);
         sb.AppendLine("  </table>");
+
+        sb.AppendLine("  <h2>Acceptance Summary</h2>");
+        sb.AppendLine("  <table class=\"details\">");
+        AppendDetailRow(sb, "Status", context.AcceptanceStatus);
+        AppendDetailRow(sb, "Minimum accuracy", FormatPercent(context.AcceptanceCriteria.MinimumAccuracy));
+        AppendDetailRow(sb, "Minimum precision", FormatPercent(context.AcceptanceCriteria.MinimumPrecision));
+        AppendDetailRow(sb, "Minimum recall", FormatPercent(context.AcceptanceCriteria.MinimumRecall));
+        AppendDetailRow(sb, "Maximum false call rate", FormatPercent(context.AcceptanceCriteria.MaximumFalseCallRate));
+        AppendDetailRow(sb, "Maximum images over 1 second", context.AcceptanceCriteria.MaximumImagesOverOneSecond.ToString(CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "Formal manifest required", context.AcceptanceCriteria.RequireFormalManifest ? "Yes" : "No");
+        sb.AppendLine("  </table>");
+        if (context.AcceptanceMessages.Count == 0)
+            sb.AppendLine("  <p>All configured acceptance checks passed.</p>");
+        else
+            AppendList(sb, context.AcceptanceMessages);
 
         sb.AppendLine("  <h2>Validation Summary</h2>");
         sb.AppendLine("  <div class=\"metric-grid\">");
@@ -191,11 +217,34 @@ public static class CustomerValidationReportService
         sb.AppendLine($"Board model: {EscapeMarkdown(context.BoardModel)}");
         sb.AppendLine($"Lot ID: {EscapeMarkdown(context.LotId)}");
         sb.AppendLine($"Engine name: {EscapeMarkdown(context.EngineName)}");
+        sb.AppendLine($"Model ID: {EscapeMarkdown(context.ModelId)}");
         sb.AppendLine($"Model version: {EscapeMarkdown(context.ModelVersion)}");
+        sb.AppendLine($"Model SHA-256: {EscapeMarkdown(context.ModelSha256)}");
+        sb.AppendLine($"Model validation status: {EscapeMarkdown(context.ModelValidationStatus)}");
         sb.AppendLine($"Model file name: {EscapeMarkdown(context.ModelFileName)}");
         sb.AppendLine($"Confidence threshold: {FormatThreshold(context.ConfidenceThreshold)}");
         sb.AppendLine($"Dataset folder: {EscapeMarkdown(context.DatasetFolder)}");
         sb.AppendLine($"Ground truth file: {EscapeMarkdown(context.GroundTruthFile)}");
+        sb.AppendLine($"Acceptance status: {EscapeMarkdown(context.AcceptanceStatus)}");
+        sb.AppendLine();
+        sb.AppendLine("## Acceptance Summary");
+        sb.AppendLine();
+        sb.AppendLine($"- Minimum accuracy: {FormatPercent(context.AcceptanceCriteria.MinimumAccuracy)}");
+        sb.AppendLine($"- Minimum precision: {FormatPercent(context.AcceptanceCriteria.MinimumPrecision)}");
+        sb.AppendLine($"- Minimum recall: {FormatPercent(context.AcceptanceCriteria.MinimumRecall)}");
+        sb.AppendLine($"- Maximum false call rate: {FormatPercent(context.AcceptanceCriteria.MaximumFalseCallRate)}");
+        sb.AppendLine($"- Maximum images over 1 second: {context.AcceptanceCriteria.MaximumImagesOverOneSecond}");
+        sb.AppendLine($"- Formal manifest required: {(context.AcceptanceCriteria.RequireFormalManifest ? "Yes" : "No")}");
+        if (context.AcceptanceMessages.Count == 0)
+        {
+            sb.AppendLine("- All configured acceptance checks passed.");
+        }
+        else
+        {
+            foreach (var message in context.AcceptanceMessages)
+                sb.AppendLine($"- {EscapeMarkdown(message)}");
+        }
+
         sb.AppendLine();
         sb.AppendLine("## Validation Summary");
         sb.AppendLine();
@@ -314,16 +363,16 @@ public static class CustomerValidationReportService
 
     private static void AppendFailedRowsTable(StringBuilder sb, IReadOnlyCollection<BatchTestRow> failed)
     {
-        sb.AppendLine("  <table><tr><th>Image</th><th>Ground Truth</th><th>Engine Result</th><th>Score</th><th>Total Time</th><th>Defect Type</th><th>Side</th><th>RefDes</th><th>Lot ID</th><th>Board Model</th><th>Notes</th><th>Image Path</th></tr>");
+        sb.AppendLine("  <table><tr><th>Image</th><th>Ground Truth</th><th>Engine Result</th><th>Score</th><th>Total Time</th><th>Defect Type</th><th>ROI ID</th><th>ROI Type</th><th>Recipe</th><th>Side</th><th>RefDes</th><th>Lot ID</th><th>Board Model</th><th>Notes</th><th>Image Path</th></tr>");
         if (failed.Count == 0)
         {
-            sb.AppendLine("  <tr><td colspan=\"12\">No failed samples were recorded.</td></tr>");
+            sb.AppendLine("  <tr><td colspan=\"15\">No failed samples were recorded.</td></tr>");
         }
         else
         {
             foreach (var row in failed)
             {
-                sb.AppendLine($"  <tr class=\"failed\"><td>{Html(row.Image)}</td><td>{Html(row.GroundTruth)}</td><td>{Html(row.EngineResult)}</td><td>{Html(row.ScoreDisplay)}</td><td>{Html(row.TotalTimeDisplay)}</td><td>{Html(row.DefectType)}</td><td>{Html(row.Side)}</td><td>{Html(row.RefDes)}</td><td>{Html(row.LotId)}</td><td>{Html(row.BoardModel)}</td><td>{Html(row.Notes)}</td><td>{Html(row.ImagePath)}</td></tr>");
+                sb.AppendLine($"  <tr class=\"failed\"><td>{Html(row.Image)}</td><td>{Html(row.GroundTruth)}</td><td>{Html(row.EngineResult)}</td><td>{Html(row.ScoreDisplay)}</td><td>{Html(row.TotalTimeDisplay)}</td><td>{Html(row.DefectType)}</td><td>{Html(row.RoiId)}</td><td>{Html(row.RoiType)}</td><td>{Html(RecipeDisplay(row))}</td><td>{Html(row.Side)}</td><td>{Html(row.RefDes)}</td><td>{Html(row.LotId)}</td><td>{Html(row.BoardModel)}</td><td>{Html(row.Notes)}</td><td>{Html(row.ImagePath)}</td></tr>");
             }
         }
 
@@ -338,13 +387,18 @@ public static class CustomerValidationReportService
             return;
         }
 
-        sb.AppendLine("| Image | Ground Truth | Engine Result | Score | Total Time | Defect Type | Side | RefDes | Lot ID | Board Model | Notes | Image Path |");
-        sb.AppendLine("|---|---|---|---:|---:|---|---|---|---|---|---|---|");
+        sb.AppendLine("| Image | Ground Truth | Engine Result | Score | Total Time | Defect Type | ROI ID | ROI Type | Recipe | Side | RefDes | Lot ID | Board Model | Notes | Image Path |");
+        sb.AppendLine("|---|---|---|---:|---:|---|---|---|---|---|---|---|---|---|---|");
         foreach (var row in failed)
         {
-            sb.AppendLine($"| {EscapeMarkdown(row.Image)} | {EscapeMarkdown(row.GroundTruth)} | {EscapeMarkdown(row.EngineResult)} | {EscapeMarkdown(row.ScoreDisplay)} | {EscapeMarkdown(row.TotalTimeDisplay)} | {EscapeMarkdown(row.DefectType)} | {EscapeMarkdown(row.Side)} | {EscapeMarkdown(row.RefDes)} | {EscapeMarkdown(row.LotId)} | {EscapeMarkdown(row.BoardModel)} | {EscapeMarkdown(row.Notes)} | {EscapeMarkdown(row.ImagePath)} |");
+            sb.AppendLine($"| {EscapeMarkdown(row.Image)} | {EscapeMarkdown(row.GroundTruth)} | {EscapeMarkdown(row.EngineResult)} | {EscapeMarkdown(row.ScoreDisplay)} | {EscapeMarkdown(row.TotalTimeDisplay)} | {EscapeMarkdown(row.DefectType)} | {EscapeMarkdown(row.RoiId)} | {EscapeMarkdown(row.RoiType)} | {EscapeMarkdown(RecipeDisplay(row))} | {EscapeMarkdown(row.Side)} | {EscapeMarkdown(row.RefDes)} | {EscapeMarkdown(row.LotId)} | {EscapeMarkdown(row.BoardModel)} | {EscapeMarkdown(row.Notes)} | {EscapeMarkdown(row.ImagePath)} |");
         }
     }
+
+    private static string RecipeDisplay(BatchTestRow row)
+        => string.IsNullOrWhiteSpace(row.RecipeName) && string.IsNullOrWhiteSpace(row.RecipeRevision)
+            ? string.Empty
+            : $"{row.RecipeName} {row.RecipeRevision}".Trim();
 
     private static void AppendList(StringBuilder sb, IReadOnlyList<string> items)
     {

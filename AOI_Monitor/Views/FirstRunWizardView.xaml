@@ -1,0 +1,180 @@
+<Window x:Class="AOI_Monitor.Views.FirstRunWizardView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AOI Monitor Setup Wizard"
+        Width="960" Height="620" MinWidth="860" MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        Background="#0B0E10">
+  <Window.Resources>
+    <Style x:Key="WizardButton" TargetType="Button">
+      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="MinWidth" Value="92"/>
+      <Setter Property="Margin" Value="6,0,0,0"/>
+      <Setter Property="Padding" Value="10,4"/>
+      <Setter Property="Background" Value="#182128"/>
+      <Setter Property="Foreground" Value="#DCE5EB"/>
+      <Setter Property="BorderBrush" Value="#4A535C"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style x:Key="FieldLabel" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="#9AA6AF"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+  </Window.Resources>
+
+  <Border Margin="8" BorderBrush="#343D44" BorderThickness="1" Background="#11161A">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="54"/>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="48"/>
+      </Grid.RowDefinitions>
+
+      <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="12">
+        <DockPanel>
+          <TextBlock x:Name="StepCounterText" DockPanel.Dock="Right" Text="Step 1 / 6" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+          <StackPanel>
+            <TextBlock x:Name="StepTitleText" Text="Storage Root" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="15"/>
+            <TextBlock x:Name="StepSubtitleText" Text="Confirm where local SQLite, image vault, exports, and settings are stored." Foreground="#8B969E" FontSize="11" Margin="0,3,0,0"/>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+
+      <Grid Grid.Row="1">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="230"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Background="#0F1316" BorderBrush="#343D44" BorderThickness="0,0,1,0" Padding="10">
+          <ListBox x:Name="StepList" Background="#0F1316" BorderThickness="0" Foreground="#DCE5EB" IsHitTestVisible="False">
+            <ListBoxItem Content="1. Storage root"/>
+            <ListBoxItem Content="2. Local diagnostics"/>
+            <ListBoxItem Content="3. Camera source"/>
+            <ListBoxItem Content="4. Inspection engine"/>
+            <ListBoxItem Content="5. Stage 1 workflow"/>
+            <ListBoxItem Content="6. Finish"/>
+          </ListBox>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="16">
+          <Grid x:Name="StepStorage">
+            <StackPanel>
+              <TextBlock Text="Storage root" Foreground="#DCE5EB" FontWeight="Bold" FontSize="13"/>
+              <TextBlock Text="This folder is used for the local SQLite database, image vault, model registry, diagnostics, and export packages."
+                         Foreground="#9AA6AF" TextWrapping="Wrap" Margin="0,4,0,12"/>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="120"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="92"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Folder"/>
+                <TextBox x:Name="StorageRootText" Grid.Column="1" MinHeight="30"/>
+                <Button Grid.Column="2" Style="{StaticResource WizardButton}" Content="Browse" Click="OnBrowseStorageClick"/>
+              </Grid>
+              <TextBlock Text="Use a local writable folder. Network/cloud-synced folders can work, but may be slower or locked by sync tools."
+                         Foreground="#E1A334" TextWrapping="Wrap" Margin="0,12,0,0"/>
+            </StackPanel>
+          </Grid>
+
+          <Grid x:Name="StepDiagnostics" Visibility="Collapsed">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <DockPanel Margin="0,0,0,10">
+                <Button DockPanel.Dock="Right" Style="{StaticResource WizardButton}" Content="Run Again" Click="OnRunDiagnosticsClick"/>
+                <TextBlock x:Name="DiagnosticsSummaryText" Text="Diagnostics have not run." Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              </DockPanel>
+              <DataGrid Grid.Row="1" x:Name="DiagnosticsGrid" AutoGenerateColumns="False" IsReadOnly="True">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
+                  <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="130"/>
+                  <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="160"/>
+                  <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                  <DataGridTextColumn Header="Remediation" Binding="{Binding Remediation}" Width="*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
+          </Grid>
+
+          <Grid x:Name="StepCamera" Visibility="Collapsed">
+            <StackPanel>
+              <TextBlock Text="Camera source" Foreground="#DCE5EB" FontWeight="Bold" FontSize="13"/>
+              <TextBlock Text="Stage 1 can run without real camera hardware. Folder Simulation is best for evaluator demos with sample images."
+                         Foreground="#9AA6AF" TextWrapping="Wrap" Margin="0,4,0,12"/>
+              <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Mode"/>
+                <ComboBox x:Name="CameraModeCombo" Grid.Column="1" MinHeight="30" SelectedIndex="0">
+                  <ComboBoxItem Content="No Camera / Not Connected"/>
+                  <ComboBoxItem Content="Folder Simulation"/>
+                </ComboBox>
+              </Grid>
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="92"/></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Top folder"/>
+                <TextBox x:Name="CameraFolderText" Grid.Column="1" MinHeight="30"/>
+                <Button Grid.Column="2" Style="{StaticResource WizardButton}" Content="Browse" Click="OnBrowseCameraFolderClick"/>
+              </Grid>
+              <TextBlock Text="Folder Simulation is explicitly simulated input. It does not claim camera readiness."
+                         Foreground="#E1A334" TextWrapping="Wrap" Margin="0,12,0,0"/>
+            </StackPanel>
+          </Grid>
+
+          <Grid x:Name="StepEngine" Visibility="Collapsed">
+            <StackPanel>
+              <TextBlock Text="Inspection engine" Foreground="#DCE5EB" FontWeight="Bold" FontSize="13"/>
+              <TextBlock Text="Pixel Difference is the stable Stage 1 demonstration path. ONNX can be selected only when model configuration is available."
+                         Foreground="#9AA6AF" TextWrapping="Wrap" Margin="0,4,0,12"/>
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Engine"/>
+                <ComboBox x:Name="EngineCombo" Grid.Column="1" MinHeight="30" SelectedIndex="0">
+                  <ComboBoxItem Content="Pixel Difference Prototype Engine"/>
+                  <ComboBoxItem Content="ONNX ML Model"/>
+                </ComboBox>
+              </Grid>
+              <TextBlock x:Name="EngineStatusText" Text="Current engine status will be shown after diagnostics run."
+                         Foreground="#DCE5EB" TextWrapping="Wrap" Margin="0,12,0,0"/>
+            </StackPanel>
+          </Grid>
+
+          <Grid x:Name="StepWorkflow" Visibility="Collapsed">
+            <StackPanel>
+              <TextBlock Text="Stage 1 demo workflow" Foreground="#DCE5EB" FontWeight="Bold" FontSize="13"/>
+              <TextBlock TextWrapping="Wrap" Foreground="#DCE5EB" LineHeight="20" Margin="0,8,0,0"><Run Text="1. Verify readiness indicators: Database, Image Vault, Inspection Engine."/><LineBreak/><Run Text="2. Import or select sample/golden images."/><LineBreak/><Run Text="3. Run Golden Compare or Main Inspection with Pixel Difference."/><LineBreak/><Run Text="4. Confirm overlay and defect list evidence."/><LineBreak/><Run Text="5. Save result, record disposition, and export CSV/customer evidence from Log &amp; Export."/></TextBlock>
+              <TextBlock Text="Docs: README storage-root notes, Settings / Guide, Installation Notes, AI Model Test validation report."
+                         Foreground="#9AA6AF" TextWrapping="Wrap" Margin="0,14,0,0"/>
+            </StackPanel>
+          </Grid>
+
+          <Grid x:Name="StepFinish" Visibility="Collapsed">
+            <StackPanel>
+              <TextBlock Text="Ready for evaluator handoff" Foreground="#DCE5EB" FontWeight="Bold" FontSize="13"/>
+              <TextBlock x:Name="FinishSummaryText" Text="Run diagnostics and press Finish to save first-run completion." Foreground="#9AA6AF" TextWrapping="Wrap" Margin="0,8,0,0"/>
+              <TextBlock Text="Optional integrations such as camera, lighting, robot, and MES may remain Not Connected for Stage 1. They are reported as warnings, not blockers."
+                         Foreground="#E1A334" TextWrapping="Wrap" Margin="0,12,0,0"/>
+            </StackPanel>
+          </Grid>
+        </Grid>
+      </Grid>
+
+      <Border Grid.Row="2" Background="#0F1316" BorderBrush="#343D44" BorderThickness="0,1,0,0" Padding="10">
+        <DockPanel>
+          <TextBlock x:Name="WizardStatusText" Text="Prototype setup wizard. Real hardware is not required." Foreground="#9AA6AF" VerticalAlignment="Center"/>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="SkipButton" Style="{StaticResource WizardButton}" Content="Skip" Click="OnSkipClick"/>
+            <Button x:Name="BackButton" Style="{StaticResource WizardButton}" Content="Back" Click="OnBackClick"/>
+            <Button x:Name="NextButton" Style="{StaticResource WizardButton}" Content="Next" Click="OnNextClick"/>
+            <Button x:Name="FinishButton" Style="{StaticResource WizardButton}" Content="Finish" Click="OnFinishClick"/>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </Border>
+</Window>

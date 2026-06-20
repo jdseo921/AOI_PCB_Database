@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Windows.Media.Imaging;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
@@ -29,6 +30,7 @@ public static class AoiDatabase
     public static string DatabasePath => Path.Combine(StorageRoot, "aoi_monitor.sqlite");
     public static string ImageVaultPath => Path.Combine(StorageRoot, "image_vault");
     public static string TrainingVaultPath => Path.Combine(ImageVaultPath, "training");
+    public static int LatestSchemaVersion => AoiDatabaseMigrations.LatestVersion;
 
     public static void ConfigureStorageRoot(string storageRoot)
     {
@@ -46,10 +48,18 @@ public static class AoiDatabase
         Directory.CreateDirectory(TrainingVaultPath);
 
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = SchemaSql;
-        command.ExecuteNonQuery();
-        EnsureSchemaCompatibility(connection);
+        var hasExistingSchema = HasExistingUserSchema(connection);
+        if (hasExistingSchema)
+        {
+            EnsureSchemaCompatibility(connection);
+            ExecuteSchemaSql(connection);
+        }
+        else
+        {
+            ExecuteSchemaSql(connection);
+            EnsureSchemaCompatibility(connection);
+        }
+
         AutoArchiveOldLogs(connection);
 
         _initialized = true;
@@ -499,6 +509,140 @@ public static class AoiDatabase
         return records;
     }
 
+    public static ExportHistoryRecord? GetExportHistoryRecord(long id)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, ExportType, FilePath, Status, OperatorId, AuditEventId
+            FROM ExportHistory
+            WHERE Id = $id
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadExportHistory(reader) : null;
+    }
+
+    public static ExportVerificationRecord? GetLatestExportVerification(long exportHistoryId)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ExportHistoryId, CheckedAtUtc, ExportType, ExportPath, Status,
+                   Sha256, SizeBytes, MessagesJson, ArtifactChecksumsJson
+            FROM ExportVerification
+            WHERE ExportHistoryId = $exportHistoryId
+            ORDER BY datetime(CheckedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$exportHistoryId", exportHistoryId);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadExportVerification(reader) : null;
+    }
+
+    public static IReadOnlyList<ExportVerificationRecord> GetExportVerifications(int limit = 100)
+    {
+        EnsureInitialized();
+
+        var records = new List<ExportVerificationRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ExportHistoryId, CheckedAtUtc, ExportType, ExportPath, Status,
+                   Sha256, SizeBytes, MessagesJson, ArtifactChecksumsJson
+            FROM ExportVerification
+            ORDER BY datetime(CheckedAtUtc) DESC, Id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            records.Add(ReadExportVerification(reader));
+
+        return records;
+    }
+
+    public static IReadOnlyList<ValidationPackageRecord> GetValidationPackages(int limit = 100)
+    {
+        EnsureInitialized();
+
+        var records = new List<ValidationPackageRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, PackageId, PackagePath, ManifestPath, AcceptanceStatus,
+                   Summary, RunId, OperatorId, AuditEventId
+            FROM ValidationPackages
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            records.Add(ReadValidationPackage(reader));
+
+        return records;
+    }
+
+    public static IReadOnlyList<ModelRegistryRecord> GetModelRegistryRecords()
+    {
+        EnsureInitialized();
+
+        var records = new List<ModelRegistryRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ModelId, DisplayName, Version, CreatedAtUtc, RegisteredAtUtc, SourceFileName,
+                   StoredModelPath, StoredLabelMapPath, MetadataPath, Sha256, InputTensorName, OutputTensorName,
+                   InputWidth, InputHeight, ConfidenceThreshold, LabelsJson, ValidationStatus, LastValidatedAtUtc,
+                   ValidationMessage, Notes, IsActive, AuditEventId
+            FROM ModelRegistry
+            ORDER BY IsActive DESC, datetime(RegisteredAtUtc) DESC, Id DESC;
+            """;
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            records.Add(ReadModelRegistryRecord(reader));
+
+        return records;
+    }
+
+    public static ModelRegistryRecord? GetActiveModelRegistryRecord()
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ModelId, DisplayName, Version, CreatedAtUtc, RegisteredAtUtc, SourceFileName,
+                   StoredModelPath, StoredLabelMapPath, MetadataPath, Sha256, InputTensorName, OutputTensorName,
+                   InputWidth, InputHeight, ConfidenceThreshold, LabelsJson, ValidationStatus, LastValidatedAtUtc,
+                   ValidationMessage, Notes, IsActive, AuditEventId
+            FROM ModelRegistry
+            WHERE IsActive = 1
+            ORDER BY datetime(RegisteredAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadModelRegistryRecord(reader) : null;
+    }
+
     public static IReadOnlyList<AuditEventRecord> GetAuditEvents(LogFilter filter, int limit = 500)
     {
         EnsureInitialized();
@@ -728,7 +872,9 @@ public static class AoiDatabase
             CountTable(connection, "CalibrationProfiles", "OK"),
             CountTable(connection, "CalibrationPoints", "OK"),
             CountTable(connection, "BatchTestRuns", "OK"),
+            CountTable(connection, "ModelRegistry", "OK"),
             CountTable(connection, "ExportHistory", "OK"),
+            CountTable(connection, "ValidationPackages", "OK"),
             CountTable(connection, "MesUploadAttempts", "OK"),
             CountTable(connection, "LogArchive", "OK"),
         };
@@ -825,7 +971,143 @@ public static class AoiDatabase
         command.ExecuteNonQuery();
     }
 
-    public static void RecordExport(string exportType, string filePath, string status = "OK", string? operatorId = null)
+    public static long RecordValidationPackage(
+        string packageId,
+        string packagePath,
+        string manifestPath,
+        string acceptanceStatus,
+        string summary,
+        long? runId = null,
+        string? operatorId = null)
+    {
+        EnsureInitialized();
+
+        var effectiveOperator = string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId;
+        var auditEventId = RecordAuditEvent(
+            "EXPORT",
+            $"Stage 1 validation package recorded: {packageId}; status={acceptanceStatus}; manifest={manifestPath}.",
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "ValidationPackage",
+            relatedEntityId: packageId,
+            relatedPath: manifestPath);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO ValidationPackages
+                (PackageId, PackagePath, ManifestPath, AcceptanceStatus, Summary, RunId, OperatorId, AuditEventId, CreatedAtUtc)
+            VALUES
+                ($packageId, $packagePath, $manifestPath, $acceptanceStatus, $summary, $runId, $operatorId, $auditEventId, $createdAtUtc);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$packageId", packageId);
+        command.Parameters.AddWithValue("$packagePath", packagePath);
+        command.Parameters.AddWithValue("$manifestPath", manifestPath);
+        command.Parameters.AddWithValue("$acceptanceStatus", acceptanceStatus);
+        command.Parameters.AddWithValue("$summary", summary);
+        command.Parameters.AddWithValue("$runId", runId is { } id ? (object)id : DBNull.Value);
+        command.Parameters.AddWithValue("$operatorId", effectiveOperator);
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
+        command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        return (long)(command.ExecuteScalar() ?? 0L);
+    }
+
+    public static void UpsertModelRegistryRecord(ModelRegistryRecord record)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO ModelRegistry
+                (ModelId, DisplayName, Version, CreatedAtUtc, RegisteredAtUtc, SourceFileName,
+                 StoredModelPath, StoredLabelMapPath, MetadataPath, Sha256, InputTensorName, OutputTensorName,
+                 InputWidth, InputHeight, ConfidenceThreshold, LabelsJson, ValidationStatus, LastValidatedAtUtc,
+                 ValidationMessage, Notes, IsActive, AuditEventId)
+            VALUES
+                ($modelId, $displayName, $version, $createdAtUtc, $registeredAtUtc, $sourceFileName,
+                 $storedModelPath, $storedLabelMapPath, $metadataPath, $sha256, $inputTensorName, $outputTensorName,
+                 $inputWidth, $inputHeight, $confidenceThreshold, $labelsJson, $validationStatus, $lastValidatedAtUtc,
+                 $validationMessage, $notes, $isActive, $auditEventId)
+            ON CONFLICT(ModelId) DO UPDATE SET
+                DisplayName = excluded.DisplayName,
+                Version = excluded.Version,
+                CreatedAtUtc = excluded.CreatedAtUtc,
+                RegisteredAtUtc = excluded.RegisteredAtUtc,
+                SourceFileName = excluded.SourceFileName,
+                StoredModelPath = excluded.StoredModelPath,
+                StoredLabelMapPath = excluded.StoredLabelMapPath,
+                MetadataPath = excluded.MetadataPath,
+                Sha256 = excluded.Sha256,
+                InputTensorName = excluded.InputTensorName,
+                OutputTensorName = excluded.OutputTensorName,
+                InputWidth = excluded.InputWidth,
+                InputHeight = excluded.InputHeight,
+                ConfidenceThreshold = excluded.ConfidenceThreshold,
+                LabelsJson = excluded.LabelsJson,
+                ValidationStatus = excluded.ValidationStatus,
+                LastValidatedAtUtc = excluded.LastValidatedAtUtc,
+                ValidationMessage = excluded.ValidationMessage,
+                Notes = excluded.Notes,
+                IsActive = excluded.IsActive,
+                AuditEventId = excluded.AuditEventId;
+            """;
+        BindModelRegistryRecord(command, record);
+        command.ExecuteNonQuery();
+    }
+
+    public static void SetActiveModelRegistryRecord(string modelId)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using (var clear = connection.CreateCommand())
+        {
+            clear.Transaction = transaction;
+            clear.CommandText = "UPDATE ModelRegistry SET IsActive = 0;";
+            clear.ExecuteNonQuery();
+        }
+
+        using (var set = connection.CreateCommand())
+        {
+            set.Transaction = transaction;
+            set.CommandText = "UPDATE ModelRegistry SET IsActive = 1 WHERE ModelId = $modelId;";
+            set.Parameters.AddWithValue("$modelId", modelId);
+            set.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
+    public static void UpdateModelRegistryValidation(
+        string modelId,
+        ModelConfigurationTestStatus status,
+        DateTime timestampUtc,
+        string message)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE ModelRegistry
+            SET ValidationStatus = $validationStatus,
+                LastValidatedAtUtc = $lastValidatedAtUtc,
+                ValidationMessage = $validationMessage
+            WHERE ModelId = $modelId;
+            """;
+        command.Parameters.AddWithValue("$validationStatus", status.ToString());
+        command.Parameters.AddWithValue("$lastValidatedAtUtc", timestampUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$validationMessage", message);
+        command.Parameters.AddWithValue("$modelId", modelId);
+        command.ExecuteNonQuery();
+    }
+
+    public static long RecordExport(string exportType, string filePath, string status = "OK", string? operatorId = null)
     {
         EnsureInitialized();
 
@@ -843,6 +1125,7 @@ public static class AoiDatabase
             """
             INSERT INTO ExportHistory (ExportType, FilePath, Status, OperatorId, AuditEventId, CreatedAtUtc)
             VALUES ($exportType, $filePath, $status, $operatorId, $auditEventId, $createdAtUtc);
+            SELECT last_insert_rowid();
             """;
         command.Parameters.AddWithValue("$exportType", exportType);
         command.Parameters.AddWithValue("$filePath", filePath);
@@ -850,7 +1133,33 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$operatorId", effectiveOperator);
         command.Parameters.AddWithValue("$auditEventId", auditEventId);
         command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
-        command.ExecuteNonQuery();
+        return (long)(command.ExecuteScalar() ?? 0L);
+    }
+
+    public static long RecordExportVerification(ExportVerificationResult result, long? exportHistoryId = null)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO ExportVerification
+                (ExportHistoryId, CheckedAtUtc, ExportType, ExportPath, Status, Sha256, SizeBytes, MessagesJson, ArtifactChecksumsJson)
+            VALUES
+                ($exportHistoryId, $checkedAtUtc, $exportType, $exportPath, $status, $sha256, $sizeBytes, $messagesJson, $artifactChecksumsJson);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$exportHistoryId", exportHistoryId is null ? DBNull.Value : exportHistoryId.Value);
+        command.Parameters.AddWithValue("$checkedAtUtc", result.CheckedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$exportType", result.ExportType);
+        command.Parameters.AddWithValue("$exportPath", result.ExportPath);
+        command.Parameters.AddWithValue("$status", result.Status.ToString());
+        command.Parameters.AddWithValue("$sha256", result.Sha256);
+        command.Parameters.AddWithValue("$sizeBytes", result.SizeBytes);
+        command.Parameters.AddWithValue("$messagesJson", JsonSerializer.Serialize(result.Messages));
+        command.Parameters.AddWithValue("$artifactChecksumsJson", JsonSerializer.Serialize(result.ArtifactChecksums));
+        return (long)(command.ExecuteScalar() ?? 0L);
     }
 
     public static void RecordMesUploadAttempt(
@@ -919,6 +1228,155 @@ public static class AoiDatabase
         return records;
     }
 
+    public static long EnqueueMesSpoolItem(
+        string payloadType,
+        string payloadJson,
+        string payloadPath,
+        string endpointUrl,
+        int maxRetryCount,
+        string lastError,
+        string operatorId,
+        string lotId,
+        string boardModel,
+        string result)
+    {
+        EnsureInitialized();
+
+        var now = DateTime.UtcNow;
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO MesSpoolQueue
+                (CreatedAtUtc, LastAttemptAtUtc, NextAttemptAtUtc, PayloadType, PayloadJson, PayloadPath, EndpointUrl, RetryCount, MaxRetryCount, Status, LastError, OperatorId, LotId, BoardModel, Result)
+            VALUES
+                ($createdAtUtc, $lastAttemptAtUtc, $nextAttemptAtUtc, $payloadType, $payloadJson, $payloadPath, $endpointUrl, 0, $maxRetryCount, 'Pending', $lastError, $operatorId, $lotId, $boardModel, $result);
+            """;
+        command.Parameters.AddWithValue("$createdAtUtc", now.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$lastAttemptAtUtc", now.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$nextAttemptAtUtc", now.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$payloadType", payloadType);
+        command.Parameters.AddWithValue("$payloadJson", payloadJson);
+        command.Parameters.AddWithValue("$payloadPath", payloadPath);
+        command.Parameters.AddWithValue("$endpointUrl", endpointUrl);
+        command.Parameters.AddWithValue("$maxRetryCount", maxRetryCount);
+        command.Parameters.AddWithValue("$lastError", lastError);
+        command.Parameters.AddWithValue("$operatorId", string.IsNullOrWhiteSpace(operatorId) ? "UNKNOWN" : operatorId);
+        command.Parameters.AddWithValue("$lotId", lotId);
+        command.Parameters.AddWithValue("$boardModel", boardModel);
+        command.Parameters.AddWithValue("$result", result);
+
+        command.ExecuteNonQuery();
+        command.Parameters.Clear();
+        command.CommandText = "SELECT last_insert_rowid();";
+        var id = Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        RecordAuditEvent(
+            "MES_SPOOL",
+            $"MES REST payload spooled: id={id}; type={payloadType}; result={result}; message={lastError}.",
+            operatorWithRole: operatorId,
+            relatedEntityType: "MesSpoolQueue",
+            relatedEntityId: id.ToString(CultureInfo.InvariantCulture),
+            relatedPath: payloadPath);
+        return id;
+    }
+
+    public static IReadOnlyList<MesSpoolQueueRecord> GetPendingMesSpoolItems(int limit = 100)
+    {
+        EnsureInitialized();
+
+        var records = new List<MesSpoolQueueRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, LastAttemptAtUtc, NextAttemptAtUtc, PayloadType, PayloadJson, PayloadPath, EndpointUrl,
+                   RetryCount, MaxRetryCount, Status, LastError, OperatorId, LotId, BoardModel, Result
+            FROM MesSpoolQueue
+            WHERE Status = 'Pending' AND (NextAttemptAtUtc IS NULL OR datetime(NextAttemptAtUtc) <= datetime($now))
+            ORDER BY datetime(CreatedAtUtc), Id
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            records.Add(ReadMesSpoolQueueRecord(reader));
+
+        return records;
+    }
+
+    public static IReadOnlyList<MesSpoolQueueRecord> GetMesSpoolQueue(int limit = 100)
+    {
+        EnsureInitialized();
+
+        var records = new List<MesSpoolQueueRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, LastAttemptAtUtc, NextAttemptAtUtc, PayloadType, PayloadJson, PayloadPath, EndpointUrl,
+                   RetryCount, MaxRetryCount, Status, LastError, OperatorId, LotId, BoardModel, Result
+            FROM MesSpoolQueue
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            records.Add(ReadMesSpoolQueueRecord(reader));
+
+        return records;
+    }
+
+    public static void DeleteMesSpoolItem(long id, string message)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM MesSpoolQueue WHERE Id = $id;";
+        command.Parameters.AddWithValue("$id", id);
+        command.ExecuteNonQuery();
+
+        RecordAuditEvent(
+            "MES_SPOOL",
+            $"MES spool item {id} completed and was removed. {message}",
+            relatedEntityType: "MesSpoolQueue",
+            relatedEntityId: id.ToString(CultureInfo.InvariantCulture));
+    }
+
+    public static void RecordMesSpoolRetryFailure(long id, string message, int retryBackoffMs)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE MesSpoolQueue
+            SET RetryCount = RetryCount + 1,
+                LastAttemptAtUtc = $lastAttemptAtUtc,
+                NextAttemptAtUtc = $nextAttemptAtUtc,
+                Status = CASE WHEN RetryCount + 1 >= MaxRetryCount THEN 'Failed' ELSE 'Pending' END,
+                LastError = $lastError
+            WHERE Id = $id;
+            """;
+        var now = DateTime.UtcNow;
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$lastAttemptAtUtc", now.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$nextAttemptAtUtc", now.AddMilliseconds(Math.Max(0, retryBackoffMs)).ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$lastError", message);
+        command.ExecuteNonQuery();
+
+        RecordAuditEvent(
+            "MES_SPOOL",
+            $"MES spool item {id} retry failed: {message}",
+            relatedEntityType: "MesSpoolQueue",
+            relatedEntityId: id.ToString(CultureInfo.InvariantCulture));
+    }
+
     public static string RunIntegrityCheck()
     {
         EnsureInitialized();
@@ -946,6 +1404,157 @@ public static class AoiDatabase
         var connection = new SqliteConnection(builder.ToString());
         connection.Open();
         return connection;
+    }
+
+    private static void ExecuteSchemaSql(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = SchemaSql;
+        command.ExecuteNonQuery();
+    }
+
+    private static bool HasExistingUserSchema(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type IN ('table', 'view')
+              AND name NOT LIKE 'sqlite_%';
+            """;
+        return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) > 0;
+    }
+
+    public static bool TableExists(SqliteConnection connection, string tableName)
+        => TableExists(connection, null, tableName);
+
+    internal static bool TableExists(SqliteConnection connection, SqliteTransaction? transaction, string tableName)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name = $tableName;
+            """;
+        command.Parameters.AddWithValue("$tableName", tableName);
+        return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) > 0;
+    }
+
+    public static bool ColumnExists(SqliteConnection connection, string tableName, string columnName)
+        => ColumnExists(connection, null, tableName, columnName);
+
+    internal static bool ColumnExists(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        string tableName,
+        string columnName)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"PRAGMA table_info({QuoteIdentifier(tableName)});";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    public static bool IndexExists(SqliteConnection connection, string indexName)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type = 'index'
+              AND name = $indexName;
+            """;
+        command.Parameters.AddWithValue("$indexName", indexName);
+        return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) > 0;
+    }
+
+    public static int GetSchemaVersion()
+    {
+        using var connection = OpenConnection();
+        return GetSchemaVersion(connection);
+    }
+
+    public static int GetSchemaVersion(SqliteConnection connection)
+    {
+        if (!TableExists(connection, "SchemaInfo"))
+            return 0;
+
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Value
+            FROM SchemaInfo
+            WHERE Key = 'SchemaVersion'
+            LIMIT 1;
+            """;
+        var value = Convert.ToString(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var version)
+            ? version
+            : 0;
+    }
+
+    public static void SetSchemaVersion(SqliteConnection connection, int version)
+        => SetSchemaVersion(connection, null, version);
+
+    internal static void SetSchemaVersion(SqliteConnection connection, SqliteTransaction? transaction, int version)
+    {
+        EnsureSchemaInfoTable(connection, transaction);
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO SchemaInfo (Key, Value)
+            VALUES ('SchemaVersion', $version)
+            ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value;
+            """;
+        command.Parameters.AddWithValue("$version", version.ToString(CultureInfo.InvariantCulture));
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureSchemaInfoTable(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS SchemaInfo
+            (
+                Key TEXT PRIMARY KEY,
+                Value TEXT NOT NULL
+            );
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void ExecuteNonQuery(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        string commandText)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = commandText;
+        command.ExecuteNonQuery();
+    }
+
+    private static string QuoteIdentifier(string identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+            throw new ArgumentException("SQLite identifier is required.", nameof(identifier));
+
+        return "\"" + identifier.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
     }
 
     private static string ResolveStorageRoot()
@@ -1105,6 +1714,69 @@ public static class AoiDatabase
             reader.IsDBNull(6) ? null : reader.GetInt64(6));
     }
 
+    private static ExportVerificationRecord ReadExportVerification(SqliteDataReader reader)
+    {
+        return new ExportVerificationRecord(
+            reader.GetInt64(0),
+            reader.IsDBNull(1) ? null : reader.GetInt64(1),
+            ParseDateTime(reader.GetString(2)),
+            reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            reader.IsDBNull(7) ? 0 : reader.GetInt64(7),
+            reader.IsDBNull(8) ? "[]" : reader.GetString(8),
+            reader.IsDBNull(9) ? "{}" : reader.GetString(9));
+    }
+
+    private static ValidationPackageRecord ReadValidationPackage(SqliteDataReader reader)
+    {
+        return new ValidationPackageRecord(
+            reader.GetInt64(0),
+            ParseDateTime(reader.GetString(1)),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            reader.IsDBNull(7) ? null : reader.GetInt64(7),
+            reader.IsDBNull(8) ? "UNKNOWN" : reader.GetString(8),
+            reader.IsDBNull(9) ? null : reader.GetInt64(9));
+    }
+
+    private static ModelRegistryRecord ReadModelRegistryRecord(SqliteDataReader reader)
+    {
+        var statusText = reader.IsDBNull(17) ? string.Empty : reader.GetString(17);
+        var status = Enum.TryParse<ModelConfigurationTestStatus>(statusText, ignoreCase: true, out var parsedStatus)
+            ? parsedStatus
+            : ModelConfigurationTestStatus.NotTested;
+
+        return new ModelRegistryRecord(
+            reader.GetInt64(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            ParseDateTime(reader.GetString(4)),
+            ParseDateTime(reader.GetString(5)),
+            reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+            reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+            reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+            reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+            reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
+            reader.IsDBNull(13) ? 640 : reader.GetInt32(13),
+            reader.IsDBNull(14) ? 640 : reader.GetInt32(14),
+            reader.IsDBNull(15) ? 0.65 : reader.GetDouble(15),
+            DeserializeStringList(reader.IsDBNull(16) ? "[]" : reader.GetString(16)),
+            status,
+            reader.IsDBNull(18) ? null : ParseDateTime(reader.GetString(18)),
+            reader.IsDBNull(19) ? string.Empty : reader.GetString(19),
+            reader.IsDBNull(20) ? string.Empty : reader.GetString(20),
+            !reader.IsDBNull(21) && reader.GetInt32(21) != 0,
+            reader.IsDBNull(22) ? null : reader.GetInt64(22));
+    }
+
     private static AuditEventRecord ReadAuditEvent(SqliteDataReader reader)
     {
         return new AuditEventRecord(
@@ -1135,6 +1807,27 @@ public static class AoiDatabase
             reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
             reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
             reader.IsDBNull(10) ? string.Empty : reader.GetString(10));
+    }
+
+    private static MesSpoolQueueRecord ReadMesSpoolQueueRecord(SqliteDataReader reader)
+    {
+        return new MesSpoolQueueRecord(
+            reader.GetInt64(0),
+            ParseDateTime(reader.GetString(1)),
+            reader.IsDBNull(2) ? null : ParseDateTime(reader.GetString(2)),
+            reader.IsDBNull(3) ? null : ParseDateTime(reader.GetString(3)),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            reader.GetInt32(8),
+            reader.GetInt32(9),
+            reader.GetString(10),
+            reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+            reader.IsDBNull(12) ? "UNKNOWN" : reader.GetString(12),
+            reader.IsDBNull(13) ? string.Empty : reader.GetString(13),
+            reader.IsDBNull(14) ? string.Empty : reader.GetString(14),
+            reader.IsDBNull(15) ? string.Empty : reader.GetString(15));
     }
 
     private static RecipeRevisionRecord ReadRecipeRevision(SqliteDataReader reader)
@@ -1170,6 +1863,32 @@ public static class AoiDatabase
             reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
             ParseDateTime(reader.GetString(12)),
             points);
+    }
+
+    private static void BindModelRegistryRecord(SqliteCommand command, ModelRegistryRecord record)
+    {
+        command.Parameters.AddWithValue("$modelId", record.ModelId);
+        command.Parameters.AddWithValue("$displayName", record.DisplayName);
+        command.Parameters.AddWithValue("$version", record.Version);
+        command.Parameters.AddWithValue("$createdAtUtc", record.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$registeredAtUtc", record.RegisteredAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$sourceFileName", record.SourceFileName);
+        command.Parameters.AddWithValue("$storedModelPath", record.StoredModelPath);
+        command.Parameters.AddWithValue("$storedLabelMapPath", record.StoredLabelMapPath);
+        command.Parameters.AddWithValue("$metadataPath", record.MetadataPath);
+        command.Parameters.AddWithValue("$sha256", record.Sha256);
+        command.Parameters.AddWithValue("$inputTensorName", record.InputTensorName);
+        command.Parameters.AddWithValue("$outputTensorName", record.OutputTensorName);
+        command.Parameters.AddWithValue("$inputWidth", record.InputWidth);
+        command.Parameters.AddWithValue("$inputHeight", record.InputHeight);
+        command.Parameters.AddWithValue("$confidenceThreshold", record.ConfidenceThreshold);
+        command.Parameters.AddWithValue("$labelsJson", JsonSerializer.Serialize(record.Labels));
+        command.Parameters.AddWithValue("$validationStatus", record.ValidationStatus.ToString());
+        command.Parameters.AddWithValue("$lastValidatedAtUtc", record.LastValidatedAtUtc is { } timestamp ? (object)timestamp.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
+        command.Parameters.AddWithValue("$validationMessage", record.ValidationMessage);
+        command.Parameters.AddWithValue("$notes", record.Notes);
+        command.Parameters.AddWithValue("$isActive", record.IsActive ? 1 : 0);
+        command.Parameters.AddWithValue("$auditEventId", record.AuditEventId is { } id ? (object)id : DBNull.Value);
     }
 
     private static IReadOnlyList<CalibrationPointRecord> GetCalibrationPoints(long profileId)
@@ -1319,43 +2038,148 @@ public static class AoiDatabase
             : DateTime.MinValue;
     }
 
+    private static IReadOnlyList<string> DeserializeStringList(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
     private static void EnsureSchemaCompatibility(SqliteConnection connection)
     {
-        AddColumnIfMissing(connection, "InspectionResults", "BoardProgram", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
-        AddColumnIfMissing(connection, "InspectionResults", "OperatorId", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
-        AddColumnIfMissing(connection, "InspectionResults", "InspectionEngine", "TEXT NOT NULL DEFAULT 'Pixel Difference Prototype Engine'");
-        AddColumnIfMissing(connection, "InspectionResults", "ModelFilePath", "TEXT NOT NULL DEFAULT ''");
-        AddColumnIfMissing(connection, "InspectionResults", "ConfidenceThreshold", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "InspectionResults", "ImageLoadMs", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "InspectionResults", "PreprocessingMs", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "InspectionResults", "InferenceMs", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "InspectionResults", "OverlayRenderingMs", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "InspectionResults", "TotalInspectionMs", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "Defects", "Confidence", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "Defects", "XPosition", "REAL NULL");
-        AddColumnIfMissing(connection, "Defects", "YPosition", "REAL NULL");
-        AddColumnIfMissing(connection, "Defects", "SideOrViewType", "TEXT NOT NULL DEFAULT 'sample'");
-        AddColumnIfMissing(connection, "Defects", "RoiId", "TEXT NOT NULL DEFAULT 'ROI-UNASSIGNED'");
-        AddColumnIfMissing(connection, "Defects", "JudgmentStatus", "TEXT NOT NULL DEFAULT 'REVIEW'");
-        AddColumnIfMissing(connection, "RecipeRevisions", "BoardProgram", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
-        AddColumnIfMissing(connection, "RecipeRevisions", "OperatorId", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
-        AddColumnIfMissing(connection, "RecipeRevisions", "BackgroundImagePath", "TEXT NOT NULL DEFAULT ''");
-        AddColumnIfMissing(connection, "RecipeRevisions", "RecipeJson", "TEXT NOT NULL DEFAULT ''");
-        AddColumnIfMissing(connection, "BatchTestRuns", "ModelVersion", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
-        AddColumnIfMissing(connection, "BatchTestResults", "InspectionEngine", "TEXT NOT NULL DEFAULT 'Pixel Difference Prototype Engine'");
-        AddColumnIfMissing(connection, "BatchTestResults", "ModelVersion", "TEXT NOT NULL DEFAULT 'PIXEL_DIFF_0.1'");
-        AddColumnIfMissing(connection, "BatchTestResults", "Side", "TEXT NOT NULL DEFAULT ''");
-        AddColumnIfMissing(connection, "BatchTestResults", "RefDes", "TEXT NOT NULL DEFAULT ''");
-        AddColumnIfMissing(connection, "BatchTestResults", "LotId", "TEXT NOT NULL DEFAULT ''");
-        AddColumnIfMissing(connection, "BatchTestResults", "BoardModel", "TEXT NOT NULL DEFAULT ''");
-        AddColumnIfMissing(connection, "BatchTestResults", "Notes", "TEXT NOT NULL DEFAULT ''");
-        AddColumnIfMissing(connection, "BatchTestResults", "ImageLoadMs", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "BatchTestResults", "PreprocessingMs", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "BatchTestResults", "InferenceMs", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "BatchTestResults", "OverlayRenderingMs", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "BatchTestResults", "TotalInspectionMs", "REAL NOT NULL DEFAULT 0");
-        AddColumnIfMissing(connection, "ExportHistory", "OperatorId", "TEXT NOT NULL DEFAULT 'UNKNOWN'");
-        AddColumnIfMissing(connection, "ExportHistory", "AuditEventId", "INTEGER NULL");
+        AoiDatabaseMigrations.ApplyPending(connection);
+    }
+
+    internal static void EnsureMesSpoolQueueTable(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS MesSpoolQueue
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CreatedAtUtc TEXT NOT NULL,
+                LastAttemptAtUtc TEXT NULL,
+                NextAttemptAtUtc TEXT NULL,
+                PayloadType TEXT NOT NULL,
+                PayloadJson TEXT NOT NULL,
+                PayloadPath TEXT NOT NULL DEFAULT '',
+                EndpointUrl TEXT NOT NULL DEFAULT '',
+                RetryCount INTEGER NOT NULL DEFAULT 0,
+                MaxRetryCount INTEGER NOT NULL DEFAULT 3,
+                Status TEXT NOT NULL DEFAULT 'Pending',
+                LastError TEXT NOT NULL DEFAULT '',
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                LotId TEXT NOT NULL DEFAULT '',
+                BoardModel TEXT NOT NULL DEFAULT '',
+                Result TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_MesSpoolQueue_Status_NextAttempt ON MesSpoolQueue(Status, NextAttemptAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_MesSpoolQueue_CreatedAtUtc ON MesSpoolQueue(CreatedAtUtc);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureValidationPackagesTable(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS ValidationPackages
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                PackageId TEXT NOT NULL,
+                PackagePath TEXT NOT NULL DEFAULT '',
+                ManifestPath TEXT NOT NULL,
+                AcceptanceStatus TEXT NOT NULL,
+                Summary TEXT NOT NULL DEFAULT '',
+                RunId INTEGER NULL,
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                AuditEventId INTEGER NULL,
+                CreatedAtUtc TEXT NOT NULL,
+                FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_ValidationPackages_CreatedAtUtc ON ValidationPackages(CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_ValidationPackages_PackageId ON ValidationPackages(PackageId);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureModelRegistryTable(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS ModelRegistry
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ModelId TEXT NOT NULL UNIQUE,
+                DisplayName TEXT NOT NULL,
+                Version TEXT NOT NULL,
+                CreatedAtUtc TEXT NOT NULL,
+                RegisteredAtUtc TEXT NOT NULL,
+                SourceFileName TEXT NOT NULL,
+                StoredModelPath TEXT NOT NULL,
+                StoredLabelMapPath TEXT NOT NULL DEFAULT '',
+                MetadataPath TEXT NOT NULL DEFAULT '',
+                Sha256 TEXT NOT NULL,
+                InputTensorName TEXT NOT NULL DEFAULT '',
+                OutputTensorName TEXT NOT NULL DEFAULT '',
+                InputWidth INTEGER NOT NULL DEFAULT 640,
+                InputHeight INTEGER NOT NULL DEFAULT 640,
+                ConfidenceThreshold REAL NOT NULL DEFAULT 0.65,
+                LabelsJson TEXT NOT NULL DEFAULT '[]',
+                ValidationStatus TEXT NOT NULL DEFAULT 'NotTested',
+                LastValidatedAtUtc TEXT NULL,
+                ValidationMessage TEXT NOT NULL DEFAULT '',
+                Notes TEXT NOT NULL DEFAULT '',
+                IsActive INTEGER NOT NULL DEFAULT 0,
+                AuditEventId INTEGER NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_ModelRegistry_ModelId ON ModelRegistry(ModelId);
+            CREATE INDEX IF NOT EXISTS IX_ModelRegistry_IsActive ON ModelRegistry(IsActive);
+            CREATE INDEX IF NOT EXISTS IX_ModelRegistry_RegisteredAtUtc ON ModelRegistry(RegisteredAtUtc);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureExportVerificationTable(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS ExportVerification
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ExportHistoryId INTEGER NULL,
+                CheckedAtUtc TEXT NOT NULL,
+                ExportType TEXT NOT NULL,
+                ExportPath TEXT NOT NULL,
+                Status TEXT NOT NULL,
+                Sha256 TEXT NOT NULL DEFAULT '',
+                SizeBytes INTEGER NOT NULL DEFAULT 0,
+                MessagesJson TEXT NOT NULL DEFAULT '[]',
+                ArtifactChecksumsJson TEXT NOT NULL DEFAULT '{}',
+                FOREIGN KEY (ExportHistoryId) REFERENCES ExportHistory(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_ExportVerification_ExportHistoryId ON ExportVerification(ExportHistoryId);
+            CREATE INDEX IF NOT EXISTS IX_ExportVerification_CheckedAtUtc ON ExportVerification(CheckedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_ExportVerification_Status ON ExportVerification(Status);
+            """;
+        command.ExecuteNonQuery();
     }
 
     private static void AutoArchiveOldLogs(SqliteConnection connection)
@@ -1418,22 +2242,23 @@ public static class AoiDatabase
         command.ExecuteNonQuery();
     }
 
-    private static void AddColumnIfMissing(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
-    {
-        using var readCommand = connection.CreateCommand();
-        readCommand.CommandText = $"PRAGMA table_info({tableName});";
+    public static void AddColumnIfMissing(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
+        => AddColumnIfMissing(connection, null, tableName, columnName, columnDefinition);
 
-        using (var reader = readCommand.ExecuteReader())
-        {
-            while (reader.Read())
-            {
-                if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
-                    return;
-            }
-        }
+    internal static void AddColumnIfMissing(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        string tableName,
+        string columnName,
+        string columnDefinition)
+    {
+        if (!TableExists(connection, transaction, tableName) || ColumnExists(connection, transaction, tableName, columnName))
+            return;
 
         using var alterCommand = connection.CreateCommand();
-        alterCommand.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
+        alterCommand.Transaction = transaction;
+        alterCommand.CommandText =
+            $"ALTER TABLE {QuoteIdentifier(tableName)} ADD COLUMN {QuoteIdentifier(columnName)} {columnDefinition};";
         alterCommand.ExecuteNonQuery();
     }
 
@@ -1496,6 +2321,12 @@ public static class AoiDatabase
         """
         PRAGMA journal_mode = WAL;
         PRAGMA foreign_keys = ON;
+
+        CREATE TABLE IF NOT EXISTS SchemaInfo
+        (
+            Key TEXT PRIMARY KEY,
+            Value TEXT NOT NULL
+        );
 
         CREATE TABLE IF NOT EXISTS Images
         (
@@ -1688,6 +2519,33 @@ public static class AoiDatabase
             FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
         );
 
+        CREATE TABLE IF NOT EXISTS ModelRegistry
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ModelId TEXT NOT NULL UNIQUE,
+            DisplayName TEXT NOT NULL,
+            Version TEXT NOT NULL,
+            CreatedAtUtc TEXT NOT NULL,
+            RegisteredAtUtc TEXT NOT NULL,
+            SourceFileName TEXT NOT NULL,
+            StoredModelPath TEXT NOT NULL,
+            StoredLabelMapPath TEXT NOT NULL DEFAULT '',
+            MetadataPath TEXT NOT NULL DEFAULT '',
+            Sha256 TEXT NOT NULL,
+            InputTensorName TEXT NOT NULL DEFAULT '',
+            OutputTensorName TEXT NOT NULL DEFAULT '',
+            InputWidth INTEGER NOT NULL DEFAULT 640,
+            InputHeight INTEGER NOT NULL DEFAULT 640,
+            ConfidenceThreshold REAL NOT NULL DEFAULT 0.65,
+            LabelsJson TEXT NOT NULL DEFAULT '[]',
+            ValidationStatus TEXT NOT NULL DEFAULT 'NotTested',
+            LastValidatedAtUtc TEXT NULL,
+            ValidationMessage TEXT NOT NULL DEFAULT '',
+            Notes TEXT NOT NULL DEFAULT '',
+            IsActive INTEGER NOT NULL DEFAULT 0,
+            AuditEventId INTEGER NULL
+        );
+
         CREATE TABLE IF NOT EXISTS ExportHistory
         (
             Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1697,6 +2555,36 @@ public static class AoiDatabase
             OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
             AuditEventId INTEGER NULL,
             CreatedAtUtc TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS ExportVerification
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ExportHistoryId INTEGER NULL,
+            CheckedAtUtc TEXT NOT NULL,
+            ExportType TEXT NOT NULL,
+            ExportPath TEXT NOT NULL,
+            Status TEXT NOT NULL,
+            Sha256 TEXT NOT NULL DEFAULT '',
+            SizeBytes INTEGER NOT NULL DEFAULT 0,
+            MessagesJson TEXT NOT NULL DEFAULT '[]',
+            ArtifactChecksumsJson TEXT NOT NULL DEFAULT '{}',
+            FOREIGN KEY (ExportHistoryId) REFERENCES ExportHistory(Id)
+        );
+
+        CREATE TABLE IF NOT EXISTS ValidationPackages
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            PackageId TEXT NOT NULL,
+            PackagePath TEXT NOT NULL DEFAULT '',
+            ManifestPath TEXT NOT NULL,
+            AcceptanceStatus TEXT NOT NULL,
+            Summary TEXT NOT NULL DEFAULT '',
+            RunId INTEGER NULL,
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            AuditEventId INTEGER NULL,
+            CreatedAtUtc TEXT NOT NULL,
+            FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
         );
 
         CREATE TABLE IF NOT EXISTS MesUploadAttempts
@@ -1712,6 +2600,26 @@ public static class AoiDatabase
             BoardModel TEXT NOT NULL DEFAULT '',
             Result TEXT NOT NULL DEFAULT '',
             CreatedAtUtc TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS MesSpoolQueue
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CreatedAtUtc TEXT NOT NULL,
+            LastAttemptAtUtc TEXT NULL,
+            NextAttemptAtUtc TEXT NULL,
+            PayloadType TEXT NOT NULL,
+            PayloadJson TEXT NOT NULL,
+            PayloadPath TEXT NOT NULL DEFAULT '',
+            EndpointUrl TEXT NOT NULL DEFAULT '',
+            RetryCount INTEGER NOT NULL DEFAULT 0,
+            MaxRetryCount INTEGER NOT NULL DEFAULT 3,
+            Status TEXT NOT NULL DEFAULT 'Pending',
+            LastError TEXT NOT NULL DEFAULT '',
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            LotId TEXT NOT NULL DEFAULT '',
+            BoardModel TEXT NOT NULL DEFAULT '',
+            Result TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS LogArchive
@@ -1739,7 +2647,17 @@ public static class AoiDatabase
         CREATE INDEX IF NOT EXISTS IX_CalibrationProfiles_BoardModel_CreatedAtUtc ON CalibrationProfiles(BoardModel, CreatedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_CalibrationPoints_ProfileId ON CalibrationPoints(ProfileId);
         CREATE INDEX IF NOT EXISTS IX_BatchTestResults_RunId ON BatchTestResults(RunId);
+        CREATE INDEX IF NOT EXISTS IX_ModelRegistry_ModelId ON ModelRegistry(ModelId);
+        CREATE INDEX IF NOT EXISTS IX_ModelRegistry_IsActive ON ModelRegistry(IsActive);
+        CREATE INDEX IF NOT EXISTS IX_ModelRegistry_RegisteredAtUtc ON ModelRegistry(RegisteredAtUtc);
         CREATE INDEX IF NOT EXISTS IX_ExportHistory_CreatedAtUtc ON ExportHistory(CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_ExportVerification_ExportHistoryId ON ExportVerification(ExportHistoryId);
+        CREATE INDEX IF NOT EXISTS IX_ExportVerification_CheckedAtUtc ON ExportVerification(CheckedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_ExportVerification_Status ON ExportVerification(Status);
+        CREATE INDEX IF NOT EXISTS IX_ValidationPackages_CreatedAtUtc ON ValidationPackages(CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_ValidationPackages_PackageId ON ValidationPackages(PackageId);
         CREATE INDEX IF NOT EXISTS IX_MesUploadAttempts_CreatedAtUtc ON MesUploadAttempts(CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_MesSpoolQueue_Status_NextAttempt ON MesSpoolQueue(Status, NextAttemptAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_MesSpoolQueue_CreatedAtUtc ON MesSpoolQueue(CreatedAtUtc);
         """;
 }

@@ -1,0 +1,57 @@
+name: .NET CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test-package:
+    name: Build, Test, Package
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Check repository hygiene
+        shell: pwsh
+        run: ./Scripts/check-repo-hygiene.ps1
+
+      - name: Restore
+        run: dotnet restore AOI_PCB_Database.slnx
+
+      - name: Restore publish runtime assets
+        run: dotnet restore AOI_Monitor/AOI_Monitor.csproj --runtime win-x64
+
+      - name: Build
+        run: dotnet build AOI_PCB_Database.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test AOI_PCB_Database.slnx --configuration Release --no-build --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: TestResults/**/*.trx
+          if-no-files-found: ignore
+
+      - name: Validate publish package
+        shell: pwsh
+        run: |
+          $publishRoot = Join-Path $env:RUNNER_TEMP "aoi_publish"
+          ./Scripts/publish.ps1 -Configuration Release -OutputRoot $publishRoot -ValidationOnly -NoRestore
+
+      - name: Upload main branch package
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AOI_Monitor_PoC
+          path: ${{ runner.temp }}/aoi_publish/AOI_Monitor_PoC_*
+          if-no-files-found: error

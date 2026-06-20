@@ -162,7 +162,7 @@ public static class ModelConfigurationValidator
         }
     }
 
-    private static Dictionary<int, string> LoadLabels(string path)
+    public static Dictionary<int, string> LoadLabels(string path)
     {
         var labels = new Dictionary<int, string>();
         if (Path.GetExtension(path).Equals(".json", StringComparison.OrdinalIgnoreCase))
@@ -207,9 +207,16 @@ public static class ModelConfigurationValidator
 
             var parts = line.Split(',', 2);
             if (parts.Length == 2 && int.TryParse(parts[0].Trim(), out var classId))
+            {
                 labels[classId] = parts[1].Trim();
+                nextIndex = Math.Max(nextIndex, classId + 1);
+            }
             else
+            {
+                while (labels.ContainsKey(nextIndex))
+                    nextIndex++;
                 labels[nextIndex++] = line;
+            }
         }
 
         return labels;

@@ -45,6 +45,9 @@ public static class InspectionModelConfigurationService
     public static void Save(InspectionModelConfiguration configuration)
         => Save(configuration, notify: true);
 
+    public static void NotifyExternalConfigurationChanged()
+        => ConfigurationChanged?.Invoke();
+
     public static InspectionEngineStatus GetStatus()
         => GetStatus(Load());
 
@@ -109,6 +112,11 @@ public static class InspectionModelConfigurationService
     private static void Normalize(InspectionModelConfiguration configuration)
     {
         configuration.SelectedEngineKey = InspectionEngineFactory.NormalizeEngineKey(configuration.SelectedEngineKey);
+        configuration.ActiveModelId = configuration.ActiveModelId?.Trim() ?? string.Empty;
+        configuration.ActiveModelSha256 = configuration.ActiveModelSha256?.Trim() ?? string.Empty;
+        configuration.ActiveModelValidationStatus = string.IsNullOrWhiteSpace(configuration.ActiveModelValidationStatus)
+            ? ModelConfigurationTestStatus.NotTested.ToString()
+            : configuration.ActiveModelValidationStatus.Trim();
         configuration.InputImageWidth = Math.Clamp(configuration.InputImageWidth, 32, 8192);
         configuration.InputImageHeight = Math.Clamp(configuration.InputImageHeight, 32, 8192);
         configuration.ConfidenceThreshold = Math.Clamp(configuration.ConfidenceThreshold, 0.0, 1.0);
@@ -135,6 +143,9 @@ public static class InspectionModelConfigurationService
         => new()
         {
             SelectedEngineKey = source.SelectedEngineKey,
+            ActiveModelId = source.ActiveModelId,
+            ActiveModelSha256 = source.ActiveModelSha256,
+            ActiveModelValidationStatus = source.ActiveModelValidationStatus,
             ModelFilePath = source.ModelFilePath,
             ModelVersion = source.ModelVersion,
             InputImageWidth = source.InputImageWidth,

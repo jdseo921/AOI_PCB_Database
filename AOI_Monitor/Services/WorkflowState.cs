@@ -91,8 +91,16 @@ public sealed class WorkflowState
 
     public void SetAnalysis(AnalysisResult result, bool persist)
     {
-        result.BoardProgram = BoardProgram;
-        result.OperatorId = OperatorWithRole;
+        if (string.IsNullOrWhiteSpace(result.BoardProgram) || result.BoardProgram == "UNKNOWN")
+            result.BoardProgram = BoardProgram;
+        if (string.IsNullOrWhiteSpace(result.BoardId) || result.BoardId == "UNKNOWN")
+            result.BoardId = result.BoardProgram;
+        if (string.IsNullOrWhiteSpace(result.LotId) || result.LotId == "UNKNOWN")
+            result.LotId = "POC-LOT";
+        if (string.IsNullOrWhiteSpace(result.StationId))
+            result.StationId = StationId;
+        if (string.IsNullOrWhiteSpace(result.OperatorId) || result.OperatorId == "UNKNOWN")
+            result.OperatorId = OperatorWithRole;
         LastAnalysis = result;
         long? inspectionResultId = null;
         if (persist)
@@ -113,6 +121,8 @@ public sealed class WorkflowState
             {
                 AddEvent("INTEGRATION", $"Contract export failed: {ex.Message}");
             }
+
+            QueueAutomaticTraceabilityUpload(result);
         }
 
         AddEvent(
@@ -125,6 +135,31 @@ public sealed class WorkflowState
             relatedPath: result.SamplePath);
 
         Notify();
+    }
+
+    private void QueueAutomaticTraceabilityUpload(AnalysisResult result)
+    {
+        var settings = MesIntegrationSettingsService.Load();
+        if (!settings.AutoUploadEnabled || !settings.IsUploadCapable)
+            return;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var outcome = await TraceabilityUploadService.UploadInspectionResultAsync(result).ConfigureAwait(false);
+                AddEvent(
+                    outcome.Result.Accepted ? "MES_UPLOAD" : "MES_UPLOAD_ERROR",
+                    $"Automatic MES traceability upload {outcome.Result.Status}: {outcome.Result.Message}",
+                    relatedEntityType: "AnalysisResult",
+                    relatedEntityId: result.InspectionId,
+                    relatedPath: outcome.PayloadPath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Net.Http.HttpRequestException)
+            {
+                AddEvent("MES_UPLOAD_ERROR", $"Automatic MES traceability upload failed safely: {ex.Message}");
+            }
+        });
     }
 
     public void AddDisposition(string action)

@@ -33,6 +33,7 @@ public partial class AIModelTestView : UserControl
     private string _currentEngineDisplay = "Pixel Difference Prototype Engine / PIXEL_DIFF_0.1";
     private string _lastAnnotatedImageFolder = string.Empty;
     private string _lastReportPath = string.Empty;
+    private bool _currentRunUsedFormalManifest;
     private CancellationTokenSource? _workCts;
 
     public AIModelTestView()
@@ -222,6 +223,7 @@ public partial class AIModelTestView : UserControl
             _currentRunId = batch.RunId > 0 ? batch.RunId : null;
             _currentRunCreatedAtUtc = DateTime.UtcNow;
             _currentEngineDisplay = batch.EngineDisplay;
+            _currentRunUsedFormalManifest = batch.IsFormalManifest;
             _lastAnnotatedImageFolder = string.Empty;
             _lastReportPath = string.Empty;
 
@@ -312,8 +314,8 @@ public partial class AIModelTestView : UserControl
         try
         {
             File.WriteAllText(dialog.FileName, BatchValidationService.BuildResultsCsv(_rows), Encoding.UTF8);
-            AoiDatabase.RecordExport("Stage1ValidationCsv", dialog.FileName);
-            StatusText.Text = $"CSV exported: {dialog.FileName}";
+            var verified = ExportVerificationService.RecordVerifiedExport("Stage1ValidationCsv", dialog.FileName);
+            StatusText.Text = $"CSV exported: {dialog.FileName}. Verification: {verified.Verification.Status}.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -392,9 +394,12 @@ public partial class AIModelTestView : UserControl
                 return new ExportOutcome(exported, errors);
             }, cts.Token);
 
-            AoiDatabase.RecordExport("Stage1AnnotatedImages", dialog.FolderName, result.Errors.Count == 0 ? "OK" : "WARN");
+            var verified = ExportVerificationService.RecordVerifiedExport(
+                "Stage1AnnotatedImages",
+                dialog.FolderName,
+                result.Errors.Count == 0 ? "OK" : "WARN");
             _lastAnnotatedImageFolder = dialog.FolderName;
-            StatusText.Text = $"Annotated image export complete: {result.Count} file(s), {result.Errors.Count} issue(s).";
+            StatusText.Text = $"Annotated image export complete: {result.Count} file(s), {result.Errors.Count} issue(s). Verification: {verified.Verification.Status}.";
             WorkflowState.Instance.AddEvent("EXPORT", $"Stage 1 annotated images exported: {result.Count} file(s), {result.Errors.Count} issue(s).");
             foreach (var error in result.Errors.Take(20))
                 WorkflowState.Instance.AddEvent("EXPORT_ERROR", error);
@@ -426,52 +431,74 @@ public partial class AIModelTestView : UserControl
     {
         if (_rows.Count == 0 || _currentRunId is null)
         {
-            MessageBox.Show("Run a validation batch before generating the customer report.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Run a validation batch before exporting the validation package.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-
-        var dialog = new SaveFileDialog
-        {
-            Title = "Generate customer validation report",
-            Filter = "HTML report|*.html",
-            FileName = $"customer_validation_run_{_currentRunId}_{DateTime.Now:yyyyMMdd_HHmmss}.html",
-        };
-
-        if (dialog.ShowDialog() != true)
-            return;
 
         var metrics = BatchValidationService.CalculateMetrics(_rows);
 
         try
         {
-            var reportPath = dialog.FileName;
-            var reportDir = Path.GetDirectoryName(reportPath) ?? Environment.CurrentDirectory;
-            var assetFolderName = $"{Path.GetFileNameWithoutExtension(reportPath)}_assets";
-            var assetFolder = Path.Combine(reportDir, assetFolderName);
-            var assetResult = ValidationReportAssetService.ExportSampleAnnotatedImages(_rows.ToArray(), assetFolder, assetFolderName);
-            var context = BuildCustomerValidationReportContext(metrics, assetResult.Images, assetResult.Warnings);
-            var instructionsPath = Path.Combine(reportDir, $"{Path.GetFileNameWithoutExtension(reportPath)}_print_to_pdf.txt");
-
-            File.WriteAllText(reportPath, CustomerValidationReportService.BuildHtml(context), Encoding.UTF8);
-            File.WriteAllText(instructionsPath, CustomerValidationReportService.BuildPrintToPdfInstructions(reportPath), Encoding.UTF8);
-            AoiDatabase.RecordExport("CustomerValidationHtmlReport", reportPath, assetResult.Warnings.Count == 0 ? "OK" : "WARN");
-            AoiDatabase.RecordExport("CustomerValidationPrintInstructions", instructionsPath);
-            _lastReportPath = dialog.FileName;
-            ReportPathText.Text = $"Report: {reportPath}";
-            StatusText.Text = $"Customer validation report saved: {reportPath}. Print-to-PDF instructions were generated beside it.";
-            WorkflowState.Instance.AddEvent("EXPORT", $"Customer validation HTML report exported for run {_currentRunId}: {Path.GetFileName(reportPath)}");
-            foreach (var warning in assetResult.Warnings)
+            var request = BuildPackageRequest(metrics);
+            var package = CustomerValidationPackageService.CreatePackage(request);
+            _lastReportPath = package.ReportPath;
+            _lastAnnotatedImageFolder = package.AnnotatedImagesFolder;
+            ReportPathText.Text = $"Package: {package.PackageFolder}";
+            StatusText.Text = $"Validation package exported: {package.Acceptance.Status} / {package.PackageId}. Manifest: {package.ManifestPath}";
+            WorkflowState.Instance.AddEvent("EXPORT", $"Stage 1 validation package exported for run {_currentRunId}: {package.PackageId}; status={package.Acceptance.Status}.");
+            foreach (var warning in package.Warnings.Take(20))
                 WorkflowState.Instance.AddEvent("EXPORT_WARNING", warning);
+
+            MessageBox.Show(
+                $"Validation package exported.\n\nStatus: {package.Acceptance.Status}\nPackage ID: {package.PackageId}\nFolder: {package.PackageFolder}",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                package.Acceptance.Status == "FAIL" ? MessageBoxImage.Warning : MessageBoxImage.Information);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             var message = ex is UnauthorizedAccessException
-                ? "Customer validation report export failed: export folder access was denied or the file is locked."
-                : $"Customer validation report export failed: {ex.Message}";
+                ? "Validation package export failed: export folder access was denied or the file is locked."
+                : $"Validation package export failed: {ex.Message}";
             StatusText.Text = message;
             WorkflowState.Instance.AddEvent("EXPORT_ERROR", message);
             MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private CustomerValidationPackageRequest BuildPackageRequest(BatchMetrics metrics)
+    {
+        var configuration = InspectionModelConfigurationService.Load();
+        var state = WorkflowState.Instance;
+        var boardModel = CustomerValidationReportService.SummarizeDistinct(_rows.Select(row => row.BoardModel));
+        if (string.Equals(boardModel, "Not provided", StringComparison.OrdinalIgnoreCase))
+            boardModel = state.BoardProgram;
+
+        return new CustomerValidationPackageRequest
+        {
+            RunId = _currentRunId,
+            RunCreatedAtUtc = _currentRunCreatedAtUtc,
+            StationId = state.StationId,
+            OperatorId = state.CurrentUser.UserId,
+            OperatorRole = state.CurrentRole.ToString(),
+            BoardModel = boardModel,
+            LotId = CustomerValidationReportService.SummarizeDistinct(_rows.Select(row => row.LotId)),
+            ModelId = string.IsNullOrWhiteSpace(configuration.ActiveModelId) ? "Not selected" : configuration.ActiveModelId,
+            ModelSha256 = string.IsNullOrWhiteSpace(configuration.ActiveModelSha256) ? "Not available" : configuration.ActiveModelSha256,
+            ModelValidationStatus = string.IsNullOrWhiteSpace(configuration.ActiveModelValidationStatus) ? ModelConfigurationTestStatus.NotTested.ToString() : configuration.ActiveModelValidationStatus,
+            EngineName = GetEngineNamePart(),
+            ModelVersion = GetEngineVersionPart(),
+            ModelFileName = string.IsNullOrWhiteSpace(configuration.ModelFilePath)
+                ? "Not configured"
+                : Path.GetFileName(configuration.ModelFilePath),
+            ConfidenceThreshold = configuration.ConfidenceThreshold,
+            DatasetFolder = _selectedFolder ?? string.Empty,
+            GroundTruthCsvPath = _groundTruthCsvPath ?? string.Empty,
+            IsFormalManifest = _currentRunUsedFormalManifest,
+            Metrics = metrics,
+            PerformanceSummary = BatchValidationService.CalculatePerformanceSummary(_rows),
+            Rows = _rows.ToArray(),
+        };
     }
 
     private CustomerValidationReportContext BuildCustomerValidationReportContext(
@@ -487,6 +514,12 @@ public partial class AIModelTestView : UserControl
         var boardModel = CustomerValidationReportService.SummarizeDistinct(_rows.Select(row => row.BoardModel));
         if (string.Equals(boardModel, "Not provided", StringComparison.OrdinalIgnoreCase))
             boardModel = state.BoardProgram;
+        var performance = BatchValidationService.CalculatePerformanceSummary(_rows);
+        var acceptance = CustomerValidationPackageService.EvaluateAcceptance(
+            metrics,
+            performance,
+            _rows.Count,
+            _currentRunUsedFormalManifest);
 
         return new CustomerValidationReportContext
         {
@@ -497,6 +530,9 @@ public partial class AIModelTestView : UserControl
             TestTimestamp = testTimestamp,
             BoardModel = boardModel,
             LotId = CustomerValidationReportService.SummarizeDistinct(_rows.Select(row => row.LotId)),
+            ModelId = string.IsNullOrWhiteSpace(configuration.ActiveModelId) ? "Not selected" : configuration.ActiveModelId,
+            ModelSha256 = string.IsNullOrWhiteSpace(configuration.ActiveModelSha256) ? "Not available" : configuration.ActiveModelSha256,
+            ModelValidationStatus = string.IsNullOrWhiteSpace(configuration.ActiveModelValidationStatus) ? ModelConfigurationTestStatus.NotTested.ToString() : configuration.ActiveModelValidationStatus,
             EngineName = GetEngineNamePart(),
             ModelVersion = GetEngineVersionPart(),
             ModelFileName = string.IsNullOrWhiteSpace(configuration.ModelFilePath)
@@ -506,7 +542,10 @@ public partial class AIModelTestView : UserControl
             DatasetFolder = string.IsNullOrWhiteSpace(_selectedFolder) ? "Not available" : _selectedFolder,
             GroundTruthFile = string.IsNullOrWhiteSpace(_groundTruthCsvPath) ? "Not selected" : _groundTruthCsvPath,
             Metrics = metrics,
-            PerformanceSummary = BatchValidationService.CalculatePerformanceSummary(_rows),
+            PerformanceSummary = performance,
+            AcceptanceStatus = acceptance.Status,
+            AcceptanceMessages = acceptance.Messages,
+            AcceptanceCriteria = new ValidationAcceptanceCriteria(),
             Rows = _rows.ToArray(),
             SampleAnnotatedImages = sampleImages,
             Warnings = warnings,
@@ -524,6 +563,7 @@ public partial class AIModelTestView : UserControl
         _currentEngineDisplay = $"{run.EngineName} / {run.ModelVersion}";
         _selectedFolder = run.ImageFolder;
         _groundTruthCsvPath = run.GroundTruthCsvPath;
+        _currentRunUsedFormalManifest = TryLoadFormalManifestFlag(run.GroundTruthCsvPath, run.ImageFolder);
         _lastReportPath = string.Empty;
         ReportPathText.Text = "Report: not generated";
         FolderPathText.Text = run.ImageFolder;
@@ -538,6 +578,18 @@ public partial class AIModelTestView : UserControl
         ApplyMetrics(BatchValidationService.CalculateMetrics(_rows));
         RunSummaryText.Text = $"{run.TotalImages} images / {run.FailedCount} failed / run {run.Id}";
         StatusText.Text = $"Loaded latest persisted Stage 1 validation run: {run.Id}.";
+    }
+
+    private static bool TryLoadFormalManifestFlag(string? groundTruthCsvPath, string imageFolder)
+    {
+        try
+        {
+            return BatchValidationService.LoadValidationManifest(groundTruthCsvPath, imageFolder).IsFormalManifest;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            return false;
+        }
     }
 
     private void ApplyMetrics(BatchMetrics metrics)
@@ -621,11 +673,11 @@ public partial class AIModelTestView : UserControl
         }
         else
         {
-            sb.AppendLine("| Image | Ground Truth | Engine Result | Pass/Fail | Defect Type | Side | RefDes | Lot ID | Board Model | Notes |");
-            sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|");
+            sb.AppendLine("| Image | Ground Truth | Engine Result | Pass/Fail | Defect Type | ROI ID | ROI Type | Recipe | Side | RefDes | Lot ID | Board Model | Notes |");
+            sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
             foreach (var row in failed)
             {
-                sb.AppendLine($"| {EscapeMarkdown(row.Image)} | {EscapeMarkdown(row.GroundTruth)} | {EscapeMarkdown(row.EngineResult)} | {EscapeMarkdown(row.PassFail)} | {EscapeMarkdown(row.DefectType)} | {EscapeMarkdown(row.Side)} | {EscapeMarkdown(row.RefDes)} | {EscapeMarkdown(row.LotId)} | {EscapeMarkdown(row.BoardModel)} | {EscapeMarkdown(row.Notes)} |");
+                sb.AppendLine($"| {EscapeMarkdown(row.Image)} | {EscapeMarkdown(row.GroundTruth)} | {EscapeMarkdown(row.EngineResult)} | {EscapeMarkdown(row.PassFail)} | {EscapeMarkdown(row.DefectType)} | {EscapeMarkdown(row.RoiId)} | {EscapeMarkdown(row.RoiType)} | {EscapeMarkdown(RecipeDisplay(row))} | {EscapeMarkdown(row.Side)} | {EscapeMarkdown(row.RefDes)} | {EscapeMarkdown(row.LotId)} | {EscapeMarkdown(row.BoardModel)} | {EscapeMarkdown(row.Notes)} |");
             }
         }
 
@@ -635,11 +687,11 @@ public partial class AIModelTestView : UserControl
     private string BuildHtmlReport(BatchMetrics metrics)
     {
         var failedRows = _rows.Where(r => r.PassFail == "FAIL")
-            .Select(row => $"<tr class=\"failed\"><td>{EscapeHtml(row.Image)}</td><td>{EscapeHtml(row.GroundTruth)}</td><td>{EscapeHtml(row.EngineResult)}</td><td>{EscapeHtml(row.PassFail)}</td><td>{EscapeHtml(row.DefectType)}</td><td>{EscapeHtml(row.Side)}</td><td>{EscapeHtml(row.RefDes)}</td><td>{EscapeHtml(row.LotId)}</td><td>{EscapeHtml(row.BoardModel)}</td><td>{EscapeHtml(row.Notes)}</td></tr>");
+            .Select(row => $"<tr class=\"failed\"><td>{EscapeHtml(row.Image)}</td><td>{EscapeHtml(row.GroundTruth)}</td><td>{EscapeHtml(row.EngineResult)}</td><td>{EscapeHtml(row.PassFail)}</td><td>{EscapeHtml(row.DefectType)}</td><td>{EscapeHtml(row.RoiId)}</td><td>{EscapeHtml(row.RoiType)}</td><td>{EscapeHtml(RecipeDisplay(row))}</td><td>{EscapeHtml(row.Side)}</td><td>{EscapeHtml(row.RefDes)}</td><td>{EscapeHtml(row.LotId)}</td><td>{EscapeHtml(row.BoardModel)}</td><td>{EscapeHtml(row.Notes)}</td></tr>");
 
         var failedTableRows = string.Join(Environment.NewLine, failedRows);
         if (string.IsNullOrWhiteSpace(failedTableRows))
-            failedTableRows = "<tr><td colspan=\"10\">No failed samples.</td></tr>";
+            failedTableRows = "<tr><td colspan=\"13\">No failed samples.</td></tr>";
 
         var failedCount = _rows.Count(r => r.PassFail == "FAIL");
         var configuration = InspectionModelConfigurationService.Load();
@@ -689,7 +741,7 @@ public partial class AIModelTestView : UserControl
           <h2>Review Categories</h2>
           <table><tr><th>OK</th><th>NG</th><th>REVIEW</th><th>False Call</th><th>Possible Escape</th><th>Unknown / Unlabeled</th></tr><tr><td>{{metrics.OkCount}}</td><td>{{metrics.NgCount}}</td><td>{{metrics.ReviewCount}}</td><td>{{metrics.FalseCall}}</td><td>{{metrics.PossibleEscape}}</td><td>{{metrics.Unknown}}</td></tr></table>
           <h2>Failed Samples</h2>
-          <table><tr><th>Image</th><th>Ground Truth</th><th>Engine Result</th><th>Pass/Fail</th><th>Defect Type</th><th>Side</th><th>RefDes</th><th>Lot ID</th><th>Board Model</th><th>Notes</th></tr>{{failedTableRows}}</table>
+          <table><tr><th>Image</th><th>Ground Truth</th><th>Engine Result</th><th>Pass/Fail</th><th>Defect Type</th><th>ROI ID</th><th>ROI Type</th><th>Recipe</th><th>Side</th><th>RefDes</th><th>Lot ID</th><th>Board Model</th><th>Notes</th></tr>{{failedTableRows}}</table>
         </body>
         </html>
         """;
@@ -813,6 +865,11 @@ public partial class AIModelTestView : UserControl
 
     private static string FormatMilliseconds(double value)
         => value <= 0 ? "--" : $"{value:F0} ms";
+
+    private static string RecipeDisplay(BatchTestRow row)
+        => string.IsNullOrWhiteSpace(row.RecipeName) && string.IsNullOrWhiteSpace(row.RecipeRevision)
+            ? string.Empty
+            : $"{row.RecipeName} {row.RecipeRevision}".Trim();
 
     private static string EscapeCsv(string value)
         => $"\"{value.Replace("\"", "\"\"")}\"";

@@ -26,6 +26,9 @@ public enum ModelConfigurationTestStatus
 public class InspectionEngineSettings
 {
     public string SelectedEngineKey { get; set; } = "pixel-difference";
+    public string ActiveModelId { get; set; } = string.Empty;
+    public string ActiveModelSha256 { get; set; } = string.Empty;
+    public string ActiveModelValidationStatus { get; set; } = ModelConfigurationTestStatus.NotTested.ToString();
     public string ModelFilePath { get; set; } = string.Empty;
     public string ModelVersion { get; set; } = "UNCONFIGURED";
     public int InputImageWidth { get; set; } = 640;
@@ -62,3 +65,68 @@ public class InspectionEngineSettings
 public sealed class InspectionModelConfiguration : InspectionEngineSettings
 {
 }
+
+public sealed class ModelRegistrationRequest
+{
+    public string ModelFilePath { get; set; } = string.Empty;
+    public string LabelMapPath { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Version { get; set; } = "UNCONFIGURED";
+    public DateTime? CreatedAtUtc { get; set; }
+    public string InputTensorName { get; set; } = string.Empty;
+    public string OutputTensorName { get; set; } = string.Empty;
+    public int InputWidth { get; set; } = 640;
+    public int InputHeight { get; set; } = 640;
+    public double ConfidenceThreshold { get; set; } = 0.65;
+    public string Notes { get; set; } = string.Empty;
+}
+
+public sealed class ModelRegistryEntry
+{
+    public string ModelId { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Version { get; set; } = "UNCONFIGURED";
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime RegisteredAtUtc { get; set; } = DateTime.UtcNow;
+    public string SourceFileName { get; set; } = string.Empty;
+    public string StoredModelPath { get; set; } = string.Empty;
+    public string StoredLabelMapPath { get; set; } = string.Empty;
+    public string MetadataPath { get; set; } = string.Empty;
+    public string Sha256 { get; set; } = string.Empty;
+    public string InputTensorName { get; set; } = string.Empty;
+    public string OutputTensorName { get; set; } = string.Empty;
+    public int InputWidth { get; set; } = 640;
+    public int InputHeight { get; set; } = 640;
+    public double ConfidenceThreshold { get; set; } = 0.65;
+    public List<string> Labels { get; set; } = new();
+    public ModelConfigurationTestStatus ValidationStatus { get; set; } = ModelConfigurationTestStatus.NotTested;
+    public DateTime? LastValidatedAtUtc { get; set; }
+    public string ValidationMessage { get; set; } = "Not validated.";
+    public string Notes { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+}
+
+public record ModelRegistryRecord(
+    long Id,
+    string ModelId,
+    string DisplayName,
+    string Version,
+    DateTime CreatedAtUtc,
+    DateTime RegisteredAtUtc,
+    string SourceFileName,
+    string StoredModelPath,
+    string StoredLabelMapPath,
+    string MetadataPath,
+    string Sha256,
+    string InputTensorName,
+    string OutputTensorName,
+    int InputWidth,
+    int InputHeight,
+    double ConfidenceThreshold,
+    IReadOnlyList<string> Labels,
+    ModelConfigurationTestStatus ValidationStatus,
+    DateTime? LastValidatedAtUtc,
+    string ValidationMessage,
+    string Notes,
+    bool IsActive,
+    long? AuditEventId);

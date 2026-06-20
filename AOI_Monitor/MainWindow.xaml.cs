@@ -47,6 +47,7 @@ public partial class MainWindow : Window
             StorageRootSettingsService.ApplySavedStorageRoot();
             AoiDatabase.Initialize();
             CameraSourceSettingsService.ApplyActiveSource();
+            LightingSettingsService.ApplyIntegrationBoundary();
             MesIntegrationSettingsService.ApplyIntegrationBoundary();
             WorkflowState.Instance.AddEvent("STORAGE", $"SQLite ready: {AoiDatabase.DatabasePath}");
             UpdateReadinessPanel(databaseConnected: File.Exists(AoiDatabase.DatabasePath), vaultAvailable: Directory.Exists(AoiDatabase.ImageVaultPath));
@@ -78,14 +79,39 @@ public partial class MainWindow : Window
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
         CameraSourceFactory.ActiveSourceChanged += OnCameraSourceChanged;
+        LightingSettingsService.SettingsChanged += OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
         Closed += (_, _) => WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         Closed += (_, _) => InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
         Closed += (_, _) => CameraSourceFactory.ActiveSourceChanged -= OnCameraSourceChanged;
+        Closed += (_, _) => LightingSettingsService.SettingsChanged -= OnLightingSettingsChanged;
         Closed += (_, _) => MesIntegrationSettingsService.SettingsChanged -= OnMesIntegrationSettingsChanged;
 
         SwitchPage("monitor");
         UpdateWorkflowPanel();
+        Dispatcher.BeginInvoke(new Action(ShowFirstRunWizardIfNeeded));
+    }
+
+    private void ShowFirstRunWizardIfNeeded()
+    {
+        try
+        {
+            if (FirstRunSettingsService.IsCompleted())
+                return;
+
+            var wizard = new FirstRunWizardView
+            {
+                Owner = this,
+            };
+            wizard.ShowDialog();
+            UpdateReadinessPanel(databaseConnected: File.Exists(AoiDatabase.DatabasePath), vaultAvailable: Directory.Exists(AoiDatabase.ImageVaultPath));
+            UpdateFooterStatus();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            WorkflowState.Instance.AddEvent("FIRST_RUN", $"First-run setup wizard could not be shown: {ex.Message}");
+            MessageBox.Show($"Setup wizard could not be shown. The app remains usable.\n{ex.Message}", "AOI Monitor Setup", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void SwitchPage(string key)
@@ -334,6 +360,15 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(UpdateIntegrationBoundaryStatus);
     }
 
+    private void OnLightingSettingsChanged()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            LightingSettingsService.ApplyIntegrationBoundary();
+            UpdateIntegrationBoundaryStatus();
+        });
+    }
+
     private void UpdateWorkflowPanel()
     {
         var state = WorkflowState.Instance;
@@ -460,12 +495,14 @@ public partial class MainWindow : Window
         var status = CameraSourceFactory.ActiveSource.ConnectionStatus;
         CameraStatusText.Text = status switch
         {
+            CameraSourceStatus.Ready => "Connected",
             CameraSourceStatus.Simulated => "Simulated",
             CameraSourceStatus.Error => "Error",
             _ => "Not Connected",
         };
         CameraStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
         {
+            CameraSourceStatus.Ready => "#50F56E",
             CameraSourceStatus.Simulated => "#E1A334",
             CameraSourceStatus.Error => "#F27777",
             _ => "#F27777",

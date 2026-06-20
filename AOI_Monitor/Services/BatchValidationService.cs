@@ -32,6 +32,10 @@ public static class BatchValidationService
             LotId = manifest.LotId,
             BoardModel = manifest.BoardModel,
             Notes = manifest.Notes,
+            RecipeName = analysis.RecipeName,
+            RecipeRevision = analysis.RecipeRevision,
+            RoiId = defect?.RoiId ?? string.Empty,
+            RoiType = defect?.RoiType ?? string.Empty,
             RoiX = roi.X,
             RoiY = roi.Y,
             RoiWidth = roi.Width,
@@ -227,7 +231,7 @@ public static class BatchValidationService
     public static string BuildResultsCsv(IEnumerable<BatchTestRow> rows)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Image,Ground Truth,AI/Engine Result,Inspection Engine,Model Version,Score,Pass/Fail,Defect Type,Side,RefDes,LotId,BoardModel,Notes,Image Path,RoiX,RoiY,RoiWidth,RoiHeight,ImageLoadMs,PreprocessingMs,InferenceMs,OverlayRenderingMs,TotalInspectionMs");
+        sb.AppendLine("Image,Ground Truth,AI/Engine Result,Inspection Engine,Model Version,Recipe Name,Recipe Revision,Score,Pass/Fail,Defect Type,ROI ID,ROI Type,Side,RefDes,LotId,BoardModel,Notes,Image Path,RoiX,RoiY,RoiWidth,RoiHeight,ImageLoadMs,PreprocessingMs,InferenceMs,OverlayRenderingMs,TotalInspectionMs");
         foreach (var row in rows)
         {
             sb.AppendLine(string.Join(",",
@@ -236,9 +240,13 @@ public static class BatchValidationService
                 EscapeCsv(row.EngineResult),
                 EscapeCsv(row.InspectionEngine),
                 EscapeCsv(row.ModelVersion),
+                EscapeCsv(row.RecipeName),
+                EscapeCsv(row.RecipeRevision),
                 row.Score.ToString("F4", CultureInfo.InvariantCulture),
                 EscapeCsv(row.PassFail),
                 EscapeCsv(row.DefectType),
+                EscapeCsv(row.RoiId),
+                EscapeCsv(row.RoiType),
                 EscapeCsv(row.Side),
                 EscapeCsv(row.RefDes),
                 EscapeCsv(row.LotId),
@@ -405,6 +413,10 @@ public sealed class BatchTestRow
     public string LotId { get; set; } = string.Empty;
     public string BoardModel { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
+    public string RecipeName { get; set; } = string.Empty;
+    public string RecipeRevision { get; set; } = string.Empty;
+    public string RoiId { get; set; } = string.Empty;
+    public string RoiType { get; set; } = string.Empty;
     public double RoiX { get; set; }
     public double RoiY { get; set; }
     public double RoiWidth { get; set; }
@@ -441,7 +453,7 @@ public sealed class BatchTestRow
             RefDes,
             LotId,
             BoardModel,
-            Notes,
+            BuildPersistedNotes(Notes, RecipeName, RecipeRevision, RoiId, RoiType),
             ImageLoadMilliseconds,
             PreprocessingMilliseconds,
             InferenceMilliseconds,
@@ -478,5 +490,17 @@ public sealed class BatchTestRow
             RoiWidth = record.RoiWidth,
             RoiHeight = record.RoiHeight,
         };
+    }
+
+    private static string BuildPersistedNotes(string notes, string recipeName, string recipeRevision, string roiId, string roiType)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(notes))
+            parts.Add(notes);
+        if (!string.IsNullOrWhiteSpace(recipeName) || !string.IsNullOrWhiteSpace(recipeRevision))
+            parts.Add($"Recipe={recipeName} rev={recipeRevision}");
+        if (!string.IsNullOrWhiteSpace(roiId) || !string.IsNullOrWhiteSpace(roiType))
+            parts.Add($"ROI={roiId} type={roiType}");
+        return string.Join("; ", parts);
     }
 }

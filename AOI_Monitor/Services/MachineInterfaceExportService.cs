@@ -26,7 +26,10 @@ public static class MachineInterfaceExportService
         var json = JsonSerializer.Serialize(contract, JsonOptions);
         File.WriteAllText(latestPath, json);
         File.WriteAllText(snapshotPath, json);
-        File.AppendAllText(ndjsonPath, JsonSerializer.Serialize(contract) + Environment.NewLine);
+        File.AppendAllText(ndjsonPath, JsonSerializer.Serialize(contract, JsonOptions) + Environment.NewLine);
+        ExportVerificationService.RecordVerifiedExport("MachineInterfaceLatestJson", latestPath);
+        ExportVerificationService.RecordVerifiedExport("MachineInterfaceDecisionJson", snapshotPath);
+        ExportVerificationService.RecordVerifiedExport("MachineInterfaceDecisionHistory", ndjsonPath);
 
         return latestPath;
     }
@@ -50,6 +53,7 @@ public static class MachineInterfaceExportService
 
         var path = Path.Combine(root, "disposition_events.ndjson");
         File.AppendAllText(path, JsonSerializer.Serialize(payload) + Environment.NewLine);
+        ExportVerificationService.RecordVerifiedExport("MachineInterfaceDispositionNdjson", path);
         return path;
     }
 

@@ -190,7 +190,7 @@
           <Button Style="{StaticResource ActionBtn}" Content="Preview Selected" Margin="0,0,6,0" Click="OnPreviewSelectedClick"/>
           <Button Style="{StaticResource ActionBtnGreen}" Content="Export CSV" Margin="0,0,6,0" Click="OnExportCsvClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Export Annotated Images" Margin="0,0,6,0" Click="OnExportAnnotatedImagesClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Generate Customer Validation Report" Click="OnGenerateReportClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Export Validation Package" Click="OnGenerateReportClick"/>
         </StackPanel>
       </DockPanel>
     </Border>

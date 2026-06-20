@@ -50,15 +50,21 @@ public partial class CompareView : UserControl
             var judgement = ToChipVerdict(a.Verdict);
             var topEvidence = a.Evidence.Take(3).ToArray();
 
-            FindingsGrid.ItemsSource = new[]
+            var rows = new List<object>();
+            rows.AddRange(a.Defects.Select(defect => new
             {
-                new { Region = "Decision", Defect = a.DecisionReason, Golden = $"Policy: {a.PolicyName}", Judgement = judgement },
-                new { Region = "Score vs Threshold", Defect = $"{a.DifferenceScore:F1}%", Golden = $"R {a.ReviewThreshold:F1}% / NG {a.NgThreshold:F1}%", Judgement = judgement },
-                new { Region = "Hotspot ROI", Defect = $"x={a.Hotspot.X:P0}, y={a.Hotspot.Y:P0}", Golden = $"w={a.Hotspot.Width:P0}, h={a.Hotspot.Height:P0}", Judgement = judgement },
-                new { Region = "Evidence 1", Defect = topEvidence.Length > 0 ? topEvidence[0] : "-", Golden = "", Judgement = judgement },
-                new { Region = "Evidence 2", Defect = topEvidence.Length > 1 ? topEvidence[1] : "-", Golden = "", Judgement = judgement },
-                new { Region = "Evidence 3", Defect = topEvidence.Length > 2 ? topEvidence[2] : "-", Golden = "", Judgement = judgement },
-            };
+                Region = string.IsNullOrWhiteSpace(defect.RoiId) ? "Defect ROI" : defect.RoiId,
+                Defect = $"{defect.DefectType} {defect.Confidence:P0}",
+                Golden = string.IsNullOrWhiteSpace(defect.RoiType) ? $"Box {defect.BoundingBox.X:P0},{defect.BoundingBox.Y:P0}" : defect.RoiType,
+                Judgement = ToChipVerdict(defect.JudgmentStatus),
+            }));
+            rows.Add(new { Region = "Decision", Defect = a.DecisionReason, Golden = $"Policy: {a.PolicyName}", Judgement = judgement });
+            rows.Add(new { Region = "Score vs Threshold", Defect = $"{a.DifferenceScore:F1}%", Golden = $"R {a.ReviewThreshold:F1}% / NG {a.NgThreshold:F1}%", Judgement = judgement });
+            rows.Add(new { Region = "Hotspot ROI", Defect = $"x={a.Hotspot.X:P0}, y={a.Hotspot.Y:P0}", Golden = $"w={a.Hotspot.Width:P0}, h={a.Hotspot.Height:P0}", Judgement = judgement });
+            rows.Add(new { Region = "Evidence 1", Defect = topEvidence.Length > 0 ? topEvidence[0] : "-", Golden = "", Judgement = judgement });
+            rows.Add(new { Region = "Evidence 2", Defect = topEvidence.Length > 1 ? topEvidence[1] : "-", Golden = "", Judgement = judgement });
+            rows.Add(new { Region = "Evidence 3", Defect = topEvidence.Length > 2 ? topEvidence[2] : "-", Golden = "", Judgement = judgement });
+            FindingsGrid.ItemsSource = rows;
 
             FindingsSourceText.Text = "Analysis Result";
             FindingsSourceText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#C6FFD0"));
@@ -152,10 +158,12 @@ public partial class CompareView : UserControl
 
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(rtb));
-        using var fs = File.Create(dialog.FileName);
-        encoder.Save(fs);
+        using (var fs = File.Create(dialog.FileName))
+        {
+            encoder.Save(fs);
+        }
 
-        AoiDatabase.RecordExport("ComparisonSnapshot", dialog.FileName);
-        WorkflowState.Instance.AddEvent("EXPORT", $"Comparison pair exported: {Path.GetFileName(dialog.FileName)}");
+        var verified = ExportVerificationService.RecordVerifiedExport("ComparisonSnapshot", dialog.FileName);
+        WorkflowState.Instance.AddEvent("EXPORT", $"Comparison pair exported: {Path.GetFileName(dialog.FileName)}; verification={verified.Verification.Status}.");
     }
 }

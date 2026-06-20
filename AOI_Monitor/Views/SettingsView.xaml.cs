@@ -1,8 +1,10 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Globalization;
+using System.Text.Json;
 using System.Windows.Markup;
 using System.Windows.Media;
 using Microsoft.Win32;
@@ -16,12 +18,14 @@ namespace AOI_Monitor.Views;
 public partial class SettingsView : UserControl
 {
     private readonly MainViewModel _vm;
+    private readonly ObservableCollection<ModelRegistryRow> _modelRegistryRows = new();
     private bool _isKorean;
 
     public SettingsView(MainViewModel vm)
     {
         InitializeComponent();
         _vm = vm;
+        ModelRegistryGrid.ItemsSource = _modelRegistryRows;
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -31,7 +35,9 @@ public partial class SettingsView : UserControl
     {
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
+        ModelRegistryService.RegistryChanged += OnModelRegistryChanged;
         CameraSourceSettingsService.SettingsChanged += OnCameraSourceSettingsChanged;
+        LightingSettingsService.SettingsChanged += OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
         RefreshWorkflowUi();
         ApplyLanguageVisuals();
@@ -42,13 +48,17 @@ public partial class SettingsView : UserControl
     {
         WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
+        ModelRegistryService.RegistryChanged -= OnModelRegistryChanged;
         CameraSourceSettingsService.SettingsChanged -= OnCameraSourceSettingsChanged;
+        LightingSettingsService.SettingsChanged -= OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged -= OnMesIntegrationSettingsChanged;
     }
 
     private void OnWorkflowStateChanged() => Dispatcher.Invoke(RefreshWorkflowUi);
     private void OnInspectionConfigurationChanged() => Dispatcher.Invoke(RefreshInspectionConfigurationUi);
+    private void OnModelRegistryChanged() => Dispatcher.Invoke(RefreshModelRegistryUi);
     private void OnCameraSourceSettingsChanged() => Dispatcher.Invoke(RefreshCameraSourceUi);
+    private void OnLightingSettingsChanged() => Dispatcher.Invoke(RefreshLightingUi);
     private void OnMesIntegrationSettingsChanged() => Dispatcher.Invoke(RefreshMesIntegrationUi);
 
     private void OnApply(object sender, RoutedEventArgs e)
@@ -58,6 +68,8 @@ public partial class SettingsView : UserControl
         var newConfig = BuildConfigurationFromUi();
         var existingCamera = CameraSourceSettingsService.Load();
         var newCamera = BuildCameraSourceSettingsFromUi();
+        var existingLighting = LightingSettingsService.Load();
+        var newLighting = BuildLightingSettingsFromUi();
         var existingMes = MesIntegrationSettingsService.Load();
         var newMes = BuildMesIntegrationSettingsFromUi();
         var newStorageRoot = string.IsNullOrWhiteSpace(StorageRootText.Text)
@@ -81,17 +93,48 @@ public partial class SettingsView : UserControl
             !string.Equals(existingCamera.TopFolder, newCamera.TopFolder, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingCamera.SideFolder, newCamera.SideFolder, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingCamera.BottomFolder, newCamera.BottomFolder, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingCamera.TopDeviceId, newCamera.TopDeviceId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingCamera.SideDeviceId, newCamera.SideDeviceId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingCamera.BottomDeviceId, newCamera.BottomDeviceId, StringComparison.OrdinalIgnoreCase) ||
+            existingCamera.AcquisitionMode != newCamera.AcquisitionMode ||
+            Math.Abs(existingCamera.ExposureMs - newCamera.ExposureMs) > 0.0001 ||
+            Math.Abs(existingCamera.Gain - newCamera.Gain) > 0.0001 ||
+            existingCamera.TriggerTimeoutMs != newCamera.TriggerTimeoutMs ||
+            existingCamera.FrameTimeoutMs != newCamera.FrameTimeoutMs ||
             !string.Equals(existingCamera.BoardModel, newCamera.BoardModel, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingCamera.LotId, newCamera.LotId, StringComparison.OrdinalIgnoreCase);
         var mesConfigChanged =
             existingMes.Mode != newMes.Mode ||
             !string.Equals(existingMes.MockEndpointUrl, newMes.MockEndpointUrl, StringComparison.OrdinalIgnoreCase) ||
-            existingMes.UploadTimeoutSeconds != newMes.UploadTimeoutSeconds;
+            existingMes.UploadTimeoutSeconds != newMes.UploadTimeoutSeconds ||
+            existingMes.AutoUploadEnabled != newMes.AutoUploadEnabled ||
+            !string.Equals(existingMes.BaseUrl, newMes.BaseUrl, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingMes.UploadResultPath, newMes.UploadResultPath, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingMes.UploadImagePath, newMes.UploadImagePath, StringComparison.OrdinalIgnoreCase) ||
+            existingMes.AuthMode != newMes.AuthMode ||
+            !string.Equals(existingMes.ApiKeyHeaderName, newMes.ApiKeyHeaderName, StringComparison.Ordinal) ||
+            !string.Equals(existingMes.ApiKey, newMes.ApiKey, StringComparison.Ordinal) ||
+            !string.Equals(existingMes.BearerToken, newMes.BearerToken, StringComparison.Ordinal) ||
+            !string.Equals(existingMes.Username, newMes.Username, StringComparison.Ordinal) ||
+            !string.Equals(existingMes.Password, newMes.Password, StringComparison.Ordinal) ||
+            existingMes.MaxRetryCount != newMes.MaxRetryCount ||
+            existingMes.RetryBackoffMs != newMes.RetryBackoffMs;
+        var lightingConfigChanged =
+            !string.Equals(existingLighting.Mode, newLighting.Mode, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingLighting.TcpHost, newLighting.TcpHost, StringComparison.OrdinalIgnoreCase) ||
+            existingLighting.TcpPort != newLighting.TcpPort ||
+            !string.Equals(existingLighting.SerialPortName, newLighting.SerialPortName, StringComparison.OrdinalIgnoreCase) ||
+            existingLighting.BaudRate != newLighting.BaudRate ||
+            !string.Equals(existingLighting.TopProgram, newLighting.TopProgram, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingLighting.SideProgram, newLighting.SideProgram, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingLighting.BottomProgram, newLighting.BottomProgram, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingLighting.CommandTemplate, newLighting.CommandTemplate, StringComparison.Ordinal) ||
+            existingLighting.ResponseTimeoutMs != newLighting.ResponseTimeoutMs;
         var thresholdChanged =
             ComboToPriority(DetectionPriorityCombo.SelectedIndex) != state.DetectionPriority ||
             Math.Abs(existingConfig.ConfidenceThreshold - newConfig.ConfidenceThreshold) > 0.0001;
 
-        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || mesConfigChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, camera source, or Mock MES settings"))
+        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || lightingConfigChanged || mesConfigChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, camera source, lighting sync, or MES integration settings"))
             return;
 
         if (thresholdChanged && !Authorize(RoleAuthorization.CanChangeThresholds, "Changing inspection thresholds or detection priority"))
@@ -104,6 +147,7 @@ public partial class SettingsView : UserControl
 
         SaveInspectionConfiguration(newConfig);
         SaveCameraSourceSettings(newCamera);
+        SaveLightingSettings(newLighting);
         SaveMesIntegrationSettings(newMes);
 
         if (!state.TrySetDetectionPriority(ComboToPriority(DetectionPriorityCombo.SelectedIndex), out var message))
@@ -142,8 +186,40 @@ public partial class SettingsView : UserControl
         CameraSourceSettingsService.Save(new CameraSourceSettings());
         CameraSourceSettingsService.ApplyActiveSource();
         MesModeCombo.SelectedIndex = 0;
+        CameraTopDeviceIdText.Text = string.Empty;
+        CameraSideDeviceIdText.Text = string.Empty;
+        CameraBottomDeviceIdText.Text = string.Empty;
+        CameraAcquisitionModeCombo.SelectedIndex = 0;
+        CameraExposureMsText.Text = "5.0";
+        CameraGainText.Text = "1.0";
+        CameraTriggerTimeoutMsText.Text = "250";
+        CameraFrameTimeoutMsText.Text = "1000";
+        LightingModeCombo.SelectedIndex = 0;
+        LightingTcpHostText.Text = string.Empty;
+        LightingTcpPortText.Text = "5025";
+        LightingSerialPortText.Text = string.Empty;
+        LightingBaudRateText.Text = "9600";
+        LightingTopProgramText.Text = "TOP";
+        LightingSideProgramText.Text = "SIDE";
+        LightingBottomProgramText.Text = "BOTTOM";
+        LightingCommandTemplateText.Text = "SET {view} {program}\\n";
+        LightingTimeoutMsText.Text = "500";
+        LightingSettingsService.Save(new LightingSettings());
+        LightingSettingsService.ApplyIntegrationBoundary();
         MesEndpointText.Text = string.Empty;
+        MesRestBaseUrlText.Text = string.Empty;
+        MesResultPathText.Text = "/api/aoi/results";
+        MesImagePathText.Text = "/api/aoi/images";
+        MesAuthModeCombo.SelectedIndex = 0;
+        MesApiKeyHeaderText.Text = "X-API-Key";
+        MesApiKeyBox.Password = string.Empty;
+        MesBearerTokenBox.Password = string.Empty;
+        MesUsernameText.Text = string.Empty;
+        MesPasswordBox.Password = string.Empty;
         MesTimeoutText.Text = "10";
+        MesMaxRetryText.Text = "2";
+        MesRetryBackoffText.Text = "500";
+        MesAutoUploadCheck.IsChecked = false;
         MesIntegrationSettingsService.Save(new MesIntegrationSettings());
 
         ApplyLanguageVisuals();
@@ -159,6 +235,41 @@ public partial class SettingsView : UserControl
 
         RefreshWorkflowUi();
         MessageBox.Show("Settings reset to defaults.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void OnRunSetupWizardClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Running setup wizard"))
+            return;
+
+        var wizard = new FirstRunWizardView
+        {
+            Owner = Window.GetWindow(this),
+        };
+        wizard.ShowDialog();
+        RefreshWorkflowUi();
+    }
+
+    private void OnExportDiagnosticsClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Exporting diagnostics report"))
+            return;
+
+        try
+        {
+            var report = SystemDiagnosticService.RunDiagnostics();
+            var export = SystemDiagnosticService.ExportReport(report);
+            WorkflowState.Instance.AddEvent("DIAGNOSTICS", $"Diagnostics report exported: {Path.GetFileName(export.JsonPath)}");
+            MessageBox.Show(
+                $"Diagnostics exported.\n\nJSON: {export.JsonPath}\nHTML: {export.HtmlPath}\nText: {export.TextPath}",
+                "AOI Monitor Diagnostics",
+                MessageBoxButton.OK,
+                report.ErrorCount == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            MessageBox.Show($"Diagnostics export failed:\n{ex.Message}", "AOI Monitor Diagnostics", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OnStartTrainingClick(object sender, RoutedEventArgs e)
@@ -264,6 +375,86 @@ public partial class SettingsView : UserControl
         RefreshInspectionConfigurationUi(BuildConfigurationFromUi());
     }
 
+    private void OnRegisterModelClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Registering local ONNX model"))
+            return;
+
+        try
+        {
+            var request = BuildModelRegistrationRequestFromUi();
+            var entry = ModelRegistryService.Register(request);
+            RefreshModelRegistryUi();
+            ModelRegistryGrid.SelectedItem = _modelRegistryRows.FirstOrDefault(row => row.ModelId == entry.ModelId);
+            WorkflowState.Instance.AddEvent("MODEL_REGISTRY", $"Registered model {entry.ModelId}; version {entry.Version}; status {entry.ValidationStatus}.");
+            MessageBox.Show(
+                $"Model registered.\n\nModel ID: {entry.ModelId}\nSHA-256: {entry.Sha256}",
+                "Model Registry",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException or JsonException)
+        {
+            MessageBox.Show($"Model registration failed:\n{ex.Message}", "Model Registry", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnValidateRegisteredModelClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanTestModelConfiguration, "Validating registered model"))
+            return;
+
+        if (ModelRegistryGrid.SelectedItem is not ModelRegistryRow row)
+        {
+            MessageBox.Show("Select a registered model first.", "Model Registry", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var result = ModelRegistryService.Validate(row.ModelId);
+            RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
+            RefreshModelRegistryUi();
+            WorkflowState.Instance.AddEvent("MODEL_CHECK", $"Registered model validation: {row.ModelId}; {result.DisplayStatus}. {result.Message}");
+            MessageBox.Show(
+                $"{result.DisplayStatus}\n\n{result.Message}",
+                "Registered Model Validation",
+                MessageBoxButton.OK,
+                result.Status == ModelConfigurationTestStatus.Ready ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            MessageBox.Show($"Registered model validation failed:\n{ex.Message}", "Model Registry", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnSetActiveModelClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Setting active ONNX model"))
+            return;
+
+        if (ModelRegistryGrid.SelectedItem is not ModelRegistryRow row)
+        {
+            MessageBox.Show("Select a registered model first.", "Model Registry", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!ModelRegistryService.SetActiveModel(row.ModelId))
+        {
+            MessageBox.Show("The selected model registry entry could not be found.", "Model Registry", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
+        RefreshModelRegistryUi();
+        WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT", $"Active model set to {row.ModelId}. ONNX inference remains gated by validation status.");
+        MessageBox.Show(
+            $"Active model set.\n\nModel ID: {row.ModelId}\nRun Validate before using it for accepted ONNX inference.",
+            "Model Registry",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
     private void OnBrowseCameraTopClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Top);
     private void OnBrowseCameraSideClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Side);
     private void OnBrowseCameraBottomClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Bottom);
@@ -297,6 +488,42 @@ public partial class SettingsView : UserControl
 
         CameraSourceCombo.SelectedIndex = 1;
         RefreshCameraSourceUi(BuildCameraSourceSettingsFromUi());
+    }
+
+    private void OnTestCameraSourceClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Testing camera source"))
+            return;
+
+        var settings = BuildCameraSourceSettingsFromUi();
+        var source = CameraSourceFactory.Create(settings);
+        source.SelectedView = CameraViewType.Top;
+        CameraFrame? frame = null;
+        try
+        {
+            source.StartAcquisition();
+            frame = source.GetNextFrame();
+            source.StopAcquisition();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            CameraDiagnosticsText.Text = $"Camera test failed: {ex.Message}";
+            MessageBox.Show(CameraDiagnosticsText.Text, "Camera Source Test", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var diagnostics = source is ICameraStatusDiagnostics statusDiagnostics
+            ? string.Join(" ", statusDiagnostics.GetMessages())
+            : source.StatusMessage;
+        var frameMessage = frame is null
+            ? "No frame returned."
+            : $"Frame {frame.FrameId}, {frame.Width}x{frame.Height}, {frame.PixelFormat}, {frame.SourceKind}.";
+        CameraDiagnosticsText.Text = $"{source.Name}: {CameraStatusDisplay(source.ConnectionStatus)}. {source.StatusMessage} {frameMessage} {diagnostics}";
+        MessageBox.Show(
+            CameraDiagnosticsText.Text,
+            "Camera Source Test",
+            MessageBoxButton.OK,
+            source.ConnectionStatus is CameraSourceStatus.Ready or CameraSourceStatus.Simulated ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
 
     private void OnOpenTrainingFolderClick(object sender, RoutedEventArgs e)
@@ -334,7 +561,9 @@ public partial class SettingsView : UserControl
 
         RefreshRoleControls();
         RefreshInspectionConfigurationUi();
+        RefreshModelRegistryUi();
         RefreshCameraSourceUi();
+        RefreshLightingUi();
         RefreshMesIntegrationUi();
     }
 
@@ -350,16 +579,49 @@ public partial class SettingsView : UserControl
         CameraTopFolderText.IsEnabled = canManageSettings;
         CameraSideFolderText.IsEnabled = canManageSettings;
         CameraBottomFolderText.IsEnabled = canManageSettings;
+        CameraTopDeviceIdText.IsEnabled = canManageSettings;
+        CameraSideDeviceIdText.IsEnabled = canManageSettings;
+        CameraBottomDeviceIdText.IsEnabled = canManageSettings;
+        CameraAcquisitionModeCombo.IsEnabled = canManageSettings;
+        CameraExposureMsText.IsEnabled = canManageSettings;
+        CameraGainText.IsEnabled = canManageSettings;
+        CameraTriggerTimeoutMsText.IsEnabled = canManageSettings;
+        CameraFrameTimeoutMsText.IsEnabled = canManageSettings;
         CameraBoardModelText.IsEnabled = canManageSettings;
         CameraLotIdText.IsEnabled = canManageSettings;
+        LightingModeCombo.IsEnabled = canManageSettings;
+        LightingTcpHostText.IsEnabled = canManageSettings;
+        LightingTcpPortText.IsEnabled = canManageSettings;
+        LightingSerialPortText.IsEnabled = canManageSettings;
+        LightingBaudRateText.IsEnabled = canManageSettings;
+        LightingTopProgramText.IsEnabled = canManageSettings;
+        LightingSideProgramText.IsEnabled = canManageSettings;
+        LightingBottomProgramText.IsEnabled = canManageSettings;
+        LightingCommandTemplateText.IsEnabled = canManageSettings;
+        LightingTimeoutMsText.IsEnabled = canManageSettings;
         StorageRootText.IsEnabled = canManageSettings;
         BrowseStorageRootBtn.IsEnabled = canManageSettings;
         MesModeCombo.IsEnabled = canManageSettings;
         MesEndpointText.IsEnabled = canManageSettings;
+        MesRestBaseUrlText.IsEnabled = canManageSettings;
+        MesResultPathText.IsEnabled = canManageSettings;
+        MesImagePathText.IsEnabled = canManageSettings;
+        MesAuthModeCombo.IsEnabled = canManageSettings;
+        MesApiKeyHeaderText.IsEnabled = canManageSettings;
+        MesApiKeyBox.IsEnabled = canManageSettings;
+        MesBearerTokenBox.IsEnabled = canManageSettings;
+        MesUsernameText.IsEnabled = canManageSettings;
+        MesPasswordBox.IsEnabled = canManageSettings;
         MesTimeoutText.IsEnabled = canManageSettings;
+        MesMaxRetryText.IsEnabled = canManageSettings;
+        MesRetryBackoffText.IsEnabled = canManageSettings;
+        MesAutoUploadCheck.IsEnabled = canManageSettings;
+        TestMesRestBtn.IsEnabled = canManageSettings;
         BrowseCameraTopBtn.IsEnabled = canManageSettings;
         BrowseCameraSideBtn.IsEnabled = canManageSettings;
         BrowseCameraBottomBtn.IsEnabled = canManageSettings;
+        TestCameraSourceBtn.IsEnabled = canManageSettings;
+        TestLightingBtn.IsEnabled = canManageSettings;
         ModelPathText.IsEnabled = canManageSettings;
         ModelVersionText.IsEnabled = canManageSettings;
         LabelMapPathText.IsEnabled = canManageSettings;
@@ -369,8 +631,13 @@ public partial class SettingsView : UserControl
         OutputTensorNameText.IsEnabled = canManageSettings;
         BrowseModelBtn.IsEnabled = canManageSettings;
         BrowseLabelMapBtn.IsEnabled = canManageSettings;
+        RegisterModelBtn.IsEnabled = canManageSettings;
+        SetActiveModelBtn.IsEnabled = canManageSettings;
+        RunSetupWizardBtn.IsEnabled = canManageSettings;
+        ExportDiagnosticsBtn.IsEnabled = canManageSettings;
         ConfidenceThresholdText.IsEnabled = canChangeThresholds;
         TestModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
+        ValidateRegisteredModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
     }
 
     private void RefreshInspectionConfigurationUi()
@@ -402,10 +669,41 @@ public partial class SettingsView : UserControl
         ModelCheckMessageText.Text = configuration.LastModelCheckMessage;
     }
 
+    private void RefreshModelRegistryUi()
+    {
+        var selectedModelId = (ModelRegistryGrid.SelectedItem as ModelRegistryRow)?.ModelId;
+        _modelRegistryRows.Clear();
+
+        try
+        {
+            foreach (var model in ModelRegistryService.GetModels())
+                _modelRegistryRows.Add(new ModelRegistryRow(model));
+
+            if (!string.IsNullOrWhiteSpace(selectedModelId))
+            {
+                ModelRegistryGrid.SelectedItem = _modelRegistryRows.FirstOrDefault(row =>
+                    string.Equals(row.ModelId, selectedModelId, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            ModelCheckMessageText.Text = $"Model registry could not be loaded: {ex.Message}";
+        }
+    }
+
     private void SaveInspectionConfiguration(InspectionModelConfiguration? preparedConfiguration = null)
     {
         var configuration = preparedConfiguration ?? BuildConfigurationFromUi();
         var existing = InspectionModelConfigurationService.Load();
+        if (string.IsNullOrWhiteSpace(configuration.ActiveModelId) &&
+            !string.IsNullOrWhiteSpace(existing.ActiveModelId) &&
+            string.Equals(existing.ModelFilePath, configuration.ModelFilePath, StringComparison.OrdinalIgnoreCase))
+        {
+            configuration.ActiveModelId = existing.ActiveModelId;
+            configuration.ActiveModelSha256 = existing.ActiveModelSha256;
+            configuration.ActiveModelValidationStatus = existing.ActiveModelValidationStatus;
+        }
+
         if (string.Equals(
                 ModelConfigurationValidator.ComputeConfigurationHash(existing),
                 ModelConfigurationValidator.ComputeConfigurationHash(configuration),
@@ -509,9 +807,12 @@ public partial class SettingsView : UserControl
 
         WorkflowState.Instance.AddEvent(
             "CAMERA_CONFIG",
-            settings.IsFolderSimulation
-                ? $"Camera source set to Folder Simulation; status {CameraSourceFactory.ActiveSource.ConnectionStatus}."
-                : "Camera source set to No Camera / Not Connected.");
+            settings.SourceKey switch
+            {
+                CameraSourceFactory.FolderSimulationSourceKey => $"Camera source set to Folder Simulation; status {CameraSourceFactory.ActiveSource.ConnectionStatus}.",
+                CameraSourceFactory.GenericVisionAdapterSourceKey => $"Camera source set to Generic Vision Adapter; status {CameraSourceFactory.ActiveSource.ConnectionStatus}. Adapter configured does not imply camera connected.",
+                _ => "Camera source set to No Camera / Not Connected.",
+            });
     }
 
     private void RefreshCameraSourceUi()
@@ -519,51 +820,185 @@ public partial class SettingsView : UserControl
 
     private void RefreshCameraSourceUi(CameraSourceSettings settings)
     {
-        CameraSourceCombo.SelectedIndex = settings.IsFolderSimulation ? 1 : 0;
+        CameraSourceCombo.SelectedIndex = settings.SourceKey switch
+        {
+            CameraSourceFactory.FolderSimulationSourceKey => 1,
+            CameraSourceFactory.GenericVisionAdapterSourceKey => 2,
+            _ => 0,
+        };
         CameraTopFolderText.Text = settings.TopFolder;
         CameraSideFolderText.Text = settings.SideFolder;
         CameraBottomFolderText.Text = settings.BottomFolder;
+        CameraTopDeviceIdText.Text = settings.TopDeviceId;
+        CameraSideDeviceIdText.Text = settings.SideDeviceId;
+        CameraBottomDeviceIdText.Text = settings.BottomDeviceId;
+        CameraAcquisitionModeCombo.SelectedIndex = settings.AcquisitionMode switch
+        {
+            CameraAcquisitionMode.SoftwareTrigger => 1,
+            CameraAcquisitionMode.HardwareTrigger => 2,
+            _ => 0,
+        };
+        CameraExposureMsText.Text = settings.ExposureMs.ToString("0.###", CultureInfo.InvariantCulture);
+        CameraGainText.Text = settings.Gain.ToString("0.###", CultureInfo.InvariantCulture);
+        CameraTriggerTimeoutMsText.Text = settings.TriggerTimeoutMs.ToString(CultureInfo.InvariantCulture);
+        CameraFrameTimeoutMsText.Text = settings.FrameTimeoutMs.ToString(CultureInfo.InvariantCulture);
         CameraBoardModelText.Text = settings.BoardModel;
         CameraLotIdText.Text = settings.LotId;
 
         var source = CameraSourceFactory.Create(settings);
-        CameraSourceStatusText.Text = source.ConnectionStatus switch
-        {
-            CameraSourceStatus.Simulated => "Camera: Simulated",
-            CameraSourceStatus.Error => "Camera: Error",
-            _ => "Camera: Not Connected",
-        };
-        CameraSourceStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(source.ConnectionStatus switch
-        {
-            CameraSourceStatus.Simulated => "#E1A334",
-            CameraSourceStatus.Error => "#F27777",
-            _ => "#F27777",
-        }));
+        CameraSourceStatusText.Text = $"Camera: {CameraStatusDisplay(source.ConnectionStatus)}";
+        CameraSourceStatusText.Foreground = StatusBrush(source.ConnectionStatus);
+        CameraDiagnosticsText.Text = source.StatusMessage;
     }
 
     private CameraSourceSettings BuildCameraSourceSettingsFromUi()
         => new()
         {
-            SourceKey = CameraSourceCombo.SelectedIndex == 1
-                ? CameraSourceFactory.FolderSimulationSourceKey
-                : CameraSourceFactory.NullSourceKey,
+            SourceKey = CameraSourceCombo.SelectedIndex switch
+            {
+                1 => CameraSourceFactory.FolderSimulationSourceKey,
+                2 => CameraSourceFactory.GenericVisionAdapterSourceKey,
+                _ => CameraSourceFactory.NullSourceKey,
+            },
             TopFolder = CameraTopFolderText.Text.Trim(),
             SideFolder = CameraSideFolderText.Text.Trim(),
             BottomFolder = CameraBottomFolderText.Text.Trim(),
+            TopDeviceId = CameraTopDeviceIdText.Text.Trim(),
+            SideDeviceId = CameraSideDeviceIdText.Text.Trim(),
+            BottomDeviceId = CameraBottomDeviceIdText.Text.Trim(),
+            AcquisitionMode = CameraAcquisitionModeCombo.SelectedIndex switch
+            {
+                1 => CameraAcquisitionMode.SoftwareTrigger,
+                2 => CameraAcquisitionMode.HardwareTrigger,
+                _ => CameraAcquisitionMode.Continuous,
+            },
+            ExposureMs = double.TryParse(CameraExposureMsText.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var exposureMs) ? exposureMs : 5.0,
+            Gain = double.TryParse(CameraGainText.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var gain) ? gain : 1.0,
+            TriggerTimeoutMs = int.TryParse(CameraTriggerTimeoutMsText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var triggerTimeoutMs) ? triggerTimeoutMs : 250,
+            FrameTimeoutMs = int.TryParse(CameraFrameTimeoutMsText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var frameTimeoutMs) ? frameTimeoutMs : 1000,
             BoardModel = CameraBoardModelText.Text.Trim(),
             LotId = CameraLotIdText.Text.Trim(),
+        };
+
+    private void SaveLightingSettings(LightingSettings? preparedSettings = null)
+    {
+        var settings = preparedSettings ?? BuildLightingSettingsFromUi();
+        var validation = LightingSettingsService.Validate(settings);
+        if (validation.Count > 0)
+        {
+            LightingDiagnosticsText.Text = string.Join(" ", validation);
+            WorkflowState.Instance.AddEvent("LIGHTING_CONFIG_WARNING", LightingDiagnosticsText.Text);
+            return;
+        }
+
+        LightingSettingsService.Save(settings);
+        LightingSettingsService.ApplyIntegrationBoundary();
+
+        WorkflowState.Instance.AddEvent(
+            "LIGHTING_CONFIG",
+            settings.Mode switch
+            {
+                LightingModes.Simulated => "Lighting set to Simulated. No real lighting command will be sent.",
+                LightingModes.TcpText => $"Lighting set to TCP text protocol endpoint {settings.TcpHost}:{settings.TcpPort}.",
+                LightingModes.SerialText => $"Lighting set to Serial text protocol endpoint {settings.SerialPortName}.",
+                _ => "Lighting set to None / Not Connected.",
+            });
+    }
+
+    private void RefreshLightingUi()
+        => RefreshLightingUi(LightingSettingsService.Load());
+
+    private void RefreshLightingUi(LightingSettings settings)
+    {
+        LightingModeCombo.SelectedIndex = settings.Mode switch
+        {
+            LightingModes.Simulated => 1,
+            LightingModes.TcpText => 2,
+            LightingModes.SerialText => 3,
+            _ => 0,
+        };
+        LightingTcpHostText.Text = settings.TcpHost;
+        LightingTcpPortText.Text = settings.TcpPort.ToString(CultureInfo.InvariantCulture);
+        LightingSerialPortText.Text = settings.SerialPortName;
+        LightingBaudRateText.Text = settings.BaudRate.ToString(CultureInfo.InvariantCulture);
+        LightingTopProgramText.Text = settings.TopProgram;
+        LightingSideProgramText.Text = settings.SideProgram;
+        LightingBottomProgramText.Text = settings.BottomProgram;
+        LightingCommandTemplateText.Text = settings.CommandTemplate;
+        LightingTimeoutMsText.Text = settings.ResponseTimeoutMs.ToString(CultureInfo.InvariantCulture);
+
+        var controller = LightingControllerFactory.Create(settings);
+        LightingSettingsStatusText.Text = $"Lighting: {IntegrationStatusDisplay(controller.Status)}";
+        LightingSettingsStatusText.Foreground = IntegrationStatusBrush(controller.Status);
+        var validation = LightingSettingsService.Validate(settings);
+        LightingDiagnosticsText.Text = validation.Count == 0
+            ? controller.StatusMessage
+            : string.Join(" ", validation);
+    }
+
+    private async void OnTestLightingClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Testing lighting synchronization"))
+            return;
+
+        var settings = BuildLightingSettingsFromUi();
+        var validation = LightingSettingsService.Validate(settings);
+        if (validation.Count > 0)
+        {
+            LightingDiagnosticsText.Text = string.Join(" ", validation);
+            MessageBox.Show(LightingDiagnosticsText.Text, "Lighting Test", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var controller = LightingControllerFactory.Create(settings);
+        var result = await LightingSynchronizationService.SynchronizeAsync(controller, settings, "Top");
+        LightingDiagnosticsText.Text = $"{result.Message} Status={result.Status}.";
+        LightingSettingsStatusText.Text = $"Lighting: {IntegrationStatusDisplay(result.Status)}";
+        LightingSettingsStatusText.Foreground = IntegrationStatusBrush(result.Status);
+        MessageBox.Show(
+            LightingDiagnosticsText.Text,
+            "Lighting Test",
+            MessageBoxButton.OK,
+            result.Status is IntegrationConnectionStatus.Ready or IntegrationConnectionStatus.Simulated ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
+    private LightingSettings BuildLightingSettingsFromUi()
+        => new()
+        {
+            Mode = LightingModeCombo.SelectedIndex switch
+            {
+                1 => LightingModes.Simulated,
+                2 => LightingModes.TcpText,
+                3 => LightingModes.SerialText,
+                _ => LightingModes.None,
+            },
+            TcpHost = LightingTcpHostText.Text.Trim(),
+            TcpPort = int.TryParse(LightingTcpPortText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var tcpPort) ? tcpPort : 0,
+            SerialPortName = LightingSerialPortText.Text.Trim(),
+            BaudRate = int.TryParse(LightingBaudRateText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var baudRate) ? baudRate : 0,
+            TopProgram = LightingTopProgramText.Text.Trim(),
+            SideProgram = LightingSideProgramText.Text.Trim(),
+            BottomProgram = LightingBottomProgramText.Text.Trim(),
+            CommandTemplate = LightingCommandTemplateText.Text,
+            ResponseTimeoutMs = int.TryParse(LightingTimeoutMsText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var timeout) ? timeout : 0,
         };
 
     private void SaveMesIntegrationSettings(MesIntegrationSettings? preparedSettings = null)
     {
         var settings = preparedSettings ?? BuildMesIntegrationSettingsFromUi();
+        var validation = MesIntegrationSettingsService.Validate(settings);
+        if (validation.Count > 0)
+        {
+            MesDiagnosticsText.Text = string.Join(" ", validation);
+            WorkflowState.Instance.AddEvent("MES_CONFIG_WARNING", MesDiagnosticsText.Text);
+            return;
+        }
+
         MesIntegrationSettingsService.Save(settings);
 
         WorkflowState.Instance.AddEvent(
             "MES_CONFIG",
-            settings.Mode == MesIntegrationMode.MockRest
-                ? $"Mock MES mode set to Mock REST. Endpoint configured: {!string.IsNullOrWhiteSpace(settings.MockEndpointUrl)}. This is not production MES."
-                : $"MES/ERP mode set to {TraceabilityUploadService.ToDisplay(settings.Mode)}.");
+            $"MES/ERP settings updated: {MesIntegrationSettingsService.RedactedSummary(settings)}");
     }
 
     private void RefreshMesIntegrationUi()
@@ -574,11 +1009,29 @@ public partial class SettingsView : UserControl
         MesModeCombo.SelectedIndex = settings.Mode switch
         {
             MesIntegrationMode.MockRest => 1,
-            MesIntegrationMode.FutureProduction => 2,
+            MesIntegrationMode.Rest => 2,
             _ => 0,
         };
         MesEndpointText.Text = settings.MockEndpointUrl;
+        MesRestBaseUrlText.Text = settings.BaseUrl;
+        MesResultPathText.Text = settings.UploadResultPath;
+        MesImagePathText.Text = settings.UploadImagePath;
+        MesAuthModeCombo.SelectedIndex = settings.AuthMode switch
+        {
+            MesRestAuthMode.ApiKey => 1,
+            MesRestAuthMode.Bearer => 2,
+            MesRestAuthMode.Basic => 3,
+            _ => 0,
+        };
+        MesApiKeyHeaderText.Text = settings.ApiKeyHeaderName;
+        MesApiKeyBox.Password = settings.ApiKey;
+        MesBearerTokenBox.Password = settings.BearerToken;
+        MesUsernameText.Text = settings.Username;
+        MesPasswordBox.Password = settings.Password;
         MesTimeoutText.Text = settings.UploadTimeoutSeconds.ToString(CultureInfo.InvariantCulture);
+        MesMaxRetryText.Text = settings.MaxRetryCount.ToString(CultureInfo.InvariantCulture);
+        MesRetryBackoffText.Text = settings.RetryBackoffMs.ToString(CultureInfo.InvariantCulture);
+        MesAutoUploadCheck.IsChecked = settings.AutoUploadEnabled;
 
         MesIntegrationSettingsService.ApplyIntegrationBoundary();
         var status = IntegrationBoundaryRegistry.MesClient.Status;
@@ -587,7 +1040,7 @@ public partial class SettingsView : UserControl
             MesIntegrationMode.MockRest => string.IsNullOrWhiteSpace(settings.MockEndpointUrl)
                 ? "Mock MES: Local JSON"
                 : "Mock MES: REST Configured",
-            MesIntegrationMode.FutureProduction => "MES: Future Production Planned",
+            MesIntegrationMode.Rest => status == IntegrationConnectionStatus.Ready ? "MES REST: Ready" : "MES REST: Config Error",
             _ => "MES: Not Connected",
         };
         MesMockStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
@@ -597,6 +1050,53 @@ public partial class SettingsView : UserControl
             IntegrationConnectionStatus.Error => "#F27777",
             _ => "#F27777",
         }));
+        MesDiagnosticsText.Text = MesIntegrationSettingsService.RedactedSummary(settings);
+    }
+
+    private async void OnTestMesRestClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Testing MES integration"))
+            return;
+
+        var settings = BuildMesIntegrationSettingsFromUi();
+        var validation = MesIntegrationSettingsService.Validate(settings);
+        if (validation.Count > 0)
+        {
+            MesDiagnosticsText.Text = string.Join(" ", validation);
+            MessageBox.Show(MesDiagnosticsText.Text, "MES Integration Test", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        MesIntegrationSettingsService.Save(settings);
+        var payload = new TraceabilityPayload
+        {
+            IntegrationMode = TraceabilityUploadService.ToDisplay(settings.Mode),
+            LotId = "TEST-LOT",
+            BoardModel = WorkflowState.Instance.BoardProgram,
+            SerialNumber = "TEST-BOARD",
+            StationId = WorkflowState.Instance.StationId,
+            OperatorId = WorkflowState.Instance.OperatorWithRole,
+            Result = "REVIEW",
+            TimestampUtc = DateTime.UtcNow,
+            DefectSummary = "Settings test payload; no production result.",
+            SourceNotice = "Settings test payload generated by AOI Monitor. No production inspection result.",
+        };
+
+        try
+        {
+            var outcome = await TraceabilityUploadService.UploadAsync(payload);
+            MesDiagnosticsText.Text = $"{outcome.Result.Message} Payload={outcome.PayloadPath}";
+            MessageBox.Show(
+                MesDiagnosticsText.Text,
+                "MES Integration Test",
+                MessageBoxButton.OK,
+                outcome.Result.Accepted ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            MesDiagnosticsText.Text = $"MES test failed safely: {ex.Message}";
+            MessageBox.Show(MesDiagnosticsText.Text, "MES Integration Test", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private MesIntegrationSettings BuildMesIntegrationSettingsFromUi()
@@ -605,10 +1105,26 @@ public partial class SettingsView : UserControl
             Mode = MesModeCombo.SelectedIndex switch
             {
                 1 => MesIntegrationMode.MockRest,
-                2 => MesIntegrationMode.FutureProduction,
+                2 => MesIntegrationMode.Rest,
                 _ => MesIntegrationMode.NotConnected,
             },
             MockEndpointUrl = MesEndpointText.Text.Trim(),
+            AutoUploadEnabled = MesAutoUploadCheck.IsChecked == true,
+            BaseUrl = MesRestBaseUrlText.Text.Trim(),
+            UploadResultPath = MesResultPathText.Text.Trim(),
+            UploadImagePath = MesImagePathText.Text.Trim(),
+            AuthMode = MesAuthModeCombo.SelectedIndex switch
+            {
+                1 => MesRestAuthMode.ApiKey,
+                2 => MesRestAuthMode.Bearer,
+                3 => MesRestAuthMode.Basic,
+                _ => MesRestAuthMode.None,
+            },
+            ApiKeyHeaderName = MesApiKeyHeaderText.Text.Trim(),
+            ApiKey = MesApiKeyBox.Password,
+            BearerToken = MesBearerTokenBox.Password,
+            Username = MesUsernameText.Text.Trim(),
+            Password = MesPasswordBox.Password,
             UploadTimeoutSeconds = int.TryParse(
                 MesTimeoutText.Text,
                 NumberStyles.Integer,
@@ -616,6 +1132,27 @@ public partial class SettingsView : UserControl
                 out var timeout)
                 ? Math.Clamp(timeout, 1, 300)
                 : 10,
+            TimeoutSeconds = int.TryParse(
+                MesTimeoutText.Text,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var restTimeout)
+                ? restTimeout
+                : 10,
+            MaxRetryCount = int.TryParse(
+                MesMaxRetryText.Text,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var retries)
+                ? retries
+                : 2,
+            RetryBackoffMs = int.TryParse(
+                MesRetryBackoffText.Text,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var backoff)
+                ? backoff
+                : 500,
         };
 
     private InspectionModelConfiguration BuildConfigurationFromUi()
@@ -666,6 +1203,26 @@ public partial class SettingsView : UserControl
         };
     }
 
+    private ModelRegistrationRequest BuildModelRegistrationRequestFromUi()
+    {
+        var configuration = BuildConfigurationFromUi();
+        return new ModelRegistrationRequest
+        {
+            ModelFilePath = configuration.ModelFilePath,
+            LabelMapPath = configuration.LabelMapPath,
+            DisplayName = string.IsNullOrWhiteSpace(configuration.ModelFilePath)
+                ? configuration.ModelVersion
+                : Path.GetFileNameWithoutExtension(configuration.ModelFilePath),
+            Version = configuration.ModelVersion,
+            InputTensorName = configuration.InputTensorName,
+            OutputTensorName = configuration.OutputTensorName,
+            InputWidth = configuration.InputImageWidth,
+            InputHeight = configuration.InputImageHeight,
+            ConfidenceThreshold = configuration.ConfidenceThreshold,
+            Notes = "Registered from Settings. No training is performed by AOI Monitor.",
+        };
+    }
+
     private static Brush StatusBrush(InspectionEngineStatus status)
     {
         var color = status switch
@@ -696,6 +1253,50 @@ public partial class SettingsView : UserControl
 
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
     }
+
+    private static Brush StatusBrush(CameraSourceStatus status)
+    {
+        var color = status switch
+        {
+            CameraSourceStatus.Ready => "#50F56E",
+            CameraSourceStatus.Simulated => "#E1A334",
+            CameraSourceStatus.Error => "#F27777",
+            _ => "#F27777",
+        };
+
+        return new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+    }
+
+    private static string CameraStatusDisplay(CameraSourceStatus status)
+        => status switch
+        {
+            CameraSourceStatus.Ready => "Connected",
+            CameraSourceStatus.Simulated => "Simulated",
+            CameraSourceStatus.Error => "Error",
+            _ => "Not Connected",
+        };
+
+    private static Brush IntegrationStatusBrush(IntegrationConnectionStatus status)
+    {
+        var color = status switch
+        {
+            IntegrationConnectionStatus.Ready => "#50F56E",
+            IntegrationConnectionStatus.Simulated => "#E1A334",
+            IntegrationConnectionStatus.Error => "#F27777",
+            _ => "#F27777",
+        };
+
+        return new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+    }
+
+    private static string IntegrationStatusDisplay(IntegrationConnectionStatus status)
+        => status switch
+        {
+            IntegrationConnectionStatus.Ready => "Ready",
+            IntegrationConnectionStatus.Simulated => "Simulated",
+            IntegrationConnectionStatus.Error => "Error",
+            _ => "Not Connected",
+        };
 
     private string? ValidateRawModelCheckFields()
     {
@@ -852,4 +1453,28 @@ public partial class SettingsView : UserControl
         2 => Models.DetectionPriority.MaximizeDefectRecall,
         _ => Models.DetectionPriority.MinimizeFalsePositives,
     };
+
+    private sealed class ModelRegistryRow
+    {
+        public ModelRegistryRow(ModelRegistryEntry entry)
+        {
+            ModelId = entry.ModelId;
+            DisplayName = entry.DisplayName;
+            Version = entry.Version;
+            ValidationStatus = ModelConfigurationValidator.ToDisplay(entry.ValidationStatus);
+            ThresholdDisplay = entry.ConfidenceThreshold.ToString("P0", CultureInfo.InvariantCulture);
+            LastValidatedDisplay = entry.LastValidatedAtUtc is { } timestamp
+                ? timestamp.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture)
+                : "--";
+            ActiveDisplay = entry.IsActive ? "Yes" : string.Empty;
+        }
+
+        public string ModelId { get; }
+        public string DisplayName { get; }
+        public string Version { get; }
+        public string ValidationStatus { get; }
+        public string ThresholdDisplay { get; }
+        public string LastValidatedDisplay { get; }
+        public string ActiveDisplay { get; }
+    }
 }

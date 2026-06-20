@@ -5,15 +5,43 @@ public enum MesIntegrationMode
     NotConnected,
     MockRest,
     FutureProduction,
+    Rest,
 }
 
-public sealed class MesIntegrationSettings
+public enum MesRestAuthMode
+{
+    None,
+    ApiKey,
+    Bearer,
+    Basic,
+}
+
+public class MesRestSettings
 {
     public MesIntegrationMode Mode { get; set; } = MesIntegrationMode.NotConnected;
     public string MockEndpointUrl { get; set; } = string.Empty;
     public int UploadTimeoutSeconds { get; set; } = 10;
+    public bool AutoUploadEnabled { get; set; }
+    public string BaseUrl { get; set; } = string.Empty;
+    public string UploadResultPath { get; set; } = "/api/aoi/results";
+    public string UploadImagePath { get; set; } = "/api/aoi/images";
+    public MesRestAuthMode AuthMode { get; set; } = MesRestAuthMode.None;
+    public string ApiKeyHeaderName { get; set; } = "X-API-Key";
+    public string ApiKey { get; set; } = string.Empty;
+    public string BearerToken { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public int TimeoutSeconds { get; set; } = 10;
+    public int MaxRetryCount { get; set; } = 2;
+    public int RetryBackoffMs { get; set; } = 500;
 
+    public bool IsRest => Mode == MesIntegrationMode.Rest;
+}
+
+public sealed class MesIntegrationSettings : MesRestSettings
+{
     public bool IsMockRest => Mode == MesIntegrationMode.MockRest;
+    public bool IsUploadCapable => Mode is MesIntegrationMode.MockRest or MesIntegrationMode.Rest;
 }
 
 public sealed class TraceabilityPayload
@@ -49,3 +77,26 @@ public sealed record MesUploadAttemptRecord(
     string LotId,
     string BoardModel,
     string Result);
+
+public sealed record MesSpoolQueueRecord(
+    long Id,
+    DateTime CreatedAtUtc,
+    DateTime? LastAttemptAtUtc,
+    DateTime? NextAttemptAtUtc,
+    string PayloadType,
+    string PayloadJson,
+    string PayloadPath,
+    string EndpointUrl,
+    int RetryCount,
+    int MaxRetryCount,
+    string Status,
+    string LastError,
+    string OperatorId,
+    string LotId,
+    string BoardModel,
+    string Result);
+
+public sealed record MesSpoolRetrySummary(
+    int Attempted,
+    int Succeeded,
+    int Failed);

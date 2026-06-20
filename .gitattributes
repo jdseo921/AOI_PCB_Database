@@ -1,1 +1,28 @@
+* text=auto
+
+*.cs text
+*.xaml text
+*.csproj text
+*.slnx text
+*.md text
+*.ps1 text
+*.yml text
+*.yaml text
+*.json text
+*.csv text
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+*.webp binary
+*.gif binary
+*.zip binary
+*.7z binary
+*.rar binary
+*.docx binary
+*.pdf binary
+
 *.psd filter=lfs diff=lfs merge=lfs -text

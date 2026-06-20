@@ -19,10 +19,14 @@ public sealed class AoiDatabaseTests : IDisposable
     {
         _root = Path.Combine(Path.GetTempPath(), "AOI_Monitor_Tests", Guid.NewGuid().ToString("N"));
         AoiDatabase.ConfigureStorageRoot(_root);
+        RecipeService.Invalidate();
+        FirstRunSettingsService.ResetForTests();
     }
 
     public void Dispose()
     {
+        RecipeService.Invalidate();
+        FirstRunSettingsService.ResetForTests();
         StorageRootSettingsService.ConfigureSettingsDirectoryForTests(null);
         try
         {
@@ -68,11 +72,350 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Contains("Images", tables);
         Assert.Contains("InspectionResults", tables);
         Assert.Contains("BatchTestRuns", tables);
+        Assert.Contains("ModelRegistry", tables);
         Assert.Contains("RecipeRevisions", tables);
         Assert.Contains("CalibrationProfiles", tables);
         Assert.Contains("CalibrationPoints", tables);
         Assert.Contains("ExportHistory", tables);
+        Assert.Contains("ExportVerification", tables);
+        Assert.Contains("ValidationPackages", tables);
         Assert.Contains("AuditEvents", tables);
+        Assert.Contains("SchemaInfo", tables);
+    }
+
+    [Fact]
+    public void NewDatabaseInitializesToLatestSchemaVersion()
+    {
+        AoiDatabase.Initialize();
+
+        using var connection = OpenTestConnection();
+        Assert.Equal(AoiDatabaseMigrations.LatestVersion, AoiDatabase.GetSchemaVersion(connection));
+        Assert.True(AoiDatabase.TableExists(connection, "SchemaInfo"));
+        Assert.True(AoiDatabase.ColumnExists(connection, "InspectionResults", "BoardProgram"));
+        Assert.True(AoiDatabase.IndexExists(connection, "IX_InspectionResults_CreatedAtUtc"));
+    }
+
+    [Fact]
+    public void SimulatedOlderDatabaseMissingNewerColumnsMigratesSuccessfully()
+    {
+        Directory.CreateDirectory(_root);
+        using (var connection = OpenTestConnection())
+        {
+            ExecuteSql(
+                connection,
+                """
+                CREATE TABLE SchemaInfo
+                (
+                    Key TEXT PRIMARY KEY,
+                    Value TEXT NOT NULL
+                );
+
+                INSERT INTO SchemaInfo (Key, Value) VALUES ('SchemaVersion', '0');
+
+                CREATE TABLE InspectionResults
+                (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    SampleImagePath TEXT NOT NULL,
+                    GoldenImagePath TEXT NULL,
+                    DifferenceScore REAL NOT NULL,
+                    MeanBrightness REAL NOT NULL,
+                    Verdict TEXT NOT NULL,
+                    Confidence REAL NOT NULL,
+                    SuggestedDefect TEXT NOT NULL,
+                    PolicyName TEXT NOT NULL,
+                    ModelVersion TEXT NOT NULL,
+                    DecisionReason TEXT NOT NULL,
+                    HotspotX REAL NOT NULL,
+                    HotspotY REAL NOT NULL,
+                    HotspotWidth REAL NOT NULL,
+                    HotspotHeight REAL NOT NULL,
+                    CreatedAtUtc TEXT NOT NULL
+                );
+
+                CREATE TABLE Defects
+                (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    InspectionResultId INTEGER NULL,
+                    ImageId INTEGER NULL,
+                    RefDes TEXT NULL,
+                    DefectType TEXT NOT NULL,
+                    Severity TEXT NOT NULL,
+                    RoiX REAL NULL,
+                    RoiY REAL NULL,
+                    RoiWidth REAL NULL,
+                    RoiHeight REAL NULL,
+                    CreatedAtUtc TEXT NOT NULL
+                );
+
+                CREATE TABLE RecipeRevisions
+                (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    RecipeName TEXT NOT NULL,
+                    Revision TEXT NOT NULL,
+                    DetectionPriority TEXT NOT NULL,
+                    Notes TEXT NULL,
+                    CreatedAtUtc TEXT NOT NULL
+                );
+
+                CREATE TABLE BatchTestRuns
+                (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ImageFolder TEXT NOT NULL,
+                    GroundTruthCsvPath TEXT NULL,
+                    EngineName TEXT NOT NULL,
+                    Accuracy REAL NOT NULL,
+                    Precision REAL NOT NULL,
+                    Recall REAL NOT NULL,
+                    FalseCallRate REAL NOT NULL,
+                    TotalImages INTEGER NOT NULL,
+                    FailedCount INTEGER NOT NULL,
+                    CreatedAtUtc TEXT NOT NULL
+                );
+
+                CREATE TABLE BatchTestResults
+                (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    RunId INTEGER NOT NULL,
+                    ImagePath TEXT NOT NULL,
+                    ImageName TEXT NOT NULL,
+                    GroundTruth TEXT NOT NULL,
+                    EngineResult TEXT NOT NULL,
+                    Score REAL NOT NULL,
+                    PassFail TEXT NOT NULL,
+                    DefectType TEXT NOT NULL,
+                    RoiX REAL NOT NULL,
+                    RoiY REAL NOT NULL,
+                    RoiWidth REAL NOT NULL,
+                    RoiHeight REAL NOT NULL,
+                    CreatedAtUtc TEXT NOT NULL
+                );
+
+                CREATE TABLE ExportHistory
+                (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ExportType TEXT NOT NULL,
+                    FilePath TEXT NOT NULL,
+                    Status TEXT NOT NULL,
+                    CreatedAtUtc TEXT NOT NULL
+                );
+                """);
+        }
+
+        AoiDatabase.Initialize();
+
+        using var migrated = OpenTestConnection();
+        Assert.Equal(AoiDatabaseMigrations.LatestVersion, AoiDatabase.GetSchemaVersion(migrated));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "InspectionResults", "BoardProgram"));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "InspectionResults", "TotalInspectionMs"));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "Defects", "RoiId"));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "RecipeRevisions", "RecipeJson"));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "BatchTestRuns", "ModelVersion"));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "BatchTestResults", "TotalInspectionMs"));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "ExportHistory", "OperatorId"));
+        Assert.True(AoiDatabase.TableExists(migrated, "ModelRegistry"));
+        Assert.True(AoiDatabase.TableExists(migrated, "ValidationPackages"));
+        Assert.True(AoiDatabase.TableExists(migrated, "MesSpoolQueue"));
+        Assert.True(AoiDatabase.IndexExists(migrated, "IX_InspectionResults_BoardProgram"));
+    }
+
+    [Fact]
+    public void RerunningInitializeIsIdempotent()
+    {
+        AoiDatabase.Initialize();
+        var version = AoiDatabase.GetSchemaVersion();
+
+        AoiDatabase.Initialize();
+
+        Assert.Equal(version, AoiDatabase.GetSchemaVersion());
+        Assert.Equal(AoiDatabaseMigrations.LatestVersion, version);
+        Assert.Equal("ok", AoiDatabase.RunIntegrityCheck(), ignoreCase: true);
+    }
+
+    [Fact]
+    public void MigrationFailureDoesNotLeavePartialVersionIncrement()
+    {
+        Directory.CreateDirectory(_root);
+        using var connection = OpenTestConnection();
+        var failingMigration = new AoiDatabaseMigration(
+            1,
+            "Intentional failure after a transactional change.",
+            (db, transaction) =>
+            {
+                using var command = db.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = "CREATE TABLE PartialMigrationMarker (Id INTEGER PRIMARY KEY);";
+                command.ExecuteNonQuery();
+                throw new InvalidOperationException("boom");
+            });
+
+        Assert.Throws<InvalidOperationException>(
+            () => AoiDatabaseMigrations.ApplyPending(connection, new[] { failingMigration }));
+
+        Assert.Equal(0, AoiDatabase.GetSchemaVersion(connection));
+        Assert.False(AoiDatabase.TableExists(connection, "PartialMigrationMarker"));
+    }
+
+    [Fact]
+    public void ExportVerificationCsvWithCorrectHeadersPassesAndPersists()
+    {
+        AoiDatabase.Initialize();
+        var csv = Path.Combine(_root, "validation_results.csv");
+        File.WriteAllText(
+            csv,
+            "Image,Ground Truth,AI/Engine Result,Inspection Engine,Model Version,Recipe Name,Recipe Revision,Score,Pass/Fail,Defect Type,ROI ID,ROI Type,Side,RefDes,LotId,BoardModel,Notes,Image Path,RoiX,RoiY,RoiWidth,RoiHeight,ImageLoadMs,PreprocessingMs,InferenceMs,OverlayRenderingMs,TotalInspectionMs" + Environment.NewLine,
+            Encoding.UTF8);
+
+        var recorded = ExportVerificationService.RecordVerifiedExport("Stage1ValidationCsv", csv);
+        var persisted = AoiDatabase.GetLatestExportVerification(recorded.ExportHistoryId);
+
+        Assert.Equal(ExportVerificationStatus.OK, recorded.Verification.Status);
+        Assert.NotEmpty(recorded.Verification.Sha256);
+        Assert.NotNull(persisted);
+        Assert.Equal("OK", persisted.Status);
+        Assert.Equal(recorded.Verification.Sha256, persisted.Sha256);
+    }
+
+    [Fact]
+    public void ExportVerificationMissingFileFails()
+    {
+        var result = ExportVerificationService.Verify(Path.Combine(_root, "missing.csv"), "Stage1ValidationCsv");
+
+        Assert.Equal(ExportVerificationStatus.ERROR, result.Status);
+        Assert.Contains(result.Messages, message => message.Contains("does not exist", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ExportVerificationJsonMissingRequiredFieldsFails()
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, "latest_decision.json");
+        File.WriteAllText(path, "{\"schemaVersion\":\"inspection-result/v1\"}", Encoding.UTF8);
+
+        var result = ExportVerificationService.Verify(path, "MachineInterfaceDecisionJson");
+
+        Assert.Equal(ExportVerificationStatus.ERROR, result.Status);
+        Assert.Contains(result.Messages, message => message.Contains("inspectionId", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ExportVerificationPngSignaturePasses()
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, "overlay.png");
+        File.WriteAllBytes(path, TinyPngBytes());
+
+        var result = ExportVerificationService.Verify(path, "AnnotatedImageOverlay");
+
+        Assert.Equal(ExportVerificationStatus.OK, result.Status);
+        Assert.NotEmpty(result.Sha256);
+        Assert.Contains(result.Messages, message => message.Contains("PNG signature verified", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ExportVerificationCustomerPackageManifestMismatchFails()
+    {
+        var package = Path.Combine(_root, "stage1_validation_package");
+        Directory.CreateDirectory(package);
+        File.WriteAllText(
+            Path.Combine(package, "package_manifest.json"),
+            """
+            {
+              "schemaVersion": "stage1-customer-package/v1",
+              "packageId": "unit-test-package",
+              "generatedAtUtc": "2026-06-21T00:00:00Z",
+              "includedFiles": [
+                { "relativePath": "missing.csv", "fileType": "CSV", "bytes": 12 }
+              ]
+            }
+            """,
+            Encoding.UTF8);
+
+        var result = ExportVerificationService.Verify(package, "Stage1CustomerPackage");
+
+        Assert.Equal(ExportVerificationStatus.ERROR, result.Status);
+        Assert.Contains(result.Messages, message => message.Contains("missing.csv", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DiagnosticsReturnOkForTempWritableStorage()
+    {
+        AoiDatabase.Initialize();
+        InspectionModelConfigurationService.Save(new InspectionModelConfiguration());
+        CameraSourceSettingsService.ApplyActiveSource();
+        LightingSettingsService.ApplyIntegrationBoundary();
+        MesIntegrationSettingsService.ApplyIntegrationBoundary();
+
+        var report = SystemDiagnosticService.RunDiagnostics();
+
+        Assert.Contains(report.Checks, check => check.Category == "Storage" && check.Status == DiagnosticStatus.OK);
+        Assert.Contains(report.Checks, check => check.Category == "Database" && check.Status == DiagnosticStatus.OK);
+        Assert.Contains(report.Checks, check => check.Category == "Image Vault" && check.Name == "Image vault folder" && check.Status == DiagnosticStatus.OK);
+        Assert.Contains(report.Checks, check => check.Category == "Image Vault" && check.Name == "Training folder" && check.Status == DiagnosticStatus.OK);
+        Assert.Contains(report.Checks, check => check.Category == "Exports" && check.Status == DiagnosticStatus.OK);
+        Assert.Contains(report.Checks, check => check.Category == "Inspection Engine" && check.Status != DiagnosticStatus.Error);
+    }
+
+    [Fact]
+    public void DiagnosticsReturnErrorForInvalidStorageRootPath()
+    {
+        AoiDatabase.Initialize();
+        var filePath = Path.Combine(_root, "not-a-folder.txt");
+        Directory.CreateDirectory(_root);
+        File.WriteAllText(filePath, "not a directory");
+
+        var report = SystemDiagnosticService.RunDiagnostics(filePath);
+
+        Assert.Contains(report.Checks, check => check.Category == "Storage" && check.Status == DiagnosticStatus.Error);
+    }
+
+    [Fact]
+    public void FirstRunSettingsPersistCompletionFlag()
+    {
+        AoiDatabase.Initialize();
+
+        FirstRunSettingsService.MarkCompleted();
+        FirstRunSettingsService.ResetForTests();
+        var settings = FirstRunSettingsService.Load();
+
+        Assert.True(settings.Completed);
+        Assert.Equal(FirstRunSettings.CurrentWizardVersion, settings.VersionCompleted);
+        Assert.True(FirstRunSettingsService.IsCompleted());
+    }
+
+    [Fact]
+    public void DiagnosticExportContainsAllCategories()
+    {
+        AoiDatabase.Initialize();
+        var report = SystemDiagnosticService.RunDiagnostics();
+        var exportRoot = Path.Combine(_root, "diagnostic_exports");
+
+        var export = SystemDiagnosticService.ExportReport(report, exportRoot);
+        var json = File.ReadAllText(export.JsonPath);
+        var html = File.ReadAllText(export.HtmlPath);
+        var text = File.ReadAllText(export.TextPath);
+
+        Assert.True(File.Exists(export.JsonPath));
+        Assert.True(File.Exists(export.HtmlPath));
+        Assert.True(File.Exists(export.TextPath));
+        foreach (var category in new[]
+                 {
+                     "Storage",
+                     "Database",
+                     "Image Vault",
+                     "Exports",
+                     "Inspection Engine",
+                     "Camera",
+                     "Lighting",
+                     "Robot",
+                     "MES / Traceability",
+                     "E-Stop",
+                     "Model Registry",
+                 })
+        {
+            Assert.Contains(category, json);
+            Assert.Contains(category, html);
+            Assert.Contains(category, text);
+        }
     }
 
     [Fact]
@@ -295,6 +638,60 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
+    public void ValidationAcceptanceCriteriaReturnsPassFailAndConditional()
+    {
+        var passingRows = new[]
+        {
+            Row("NG", "NG", "ng.png"),
+            Row("OK", "OK", "ok.png"),
+        };
+        var passingMetrics = BatchValidationService.CalculateMetrics(passingRows);
+        var passingPerformance = BatchValidationService.CalculatePerformanceSummary(passingRows);
+
+        var pass = CustomerValidationPackageService.EvaluateAcceptance(
+            passingMetrics,
+            passingPerformance,
+            passingRows.Length,
+            isFormalManifest: true);
+
+        Assert.Equal("PASS", pass.Status);
+        Assert.True(pass.NumericGatesPassed);
+
+        var failRows = new[]
+        {
+            Row("NG", "OK", "escape.png"),
+            Row("OK", "NG", "false-call.png"),
+        };
+        var fail = CustomerValidationPackageService.EvaluateAcceptance(
+            BatchValidationService.CalculateMetrics(failRows),
+            BatchValidationService.CalculatePerformanceSummary(failRows),
+            failRows.Length,
+            isFormalManifest: true);
+
+        Assert.Equal("FAIL", fail.Status);
+        Assert.Contains(fail.Messages, message => message.Contains("Accuracy", StringComparison.OrdinalIgnoreCase));
+
+        var conditional = CustomerValidationPackageService.EvaluateAcceptance(
+            passingMetrics,
+            passingPerformance,
+            passingRows.Length,
+            isFormalManifest: false);
+
+        Assert.Equal("CONDITIONAL", conditional.Status);
+        Assert.Contains(conditional.Messages, message => message.Contains("Formal validation manifest", StringComparison.OrdinalIgnoreCase));
+
+        var unknownRows = new[] { Row("UNKNOWN", "OK", "unknown.png") };
+        var unknown = CustomerValidationPackageService.EvaluateAcceptance(
+            BatchValidationService.CalculateMetrics(unknownRows),
+            BatchValidationService.CalculatePerformanceSummary(unknownRows),
+            unknownRows.Length,
+            isFormalManifest: true);
+
+        Assert.Equal("CONDITIONAL", unknown.Status);
+        Assert.False(unknown.MetricsComputed);
+    }
+
+    [Fact]
     public void GenericDetectionOutputParserParsesDetectionRows()
     {
         var tensor = new DenseTensor<float>(new[] { 2, 6 });
@@ -498,6 +895,94 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
+    public void ValidationPackageServiceCreatesManifestFilesAndPersistenceWithoutRawImageCopy()
+    {
+        AoiDatabase.Initialize();
+        var datasetFolder = Path.Combine(_root, "customer-dataset");
+        Directory.CreateDirectory(datasetFolder);
+        var rawCustomerImage = Path.Combine(datasetFolder, "raw-customer-board.png");
+        File.WriteAllBytes(rawCustomerImage, TinyPngBytes());
+        var groundTruth = Path.Combine(datasetFolder, "ground_truth.csv");
+        File.WriteAllText(
+            groundTruth,
+            "image,ground_truth,golden_image,defect_type,side,refdes,lot_id,board_model,notes",
+            Encoding.UTF8);
+
+        var rows = new[]
+        {
+            Row("NG", "NG", "board-ng.png"),
+            Row("OK", "OK", "board-ok.png"),
+        };
+        rows[0].ImagePath = Path.Combine(datasetFolder, "missing-board-ng.png");
+        rows[1].ImagePath = Path.Combine(datasetFolder, "missing-board-ok.png");
+        var metrics = BatchValidationService.CalculateMetrics(rows);
+        var performance = BatchValidationService.CalculatePerformanceSummary(rows);
+        var runId = AoiDatabase.RecordBatchTestRun(
+            datasetFolder,
+            groundTruth,
+            "Unit Test Engine",
+            "TEST-1",
+            metrics.Accuracy,
+            metrics.Precision,
+            metrics.Recall,
+            metrics.FalseCallRate,
+            rows.Select(row => row.ToRecord()).ToArray());
+        var outputRoot = Path.Combine(_root, "exports", "packages");
+
+        var result = CustomerValidationPackageService.CreatePackage(new CustomerValidationPackageRequest
+        {
+            OutputRoot = outputRoot,
+            RunId = runId,
+            RunCreatedAtUtc = DateTime.UtcNow,
+            StationId = "AOI-UNIT",
+            OperatorId = "Engineer01",
+            OperatorRole = "Engineer",
+            BoardModel = "TBOX",
+            LotId = "LOT-42",
+            EngineName = "Unit Test Engine",
+            ModelVersion = "TEST-1",
+            DatasetFolder = datasetFolder,
+            GroundTruthCsvPath = groundTruth,
+            IsFormalManifest = true,
+            Metrics = metrics,
+            PerformanceSummary = performance,
+            Rows = rows,
+        });
+
+        Assert.True(Directory.Exists(result.PackageFolder));
+        Assert.True(File.Exists(result.CsvPath));
+        Assert.True(File.Exists(result.ReportPath));
+        Assert.True(File.Exists(result.ManifestPath));
+        Assert.True(File.Exists(Path.Combine(result.PackageFolder, "README.txt")));
+        Assert.True(File.Exists(Path.Combine(result.PackageFolder, "print_to_pdf_instructions.txt")));
+        Assert.True(Directory.Exists(result.AnnotatedImagesFolder));
+        Assert.Equal("PASS", result.Acceptance.Status);
+
+        using var manifestDocument = JsonDocument.Parse(File.ReadAllText(result.ManifestPath));
+        var root = manifestDocument.RootElement;
+        Assert.Equal("stage1-validation-package/v1", root.GetProperty("schemaVersion").GetString());
+        Assert.Equal(result.PackageId, root.GetProperty("packageId").GetString());
+        Assert.Equal("PASS", root.GetProperty("acceptanceStatus").GetString());
+        Assert.Equal("TBOX", root.GetProperty("boardModel").GetString());
+        Assert.Equal("ground_truth.csv", root.GetProperty("groundTruthCsvName").GetString());
+        var included = root.GetProperty("includedFiles").EnumerateArray().ToArray();
+        Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "validation_results.csv");
+        Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "customer_validation_report.html");
+        Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "validation_manifest.json");
+
+        var packageFiles = Directory.EnumerateFiles(result.PackageFolder, "*", SearchOption.AllDirectories)
+            .Select(Path.GetFileName)
+            .ToArray();
+        Assert.DoesNotContain("raw-customer-board.png", packageFiles);
+
+        var packages = AoiDatabase.GetValidationPackages();
+        Assert.Contains(packages, package =>
+            package.PackageId == result.PackageId &&
+            package.ManifestPath == result.ManifestPath &&
+            package.AcceptanceStatus == "PASS");
+    }
+
+    [Fact]
     public void RoleChangeWritesFactoryAuditFields()
     {
         AoiDatabase.Initialize();
@@ -678,6 +1163,102 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
+    public void ModelRegistryRegisterCalculatesShaAndPersistsMetadata()
+    {
+        AoiDatabase.Initialize();
+        var modelPath = Path.Combine(_root, "registry-invalid.onnx");
+        var labelPath = Path.Combine(_root, "labels.txt");
+        File.WriteAllText(modelPath, "not a production model");
+        File.WriteAllText(
+            labelPath,
+            string.Join(Environment.NewLine, "# AOI labels", "", "0,OK", "1,Solder Bridge", "2,Insufficient Solder"),
+            Encoding.UTF8);
+        var expectedSha = ModelRegistryService.ComputeSha256(modelPath);
+
+        var entry = ModelRegistryService.Register(new ModelRegistrationRequest
+        {
+            ModelFilePath = modelPath,
+            LabelMapPath = labelPath,
+            DisplayName = "Unit Test Model",
+            Version = "REG-1",
+            InputTensorName = "images",
+            OutputTensorName = "detections",
+            InputWidth = 320,
+            InputHeight = 240,
+            ConfidenceThreshold = 0.72,
+            Notes = "unit test registry entry",
+        });
+
+        Assert.Equal(expectedSha, entry.Sha256);
+        Assert.Equal("REG-1", entry.Version);
+        Assert.True(File.Exists(entry.StoredModelPath));
+        Assert.True(File.Exists(entry.StoredLabelMapPath));
+        Assert.True(File.Exists(entry.MetadataPath));
+        Assert.StartsWith(Path.GetFullPath(ModelRegistryService.ModelsRoot), Path.GetFullPath(entry.StoredModelPath), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Solder Bridge", entry.Labels);
+
+        var persisted = Assert.Single(AoiDatabase.GetModelRegistryRecords());
+        Assert.Equal(entry.ModelId, persisted.ModelId);
+        Assert.Equal(expectedSha, persisted.Sha256);
+        Assert.Equal(0.72, persisted.ConfidenceThreshold, precision: 3);
+        Assert.Contains("Insufficient Solder", persisted.Labels);
+
+        using var metadata = JsonDocument.Parse(File.ReadAllText(entry.MetadataPath));
+        Assert.Equal(entry.ModelId, metadata.RootElement.GetProperty("modelId").GetString());
+        Assert.Equal(expectedSha, metadata.RootElement.GetProperty("sha256").GetString());
+        Assert.Equal("NotTested", metadata.RootElement.GetProperty("validationStatus").GetString());
+    }
+
+    [Fact]
+    public void ActiveRegistryModelChangesFactorySelectionAndUnvalidatedModelReviewsSafely()
+    {
+        AoiDatabase.Initialize();
+        var modelPath = Path.Combine(_root, "active-invalid.onnx");
+        File.WriteAllText(modelPath, "invalid onnx model");
+        var entry = ModelRegistryService.Register(new ModelRegistrationRequest
+        {
+            ModelFilePath = modelPath,
+            DisplayName = "Factory Model",
+            Version = "REG-FACTORY",
+            InputTensorName = "images",
+            OutputTensorName = "detections",
+        });
+
+        Assert.True(ModelRegistryService.SetActiveModel(entry.ModelId));
+
+        var config = InspectionModelConfigurationService.Load();
+        var engine = InspectionEngineFactory.Create();
+        var result = engine.Analyze(Path.Combine(_root, "sample.png"), null, DetectionPriority.Balanced);
+
+        Assert.Equal(InspectionEngineFactory.OnnxEngineKey, config.SelectedEngineKey);
+        Assert.Equal(entry.ModelId, config.ActiveModelId);
+        Assert.Equal("ONNX ML Model", engine.Name);
+        Assert.Equal("REG-FACTORY", engine.Version);
+        Assert.Equal("REVIEW", result.Verdict);
+        Assert.Equal("MODEL_REGISTRY_NOT_READY", result.ErrorCode);
+        Assert.Contains(result.Evidence, line => line.Contains(entry.ModelId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void LabelMapParserSkipsCommentsBlanksAndAllowsDuplicateLabels()
+    {
+        Directory.CreateDirectory(_root);
+        var labelPath = Path.Combine(_root, "duplicate-labels.txt");
+        File.WriteAllText(
+            labelPath,
+            string.Join(Environment.NewLine, "# comment", "", "0,OK", "1,Solder Bridge", "2,Solder Bridge", "Loose Label"),
+            Encoding.UTF8);
+
+        var labels = ModelConfigurationValidator.LoadLabels(labelPath);
+
+        Assert.Equal("OK", labels[0]);
+        Assert.Equal("Solder Bridge", labels[1]);
+        Assert.Equal("Solder Bridge", labels[2]);
+        Assert.Contains(labels.Values, value => value == "Loose Label");
+        Assert.DoesNotContain(labels.Values, string.IsNullOrWhiteSpace);
+    }
+
+    [Fact]
     public void TestAndSavePersistsRuntimeErrorReadiness()
     {
         Directory.CreateDirectory(_root);
@@ -745,6 +1326,114 @@ public sealed class AoiDatabaseTests : IDisposable
         var loadedDocument = JsonSerializer.Deserialize<RecipeDocument>(loaded.RecipeJson);
         Assert.NotNull(loadedDocument);
         Assert.Equal("ROI-1", loadedDocument.Rois.Single().Id);
+    }
+
+    [Fact]
+    public void RecipeServiceParsesRecipeJsonRoundTrip()
+    {
+        var document = new RecipeDocument
+        {
+            RecipeName = "TBOX_TOP",
+            BoardProgram = "TBOX-MAIN",
+            BackgroundImagePath = @"C:\images\board.png",
+            Rois =
+            {
+                new RecipeRoiDocument
+                {
+                    Id = "ROI-1",
+                    Name = "U10 bridge check",
+                    RoiType = "Solder Bridge",
+                    X = 0.1,
+                    Y = 0.2,
+                    Width = 0.3,
+                    Height = 0.4,
+                    AiScoreThreshold = 0.12,
+                    Enabled = true,
+                },
+            },
+        };
+        var revision = new RecipeRevisionRecord(
+            1,
+            "TBOX_TOP",
+            "R0001",
+            "TBOX-MAIN",
+            "Engineer01",
+            "Balanced",
+            document.BackgroundImagePath,
+            JsonSerializer.Serialize(document),
+            DateTime.UtcNow);
+
+        var parsed = RecipeService.ParseRevision(revision);
+
+        Assert.Empty(parsed.Warnings);
+        Assert.NotNull(parsed.Recipe);
+        Assert.Equal("TBOX_TOP", parsed.Recipe.RecipeName);
+        Assert.Equal("R0001", parsed.Recipe.Revision);
+        var roi = Assert.Single(parsed.Recipe.Rois);
+        Assert.Equal("ROI-1", roi.RoiId);
+        Assert.Equal("U10 bridge check", roi.RoiName);
+        Assert.Equal("Solder Bridge", roi.RoiType);
+        Assert.Equal(0.12, roi.Thresholds.AiScoreThreshold, precision: 3);
+    }
+
+    [Fact]
+    public void PixelDifferenceEngineProducesPerRoiDefectForRecipeDifference()
+    {
+        AoiDatabase.Initialize();
+        var golden = WriteBmp("golden.bmp", 40, 40, (_, _) => White());
+        var sample = WriteBmp("sample-left-diff.bmp", 40, 40, (x, _) => x < 20 ? Black() : White());
+        SaveTestRecipe(
+            new RecipeRoiDocument { Id = "ROI-LEFT", Name = "Left component", RoiType = "Solder Bridge", X = 0, Y = 0, Width = 0.5, Height = 1, AiScoreThreshold = 0.01 },
+            new RecipeRoiDocument { Id = "ROI-RIGHT", Name = "Right component", RoiType = "Presence", X = 0.5, Y = 0, Width = 0.5, Height = 1, AiScoreThreshold = 0.01 });
+
+        var result = new PixelDifferenceInspectionEngine().Analyze(sample, golden, DetectionPriority.Balanced);
+
+        Assert.Equal("NG", result.Verdict);
+        Assert.Equal("TBOX_TOP", result.RecipeName);
+        Assert.Contains(result.Evidence, line => line.Contains("Checked 2 enabled recipe ROI", StringComparison.OrdinalIgnoreCase));
+        var defect = Assert.Single(result.Defects);
+        Assert.Equal("ROI-LEFT", defect.RoiId);
+        Assert.Equal("Solder Bridge", defect.RoiType);
+        Assert.Equal("Left component", defect.RoiName);
+        Assert.Equal("NG", defect.JudgmentStatus);
+    }
+
+    [Fact]
+    public void PixelDifferenceEngineReturnsOkWhenRecipeRoisAreBelowThreshold()
+    {
+        AoiDatabase.Initialize();
+        var golden = WriteBmp("golden-ok.bmp", 40, 40, (_, _) => White());
+        var sample = WriteBmp("sample-ok.bmp", 40, 40, (_, _) => White());
+        SaveTestRecipe(
+            new RecipeRoiDocument { Id = "ROI-A", RoiType = "Presence", X = 0, Y = 0, Width = 0.5, Height = 1, AiScoreThreshold = 0.01 },
+            new RecipeRoiDocument { Id = "ROI-B", RoiType = "Polarity", X = 0.5, Y = 0, Width = 0.5, Height = 1, AiScoreThreshold = 0.01 });
+
+        var result = new PixelDifferenceInspectionEngine().Analyze(sample, golden, DetectionPriority.Balanced);
+
+        Assert.Equal("OK", result.Verdict);
+        Assert.Empty(result.Defects);
+        Assert.Contains(result.Evidence, line => line.Contains("Checked 2 enabled recipe ROI", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void MalformedRecipeJsonAddsWarningAndDoesNotCrashInspection()
+    {
+        AoiDatabase.Initialize();
+        AoiDatabase.SaveRecipeRevision(
+            "BROKEN",
+            "TBOX-MAIN",
+            "Engineer01",
+            "Balanced",
+            string.Empty,
+            "{not valid json");
+        RecipeService.Invalidate("TBOX-MAIN");
+        var golden = WriteBmp("golden-malformed.bmp", 40, 40, (_, _) => White());
+        var sample = WriteBmp("sample-malformed.bmp", 40, 40, (x, _) => x < 20 ? Black() : White());
+
+        var result = new PixelDifferenceInspectionEngine().Analyze(sample, golden, DetectionPriority.Balanced);
+
+        Assert.Contains(result.Evidence, line => line.Contains("Recipe warning", StringComparison.OrdinalIgnoreCase));
+        Assert.NotEqual(string.Empty, result.Verdict);
     }
 
     [Fact]
@@ -870,10 +1559,98 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Null(source.GetNextFrame());
     }
 
+    [Fact]
+    public void CameraSourceFactoryReturnsConfiguredSourceTypes()
+    {
+        Assert.IsType<NullCameraSource>(CameraSourceFactory.Create(new CameraSourceSettings { SourceKey = CameraSourceFactory.NullSourceKey }));
+        Assert.IsType<FolderCameraSource>(CameraSourceFactory.Create(new CameraSourceSettings { SourceKey = CameraSourceFactory.FolderSimulationSourceKey }));
+        Assert.IsType<GenericVisionCameraSource>(CameraSourceFactory.Create(new CameraSourceSettings { SourceKey = CameraSourceFactory.GenericVisionAdapterSourceKey }));
+        Assert.Equal(CameraSourceFactory.GenericVisionAdapterSourceKey, CameraSourceFactory.NormalizeSourceKey("generic"));
+    }
+
+    [Fact]
+    public void GenericVisionCameraSourceWithNullAdapterReportsNotConnected()
+    {
+        var source = new GenericVisionCameraSource(new CameraSourceSettings
+        {
+            SourceKey = CameraSourceFactory.GenericVisionAdapterSourceKey,
+            TopDeviceId = "CAM-TOP-1",
+            AcquisitionMode = CameraAcquisitionMode.SoftwareTrigger,
+        });
+
+        Assert.Equal(CameraSourceStatus.NotConnected, source.ConnectionStatus);
+        source.StartAcquisition();
+
+        Assert.False(source.IsAcquiring);
+        Assert.Null(source.GetNextFrame());
+        Assert.Contains("no vendor SDK adapter", source.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        source.StopAcquisition();
+    }
+
+    [Fact]
+    public void GenericVisionCameraSourceWithFakeAdapterCanAcquireTriggeredFrame()
+    {
+        var imagePath = WriteTinyPng("fake-camera.png");
+        var adapter = new FakeVisionCameraAdapter(imagePath);
+        var source = new GenericVisionCameraSource(
+            new CameraSourceSettings
+            {
+                SourceKey = CameraSourceFactory.GenericVisionAdapterSourceKey,
+                TopDeviceId = "FAKE-TOP",
+                AcquisitionMode = CameraAcquisitionMode.SoftwareTrigger,
+                TriggerTimeoutMs = 50,
+                FrameTimeoutMs = 100,
+                BoardModel = "BOARD-X",
+                LotId = "LOT-X",
+            },
+            adapter);
+
+        source.StartAcquisition();
+        var frame = source.GetNextFrame();
+        source.StopAcquisition();
+
+        Assert.True(adapter.ConnectCalled);
+        Assert.True(adapter.StartCalled);
+        Assert.True(adapter.TriggerCalled);
+        Assert.True(adapter.StopCalled);
+        Assert.NotNull(frame);
+        Assert.Equal(CameraSourceStatus.NotConnected, source.ConnectionStatus);
+        Assert.Equal("GenericVisionAdapter", frame.SourceKind);
+        Assert.False(frame.IsSimulated);
+        Assert.Equal("FAKE-TOP", frame.CameraId);
+        Assert.Equal(CameraViewType.Top, frame.ViewType);
+        Assert.Equal("BOARD-X", frame.BoardModel);
+        Assert.Equal("LOT-X", frame.LotId);
+    }
+
+    [Fact]
+    public void FolderCameraSourcePopulatesFrameMetadata()
+    {
+        var topFolder = Path.Combine(_root, "metadata-camera", "top");
+        Directory.CreateDirectory(topFolder);
+        File.WriteAllBytes(Path.Combine(topFolder, "001_top.png"), TinyPngBytes());
+        var source = new FolderCameraSource(
+            new Dictionary<CameraViewType, string> { [CameraViewType.Top] = topFolder },
+            "BOARD-META",
+            "LOT-META");
+
+        source.StartAcquisition();
+        var frame = source.GetNextFrame();
+
+        Assert.NotNull(frame);
+        Assert.Equal("FolderCameraSimulation", frame.SourceKind);
+        Assert.True(frame.IsSimulated);
+        Assert.Equal("Top-FolderSimulation", frame.CameraId);
+        Assert.Equal("BOARD-META", frame.BoardModel);
+        Assert.Equal("LOT-META", frame.LotId);
+        Assert.True(frame.Width >= 0);
+        Assert.True(frame.Height >= 0);
+        Assert.NotEqual(DateTime.MinValue, frame.EffectiveCapturedAtUtc);
+    }
+
     private IReadOnlySet<string> ReadTableNames()
     {
-        using var connection = new SqliteConnection($"Data Source={AoiDatabase.DatabasePath}");
-        connection.Open();
+        using var connection = OpenTestConnection();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table';";
         using var reader = command.ExecuteReader();
@@ -884,6 +1661,20 @@ public sealed class AoiDatabaseTests : IDisposable
         return names;
     }
 
+    private static SqliteConnection OpenTestConnection()
+    {
+        var connection = new SqliteConnection($"Data Source={AoiDatabase.DatabasePath}");
+        connection.Open();
+        return connection;
+    }
+
+    private static void ExecuteSql(SqliteConnection connection, string commandText)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = commandText;
+        command.ExecuteNonQuery();
+    }
+
     private string WriteTinyPng(string fileName)
     {
         Directory.CreateDirectory(_root);
@@ -891,6 +1682,74 @@ public sealed class AoiDatabaseTests : IDisposable
         File.WriteAllBytes(path, TinyPngBytes());
         return path;
     }
+
+    private long SaveTestRecipe(params RecipeRoiDocument[] rois)
+    {
+        var document = new RecipeDocument
+        {
+            RecipeName = "TBOX_TOP",
+            BoardProgram = "TBOX-MAIN",
+            BackgroundImagePath = @"C:\images\board.png",
+            Rois = rois.ToList(),
+        };
+
+        var id = AoiDatabase.SaveRecipeRevision(
+            document.RecipeName,
+            document.BoardProgram,
+            "Engineer01",
+            "Balanced",
+            document.BackgroundImagePath,
+            JsonSerializer.Serialize(document));
+        RecipeService.Invalidate(document.BoardProgram);
+        return id;
+    }
+
+    private string WriteBmp(string fileName, int width, int height, Func<int, int, (byte R, byte G, byte B)> colorAt)
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, fileName);
+        var pixelBytes = width * height * 4;
+        var fileSize = 54 + pixelBytes;
+        var bytes = new byte[fileSize];
+
+        bytes[0] = (byte)'B';
+        bytes[1] = (byte)'M';
+        WriteInt32(bytes, 2, fileSize);
+        WriteInt32(bytes, 10, 54);
+        WriteInt32(bytes, 14, 40);
+        WriteInt32(bytes, 18, width);
+        WriteInt32(bytes, 22, height);
+        bytes[26] = 1;
+        bytes[28] = 32;
+        WriteInt32(bytes, 34, pixelBytes);
+
+        var offset = 54;
+        for (var y = height - 1; y >= 0; y--)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var (r, g, b) = colorAt(x, y);
+                bytes[offset++] = b;
+                bytes[offset++] = g;
+                bytes[offset++] = r;
+                bytes[offset++] = 255;
+            }
+        }
+
+        File.WriteAllBytes(path, bytes);
+        return path;
+    }
+
+    private static void WriteInt32(byte[] bytes, int offset, int value)
+    {
+        bytes[offset] = (byte)(value & 0xFF);
+        bytes[offset + 1] = (byte)((value >> 8) & 0xFF);
+        bytes[offset + 2] = (byte)((value >> 16) & 0xFF);
+        bytes[offset + 3] = (byte)((value >> 24) & 0xFF);
+    }
+
+    private static (byte R, byte G, byte B) White() => (255, 255, 255);
+    private static (byte R, byte G, byte B) Black() => (0, 0, 0);
 
     private static BatchTestRow Row(string groundTruth, string engineResult, string imageName = "image.png")
     {
@@ -926,4 +1785,83 @@ public sealed class AoiDatabaseTests : IDisposable
     private static byte[] TinyPngBytes()
         => Convert.FromBase64String(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
+
+    private sealed class FakeVisionCameraAdapter : IVisionCameraAdapter
+    {
+        private readonly string _imagePath;
+        private string _deviceId = string.Empty;
+        private bool _connected;
+
+        public FakeVisionCameraAdapter(string imagePath)
+        {
+            _imagePath = imagePath;
+        }
+
+        public bool ConnectCalled { get; private set; }
+        public bool StartCalled { get; private set; }
+        public bool TriggerCalled { get; private set; }
+        public bool StopCalled { get; private set; }
+
+        public bool Connect(CameraViewType viewType, string deviceId, CameraAcquisitionMode acquisitionMode, double exposureMs, double gain, int timeoutMs)
+        {
+            ConnectCalled = true;
+            _connected = true;
+            _deviceId = deviceId;
+            return true;
+        }
+
+        public void Disconnect()
+        {
+            _connected = false;
+        }
+
+        public bool Start()
+        {
+            StartCalled = true;
+            return _connected;
+        }
+
+        public void Stop()
+        {
+            StopCalled = true;
+        }
+
+        public bool Trigger(int timeoutMs)
+        {
+            TriggerCalled = true;
+            return _connected;
+        }
+
+        public bool TryGetFrame(CameraViewType viewType, int timeoutMs, out CameraFrame? frame)
+        {
+            if (!_connected)
+            {
+                frame = null;
+                return false;
+            }
+
+            var capturedAtUtc = DateTime.UtcNow;
+            frame = new CameraFrame(
+                "FAKE-000001",
+                _imagePath,
+                viewType,
+                capturedAtUtc.ToLocalTime(),
+                "Fake Adapter",
+                string.Empty,
+                string.Empty,
+                CameraId: _deviceId,
+                CapturedAtUtc: capturedAtUtc,
+                Width: 640,
+                Height: 480,
+                PixelFormat: "Mono8",
+                SourceKind: "FakeAdapter",
+                IsSimulated: false);
+            return true;
+        }
+
+        public VisionCameraDiagnostics GetDiagnostics()
+            => _connected
+                ? new VisionCameraDiagnostics(CameraSourceStatus.Ready, "Fake adapter ready.", Array.Empty<string>())
+                : new VisionCameraDiagnostics(CameraSourceStatus.NotConnected, "Fake adapter disconnected.", Array.Empty<string>());
+    }
 }

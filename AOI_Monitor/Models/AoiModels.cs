@@ -154,6 +154,133 @@ public record ExportHistoryRecord(
     string OperatorId,
     long? AuditEventId);
 
+public enum ExportVerificationStatus
+{
+    OK,
+    WARN,
+    ERROR,
+}
+
+public sealed class ExportVerificationResult
+{
+    public string ExportPath { get; set; } = string.Empty;
+    public string ExportType { get; set; } = string.Empty;
+    public ExportVerificationStatus Status { get; set; } = ExportVerificationStatus.ERROR;
+    public string Sha256 { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+    public DateTime CheckedAtUtc { get; set; } = DateTime.UtcNow;
+    public List<string> Messages { get; set; } = new();
+    public Dictionary<string, string> ArtifactChecksums { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+public record ExportVerificationRecord(
+    long Id,
+    long? ExportHistoryId,
+    DateTime CheckedAtUtc,
+    string ExportType,
+    string ExportPath,
+    string Status,
+    string Sha256,
+    long SizeBytes,
+    string MessagesJson,
+    string ArtifactChecksumsJson);
+
+public record ValidationPackageRecord(
+    long Id,
+    DateTime CreatedAtUtc,
+    string PackageId,
+    string PackagePath,
+    string ManifestPath,
+    string AcceptanceStatus,
+    string Summary,
+    long? RunId,
+    string OperatorId,
+    long? AuditEventId);
+
+public sealed class ValidationAcceptanceCriteria
+{
+    public double MinimumAccuracy { get; set; } = 0.90;
+    public double MinimumPrecision { get; set; } = 0.90;
+    public double MinimumRecall { get; set; } = 0.90;
+    public double MaximumFalseCallRate { get; set; } = 0.05;
+    public int MaximumImagesOverOneSecond { get; set; } = 0;
+    public bool RequireFormalManifest { get; set; }
+}
+
+public sealed class ValidationAcceptanceSummary
+{
+    public string Status { get; set; } = "CONDITIONAL";
+    public bool MetricsComputed { get; set; }
+    public bool FormalManifestPresent { get; set; }
+    public bool NumericGatesPassed { get; set; }
+    public List<string> Messages { get; set; } = new();
+}
+
+public sealed class ValidationPackageManifest
+{
+    public string SchemaVersion { get; set; } = "stage1-validation-package/v1";
+    public string PackageId { get; set; } = string.Empty;
+    public DateTime GeneratedAtUtc { get; set; } = DateTime.UtcNow;
+    public string AppVersion { get; set; } = string.Empty;
+    public string StationId { get; set; } = string.Empty;
+    public string OperatorId { get; set; } = string.Empty;
+    public string BoardModel { get; set; } = string.Empty;
+    public string LotId { get; set; } = string.Empty;
+    public string ModelId { get; set; } = string.Empty;
+    public string ModelSha256 { get; set; } = string.Empty;
+    public string ModelValidationStatus { get; set; } = string.Empty;
+    public string ModelVersion { get; set; } = string.Empty;
+    public string EngineName { get; set; } = string.Empty;
+    public double ActiveConfidenceThreshold { get; set; }
+    public string DatasetFolderHashOrName { get; set; } = string.Empty;
+    public string GroundTruthCsvName { get; set; } = string.Empty;
+    public string RunId { get; set; } = string.Empty;
+    public ValidationMetricSummary MetricSummary { get; set; } = new();
+    public ValidationPackagePerformanceSummary PerformanceSummary { get; set; } = new();
+    public string AcceptanceStatus { get; set; } = "CONDITIONAL";
+    public ValidationAcceptanceCriteria Criteria { get; set; } = new();
+    public List<ValidationIncludedFile> IncludedFiles { get; set; } = new();
+    public List<string> Warnings { get; set; } = new();
+    public List<string> Limitations { get; set; } = new();
+}
+
+public sealed class ValidationMetricSummary
+{
+    public int TotalImages { get; set; }
+    public int KnownGroundTruthImages { get; set; }
+    public int UnknownGroundTruthImages { get; set; }
+    public double Accuracy { get; set; }
+    public double Precision { get; set; }
+    public double Recall { get; set; }
+    public double FalseCallRate { get; set; }
+    public int TruePositive { get; set; }
+    public int TrueNegative { get; set; }
+    public int FalsePositive { get; set; }
+    public int FalseNegative { get; set; }
+    public int FalseCall { get; set; }
+    public int PossibleEscape { get; set; }
+    public int VerifiedNg { get; set; }
+    public int OkCount { get; set; }
+    public int NgCount { get; set; }
+    public int ReviewCount { get; set; }
+}
+
+public sealed class ValidationPackagePerformanceSummary
+{
+    public double AverageMilliseconds { get; set; }
+    public double MaxMilliseconds { get; set; }
+    public double MinMilliseconds { get; set; }
+    public int CountOverOneSecond { get; set; }
+    public int TimedImageCount { get; set; }
+}
+
+public sealed class ValidationIncludedFile
+{
+    public string RelativePath { get; set; } = string.Empty;
+    public string FileType { get; set; } = string.Empty;
+    public long Bytes { get; set; }
+}
+
 public record AuditEventRecord(
     long Id,
     DateTime TimestampUtc,
@@ -232,6 +359,7 @@ public sealed class RecipeDocument
 public sealed class RecipeRoiDocument
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = string.Empty;
     public string RoiType { get; set; } = "Presence";
     public double X { get; set; }
     public double Y { get; set; }
@@ -242,4 +370,52 @@ public sealed class RecipeRoiDocument
     public double HeightMax { get; set; }
     public double VolumeMin { get; set; }
     public double VolumeMax { get; set; }
+    public bool Enabled { get; set; } = true;
+}
+
+public sealed class RecipeDefinition
+{
+    public string RecipeName { get; set; } = "AOI_RECIPE";
+    public string Revision { get; set; } = string.Empty;
+    public string BoardProgram { get; set; } = "UNKNOWN";
+    public string DetectionPriority { get; set; } = string.Empty;
+    public string BackgroundImagePath { get; set; } = string.Empty;
+    public List<RecipeRoi> Rois { get; set; } = new();
+}
+
+public sealed class RecipeRoi
+{
+    public string RoiId { get; set; } = string.Empty;
+    public string RoiName { get; set; } = string.Empty;
+    public string RoiType { get; set; } = "Presence";
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+    public RecipeThresholds Thresholds { get; set; } = new();
+    public bool Enabled { get; set; } = true;
+
+    public string DisplayName => string.IsNullOrWhiteSpace(RoiName) ? RoiId : RoiName;
+}
+
+public sealed class RecipeThresholds
+{
+    public double AiScoreThreshold { get; set; } = 0.65;
+    public double HeightMin { get; set; }
+    public double HeightMax { get; set; }
+    public double VolumeMin { get; set; }
+    public double VolumeMax { get; set; }
+}
+
+public sealed class RecipeLoadResult
+{
+    public RecipeLoadResult(RecipeDefinition? recipe, IReadOnlyList<string> warnings)
+    {
+        Recipe = recipe;
+        Warnings = warnings;
+    }
+
+    public RecipeDefinition? Recipe { get; }
+    public IReadOnlyList<string> Warnings { get; }
+    public bool HasEnabledRois => Recipe?.Rois.Any(roi => roi.Enabled) == true;
 }

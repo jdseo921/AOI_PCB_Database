@@ -313,6 +313,7 @@ Implemented features:
 - Recipe-lock enforcement for detection-priority changes.
 - Model configuration readiness test for Engineer/Admin roles with results `Ready`, `Missing Model`, `Invalid Label Map`, `Runtime Error`, or `Unsupported Output Format`.
 - Last model-check timestamp and result display.
+- Admin-configurable local storage root for SQLite, image vault, local settings, and local exports.
 - Training Set Export controls:
   - Prepare export
   - Validate list

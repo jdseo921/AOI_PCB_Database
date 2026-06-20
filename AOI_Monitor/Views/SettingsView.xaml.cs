@@ -60,6 +60,13 @@ public partial class SettingsView : UserControl
         var newCamera = BuildCameraSourceSettingsFromUi();
         var existingMes = MesIntegrationSettingsService.Load();
         var newMes = BuildMesIntegrationSettingsFromUi();
+        var newStorageRoot = string.IsNullOrWhiteSpace(StorageRootText.Text)
+            ? AoiDatabase.DefaultStorageRoot
+            : StorageRootText.Text.Trim();
+        var storageRootChanged = !string.Equals(
+            Path.GetFullPath(AoiDatabase.StorageRoot),
+            Path.GetFullPath(newStorageRoot),
+            StringComparison.OrdinalIgnoreCase);
         var modelConfigChanged =
             !string.Equals(existingConfig.ModelFilePath, newConfig.ModelFilePath, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingConfig.ModelVersion, newConfig.ModelVersion, StringComparison.OrdinalIgnoreCase) ||
@@ -84,7 +91,7 @@ public partial class SettingsView : UserControl
             ComboToPriority(DetectionPriorityCombo.SelectedIndex) != state.DetectionPriority ||
             Math.Abs(existingConfig.ConfidenceThreshold - newConfig.ConfidenceThreshold) > 0.0001;
 
-        if ((modelConfigChanged || cameraConfigChanged || mesConfigChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, camera source, or Mock MES settings"))
+        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || mesConfigChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, camera source, or Mock MES settings"))
             return;
 
         if (thresholdChanged && !Authorize(RoleAuthorization.CanChangeThresholds, "Changing inspection thresholds or detection priority"))
@@ -92,6 +99,9 @@ public partial class SettingsView : UserControl
 
         ApplyLanguageVisuals();
         ApplyFontPreset();
+        if (!ApplyStorageRoot(newStorageRoot, storageRootChanged))
+            return;
+
         SaveInspectionConfiguration(newConfig);
         SaveCameraSourceSettings(newCamera);
         SaveMesIntegrationSettings(newMes);
@@ -117,6 +127,7 @@ public partial class SettingsView : UserControl
         DetectionPriorityCombo.SelectedIndex = 0;
         InspectionEngineCombo.SelectedIndex = 0;
         ModelPathText.Text = string.Empty;
+        StorageRootText.Text = AoiDatabase.DefaultStorageRoot;
         ModelVersionText.Text = "UNCONFIGURED";
         LabelMapPathText.Text = string.Empty;
         ConfidenceThresholdText.Text = "0.65";
@@ -124,6 +135,9 @@ public partial class SettingsView : UserControl
         InputHeightText.Text = "640";
         InputTensorNameText.Text = string.Empty;
         OutputTensorNameText.Text = string.Empty;
+        StorageRootSettingsService.ResetStorageRoot();
+        AoiDatabase.ConfigureStorageRoot(AoiDatabase.DefaultStorageRoot);
+        AoiDatabase.Initialize();
         InspectionModelConfigurationService.Save(new InspectionModelConfiguration());
         CameraSourceSettingsService.Save(new CameraSourceSettings());
         CameraSourceSettingsService.ApplyActiveSource();
@@ -214,6 +228,24 @@ public partial class SettingsView : UserControl
         RefreshInspectionConfigurationUi(BuildConfigurationFromUi());
     }
 
+    private void OnBrowseStorageRootClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Changing local database and image-vault storage path"))
+            return;
+
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select local AOI storage root",
+            Multiselect = false,
+        };
+
+        if (Directory.Exists(StorageRootText.Text))
+            dialog.InitialDirectory = StorageRootText.Text;
+
+        if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName))
+            StorageRootText.Text = dialog.FolderName;
+    }
+
     private void OnBrowseLabelMapClick(object sender, RoutedEventArgs e)
     {
         if (!Authorize(RoleAuthorization.CanManageSettings, "Changing label map path"))
@@ -298,6 +330,7 @@ public partial class SettingsView : UserControl
         TrainingValidationText.Text = state.Training.LastCompletedAt is null
             ? "--"
             : $"{state.Training.LastValidationScore:F1}%";
+        StorageRootText.Text = AoiDatabase.StorageRoot;
 
         RefreshRoleControls();
         RefreshInspectionConfigurationUi();
@@ -319,6 +352,8 @@ public partial class SettingsView : UserControl
         CameraBottomFolderText.IsEnabled = canManageSettings;
         CameraBoardModelText.IsEnabled = canManageSettings;
         CameraLotIdText.IsEnabled = canManageSettings;
+        StorageRootText.IsEnabled = canManageSettings;
+        BrowseStorageRootBtn.IsEnabled = canManageSettings;
         MesModeCombo.IsEnabled = canManageSettings;
         MesEndpointText.IsEnabled = canManageSettings;
         MesTimeoutText.IsEnabled = canManageSettings;
@@ -390,6 +425,30 @@ public partial class SettingsView : UserControl
             configuration.IsOnnxSelected
                 ? $"Inspection engine set to ONNX ML Model; status {EngineRuntimeStatusText.Text}; version {configuration.EffectiveModelVersion}."
                 : "Inspection engine set to Pixel Difference Prototype Engine.");
+    }
+
+    private static bool ApplyStorageRoot(string storageRoot, bool storageRootChanged)
+    {
+        if (!storageRootChanged)
+            return true;
+
+        try
+        {
+            StorageRootSettingsService.SaveStorageRoot(storageRoot);
+            AoiDatabase.ConfigureStorageRoot(storageRoot);
+            AoiDatabase.Initialize();
+            WorkflowState.Instance.AddEvent("STORAGE_CONFIG", $"Local storage root changed to {AoiDatabase.StorageRoot}.");
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            MessageBox.Show(
+                $"Storage path could not be applied:\n{ex.Message}",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return false;
+        }
     }
 
     private void OnTestModelConfigurationClick(object sender, RoutedEventArgs e)

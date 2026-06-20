@@ -25,6 +25,7 @@ public static class AoiDatabase
     public static Func<string>? AuditStationProvider { get; set; }
 
     public static string StorageRoot => _storageRoot;
+    public static string DefaultStorageRoot => ResolveStorageRoot();
     public static string DatabasePath => Path.Combine(StorageRoot, "aoi_monitor.sqlite");
     public static string ImageVaultPath => Path.Combine(StorageRoot, "image_vault");
     public static string TrainingVaultPath => Path.Combine(ImageVaultPath, "training");

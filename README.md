@@ -152,6 +152,8 @@ Imported PCB sample and golden images are copied into the managed image vault:
 %LOCALAPPDATA%\AOI_Monitor\image_vault\
 ```
 
+Admins can change the local storage root from `Settings`. The selected root is used for the SQLite database, image vault, local settings, and local exports. Changing it creates or uses storage at the new location; existing runtime folders are not deleted or migrated automatically.
+
 Candidate samples for local training-set export review are copied below:
 
 ```text

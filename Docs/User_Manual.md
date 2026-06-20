@@ -251,6 +251,6 @@ Use Settings to:
 - Review camera status.
 - Configure MES mode as Not Connected, Mock REST, or Future Production planned.
 - Configure a mock endpoint URL and upload timeout for mock REST tests. Leave the endpoint blank to generate local JSON payload evidence only.
-- Change local paths where Admin permissions allow it.
+- Change the local storage root where Admin permissions allow it. This controls the SQLite database, image vault, local settings, and local export storage root. Existing folders are left in place when a new root is selected.
 
 MES authentication and production ERP/MES writeback are planned for Stage 4 and are not implemented in the local role selector or mock upload tool.

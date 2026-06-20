@@ -137,6 +137,7 @@ Important boundary: this PoC is a local Windows WPF application. It uses local f
 | TR-008 | Documentation deliverables. | Documentation prompt | Implemented | Docs | `Docs/Installation_Guide.md`, `Docs/User_Manual.md`, `Docs/Stage_Mapping.md`, this file | Documents distinguish implemented/planned boundaries. |
 | TR-009 | 8-hour stability/soak-test mode. | Soak-test prompt | Partially Implemented | Log & Export | `AOI_Monitor/Views/ReportsView.xaml.cs` | Local simulated soak test exists; true 8-hour factory soak still requires execution evidence. |
 | TR-010 | 1-second visualization target tracking. | Performance prompt | Implemented | Main Inspection / AI Model Test / Reports | `AOI_Monitor/Models/WorkflowModels.cs`, `AOI_Monitor/Services/CustomerValidationReportService.cs` | Measures local processing timings; hardware timing remains future work. |
+| TR-011 | Image/database storage path is configurable. | Technical Requirements / Data Management | Implemented | Settings / Data | `AOI_Monitor/Views/SettingsView.xaml.cs`, `AOI_Monitor/Services/StorageRootSettingsService.cs`, `AOI_Monitor/Data/AoiDatabase.cs` | Admin can choose a local storage root for SQLite, image vault, settings, and local exports; existing folders are left in place. |
 
 ## Roles / Permissions
 

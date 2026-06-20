@@ -44,6 +44,7 @@ public partial class MainWindow : Window
     {
         try
         {
+            StorageRootSettingsService.ApplySavedStorageRoot();
             AoiDatabase.Initialize();
             CameraSourceSettingsService.ApplyActiveSource();
             MesIntegrationSettingsService.ApplyIntegrationBoundary();

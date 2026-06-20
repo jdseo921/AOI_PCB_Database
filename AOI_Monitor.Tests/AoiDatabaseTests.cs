@@ -23,6 +23,7 @@ public sealed class AoiDatabaseTests : IDisposable
 
     public void Dispose()
     {
+        StorageRootSettingsService.ConfigureSettingsDirectoryForTests(null);
         try
         {
             if (Directory.Exists(_root))
@@ -34,6 +35,24 @@ public sealed class AoiDatabaseTests : IDisposable
         catch (UnauthorizedAccessException)
         {
         }
+    }
+
+    [Fact]
+    public void StorageRootSettingsPersistAndApplyConfiguredRoot()
+    {
+        var settingsDir = Path.Combine(_root, "settings");
+        var configuredRoot = Path.Combine(_root, "configured-storage");
+        StorageRootSettingsService.ConfigureSettingsDirectoryForTests(settingsDir);
+
+        StorageRootSettingsService.SaveStorageRoot(configuredRoot);
+        AoiDatabase.ConfigureStorageRoot(Path.Combine(_root, "other-storage"));
+
+        var loadedRoot = StorageRootSettingsService.ApplySavedStorageRoot();
+
+        Assert.Equal(Path.GetFullPath(configuredRoot), loadedRoot);
+        Assert.Equal(Path.GetFullPath(configuredRoot), AoiDatabase.StorageRoot);
+        Assert.True(Directory.Exists(configuredRoot));
+        Assert.True(File.Exists(StorageRootSettingsService.SettingsPath));
     }
 
     [Fact]

@@ -97,8 +97,8 @@ public sealed class GenericVisionCameraSource : ICameraSource, ICameraStatusDiag
             LotId = string.IsNullOrWhiteSpace(frame.LotId) ? _settings.LotId : frame.LotId,
             CameraId = cameraId,
             CapturedAtUtc = capturedAtUtc,
-            SourceKind = "GenericVisionAdapter",
-            IsSimulated = false,
+            SourceKind = string.IsNullOrWhiteSpace(frame.SourceKind) ? "GenericVisionAdapter" : frame.SourceKind,
+            IsSimulated = frame.IsSimulated,
         };
     }
 

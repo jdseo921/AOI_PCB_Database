@@ -97,6 +97,54 @@ foreach ($file in ($trackedFiles + $stagedFiles | Sort-Object -Unique)) {
     }
 }
 
+$markdownFiles = @($trackedFiles + $stagedFiles |
+    Sort-Object -Unique |
+    ForEach-Object { Normalize-RepoPath $_ } |
+    Where-Object { $_ -match '\.md$' })
+
+foreach ($path in $markdownFiles) {
+    $fullPath = Join-Path $repoRoot $path
+    if (!(Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        continue
+    }
+
+    $text = Get-Content -LiteralPath $fullPath -Raw
+    $matches = [regex]::Matches($text, '\[[^\]]+\]\((Docs/[^)#?]+\.md)(?:#[^)]+)?\)')
+    foreach ($match in $matches) {
+        $target = Normalize-RepoPath $match.Groups[1].Value
+        $targetPath = Join-Path $repoRoot $target
+        if (!(Test-Path -LiteralPath $targetPath -PathType Leaf)) {
+            Add-Issue $issues "docs" $path "linked doc does not exist: $target"
+        }
+    }
+}
+
+$forbiddenDocClaims = @(
+    'simulated camera is production-ready',
+    'simulated cameras are production-ready',
+    'camera simulation is production-ready',
+    'simulated robot is production-ready',
+    'simulated robots are production-ready',
+    'robot simulation is production-ready',
+    'simulated mes is production-ready',
+    'mock mes is production-ready',
+    'mes simulation is production-ready'
+)
+
+foreach ($path in $markdownFiles) {
+    $fullPath = Join-Path $repoRoot $path
+    if (!(Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        continue
+    }
+
+    $lower = (Get-Content -LiteralPath $fullPath -Raw).ToLowerInvariant()
+    foreach ($claim in $forbiddenDocClaims) {
+        if ($lower.Contains($claim)) {
+            Add-Issue $issues "docs" $path "overclaims simulated integration evidence: '$claim'"
+        }
+    }
+}
+
 if ($issues.Count -gt 0) {
     Write-Host "Repository hygiene check failed:" -ForegroundColor Red
     foreach ($issue in $issues) {

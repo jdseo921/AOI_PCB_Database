@@ -100,3 +100,20 @@ public sealed record MesSpoolRetrySummary(
     int Attempted,
     int Succeeded,
     int Failed);
+
+public sealed class MesReadinessCriteria
+{
+    public bool FailOnPendingQueue { get; set; }
+    public bool FailOnFailedQueue { get; set; } = true;
+}
+
+public sealed class MesReadinessSummary
+{
+    public string Status { get; set; } = "MES Not Configured";
+    public string Mode { get; set; } = "Not Connected";
+    public int PendingCount { get; set; }
+    public int FailedCount { get; set; }
+    public int SentCount { get; set; }
+    public int AbandonedCount { get; set; }
+    public List<string> Messages { get; set; } = new();
+}

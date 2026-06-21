@@ -79,6 +79,19 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Contains("ExportHistory", tables);
         Assert.Contains("ExportVerification", tables);
         Assert.Contains("ValidationPackages", tables);
+        Assert.Contains("FalseCallReductionRuns", tables);
+        Assert.Contains("FalseCallReductionPoints", tables);
+        Assert.Contains("ThresholdProfiles", tables);
+        Assert.Contains("ThresholdProfileRules", tables);
+        Assert.Contains("ThresholdProfileDeployments", tables);
+        Assert.Contains("CameraAcceptanceRuns", tables);
+        Assert.Contains("CameraAcceptanceFrames", tables);
+        Assert.Contains("LightingAcceptanceRuns", tables);
+        Assert.Contains("LightingAcceptanceSteps", tables);
+        Assert.Contains("RobotAcceptanceRuns", tables);
+        Assert.Contains("RobotAcceptanceSteps", tables);
+        Assert.Contains("SoakTestRuns", tables);
+        Assert.Contains("SoakTestIterations", tables);
         Assert.Contains("AuditEvents", tables);
         Assert.Contains("SchemaInfo", tables);
     }
@@ -207,13 +220,31 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal(AoiDatabaseMigrations.LatestVersion, AoiDatabase.GetSchemaVersion(migrated));
         Assert.True(AoiDatabase.ColumnExists(migrated, "InspectionResults", "BoardProgram"));
         Assert.True(AoiDatabase.ColumnExists(migrated, "InspectionResults", "TotalInspectionMs"));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "InspectionResults", "ThresholdProfileId"));
         Assert.True(AoiDatabase.ColumnExists(migrated, "Defects", "RoiId"));
         Assert.True(AoiDatabase.ColumnExists(migrated, "RecipeRevisions", "RecipeJson"));
         Assert.True(AoiDatabase.ColumnExists(migrated, "BatchTestRuns", "ModelVersion"));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "BatchTestRuns", "ThresholdProfileId"));
         Assert.True(AoiDatabase.ColumnExists(migrated, "BatchTestResults", "TotalInspectionMs"));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "BatchTestResults", "NormalizedDefectClass"));
+        Assert.True(AoiDatabase.ColumnExists(migrated, "BatchTestResults", "FailureCategory"));
         Assert.True(AoiDatabase.ColumnExists(migrated, "ExportHistory", "OperatorId"));
         Assert.True(AoiDatabase.TableExists(migrated, "ModelRegistry"));
         Assert.True(AoiDatabase.TableExists(migrated, "ValidationPackages"));
+        Assert.True(AoiDatabase.TableExists(migrated, "ValidationBreakdownMetrics"));
+        Assert.True(AoiDatabase.TableExists(migrated, "FalseCallReductionRuns"));
+        Assert.True(AoiDatabase.TableExists(migrated, "FalseCallReductionPoints"));
+        Assert.True(AoiDatabase.TableExists(migrated, "ThresholdProfiles"));
+        Assert.True(AoiDatabase.TableExists(migrated, "ThresholdProfileRules"));
+        Assert.True(AoiDatabase.TableExists(migrated, "ThresholdProfileDeployments"));
+        Assert.True(AoiDatabase.TableExists(migrated, "CameraAcceptanceRuns"));
+        Assert.True(AoiDatabase.TableExists(migrated, "CameraAcceptanceFrames"));
+        Assert.True(AoiDatabase.TableExists(migrated, "LightingAcceptanceRuns"));
+        Assert.True(AoiDatabase.TableExists(migrated, "LightingAcceptanceSteps"));
+        Assert.True(AoiDatabase.TableExists(migrated, "RobotAcceptanceRuns"));
+        Assert.True(AoiDatabase.TableExists(migrated, "RobotAcceptanceSteps"));
+        Assert.True(AoiDatabase.TableExists(migrated, "SoakTestRuns"));
+        Assert.True(AoiDatabase.TableExists(migrated, "SoakTestIterations"));
         Assert.True(AoiDatabase.TableExists(migrated, "MesSpoolQueue"));
         Assert.True(AoiDatabase.IndexExists(migrated, "IX_InspectionResults_BoardProgram"));
     }
@@ -692,6 +723,103 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
+    public void DatasetQualityGatePreventsTinyDatasetPassAcceptance()
+    {
+        var goldenPath = WriteTinyPng("quality-golden.png");
+        var rows = new[]
+        {
+            QualityRow("OK", 0, "OK", goldenPath),
+            QualityRow("NG", 1, "BRIDGE", goldenPath),
+        };
+        var metrics = BatchValidationService.CalculateMetrics(rows);
+        var quality = DatasetQualityService.Analyze(rows);
+
+        var acceptance = CustomerValidationPackageService.EvaluateAcceptance(
+            metrics,
+            BatchValidationService.CalculatePerformanceSummary(rows),
+            rows.Length,
+            isFormalManifest: true,
+            criteria: new ValidationAcceptanceCriteria
+            {
+                MinimumAccuracy = 1,
+                MinimumPrecision = 1,
+                MinimumRecall = 1,
+                MaximumFalseCallRate = 0,
+            },
+            datasetQuality: quality);
+
+        Assert.Equal("FAIL", quality.Status);
+        Assert.NotEqual("PASS", acceptance.Status);
+        Assert.Equal("FAIL", acceptance.DatasetQualityStatus);
+        Assert.Contains(acceptance.Messages, message => message.Contains("Dataset quality gate failed", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DatasetQualityGateRejectsAllOkDataset()
+    {
+        var goldenPath = WriteTinyPng("all-ok-golden.png");
+        var rows = Enumerable.Range(0, 50)
+            .Select(index => QualityRow("OK", index, "OK", goldenPath))
+            .ToArray();
+
+        var quality = DatasetQualityService.Analyze(rows);
+
+        Assert.Equal("FAIL", quality.Status);
+        Assert.Contains(quality.BlockingFailures, failure => failure.Contains("NG image", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DatasetQualityGateRejectsAllNgDataset()
+    {
+        var goldenPath = WriteTinyPng("all-ng-golden.png");
+        var rows = Enumerable.Range(0, 50)
+            .Select(index => QualityRow("NG", index, index % 2 == 0 ? "BRIDGE" : "MISSING", goldenPath))
+            .ToArray();
+
+        var quality = DatasetQualityService.Analyze(rows);
+
+        Assert.Equal("FAIL", quality.Status);
+        Assert.Contains(quality.BlockingFailures, failure => failure.Contains("OK image", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DatasetQualityGateRejectsTooManyUnknownLabels()
+    {
+        var goldenPath = WriteTinyPng("unknown-heavy-golden.png");
+        var rows = Enumerable.Range(0, 45)
+            .Select(index => QualityRow(index < 20 ? "OK" : "NG", index, index % 2 == 0 ? "BRIDGE" : "MISSING", goldenPath))
+            .Concat(Enumerable.Range(45, 5).Select(index => QualityRow("UNKNOWN", index, "UNASSIGNED", goldenPath)))
+            .ToArray();
+
+        var quality = DatasetQualityService.Analyze(rows);
+
+        Assert.Equal("FAIL", quality.Status);
+        Assert.True(quality.UnknownLabelRate > new ValidationDatasetQualityCriteria().MaximumUnknownLabelRate);
+        Assert.Contains(quality.BlockingFailures, failure => failure.Contains("Unknown label rate", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DatasetQualityGatePassesBalancedSyntheticDataset()
+    {
+        var goldenPath = WriteTinyPng("balanced-golden.png");
+        var rows = Enumerable.Range(0, 20)
+            .Select(index => QualityRow("OK", index, "OK", goldenPath))
+            .Concat(Enumerable.Range(20, 15).Select(index => QualityRow("NG", index, "BRIDGE", goldenPath)))
+            .Concat(Enumerable.Range(35, 15).Select(index => QualityRow("NG", index, "MISSING", goldenPath)))
+            .ToArray();
+
+        var quality = DatasetQualityService.Analyze(rows);
+
+        Assert.Equal("PASS", quality.Status);
+        Assert.Equal(50, quality.TotalImages);
+        Assert.Equal(20, quality.OkImages);
+        Assert.Equal(30, quality.NgImages);
+        Assert.Equal(2, quality.DefectClassCount);
+        Assert.Empty(quality.BlockingFailures);
+        Assert.Empty(quality.Warnings);
+    }
+
+    [Fact]
     public void GenericDetectionOutputParserParsesDetectionRows()
     {
         var tensor = new DenseTensor<float>(new[] { 2, 6 });
@@ -789,8 +917,8 @@ public sealed class AoiDatabaseTests : IDisposable
             csv,
             string.Join(
                 Environment.NewLine,
-                "image,ground_truth,golden_image,defect_type,side,refdes,lot_id,board_model,notes",
-                "\"board-1.png\",NG,\"golden-1.png\",\"Solder, Bridge\",top,U10,LOT-7,TBOX,\"customer sample\""),
+                "image,ground_truth,golden_image,defect_type,side,refdes,roi_id,roi_type,lot_id,board_model,notes",
+                "\"board-1.png\",NG,\"golden-1.png\",\"Solder, Bridge\",top,U10,ROI-U10,\"Solder Bridge\",LOT-7,TBOX,\"customer sample\""),
             Encoding.UTF8);
 
         var manifest = BatchValidationService.LoadValidationManifest(csv, imageFolder);
@@ -801,6 +929,8 @@ public sealed class AoiDatabaseTests : IDisposable
         var entry = manifest.ByImageName["board-1.png"];
         Assert.Equal("NG", entry.Label);
         Assert.Equal("Solder, Bridge", entry.DefectType);
+        Assert.Equal("ROI-U10", entry.RoiId);
+        Assert.Equal("Solder Bridge", entry.RoiType);
         Assert.Equal("top", entry.Side);
         Assert.Equal("U10", entry.RefDes);
         Assert.Equal("LOT-7", entry.LotId);
@@ -820,8 +950,8 @@ public sealed class AoiDatabaseTests : IDisposable
             csv,
             string.Join(
                 Environment.NewLine,
-                "image,ground_truth,golden_image,defect_type,side,refdes,lot_id,board_model,notes",
-                "missing-board.png,NG,missing-golden.png,Bridge,top,U10,LOT-7,TBOX,missing sample"),
+                "image,ground_truth,golden_image,defect_type,side,refdes,roi_id,roi_type,lot_id,board_model,notes",
+                "missing-board.png,NG,missing-golden.png,Bridge,top,U10,ROI-U10,Solder Bridge,LOT-7,TBOX,missing sample"),
             Encoding.UTF8);
 
         var manifest = BatchValidationService.LoadValidationManifest(csv, imageFolder);
@@ -956,15 +1086,20 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.True(File.Exists(Path.Combine(result.PackageFolder, "README.txt")));
         Assert.True(File.Exists(Path.Combine(result.PackageFolder, "print_to_pdf_instructions.txt")));
         Assert.True(Directory.Exists(result.AnnotatedImagesFolder));
-        Assert.Equal("PASS", result.Acceptance.Status);
+        Assert.Equal("FAIL", result.Acceptance.Status);
+        Assert.Equal("FAIL", result.Acceptance.DatasetQualityStatus);
+        Assert.Contains(result.Acceptance.Messages, message => message.Contains("Dataset quality gate failed", StringComparison.OrdinalIgnoreCase));
 
         using var manifestDocument = JsonDocument.Parse(File.ReadAllText(result.ManifestPath));
         var root = manifestDocument.RootElement;
         Assert.Equal("stage1-validation-package/v1", root.GetProperty("schemaVersion").GetString());
         Assert.Equal(result.PackageId, root.GetProperty("packageId").GetString());
-        Assert.Equal("PASS", root.GetProperty("acceptanceStatus").GetString());
+        Assert.Equal("FAIL", root.GetProperty("acceptanceStatus").GetString());
         Assert.Equal("TBOX", root.GetProperty("boardModel").GetString());
         Assert.Equal("ground_truth.csv", root.GetProperty("groundTruthCsvName").GetString());
+        var quality = root.GetProperty("datasetQualitySummary");
+        Assert.Equal("FAIL", quality.GetProperty("status").GetString());
+        Assert.True(quality.GetProperty("blockingFailures").GetArrayLength() > 0);
         var included = root.GetProperty("includedFiles").EnumerateArray().ToArray();
         Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "validation_results.csv");
         Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "customer_validation_report.html");
@@ -979,7 +1114,7 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Contains(packages, package =>
             package.PackageId == result.PackageId &&
             package.ManifestPath == result.ManifestPath &&
-            package.AcceptanceStatus == "PASS");
+            package.AcceptanceStatus == "FAIL");
     }
 
     [Fact]
@@ -1023,6 +1158,7 @@ public sealed class AoiDatabaseTests : IDisposable
             AverageInspectionMilliseconds = 740,
             MinInspectionMilliseconds = 610,
             MaxInspectionMilliseconds = 1205,
+            P95InspectionMilliseconds = 1158.5,
             CountOverOneSecond = 1,
             StartManagedMemoryMegabytes = 20,
             EndManagedMemoryMegabytes = 22,
@@ -1034,15 +1170,115 @@ public sealed class AoiDatabaseTests : IDisposable
         result.Cycles.Add(new SoakTestCycleRecord(1, "Top-000001", @"C:\soak\images\board.png", "REVIEW", 740, true, "Synthetic cycle"));
 
         var reportPath = SoakTestService.WriteHtmlReport(result, _root);
+        var jsonPath = SoakTestService.WriteJsonReport(result, _root);
         var report = File.ReadAllText(reportPath);
 
         Assert.True(File.Exists(reportPath));
+        Assert.True(File.Exists(jsonPath));
         Assert.Contains("AOI Monitor Soak Test Report", report);
         Assert.Contains("Stability Metrics", report);
         Assert.Contains("Total cycles", report);
+        Assert.Contains("P95 inspection time", report);
         Assert.Contains("Count over 1 second", report);
         Assert.Contains("Synthetic inspection exception", report);
-        Assert.Contains("Folder Camera Simulation frames", report);
+        Assert.Contains("Simulated source", report);
+    }
+
+    [Fact]
+    public async Task ShortFakeSoakRunRecordsIterations()
+    {
+        var imageFolder = Path.Combine(_root, "soak_images");
+        Directory.CreateDirectory(imageFolder);
+        WriteTinyPng(Path.Combine(imageFolder, "board_001.png"));
+
+        var options = new SoakTestOptions(
+            imageFolder,
+            TimeSpan.FromSeconds(30),
+            TimeSpan.Zero,
+            InspectionEngineFactory.DefaultEngineKey,
+            _root,
+            "Admin01 [Admin]",
+            "TBOX-MAIN",
+            "SOAK-TEST")
+        {
+            MaxIterations = 3,
+        };
+
+        var result = await SoakTestService.RunAsync(options, progress: null, CancellationToken.None);
+        AoiDatabase.RecordSoakTestRun(result, result.OperatorId);
+        var persisted = AoiDatabase.GetLatestSoakTestRun();
+
+        Assert.Equal(3, result.TotalCycles);
+        Assert.Equal(3, result.Cycles.Count);
+        Assert.Equal(3, persisted?.Cycles.Count);
+        Assert.Equal("Simulated source", persisted?.SourceKind);
+    }
+
+    [Fact]
+    public async Task FailedSoakIterationDoesNotCrashRun()
+    {
+        var imageFolder = Path.Combine(_root, "bad_soak_images");
+        Directory.CreateDirectory(imageFolder);
+        File.WriteAllText(Path.Combine(imageFolder, "bad.png"), "not a real png");
+
+        var options = new SoakTestOptions(
+            imageFolder,
+            TimeSpan.FromSeconds(30),
+            TimeSpan.Zero,
+            InspectionEngineFactory.DefaultEngineKey,
+            _root,
+            "Admin01 [Admin]",
+            "TBOX-MAIN",
+            "SOAK-TEST")
+        {
+            MaxIterations = 1,
+        };
+
+        var result = await SoakTestService.RunAsync(options, progress: null, CancellationToken.None);
+
+        Assert.Equal(1, result.TotalCycles);
+        Assert.Equal(1, result.FailedCycles);
+        Assert.Single(result.Errors);
+        Assert.Equal("ERROR", Assert.Single(result.Cycles).Verdict);
+    }
+
+    [Fact]
+    public void SoakSummaryComputesP95MaxAndAverage()
+    {
+        var values = new[] { 100d, 200d, 300d, 400d };
+
+        Assert.Equal(250, values.Average());
+        Assert.Equal(400, values.Max());
+        Assert.Equal(385, SoakTestService.Percentile(values, 0.95), precision: 6);
+    }
+
+    [Fact]
+    public void CanceledSoakRunIsNotAcceptedAsFactoryEvidence()
+    {
+        var start = DateTime.Now.AddHours(-8);
+        var result = new SoakTestResult
+        {
+            StartTime = start,
+            EndTime = start.AddHours(8),
+            ImageFolder = @"C:\soak\images",
+            OutputFolder = _root,
+            EngineName = "Unit Test Engine",
+            EngineVersion = "TEST-1",
+            SourceKind = "Simulated source",
+            RequestedDuration = TimeSpan.FromHours(8),
+            OperatorId = "Admin01 [Admin]",
+            BoardModel = "TBOX-MAIN",
+            LotId = "SOAK-TEST",
+            WasCanceled = true,
+            TotalCycles = 100,
+            SuccessfulCycles = 100,
+        };
+
+        AoiDatabase.RecordSoakTestRun(result, result.OperatorId);
+        var persisted = AoiDatabase.GetLatestSoakTestRun();
+
+        Assert.False(result.IsCompletedFactoryEvidence);
+        Assert.False(persisted?.IsCompletedFactoryEvidence);
     }
 
     [Fact]
@@ -1503,12 +1739,344 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal("FAIL", persistedRows[1].PassFail);
         Assert.Equal("Unit Test Engine", persistedRows[0].InspectionEngine);
         Assert.Equal("TEST-1", persistedRows[0].ModelVersion);
-        Assert.Equal("Synthetic note", persistedRows[0].Notes);
+        Assert.Equal("SYNTHETIC", persistedRows[0].NormalizedDefectClass);
+        Assert.Equal("TOP", persistedRows[0].NormalizedSide);
+        Assert.Equal("PASS", persistedRows[0].FailureCategory);
+        Assert.NotEmpty(AoiDatabase.GetValidationBreakdownMetrics(runId));
+        Assert.StartsWith("Synthetic note", persistedRows[0].Notes, StringComparison.Ordinal);
         Assert.Equal(11, persistedRows[0].ImageLoadMilliseconds, precision: 3);
         Assert.Equal(22, persistedRows[0].PreprocessingMilliseconds, precision: 3);
         Assert.Equal(33, persistedRows[0].InferenceMilliseconds, precision: 3);
         Assert.Equal(4, persistedRows[0].OverlayRenderingMilliseconds, precision: 3);
         Assert.Equal(70, persistedRows[0].TotalInspectionMilliseconds, precision: 3);
+    }
+
+    [Fact]
+    public void FalseCallSweepComputesExpectedCounts()
+    {
+        var rows = new[]
+        {
+            ScoredRow("NG", 0.70),
+            ScoredRow("NG", 0.40),
+            ScoredRow("OK", 0.80),
+            ScoredRow("OK", 0.20),
+        };
+
+        var run = FalseCallReductionService.Analyze(
+            rows,
+            "Unit Test Engine",
+            "TEST-1",
+            "MODEL-1",
+            "HASH",
+            null,
+            new FalseCallReductionCriteria { MinimumThreshold = 0.5, MaximumThreshold = 0.5, ThresholdStep = 0.1, MaximumFalseCallRate = 1, MaximumPossibleEscapeRate = 1 });
+
+        var point = Assert.Single(run.Points);
+        Assert.Equal(1, point.TruePositive);
+        Assert.Equal(1, point.TrueNegative);
+        Assert.Equal(1, point.FalsePositive);
+        Assert.Equal(1, point.FalseNegative);
+        Assert.Equal(0.5, point.FalseCallRate, precision: 3);
+        Assert.Equal(0.5, point.PossibleEscapeRate, precision: 3);
+    }
+
+    [Fact]
+    public void ClassMetricsServiceBuildsPerClassConfusionMatrix()
+    {
+        var rows = new[]
+        {
+            ScoredRow("NG", 0.8, expectedClass: "BRIDGE", predictedClass: "BRIDGE"),
+            ScoredRow("OK", 0.8, expectedClass: "OK", predictedClass: "BRIDGE"),
+            ScoredRow("NG", 0.2, expectedClass: "MISSING", predictedClass: "UNASSIGNED"),
+        };
+
+        var summary = ClassMetricsService.Calculate(rows);
+        var bridge = Assert.Single(summary.DefectClassMetrics, metric => metric.Key == "BRIDGE");
+        var missing = Assert.Single(summary.DefectClassMetrics, metric => metric.Key == "MISSING");
+
+        Assert.Equal(1, bridge.TruePositive);
+        Assert.Equal(1, bridge.FalsePositive);
+        Assert.Equal(1, missing.FalseNegative);
+        Assert.Contains(summary.TopFalseCallContributors, metric => metric.Key.Contains("BRIDGE", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(summary.TopPossibleEscapeContributors, metric => metric.Key.Contains("MISSING", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void WrongDefectClassIsSeparateFailureCategory()
+    {
+        var row = ScoredRow("NG", 0.9, expectedClass: "BRIDGE", predictedClass: "MISSING");
+
+        Assert.Equal("WRONG_DEFECT_CLASS", row.FailureCategory);
+        var classMetric = Assert.Single(ClassMetricsService.Calculate(new[] { row }).DefectClassMetrics);
+        Assert.Equal(1, classMetric.WrongDefectClass);
+        Assert.Equal(0, classMetric.FalseNegative);
+    }
+
+    [Fact]
+    public void ValidationPackageIncludesBreakdownCsvAndManifestSummary()
+    {
+        AoiDatabase.Initialize();
+        var rows = new[]
+        {
+            ScoredRow("NG", 0.8, expectedClass: "BRIDGE", predictedClass: "BRIDGE"),
+            ScoredRow("OK", 0.8, expectedClass: "OK", predictedClass: "BRIDGE"),
+        };
+        var metrics = BatchValidationService.CalculateMetrics(rows);
+        var package = CustomerValidationPackageService.CreatePackage(new CustomerValidationPackageRequest
+        {
+            OutputRoot = Path.Combine(_root, "packages"),
+            RunId = null,
+            OperatorId = "Engineer01",
+            OperatorRole = "Engineer",
+            Metrics = metrics,
+            PerformanceSummary = BatchValidationService.CalculatePerformanceSummary(rows),
+            Rows = rows,
+        });
+
+        Assert.True(File.Exists(Path.Combine(package.PackageFolder, "validation_breakdown.csv")));
+        Assert.Contains(package.Manifest.IncludedFiles, file => file.RelativePath == "validation_breakdown.csv");
+        Assert.Contains(package.Manifest.BreakdownSummary.DefectClassMetrics, metric => metric.Key == "BRIDGE");
+    }
+
+    [Fact]
+    public void ActiveThresholdLookupSelectsMostSpecificRule()
+    {
+        AoiDatabase.Initialize();
+        var profile = new ThresholdProfile
+        {
+            ProfileId = "TP-SPECIFIC",
+            Revision = "R0001",
+            BoardModel = "ANY",
+            BoardProgram = "TBOX-MAIN",
+            RecipeName = "TBOX_TOP",
+            RecipeRevision = "R1",
+            Status = "Approved",
+            CreatedBy = "Engineer01",
+            CreatedAtUtc = DateTime.UtcNow,
+            Rules =
+            [
+                new ThresholdProfileRule { ViewType = "Any", RoiType = "Any", DefectClass = "Any", ReviewThreshold = 8, NgThreshold = 18, ConfidenceThreshold = 0.65 },
+                new ThresholdProfileRule { ViewType = "Top", RoiType = "Solder Bridge", DefectClass = "Any", ReviewThreshold = 4, NgThreshold = 9, ConfidenceThreshold = 0.7 },
+                new ThresholdProfileRule { ViewType = "Top", RoiType = "Solder Bridge", DefectClass = "SOLDER_BRIDGE", ReviewThreshold = 2, NgThreshold = 5, ConfidenceThreshold = 0.8 },
+            ],
+        };
+        AoiDatabase.SaveThresholdProfile(profile);
+        ThresholdProfileService.DeployProfile(profile.ProfileId, profile.Revision, UserRole.Engineer, "Engineer01 [Engineer]");
+
+        var effective = ThresholdProfileService.GetEffectiveThreshold("ANY", "TBOX-MAIN", "TBOX_TOP", "Top", "Solder Bridge", "Solder Bridge");
+
+        Assert.NotNull(effective);
+        Assert.Equal("TP-SPECIFIC", effective.ProfileId);
+        Assert.Equal(2, effective.ReviewThreshold, precision: 3);
+        Assert.Equal(5, effective.NgThreshold, precision: 3);
+    }
+
+    [Fact]
+    public void ProfileFromFalseCallRecommendationPersistsSourceRun()
+    {
+        AoiDatabase.Initialize();
+        var sourceRows = new[] { ScoredRow("OK", 0.1), ScoredRow("NG", 0.8) };
+        var sourceMetrics = BatchValidationService.CalculateMetrics(sourceRows);
+        var sourceRunId = AoiDatabase.RecordBatchTestRun(
+            @"C:\validation",
+            null,
+            "Unit Test Engine",
+            "TEST-1",
+            sourceMetrics.Accuracy,
+            sourceMetrics.Precision,
+            sourceMetrics.Recall,
+            sourceMetrics.FalseCallRate,
+            sourceRows.Select(row => row.ToRecord()).ToArray());
+        var run = FalseCallReductionService.AnalyzeAndPersist(
+            sourceRows,
+            "Unit Test Engine",
+            "TEST-1",
+            "MODEL-1",
+            "HASH",
+            sourceRunId,
+            new FalseCallReductionCriteria { MinimumThreshold = 0.5, MaximumThreshold = 0.5, MaximumFalseCallRate = 0, MaximumPossibleEscapeRate = 0 },
+            "Engineer01 [Engineer]");
+
+        var profile = ThresholdProfileService.CreateDraftFromFalseCallReductionRecommendation(
+            run,
+            "TBOX",
+            "TBOX-MAIN",
+            "TBOX_TOP",
+            "R1",
+            "Engineer01 [Engineer]");
+        var persisted = AoiDatabase.GetThresholdProfile(profile.ProfileId, profile.Revision);
+
+        Assert.NotNull(persisted);
+        Assert.Equal(run.Id, persisted.SourceFalseCallReductionRunId);
+        Assert.Equal(sourceRunId, persisted.SourceValidationRunId);
+        Assert.Single(persisted.Rules);
+        Assert.Equal(50, persisted.Rules[0].NgThreshold, precision: 3);
+    }
+
+    [Fact]
+    public void OperatorCannotApproveOrDeployThresholdProfile()
+    {
+        AoiDatabase.Initialize();
+        var profile = new ThresholdProfile
+        {
+            ProfileId = "TP-OPERATOR-DENIED",
+            Revision = "R0001",
+            CreatedBy = "Engineer01",
+            CreatedAtUtc = DateTime.UtcNow,
+            Rules = [new ThresholdProfileRule { ReviewThreshold = 8, NgThreshold = 18, ConfidenceThreshold = 0.65 }],
+        };
+        AoiDatabase.SaveThresholdProfile(profile);
+
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            ThresholdProfileService.ApproveProfile(profile.ProfileId, profile.Revision, UserRole.Operator, "Operator01 [Operator]"));
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            ThresholdProfileService.DeployProfile(profile.ProfileId, profile.Revision, UserRole.Operator, "Operator01 [Operator]"));
+    }
+
+    [Fact]
+    public void PixelDifferenceEngineEvidenceIncludesThresholdProfileSource()
+    {
+        AoiDatabase.Initialize();
+        var golden = WriteBmp("profile-golden.bmp", 40, 40, (_, _) => White());
+        var sample = WriteBmp("profile-sample.bmp", 40, 40, (x, _) => x < 20 ? Black() : White());
+        SaveTestRecipe(new RecipeRoiDocument { Id = "ROI-LEFT", RoiType = "Solder Bridge", X = 0, Y = 0, Width = 0.5, Height = 1, AiScoreThreshold = 0.9 });
+        var profile = new ThresholdProfile
+        {
+            ProfileId = "TP-ENGINE",
+            Revision = "R0001",
+            BoardModel = "ANY",
+            BoardProgram = "TBOX-MAIN",
+            RecipeName = "TBOX_TOP",
+            RecipeRevision = "ANY",
+            Status = "Approved",
+            CreatedBy = "Engineer01",
+            CreatedAtUtc = DateTime.UtcNow,
+            Rules = [new ThresholdProfileRule { ViewType = "Top", RoiType = "Solder Bridge", DefectClass = "Any", ReviewThreshold = 1, NgThreshold = 2, ConfidenceThreshold = 0.7 }],
+        };
+        AoiDatabase.SaveThresholdProfile(profile);
+        ThresholdProfileService.DeployProfile(profile.ProfileId, profile.Revision, UserRole.Engineer, "Engineer01 [Engineer]");
+
+        var result = new PixelDifferenceInspectionEngine().Analyze(sample, golden, DetectionPriority.Balanced);
+
+        Assert.Equal("TP-ENGINE", result.ThresholdProfileId);
+        Assert.Equal("R0001", result.ThresholdProfileRevision);
+        Assert.Contains(result.Evidence, line => line.Contains("Active threshold profile TP-ENGINE/R0001", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void MinimizeFalsePositivesPrefersLowerFpEvenIfRecallDecreases()
+    {
+        var rows = new[]
+        {
+            ScoredRow("NG", 0.60),
+            ScoredRow("OK", 0.70),
+        };
+
+        var run = FalseCallReductionService.Analyze(
+            rows,
+            "Unit Test Engine",
+            "TEST-1",
+            "MODEL-1",
+            "HASH",
+            null,
+            new FalseCallReductionCriteria
+            {
+                MinimumThreshold = 0.5,
+                MaximumThreshold = 0.8,
+                ThresholdStep = 0.3,
+                Mode = FalseCallReductionMode.MinimizeFalsePositives,
+                MaximumFalseCallRate = 1,
+                MaximumPossibleEscapeRate = 1,
+            });
+
+        Assert.Equal("VALID", run.Recommendation.Status);
+        Assert.NotNull(run.Recommendation.Point);
+        Assert.Equal(0, run.Recommendation.Point.FalsePositive);
+        Assert.Equal(1, run.Recommendation.Point.FalseNegative);
+    }
+
+    [Fact]
+    public void MaximizeDefectRecallRejectsHighPossibleEscapes()
+    {
+        var rows = new[]
+        {
+            ScoredRow("NG", 0.40),
+            ScoredRow("NG", 0.90),
+            ScoredRow("OK", 0.20),
+        };
+
+        var run = FalseCallReductionService.Analyze(
+            rows,
+            "Unit Test Engine",
+            "TEST-1",
+            "MODEL-1",
+            "HASH",
+            null,
+            new FalseCallReductionCriteria
+            {
+                MinimumThreshold = 0.3,
+                MaximumThreshold = 0.5,
+                ThresholdStep = 0.2,
+                Mode = FalseCallReductionMode.MaximizeDefectRecall,
+                MaximumFalseCallRate = 1,
+                MaximumPossibleEscapeRate = 0,
+            });
+
+        Assert.Equal("VALID", run.Recommendation.Status);
+        Assert.NotNull(run.Recommendation.Point);
+        Assert.Equal(0, run.Recommendation.Point.FalseNegative);
+        Assert.Equal(0.3, run.Recommendation.Point.ConfidenceThreshold, precision: 3);
+    }
+
+    [Fact]
+    public void InsufficientGroundTruthReturnsInvalidRecommendation()
+    {
+        var rows = new[]
+        {
+            ScoredRow("OK", 0.10),
+            ScoredRow("UNKNOWN", 0.90),
+        };
+
+        var run = FalseCallReductionService.Analyze(
+            rows,
+            "Unit Test Engine",
+            "TEST-1",
+            "MODEL-1",
+            "HASH",
+            null,
+            new FalseCallReductionCriteria { MinimumThreshold = 0.5, MaximumThreshold = 0.5 });
+
+        Assert.Equal("INVALID", run.Recommendation.Status);
+        Assert.Null(run.Recommendation.Point);
+    }
+
+    [Fact]
+    public void ApplyingFalseCallThresholdRecordsAuditEventAndUpdatesConfig()
+    {
+        AoiDatabase.Initialize();
+        WorkflowState.Instance.SetCurrentUser("EngineerApply", UserRole.Engineer);
+        InspectionModelConfigurationService.Save(new InspectionModelConfiguration { ConfidenceThreshold = 0.65 });
+        var rows = new[]
+        {
+            ScoredRow("OK", 0.10),
+            ScoredRow("NG", 0.90),
+        };
+        var run = FalseCallReductionService.AnalyzeAndPersist(
+            rows,
+            "Unit Test Engine",
+            "TEST-1",
+            "MODEL-1",
+            "HASH",
+            null,
+            new FalseCallReductionCriteria { MinimumThreshold = 0.5, MaximumThreshold = 0.5, MaximumFalseCallRate = 0, MaximumPossibleEscapeRate = 0 },
+            WorkflowState.Instance.OperatorWithRole);
+
+        FalseCallReductionService.ApplyRecommendedThreshold(run, WorkflowState.Instance.OperatorWithRole);
+
+        Assert.Equal(0.5, InspectionModelConfigurationService.Load().ConfidenceThreshold, precision: 3);
+        var audit = AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "FALSE_CALL_THRESHOLD_APPLIED", OperatorId = "EngineerApply" });
+        Assert.Contains(audit, row => row.UserRole == "Engineer" && row.RelatedEntityId == run.Id.ToString(CultureInfo.InvariantCulture));
+        Assert.NotNull(AoiDatabase.GetLatestFalseCallReductionRun());
     }
 
     [Fact]
@@ -1615,12 +2183,191 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.True(adapter.StopCalled);
         Assert.NotNull(frame);
         Assert.Equal(CameraSourceStatus.NotConnected, source.ConnectionStatus);
-        Assert.Equal("GenericVisionAdapter", frame.SourceKind);
-        Assert.False(frame.IsSimulated);
+        Assert.Equal("FakeVisionAdapter", frame.SourceKind);
+        Assert.True(frame.IsSimulated);
         Assert.Equal("FAKE-TOP", frame.CameraId);
         Assert.Equal(CameraViewType.Top, frame.ViewType);
         Assert.Equal("BOARD-X", frame.BoardModel);
         Assert.Equal("LOT-X", frame.LotId);
+    }
+
+    [Fact]
+    public void CameraAcceptanceFakeAdapterWithDeterministicFramesPassesAsSimulationOnly()
+    {
+        AoiDatabase.Initialize();
+        var adapter = new FakeVisionCameraAdapter(WriteTinyPng("acceptance-fake.png"));
+        var run = CameraAcceptanceTestService.Run(
+            new CameraSourceSettings
+            {
+                SourceKey = CameraSourceFactory.GenericVisionAdapterSourceKey,
+                TopDeviceId = "FAKE-TOP",
+                AcquisitionMode = CameraAcquisitionMode.SoftwareTrigger,
+            },
+            new CameraAcceptanceCriteria
+            {
+                FramesPerView = 3,
+                RequiredViews = new() { "Top" },
+                MaxDroppedFrameRate = 0,
+                MaxTriggerFailureRate = 0,
+            },
+            adapter);
+
+        var id = AoiDatabase.RecordCameraAcceptanceRun(run, "UnitTest [Engineer]");
+        var persisted = AoiDatabase.GetLatestCameraAcceptanceRun();
+        var summary = CameraAcceptanceTestService.ToSummary(persisted);
+
+        Assert.True(id > 0);
+        Assert.Equal("PASS", run.Status);
+        Assert.False(run.IsRealHardware);
+        Assert.Equal("NOT VALIDATED", run.FactoryReadinessStatus);
+        Assert.Equal(3, run.TotalReceivedFrames);
+        Assert.Equal("NOT VALIDATED", summary.Status);
+        Assert.Contains(summary.Messages, message => message.Contains("simulation", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(persisted);
+        Assert.Equal(3, persisted.Frames.Count);
+    }
+
+    [Fact]
+    public void CameraAcceptanceNullAdapterFailsWithNotConnectedMessage()
+    {
+        var run = CameraAcceptanceTestService.Run(
+            new CameraSourceSettings
+            {
+                SourceKey = CameraSourceFactory.GenericVisionAdapterSourceKey,
+                TopDeviceId = "NULL-TOP",
+            },
+            new CameraAcceptanceCriteria
+            {
+                FramesPerView = 2,
+                RequiredViews = new() { "Top" },
+            });
+
+        Assert.Equal("FAIL", run.Status);
+        Assert.Equal("NOT VALIDATED", run.FactoryReadinessStatus);
+        Assert.Contains(run.Failures, failure => failure.Contains("did not enter acquisition", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(run.Failures, failure => failure.Contains("no frames", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CameraAcceptanceMissingRequiredViewsFails()
+    {
+        var topFolder = Path.Combine(_root, "camera-top-only");
+        Directory.CreateDirectory(topFolder);
+        File.WriteAllBytes(Path.Combine(topFolder, "top.png"), TinyPngBytes());
+        var run = CameraAcceptanceTestService.Run(
+            new CameraSourceSettings
+            {
+                SourceKey = CameraSourceFactory.FolderSimulationSourceKey,
+                TopFolder = topFolder,
+            },
+            new CameraAcceptanceCriteria
+            {
+                FramesPerView = 1,
+                RequiredViews = new() { "Top", "Side", "Bottom" },
+            });
+
+        Assert.Equal("FAIL", run.Status);
+        Assert.Contains(run.ViewMetrics, view => view.ViewType == "Top" && view.ReceivedFrames == 1);
+        Assert.Contains(run.Failures, failure => failure.Contains("Side", StringComparison.OrdinalIgnoreCase) && failure.Contains("no frames", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(run.Failures, failure => failure.Contains("Bottom", StringComparison.OrdinalIgnoreCase) && failure.Contains("no frames", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CameraAcceptanceDroppedFrameSimulationWarnsOrFailsByCriteria()
+    {
+        var warnRun = CameraAcceptanceTestService.Run(
+            new CameraSourceSettings { SourceKey = CameraSourceFactory.GenericVisionAdapterSourceKey },
+            new CameraAcceptanceCriteria
+            {
+                FramesPerView = 5,
+                RequiredViews = new() { "Top" },
+                MaxDroppedFrameRate = 0.5,
+            },
+            sourceOverride: new DroppingCameraSource(dropEvery: 3));
+
+        var failRun = CameraAcceptanceTestService.Run(
+            new CameraSourceSettings { SourceKey = CameraSourceFactory.GenericVisionAdapterSourceKey },
+            new CameraAcceptanceCriteria
+            {
+                FramesPerView = 5,
+                RequiredViews = new() { "Top" },
+                MaxDroppedFrameRate = 0,
+            },
+            sourceOverride: new DroppingCameraSource(dropEvery: 3));
+
+        Assert.Equal("WARN", warnRun.Status);
+        Assert.Equal(1, warnRun.DroppedFrameCount);
+        Assert.Contains(warnRun.Warnings, warning => warning.Contains("dropped frame", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("FAIL", failRun.Status);
+        Assert.Contains(failRun.Failures, failure => failure.Contains("dropped-frame rate", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task LightingAcceptanceSimulatedLightingPasses()
+    {
+        AoiDatabase.Initialize();
+        var settings = new LightingSettings
+        {
+            Mode = LightingModes.Simulated,
+            TopProgram = "TOP-A",
+            SideProgram = "SIDE-A",
+            BottomProgram = "BOTTOM-A",
+            ResponseTimeoutMs = 500,
+        };
+
+        var run = await LightingAcceptanceTestService.RunAsync(
+            settings,
+            new LightingAcceptanceCriteria { RequiredViews = new() { "Top", "Side", "Bottom" } });
+        var id = AoiDatabase.RecordLightingAcceptanceRun(run, "UnitTest [Engineer]");
+        var persisted = AoiDatabase.GetLatestLightingAcceptanceRun();
+
+        Assert.True(id > 0);
+        Assert.Equal("PASS", run.Status);
+        Assert.True(run.IsSimulated);
+        Assert.Equal(3, run.PassedStepCount);
+        Assert.All(run.Steps, step => Assert.Equal("PASS", step.Status));
+        Assert.NotNull(persisted);
+        Assert.Equal(3, persisted.Steps.Count);
+    }
+
+    [Fact]
+    public async Task LightingAcceptanceNullLightingFailsAsNotConnected()
+    {
+        var run = await LightingAcceptanceTestService.RunAsync(
+            new LightingSettings { Mode = LightingModes.None, ResponseTimeoutMs = 100 },
+            new LightingAcceptanceCriteria { RequiredViews = new() { "Top" } });
+
+        Assert.Equal("FAIL", run.Status);
+        Assert.Contains(run.Failures, failure => failure.Contains("No real lighting hardware", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(run.Steps, step => step.Status == "FAIL" && !step.CommandAccepted);
+    }
+
+    [Fact]
+    public async Task LightingAcceptanceTimeoutProducesFail()
+    {
+        var run = await LightingAcceptanceTestService.RunAsync(
+            new LightingSettings { Mode = LightingModes.Simulated, ResponseTimeoutMs = 25 },
+            new LightingAcceptanceCriteria { RequiredViews = new() { "Top" } },
+            controller: new SlowLightingController());
+
+        Assert.Equal("FAIL", run.Status);
+        Assert.Contains(run.Failures, failure => failure.Contains("timed out", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task LightingAcceptanceReportContainsPerViewTiming()
+    {
+        var run = await LightingAcceptanceTestService.RunAsync(
+            new LightingSettings { Mode = LightingModes.Simulated, ResponseTimeoutMs = 500 },
+            new LightingAcceptanceCriteria { RequiredViews = new() { "Top", "Side" } });
+
+        var html = LightingAcceptanceTestService.BuildHtml(run);
+
+        Assert.Contains("Per-View Timing", html);
+        Assert.Contains("Top", html);
+        Assert.Contains("Side", html);
+        Assert.Contains("Command ms", html);
+        Assert.Contains("Trigger-to-frame ms", html);
     }
 
     [Fact]
@@ -1754,6 +2501,8 @@ public sealed class AoiDatabaseTests : IDisposable
     private static BatchTestRow Row(string groundTruth, string engineResult, string imageName = "image.png")
     {
         var passFail = BatchValidationService.CalculatePassFail(groundTruth, engineResult);
+        var expectedClass = BatchValidationService.NormalizeDefectClass("Synthetic");
+        var side = BatchValidationService.NormalizeSide("top");
         return new BatchTestRow
         {
             Image = imageName,
@@ -1765,11 +2514,23 @@ public sealed class AoiDatabaseTests : IDisposable
             Score = engineResult == "NG" ? 80 : 5,
             PassFail = passFail,
             DefectType = "Synthetic",
+            NormalizedDefectClass = expectedClass,
+            NormalizedSide = side,
+            FailureCategory = BatchValidationService.DetermineFailureCategory(
+                groundTruth,
+                engineResult,
+                expectedClass,
+                expectedClass,
+                side,
+                side,
+                false),
             Side = "top",
             RefDes = "U1",
             LotId = "LOT",
             BoardModel = "TBOX",
             Notes = "Synthetic note",
+            RoiId = "ROI-TEST",
+            RoiType = "Synthetic ROI",
             RoiX = 0.1,
             RoiY = 0.2,
             RoiWidth = 0.3,
@@ -1782,9 +2543,133 @@ public sealed class AoiDatabaseTests : IDisposable
         };
     }
 
+    private static BatchTestRow ScoredRow(
+        string groundTruth,
+        double score,
+        string expectedClass = "Synthetic",
+        string predictedClass = "Synthetic",
+        string side = "top",
+        string roiId = "ROI-TEST")
+    {
+        var engineResult = score >= 0.5 ? "NG" : "OK";
+        var normalizedExpectedClass = BatchValidationService.NormalizeDefectClass(expectedClass);
+        var normalizedPredictedClass = BatchValidationService.NormalizeDefectClass(predictedClass);
+        var normalizedSide = BatchValidationService.NormalizeSide(side);
+        return new BatchTestRow
+        {
+            Image = $"{groundTruth}_{score:F2}.png",
+            ImagePath = Path.Combine(@"C:\validation", $"{groundTruth}_{score:F2}.png"),
+            GroundTruth = groundTruth,
+            EngineResult = engineResult,
+            InspectionEngine = "Unit Test Engine",
+            ModelVersion = "TEST-1",
+            Score = score,
+            PassFail = BatchValidationService.CalculatePassFail(groundTruth, engineResult),
+            DefectType = predictedClass,
+            NormalizedDefectClass = normalizedExpectedClass,
+            NormalizedSide = normalizedSide,
+            FailureCategory = BatchValidationService.DetermineFailureCategory(
+                groundTruth,
+                engineResult,
+                normalizedExpectedClass,
+                normalizedPredictedClass,
+                normalizedSide,
+                normalizedSide,
+                false),
+            Side = side,
+            RoiId = roiId,
+            RoiType = "Synthetic ROI",
+        };
+    }
+
+    private BatchTestRow QualityRow(string groundTruth, int index, string defectClass, string goldenPath)
+    {
+        var engineResult = string.Equals(groundTruth, "NG", StringComparison.OrdinalIgnoreCase) ? "NG" : "OK";
+        var imageName = $"quality-{index:D3}.png";
+        var row = Row(groundTruth, engineResult, imageName);
+        row.ImagePath = Path.Combine(_root, "quality-images", imageName);
+        row.GoldenImagePath = goldenPath;
+        row.DefectType = defectClass;
+        row.NormalizedDefectClass = BatchValidationService.NormalizeDefectClass(defectClass);
+        row.RoiId = $"ROI-{index:D3}";
+        row.RoiType = index % 2 == 0 ? "Component" : "Solder";
+        return row;
+    }
+
     private static byte[] TinyPngBytes()
         => Convert.FromBase64String(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
+
+    private sealed class DroppingCameraSource : ICameraSource
+    {
+        private readonly int _dropEvery;
+        private int _attempts;
+
+        public DroppingCameraSource(int dropEvery)
+        {
+            _dropEvery = dropEvery;
+        }
+
+        public string Name => "Dropping Fake Camera";
+        public CameraViewType SelectedView { get; set; } = CameraViewType.Top;
+        public CameraSourceStatus ConnectionStatus => CameraSourceStatus.Simulated;
+        public string StatusMessage => "Deterministic dropping fake camera.";
+        public bool IsAcquiring { get; private set; }
+
+        public void StartAcquisition()
+        {
+            IsAcquiring = true;
+            _attempts = 0;
+        }
+
+        public void StopAcquisition()
+        {
+            IsAcquiring = false;
+        }
+
+        public CameraFrame? GetNextFrame()
+        {
+            if (!IsAcquiring)
+                return null;
+
+            _attempts++;
+            if (_dropEvery > 0 && _attempts % _dropEvery == 0)
+                return null;
+
+            var capturedAtUtc = DateTime.UtcNow.AddMilliseconds(_attempts * 10);
+            return new CameraFrame(
+                $"DROP-{_attempts:000}",
+                string.Empty,
+                SelectedView,
+                capturedAtUtc.ToLocalTime(),
+                Name,
+                "BOARD",
+                "LOT",
+                CameraId: "DROP-CAM",
+                CapturedAtUtc: capturedAtUtc,
+                Width: 640,
+                Height: 480,
+                PixelFormat: "Mono8",
+                SourceKind: "DroppingFakeCamera",
+                IsSimulated: true);
+        }
+    }
+
+    private sealed class SlowLightingController : ILightingController
+    {
+        public string Name => "Slow Fake Lighting Controller";
+        public IntegrationConnectionStatus Status => IntegrationConnectionStatus.Simulated;
+        public string StatusMessage => "Slow fake lighting controller.";
+
+        public async Task<IntegrationCommandResult> SetProgramAsync(
+            string viewType,
+            string programName,
+            CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            return new IntegrationCommandResult(true, IntegrationConnectionStatus.Simulated, "Unexpected slow fake lighting completion.");
+        }
+    }
 
     private sealed class FakeVisionCameraAdapter : IVisionCameraAdapter
     {
@@ -1854,8 +2739,8 @@ public sealed class AoiDatabaseTests : IDisposable
                 Width: 640,
                 Height: 480,
                 PixelFormat: "Mono8",
-                SourceKind: "FakeAdapter",
-                IsSimulated: false);
+                SourceKind: "FakeVisionAdapter",
+                IsSimulated: true);
             return true;
         }
 

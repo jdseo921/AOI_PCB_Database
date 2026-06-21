@@ -147,18 +147,27 @@
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
-          <TabItem Header="MES Spool">
-            <DataGrid x:Name="MesSpoolGrid" CanUserSortColumns="True">
+          <TabItem Header="MES Queue">
+            <DataGrid x:Name="MesSpoolGrid" CanUserSortColumns="True" SelectionMode="Extended">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
                 <DataGridTextColumn Header="Type" Binding="{Binding PayloadType}" Width="135"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
-                <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="75"/>
-                <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="70"/>
                 <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100"/>
                 <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
-                <DataGridTextColumn Header="Endpoint" Binding="{Binding EndpointUrl}" Width="210"/>
+                <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="70"/>
+                <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="75"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
                 <DataGridTextColumn Header="Last Error" Binding="{Binding LastError}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </TabItem>
+          <TabItem Header="Factory Readiness">
+            <DataGrid x:Name="FactoryReadinessGrid" CanUserSortColumns="True">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Category" Binding="{Binding Name}" Width="180"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="95"/>
+                <DataGridTextColumn Header="Evidence" Binding="{Binding Evidence}" Width="*"/>
+                <DataGridTextColumn Header="Next Action" Binding="{Binding NextAction}" Width="240"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -191,13 +200,17 @@
           <Button Style="{StaticResource ActionBtnGreen}" Content="Audit Trail CSV" Margin="0,0,6,6" Click="OnExportAuditTrailClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Annotated Overlays" Margin="0,0,6,6" Click="OnExportAnnotatedOverlaysClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Create Stage 1 Customer Package" Margin="0,0,6,6" Click="OnExportCustomerPackageClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Export Go/No-Go Package" Margin="0,0,6,6" Click="OnExportFactoryReadinessPackageClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="DB Integrity" Margin="0,0,6,0" Click="OnRunDbIntegrityCheckClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Database Health" Margin="0,0,6,0" Click="OnOpenDatabaseHealthClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Verify Paths" Margin="0,0,6,0" Click="OnVerifyImagePathsClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Verify Selected Export" Margin="0,0,6,0" Click="OnVerifySelectedExportClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Rebuild Image Index" Margin="0,0,6,0" Click="OnRebuildImageIndexClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Upload Result to MES" Margin="0,0,6,0" Click="OnUploadMesMockClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Retry MES Spool" Margin="0,0,6,0" Click="OnRetryMesSpoolClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Retry Selected MES" Margin="0,0,6,0" Click="OnRetrySelectedMesSpoolClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Retry All Pending MES" Margin="0,0,6,0" Click="OnRetryMesSpoolClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Export Queue Report" Margin="0,0,6,0" Click="OnExportMesQueueReportClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Mark MES Abandoned" Margin="0,0,6,0" Click="OnAbandonMesSpoolClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Soak Test" Margin="0,0,6,0" Click="OnRunSoakTestClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Recipe" Click="OnLockActiveRecipeClick"/>
         </WrapPanel>

@@ -43,6 +43,9 @@ public class AnalysisResult
     public string ModelVersion { get; set; } = "PIXEL_DIFF_0.1";
     public string ModelFilePath { get; set; } = string.Empty;
     public double ConfidenceThreshold { get; set; }
+    public string ThresholdProfileId { get; set; } = string.Empty;
+    public string ThresholdProfileRevision { get; set; } = string.Empty;
+    public string ThresholdSource { get; set; } = "Built-in policy default";
     public string PolicyName { get; set; } = "Minimize False Positives";
     public List<string> Evidence { get; set; } = new();
     public List<DefectResult> Defects { get; set; } = new();

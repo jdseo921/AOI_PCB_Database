@@ -121,7 +121,7 @@ public sealed class MesRestIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task SpoolRetryRemovesSuccessfulItem()
+    public async Task SpoolRetryMarksSuccessfulItemSent()
     {
         var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" });
         MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
@@ -132,7 +132,10 @@ public sealed class MesRestIntegrationTests : IDisposable
 
         Assert.Equal(1, summary.Attempted);
         Assert.Equal(1, summary.Succeeded);
-        Assert.Empty(AoiDatabase.GetMesSpoolQueue());
+        var spool = AoiDatabase.GetMesSpoolQueue();
+        var item = Assert.Single(spool);
+        Assert.Equal("Sent", item.Status);
+        Assert.Contains("200 OK", item.LastError);
     }
 
     [Fact]
@@ -152,6 +155,45 @@ public sealed class MesRestIntegrationTests : IDisposable
         Assert.Equal(1, spool[0].RetryCount);
         Assert.Equal("Pending", spool[0].Status);
         Assert.Contains("HTTP 503", spool[0].LastError);
+    }
+
+    [Fact]
+    public void AbandonRequiresAdminAndMarksQueueItem()
+    {
+        EnqueueTraceabilitySpool("LOT-ABANDON", maxRetryCount: 3);
+        var item = Assert.Single(AoiDatabase.GetMesSpoolQueue());
+
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            MesSpoolService.MarkAbandoned(item.Id, UserRole.Engineer, "Engineer01 [Engineer]", "Test abandon"));
+
+        MesSpoolService.MarkAbandoned(item.Id, UserRole.Admin, "Admin01 [Admin]", "Test abandon");
+
+        var spool = AoiDatabase.GetMesSpoolQueue();
+        var abandoned = Assert.Single(spool);
+        Assert.Equal("Abandoned", abandoned.Status);
+        Assert.Equal("Test abandon", abandoned.LastError);
+    }
+
+    [Fact]
+    public void MesReadinessReportsPendingAndMockStates()
+    {
+        MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
+        EnqueueTraceabilitySpool("LOT-PENDING", maxRetryCount: 3);
+
+        var pending = MesSpoolService.EvaluateReadiness();
+
+        Assert.Equal("MES Queue Pending", pending.Status);
+        Assert.Equal(1, pending.PendingCount);
+
+        AoiDatabase.MarkMesSpoolItemAbandoned(AoiDatabase.GetMesSpoolQueue()[0].Id, "Clear pending test item", "Admin01 [Admin]");
+        var settings = RestSettings();
+        settings.Mode = MesIntegrationMode.MockRest;
+        MesIntegrationSettingsService.Save(settings);
+
+        var mock = MesSpoolService.EvaluateReadiness();
+
+        Assert.Equal("MES Mock Only", mock.Status);
+        Assert.Contains(mock.Messages, message => message.Contains("Mock MES", StringComparison.OrdinalIgnoreCase));
     }
 
     private static MesIntegrationSettings RestSettings(int maxRetryCount = 0, int retryBackoffMs = 0)

@@ -26,6 +26,12 @@ public partial class AIModelTestView : UserControl
     };
 
     private readonly ObservableCollection<BatchTestRow> _rows = new();
+    private readonly ObservableCollection<ThresholdSweepPoint> _falseCallPoints = new();
+    private readonly ObservableCollection<ValidationBreakdownMetric> _defectClassBreakdown = new();
+    private readonly ObservableCollection<ValidationBreakdownMetric> _sideBreakdown = new();
+    private readonly ObservableCollection<ValidationBreakdownMetric> _roiBreakdown = new();
+    private readonly ObservableCollection<ValidationBreakdownMetric> _falseCallSources = new();
+    private readonly ObservableCollection<ValidationBreakdownMetric> _escapeSources = new();
     private string? _selectedFolder;
     private string? _groundTruthCsvPath;
     private long? _currentRunId;
@@ -34,12 +40,20 @@ public partial class AIModelTestView : UserControl
     private string _lastAnnotatedImageFolder = string.Empty;
     private string _lastReportPath = string.Empty;
     private bool _currentRunUsedFormalManifest;
+    private FalseCallReductionRun? _currentFalseCallRun;
+    private DatasetQualitySummary? _currentDatasetQuality;
     private CancellationTokenSource? _workCts;
 
     public AIModelTestView()
     {
         InitializeComponent();
         ResultsGrid.ItemsSource = _rows;
+        FalseCallGrid.ItemsSource = _falseCallPoints;
+        DefectClassBreakdownGrid.ItemsSource = _defectClassBreakdown;
+        SideBreakdownGrid.ItemsSource = _sideBreakdown;
+        RoiBreakdownGrid.ItemsSource = _roiBreakdown;
+        FalseCallSourcesGrid.ItemsSource = _falseCallSources;
+        EscapeSourcesGrid.ItemsSource = _escapeSources;
         InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
         Unloaded += (_, _) => InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
         RefreshEngineText();
@@ -143,8 +157,9 @@ public partial class AIModelTestView : UserControl
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
                 {
                     errors.Add($"Invalid ground-truth CSV: {ex.Message}");
-                    manifest = new ValidationManifest(new Dictionary<string, GroundTruthEntry>(), new List<GroundTruthEntry>(), false);
+                    manifest = new ValidationManifest(new Dictionary<string, GroundTruthEntry>(), new List<GroundTruthEntry>(), false, Array.Empty<string>());
                 }
+                errors.AddRange(manifest.Warnings);
 
                 var engine = InspectionEngineFactory.Create();
                 var engineDisplay = $"{engine.Name} / {engine.Version}";
@@ -198,7 +213,9 @@ public partial class AIModelTestView : UserControl
                         metrics.Precision,
                         metrics.Recall,
                         metrics.FalseCallRate,
-                        rows.Select(r => r.ToRecord()).ToArray());
+                        rows.Select(r => r.ToRecord()).ToArray(),
+                        rows.Select(r => r.ThresholdProfileId).FirstOrDefault(id => !string.IsNullOrWhiteSpace(id)) ?? string.Empty,
+                        rows.Select(r => r.ThresholdProfileRevision).FirstOrDefault(revision => !string.IsNullOrWhiteSpace(revision)) ?? string.Empty);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
                 {
@@ -226,10 +243,15 @@ public partial class AIModelTestView : UserControl
             _currentRunUsedFormalManifest = batch.IsFormalManifest;
             _lastAnnotatedImageFolder = string.Empty;
             _lastReportPath = string.Empty;
+            _currentFalseCallRun = null;
+            _falseCallPoints.Clear();
+            FalseCallRecommendationText.Text = "Batch complete. Analyze false calls to generate threshold candidates.";
+            ApplyRecommendedThresholdButton.IsEnabled = false;
 
             _rows.Clear();
             foreach (var row in batch.Rows)
                 _rows.Add(row);
+            _currentDatasetQuality = DatasetQualityService.Analyze(_rows, TryLoadManifest(_groundTruthCsvPath, _selectedFolder ?? string.Empty));
 
             ApplyMetrics(batch.Metrics);
             RunSummaryText.Text = $"{batch.Rows.Count} images / {batch.Rows.Count(r => r.IsFailed)} failed / run {(_currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "not saved")}";
@@ -237,9 +259,13 @@ public partial class AIModelTestView : UserControl
             var performanceSuffix = performance.CountOverOneSecond > 0
                 ? $" Performance warning: {performance.CountOverOneSecond} image(s) exceeded 1 second."
                 : string.Empty;
+            ApplyDatasetQuality(_currentDatasetQuality);
+            var qualitySuffix = _currentDatasetQuality.Status == "FAIL"
+                ? " Dataset not sufficient for factory acceptance."
+                : string.Empty;
             StatusText.Text = (batch.IsFormalManifest
                 ? $"Formal manifest validation complete. {_rows.Count} row(s), {batch.Errors.Count} issue(s)."
-                : $"Batch inspection complete. {_rows.Count} row(s), {batch.Errors.Count} issue(s).") + performanceSuffix;
+                : $"Batch inspection complete. {_rows.Count} row(s), {batch.Errors.Count} issue(s).") + performanceSuffix + qualitySuffix;
             ReportPathText.Text = "Report: not generated";
             WorkflowState.Instance.AddEvent("MODEL_TEST", $"Stage 1 validation run {_currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "not saved"}: {_rows.Count} images, {_rows.Count(r => r.IsFailed)} failed, {batch.Errors.Count} issue(s).");
             if (performance.CountOverOneSecond > 0)
@@ -427,6 +453,84 @@ public partial class AIModelTestView : UserControl
         StatusText.Text = "Cancel requested. Finishing current file...";
     }
 
+    private void OnAnalyzeFalseCallsClick(object sender, RoutedEventArgs e)
+    {
+        if (_rows.Count == 0)
+        {
+            MessageBox.Show("Run or load a validation batch before analyzing false calls.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var configuration = InspectionModelConfigurationService.Load();
+        var criteria = new FalseCallReductionCriteria
+        {
+            Mode = GetSelectedFalseCallMode(),
+            MaximumFalseCallRate = 0.10,
+            MaximumPossibleEscapeRate = GetSelectedFalseCallMode() == FalseCallReductionMode.MaximizeDefectRecall ? 0.0 : 0.05,
+            MinimumKnownOk = 1,
+            MinimumKnownNg = 1,
+            ManualReviewMinutesPerImage = 2.0,
+        };
+
+        _currentFalseCallRun = FalseCallReductionService.AnalyzeAndPersist(
+            _rows.ToArray(),
+            GetEngineNamePart(),
+            GetEngineVersionPart(),
+            configuration.ActiveModelId,
+            configuration.ActiveModelSha256,
+            _currentRunId,
+            criteria,
+            WorkflowState.Instance.OperatorWithRole);
+
+        _falseCallPoints.Clear();
+        foreach (var point in _currentFalseCallRun.Points.OrderBy(point => point.FalsePositive).ThenBy(point => point.FalseNegative).Take(8))
+            _falseCallPoints.Add(point);
+
+        var selected = _currentFalseCallRun.Recommendation.Point;
+        FalseCallRecommendationText.Text = selected is null
+            ? $"{_currentFalseCallRun.Recommendation.Status}: {string.Join(" ", _currentFalseCallRun.Recommendation.Messages.Take(2))}"
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"{_currentFalseCallRun.Recommendation.Status}: threshold {selected.ConfidenceThreshold:F3}, false call {selected.FalseCallRate:P1}, possible escapes {selected.FalseNegative}, review burden {selected.EstimatedManualReviewMinutes:F1} min.");
+        ApplyRecommendedThresholdButton.IsEnabled = string.Equals(_currentFalseCallRun.Recommendation.Status, "VALID", StringComparison.OrdinalIgnoreCase) &&
+            RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole);
+        StatusText.Text = $"False-call analysis generated for run {_currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "unsaved"}: {_currentFalseCallRun.Recommendation.Status}.";
+    }
+
+    private void OnApplyRecommendedThresholdClick(object sender, RoutedEventArgs e)
+    {
+        if (_currentFalseCallRun?.Recommendation.Point is not { } point)
+        {
+            MessageBox.Show("Analyze false calls before applying a threshold recommendation.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanChangeThresholds, "Applying false-call threshold recommendations", out var message))
+        {
+            MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!string.Equals(_currentFalseCallRun.Recommendation.Status, "VALID", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("Only VALID recommendations can be applied. Review the recommendation limitations first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"Apply confidence threshold {point.ConfidenceThreshold:F3}?\n\nThis updates the current model configuration based on Stage 1 labeled-data evidence only. It does not prove production accuracy.",
+            "Confirm Threshold Update",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        FalseCallReductionService.ApplyRecommendedThreshold(_currentFalseCallRun, WorkflowState.Instance.OperatorWithRole);
+        RefreshEngineText();
+        StatusText.Text = $"Applied recommended threshold {point.ConfidenceThreshold:F3}.";
+        FalseCallRecommendationText.Text += " Applied to current model configuration.";
+    }
+
     private void OnGenerateReportClick(object sender, RoutedEventArgs e)
     {
         if (_rows.Count == 0 || _currentRunId is null)
@@ -498,6 +602,8 @@ public partial class AIModelTestView : UserControl
             Metrics = metrics,
             PerformanceSummary = BatchValidationService.CalculatePerformanceSummary(_rows),
             Rows = _rows.ToArray(),
+            FalseCallReductionRun = _currentFalseCallRun ?? AoiDatabase.GetLatestFalseCallReductionRun(_currentRunId),
+            DatasetQualitySummary = _currentDatasetQuality ?? DatasetQualityService.Analyze(_rows, TryLoadManifest(_groundTruthCsvPath, _selectedFolder ?? string.Empty)),
         };
     }
 
@@ -515,11 +621,13 @@ public partial class AIModelTestView : UserControl
         if (string.Equals(boardModel, "Not provided", StringComparison.OrdinalIgnoreCase))
             boardModel = state.BoardProgram;
         var performance = BatchValidationService.CalculatePerformanceSummary(_rows);
+        var datasetQuality = _currentDatasetQuality ?? DatasetQualityService.Analyze(_rows, TryLoadManifest(_groundTruthCsvPath, _selectedFolder ?? string.Empty));
         var acceptance = CustomerValidationPackageService.EvaluateAcceptance(
             metrics,
             performance,
             _rows.Count,
-            _currentRunUsedFormalManifest);
+            _currentRunUsedFormalManifest,
+            datasetQuality: datasetQuality);
 
         return new CustomerValidationReportContext
         {
@@ -549,6 +657,12 @@ public partial class AIModelTestView : UserControl
             Rows = _rows.ToArray(),
             SampleAnnotatedImages = sampleImages,
             Warnings = warnings,
+            FalseCallRecommendation = FalseCallReductionService.ToSummary(_currentFalseCallRun ?? AoiDatabase.GetLatestFalseCallReductionRun(_currentRunId)),
+            BreakdownSummary = ClassMetricsService.Calculate(_rows),
+            DatasetQualitySummary = datasetQuality,
+            CameraAcceptanceSummary = CameraAcceptanceTestService.ToSummary(AoiDatabase.GetLatestCameraAcceptanceRun(realHardwareOnly: true)),
+            RobotAcceptanceSummary = RobotAcceptanceTestService.ToSummary(AoiDatabase.GetLatestRobotAcceptanceRun()),
+            MesReadinessSummary = MesSpoolService.EvaluateReadiness(),
         };
     }
 
@@ -576,9 +690,32 @@ public partial class AIModelTestView : UserControl
             _rows.Add(BatchTestRow.FromRecord(result));
 
         ApplyMetrics(BatchValidationService.CalculateMetrics(_rows));
+        _currentDatasetQuality = DatasetQualityService.Analyze(_rows, TryLoadManifest(run.GroundTruthCsvPath, run.ImageFolder));
+        ApplyDatasetQuality(_currentDatasetQuality);
         RunSummaryText.Text = $"{run.TotalImages} images / {run.FailedCount} failed / run {run.Id}";
         StatusText.Text = $"Loaded latest persisted Stage 1 validation run: {run.Id}.";
+        _currentFalseCallRun = AoiDatabase.GetLatestFalseCallReductionRun(run.Id);
+        _falseCallPoints.Clear();
+        if (_currentFalseCallRun is not null)
+        {
+            foreach (var candidate in _currentFalseCallRun.Points.OrderBy(point => point.FalsePositive).ThenBy(point => point.FalseNegative).Take(8))
+                _falseCallPoints.Add(candidate);
+
+            FalseCallRecommendationText.Text = _currentFalseCallRun.Recommendation.Point is { } selectedPoint
+                ? $"{_currentFalseCallRun.Recommendation.Status}: threshold {selectedPoint.ConfidenceThreshold:F3}, false call {selectedPoint.FalseCallRate:P1}, possible escapes {selectedPoint.FalseNegative}."
+                : $"{_currentFalseCallRun.Recommendation.Status}: no applied candidate.";
+            ApplyRecommendedThresholdButton.IsEnabled = string.Equals(_currentFalseCallRun.Recommendation.Status, "VALID", StringComparison.OrdinalIgnoreCase) &&
+                RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole);
+        }
     }
+
+    private FalseCallReductionMode GetSelectedFalseCallMode()
+        => FalseCallModeCombo.SelectedIndex switch
+        {
+            0 => FalseCallReductionMode.MinimizeFalsePositives,
+            2 => FalseCallReductionMode.MaximizeDefectRecall,
+            _ => FalseCallReductionMode.Balanced,
+        };
 
     private static bool TryLoadFormalManifestFlag(string? groundTruthCsvPath, string imageFolder)
     {
@@ -589,6 +726,18 @@ public partial class AIModelTestView : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
             return false;
+        }
+    }
+
+    private static ValidationManifest? TryLoadManifest(string? groundTruthCsvPath, string imageFolder)
+    {
+        try
+        {
+            return BatchValidationService.LoadValidationManifest(groundTruthCsvPath, imageFolder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            return null;
         }
     }
 
@@ -610,6 +759,38 @@ public partial class AIModelTestView : UserControl
         VerifiedNgText.Text = metrics.VerifiedNg.ToString(CultureInfo.InvariantCulture);
         UnknownText.Text = metrics.Unknown.ToString(CultureInfo.InvariantCulture);
         ApplyPerformance(BatchValidationService.CalculatePerformanceSummary(_rows));
+        ApplyBreakdown(ClassMetricsService.Calculate(_rows));
+    }
+
+    private void ApplyDatasetQuality(DatasetQualitySummary summary)
+    {
+        DatasetQualityText.Text = $"{summary.Status}: {summary.TotalImages} images, OK {summary.OkImages}, NG {summary.NgImages}, unknown {summary.UnknownLabelImages}";
+        DatasetQualityText.Foreground = summary.Status switch
+        {
+            "PASS" => Brushes.LightGreen,
+            "FAIL" => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFCDD0")),
+            _ => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334")),
+        };
+        var topMessages = summary.BlockingFailures.Concat(summary.Warnings).Take(3).ToArray();
+        DatasetQualityWarningsText.Text = topMessages.Length == 0
+            ? "Dataset quality criteria satisfied."
+            : string.Join(" ", topMessages);
+    }
+
+    private void ApplyBreakdown(ValidationBreakdownSummary summary)
+    {
+        Replace(_defectClassBreakdown, summary.DefectClassMetrics.Take(20));
+        Replace(_sideBreakdown, summary.SideMetrics.Take(20));
+        Replace(_roiBreakdown, summary.RoiMetrics.Take(20));
+        Replace(_falseCallSources, summary.TopFalseCallContributors.Take(20));
+        Replace(_escapeSources, summary.TopPossibleEscapeContributors.Take(20));
+    }
+
+    private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> source)
+    {
+        target.Clear();
+        foreach (var item in source)
+            target.Add(item);
     }
 
     private void ApplyPerformance(BatchPerformanceSummary performance)

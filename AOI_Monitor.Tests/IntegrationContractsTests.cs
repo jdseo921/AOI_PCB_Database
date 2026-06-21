@@ -151,6 +151,70 @@ public sealed class IntegrationContractsTests
     }
 
     [Fact]
+    public async Task RobotAcceptanceSimulatedRobotPassesExpectedTransitions()
+    {
+        await WithSimulatedRobotBoundariesAsync(async () =>
+        {
+            var run = await RobotAcceptanceTestService.RunAsync();
+
+            Assert.Equal("PASS", run.Status);
+            Assert.Equal("Simulated", run.SourceKind);
+            Assert.Equal("Completed", run.FinalState);
+            Assert.True(run.InvalidTransitionRejected);
+            Assert.True(run.EmergencyStopBlocked);
+            Assert.True(run.ResetReturnedIdle);
+            Assert.Contains(run.Steps, step => step.StepName == "Load" && step.Status == "PASS");
+            Assert.Contains(run.Warnings, warning => warning.Contains("Simulation evidence only", StringComparison.OrdinalIgnoreCase));
+        });
+    }
+
+    [Fact]
+    public async Task RobotAcceptanceEmergencyStopTestPassesWithSimulatedStop()
+    {
+        await WithSimulatedRobotBoundariesAsync(async () =>
+        {
+            var run = await RobotAcceptanceTestService.RunAsync();
+
+            Assert.True(run.EmergencyStopBlocked);
+            Assert.Contains(run.Steps, step => step.StepName == "EmergencyStopBlock" && step.Status == "PASS");
+        });
+    }
+
+    [Fact]
+    public async Task RobotAcceptanceNullRobotFailsWithNotConnected()
+    {
+        await WithRobotBoundariesAsync(new NullRobotController(), new NullEmergencyStopMonitor(), async () =>
+        {
+            var run = await RobotAcceptanceTestService.RunAsync(new RobotAcceptanceCriteria
+            {
+                RequireEmergencyStopTest = false,
+            });
+
+            Assert.Equal("FAIL", run.Status);
+            Assert.Equal("NotConnected", run.SourceKind);
+            Assert.Contains(run.Failures, failure => failure.Contains("No robot commands", StringComparison.OrdinalIgnoreCase));
+        });
+    }
+
+    [Fact]
+    public async Task RobotAcceptanceInvalidTransitionDetectionIsRecorded()
+    {
+        await WithSimulatedRobotBoundariesAsync(async () =>
+        {
+            var run = await RobotAcceptanceTestService.RunAsync(new RobotAcceptanceCriteria
+            {
+                RequireEmergencyStopTest = false,
+            });
+
+            Assert.True(run.InvalidTransitionRejected);
+            Assert.Contains(run.Steps, step =>
+                step.StepName == "InvalidTransition" &&
+                step.Status == "PASS" &&
+                step.Message.Contains("Cannot unload", StringComparison.OrdinalIgnoreCase));
+        });
+    }
+
+    [Fact]
     public async Task SimulatedLightingControllerRecordsProgramPerView()
     {
         var settings = new LightingSettings
@@ -253,6 +317,33 @@ public sealed class IntegrationContractsTests
             IntegrationBoundaryRegistry.EmergencyStopMonitor = new SimulatedEmergencyStopMonitor(robot);
             var service = new RobotCycleService((_, _) => { });
             await action(service);
+        }
+        finally
+        {
+            IntegrationBoundaryRegistry.RobotController = previousRobot;
+            IntegrationBoundaryRegistry.EmergencyStopMonitor = previousEmergencyStop;
+        }
+    }
+
+    private static Task WithSimulatedRobotBoundariesAsync(Func<Task> action)
+    {
+        var robot = new SimulatedRobotController();
+        return WithRobotBoundariesAsync(robot, new SimulatedEmergencyStopMonitor(robot), action);
+    }
+
+    private static async Task WithRobotBoundariesAsync(
+        IRobotController robot,
+        IEmergencyStopMonitor emergencyStop,
+        Func<Task> action)
+    {
+        var previousRobot = IntegrationBoundaryRegistry.RobotController;
+        var previousEmergencyStop = IntegrationBoundaryRegistry.EmergencyStopMonitor;
+
+        try
+        {
+            IntegrationBoundaryRegistry.RobotController = robot;
+            IntegrationBoundaryRegistry.EmergencyStopMonitor = emergencyStop;
+            await action();
         }
         finally
         {

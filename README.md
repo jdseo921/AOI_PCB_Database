@@ -16,6 +16,8 @@ Client/evaluator documents:
 - [Requirements Traceability Matrix](Docs/Requirements_Traceability_Matrix.md)
 - [Integration Boundaries](Docs/Integration_Boundaries.md)
 - [Stage 1 Acceptance Checklist](Docs/Stage1_Acceptance_Checklist.md)
+- [Architecture Extension Guide](Docs/Architecture_Extension_Guide.md)
+- [Factory Acceptance Test Plan](Docs/Factory_Acceptance_Test_Plan.md)
 - [Developer CI and Release Checks](Docs/Developer_CI.md)
 
 ## Project Layout

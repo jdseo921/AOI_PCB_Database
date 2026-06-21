@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Text.Json;
+using AOI_Monitor.Data;
 using System.Text;
 using AOI_Monitor.Models;
 
@@ -14,12 +16,26 @@ public sealed record SoakTestOptions(
     string OutputFolder,
     string OperatorId,
     string BoardModel,
-    string LotId);
+    string LotId)
+{
+    public int? MaxIterations { get; init; }
+}
+
+public enum SoakTestProfile
+{
+    QuickSmoke,
+    ShortStability,
+    FactoryPoc,
+    Custom,
+}
 
 public sealed record SoakTestProgress(
     int ElapsedSeconds,
     int TotalSeconds,
-    string Message);
+    string Message,
+    TimeSpan? EstimatedRemaining = null,
+    int PassCount = 0,
+    int FailCount = 0);
 
 public sealed record SoakTestCycleRecord(
     int CycleNumber,
@@ -28,10 +44,15 @@ public sealed record SoakTestCycleRecord(
     string Verdict,
     double TotalMilliseconds,
     bool Success,
-    string Message);
+    string Message,
+    DateTime? TimestampUtc = null,
+    string EngineName = "",
+    double WorkingSetMegabytes = 0,
+    string Error = "");
 
 public sealed class SoakTestResult
 {
+    public long Id { get; set; }
     public string RunId { get; init; } = Guid.NewGuid().ToString("N");
     public DateTime StartTime { get; init; } = DateTime.Now;
     public DateTime EndTime { get; set; } = DateTime.Now;
@@ -40,7 +61,11 @@ public sealed class SoakTestResult
     public string EngineName { get; set; } = "Unknown";
     public string EngineVersion { get; set; } = "UNKNOWN";
     public string EngineKey { get; init; } = InspectionEngineFactory.DefaultEngineKey;
+    public string SourceKind { get; set; } = "Simulated source";
+    public bool IsRealCameraSource { get; set; }
+    public string ProfileName { get; init; } = SoakTestProfile.Custom.ToString();
     public TimeSpan RequestedDuration { get; init; }
+    public TimeSpan ActualDuration => EndTime - StartTime;
     public TimeSpan DelayBetweenInspections { get; init; }
     public string OperatorId { get; init; } = "UNKNOWN";
     public string BoardModel { get; init; } = "TBOX-MAIN";
@@ -52,18 +77,57 @@ public sealed class SoakTestResult
     public double AverageInspectionMilliseconds { get; set; }
     public double MinInspectionMilliseconds { get; set; }
     public double MaxInspectionMilliseconds { get; set; }
+    public double P95InspectionMilliseconds { get; set; }
     public int CountOverOneSecond { get; set; }
     public double StartManagedMemoryMegabytes { get; init; }
     public double EndManagedMemoryMegabytes { get; set; }
     public double StartWorkingSetMegabytes { get; init; }
     public double EndWorkingSetMegabytes { get; set; }
     public double PeakWorkingSetMegabytes { get; set; }
+    public bool IsCompletedFactoryEvidence => !WasCanceled &&
+        FailedCycles == 0 &&
+        RequestedDuration >= TimeSpan.FromHours(8) &&
+        ActualDuration >= TimeSpan.FromHours(8);
     public List<string> Errors { get; } = new();
     public List<SoakTestCycleRecord> Cycles { get; } = new();
 }
 
 public static class SoakTestService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true,
+    };
+
+    public static SoakTestOptions CreateProfileOptions(
+        SoakTestProfile profile,
+        string imageFolder,
+        string engineKey,
+        string outputFolder,
+        string operatorId,
+        string boardModel,
+        string lotId)
+    {
+        var duration = profile switch
+        {
+            SoakTestProfile.QuickSmoke => TimeSpan.FromMinutes(5),
+            SoakTestProfile.ShortStability => TimeSpan.FromMinutes(30),
+            SoakTestProfile.FactoryPoc => TimeSpan.FromHours(8),
+            _ => TimeSpan.FromMinutes(2),
+        };
+
+        return new SoakTestOptions(
+            imageFolder,
+            duration,
+            TimeSpan.FromMilliseconds(250),
+            engineKey,
+            outputFolder,
+            operatorId,
+            boardModel,
+            lotId);
+    }
+
     public static async Task<SoakTestResult> RunAsync(
         SoakTestOptions options,
         IProgress<SoakTestProgress>? progress,
@@ -78,6 +142,7 @@ public static class SoakTestService
             ImageFolder = options.ImageFolder,
             OutputFolder = options.OutputFolder,
             EngineKey = InspectionEngineFactory.NormalizeEngineKey(options.EngineKey),
+            ProfileName = InferProfile(options.Duration).ToString(),
             RequestedDuration = options.Duration,
             DelayBetweenInspections = options.DelayBetweenInspections,
             OperatorId = options.OperatorId,
@@ -96,6 +161,10 @@ public static class SoakTestService
             SelectedView = CameraViewType.Top,
         };
         source.StartAcquisition();
+        result.SourceKind = source.ConnectionStatus == CameraSourceStatus.Simulated
+            ? "Simulated source"
+            : "Real camera source";
+        result.IsRealCameraSource = source.ConnectionStatus == CameraSourceStatus.Ready;
 
         var engine = InspectionEngineFactory.Create(options.EngineKey);
         result.EngineName = engine.Name;
@@ -105,7 +174,7 @@ public static class SoakTestService
         {
             result.Errors.Add($"Folder Camera Simulation is not ready: {source.StatusMessage}");
             CompleteResult(result, process);
-            progress?.Report(new SoakTestProgress(0, Math.Max(1, (int)options.Duration.TotalSeconds), "Soak test could not start; no readable simulation images."));
+            progress?.Report(new SoakTestProgress(0, Math.Max(1, (int)options.Duration.TotalSeconds), "Soak test could not start; no readable simulation images.", options.Duration, result.SuccessfulCycles, result.FailedCycles));
             return result;
         }
 
@@ -113,7 +182,7 @@ public static class SoakTestService
         var cycleTimings = new List<double>();
         var totalSeconds = Math.Max(1, (int)Math.Ceiling(options.Duration.TotalSeconds));
 
-        while (DateTime.Now < deadline)
+        while (DateTime.Now < deadline && (options.MaxIterations is null || result.TotalCycles < options.MaxIterations.Value))
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -122,13 +191,32 @@ public static class SoakTestService
             }
 
             var elapsedSeconds = Math.Min(totalSeconds, (int)Math.Max(0, (DateTime.Now - started).TotalSeconds));
-            progress?.Report(new SoakTestProgress(elapsedSeconds, totalSeconds, $"Soak test running: cycle {result.TotalCycles + 1}, success={result.SuccessfulCycles}, failed={result.FailedCycles}."));
+            progress?.Report(new SoakTestProgress(
+                elapsedSeconds,
+                totalSeconds,
+                $"Soak test running: elapsed={FormatDuration(DateTime.Now - started)}, remaining={FormatDuration(deadline - DateTime.Now)}, cycle {result.TotalCycles + 1}, pass={result.SuccessfulCycles}, fail={result.FailedCycles}.",
+                deadline - DateTime.Now,
+                result.SuccessfulCycles,
+                result.FailedCycles));
 
             var frame = source.GetNextFrame();
             if (frame is null)
             {
+                result.TotalCycles++;
                 result.FailedCycles++;
                 result.Errors.Add("Folder Camera Simulation returned no frame.");
+                result.Cycles.Add(new SoakTestCycleRecord(
+                    result.TotalCycles,
+                    string.Empty,
+                    string.Empty,
+                    "ERROR",
+                    0,
+                    false,
+                    "Folder Camera Simulation returned no frame.",
+                    DateTime.UtcNow,
+                    result.EngineName,
+                    CurrentWorkingSetMegabytes(process),
+                    "No frame returned"));
                 break;
             }
 
@@ -154,14 +242,17 @@ public static class SoakTestService
                     analysis.Verdict,
                     totalMs,
                     true,
-                    analysis.DecisionReason));
+                    analysis.DecisionReason,
+                    DateTime.UtcNow,
+                    result.EngineName,
+                    CurrentWorkingSetMegabytes(process)));
             }
             catch (OperationCanceledException)
             {
                 result.WasCanceled = true;
                 break;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException or ArgumentException)
             {
                 result.FailedCycles++;
                 var message = $"{Path.GetFileName(frame.ImagePath)}: {ex.GetType().Name} - {ex.Message}";
@@ -173,6 +264,10 @@ public static class SoakTestService
                     "ERROR",
                     0,
                     false,
+                    message,
+                    DateTime.UtcNow,
+                    result.EngineName,
+                    CurrentWorkingSetMegabytes(process),
                     message));
             }
 
@@ -198,18 +293,30 @@ public static class SoakTestService
             result.AverageInspectionMilliseconds = cycleTimings.Average();
             result.MinInspectionMilliseconds = cycleTimings.Min();
             result.MaxInspectionMilliseconds = cycleTimings.Max();
+            result.P95InspectionMilliseconds = Percentile(cycleTimings, 0.95);
         }
 
         CompleteResult(result, process);
-        progress?.Report(new SoakTestProgress(totalSeconds, totalSeconds, result.WasCanceled ? "Soak test canceled; partial report ready." : "Soak test complete."));
+        progress?.Report(new SoakTestProgress(totalSeconds, totalSeconds, result.WasCanceled ? "Soak test canceled; partial report ready." : "Soak test complete.", TimeSpan.Zero, result.SuccessfulCycles, result.FailedCycles));
         return result;
     }
+
+    public static long Persist(SoakTestResult result, string? operatorId = null)
+        => AoiDatabase.RecordSoakTestRun(result, operatorId);
 
     public static string WriteHtmlReport(SoakTestResult result, string outputFolder)
     {
         Directory.CreateDirectory(outputFolder);
         var path = Path.Combine(outputFolder, $"soak_test_report_{DateTime.Now:yyyyMMdd_HHmmss}.html");
         File.WriteAllText(path, BuildHtmlReport(result), Encoding.UTF8);
+        return path;
+    }
+
+    public static string WriteJsonReport(SoakTestResult result, string outputFolder)
+    {
+        Directory.CreateDirectory(outputFolder);
+        var path = Path.Combine(outputFolder, $"soak_test_report_{DateTime.Now:yyyyMMdd_HHmmss}.json");
+        File.WriteAllText(path, JsonSerializer.Serialize(result, JsonOptions), Encoding.UTF8);
         return path;
     }
 
@@ -221,9 +328,9 @@ public static class SoakTestService
                 $"<tr><td>{index + 1}</td><td>{Html(error)}</td></tr>"));
 
         var cycleRows = result.Cycles.Count == 0
-            ? "<tr><td colspan=\"7\">No inspection cycles were recorded.</td></tr>"
+            ? "<tr><td colspan=\"10\">No inspection cycles were recorded.</td></tr>"
             : string.Join(Environment.NewLine, result.Cycles.Take(200).Select(cycle =>
-                $"<tr><td>{cycle.CycleNumber}</td><td>{Html(cycle.FrameId)}</td><td>{Html(Path.GetFileName(cycle.ImagePath))}</td><td>{Html(cycle.Verdict)}</td><td>{cycle.TotalMilliseconds:F0} ms</td><td>{(cycle.Success ? "Success" : "Failed")}</td><td>{Html(cycle.Message)}</td></tr>"));
+                $"<tr><td>{cycle.CycleNumber}</td><td>{(cycle.TimestampUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty)}</td><td>{Html(cycle.FrameId)}</td><td>{Html(Path.GetFileName(cycle.ImagePath))}</td><td>{Html(cycle.EngineName)}</td><td>{Html(cycle.Verdict)}</td><td>{cycle.TotalMilliseconds:F0} ms</td><td>{cycle.WorkingSetMegabytes:F1} MB</td><td>{(cycle.Success ? "Success" : "Failed")}</td><td>{Html(string.IsNullOrWhiteSpace(cycle.Error) ? cycle.Message : cycle.Error)}</td></tr>"));
 
         return $$"""
         <!doctype html>
@@ -244,7 +351,7 @@ public static class SoakTestService
         <body>
           <h1>AOI Monitor Soak Test Report</h1>
           <p>Run ID: {{Html(result.RunId)}}</p>
-          <div class="notice {{(result.Errors.Count == 0 && !result.WasCanceled ? "ok" : string.Empty)}}">This is controlled local PoC stability evidence using Folder Camera Simulation frames. It does not indicate live camera, lighting, production robot, PLC, production MES, or Stage 2 Planned Hardware Integration completion.</div>
+          <div class="notice {{(result.Errors.Count == 0 && !result.WasCanceled ? "ok" : string.Empty)}}">This is controlled PoC stability evidence marked as {{Html(result.SourceKind)}}. Simulated-source evidence does not indicate live camera, lighting, production robot, PLC, production MES, or Stage 2 Planned Hardware Integration completion.</div>
 
           <h2>Run Summary</h2>
           <table>
@@ -253,6 +360,8 @@ public static class SoakTestService
             <tr><th>Requested duration</th><td>{{FormatDuration(result.RequestedDuration)}}</td></tr>
             <tr><th>Delay between inspections</th><td>{{FormatDuration(result.DelayBetweenInspections)}}</td></tr>
             <tr><th>Status</th><td>{{(result.WasCanceled ? "Canceled by user" : "Completed")}}</td></tr>
+            <tr><th>Factory PoC evidence accepted</th><td>{{(result.IsCompletedFactoryEvidence ? "YES" : "NO")}}</td></tr>
+            <tr><th>Source kind</th><td>{{Html(result.SourceKind)}}</td></tr>
             <tr><th>Operator</th><td>{{Html(result.OperatorId)}}</td></tr>
             <tr><th>Board model</th><td>{{Html(result.BoardModel)}}</td></tr>
             <tr><th>Lot ID</th><td>{{Html(result.LotId)}}</td></tr>
@@ -268,6 +377,7 @@ public static class SoakTestService
             <tr><th>Average inspection time</th><td>{{FormatMilliseconds(result.AverageInspectionMilliseconds)}}</td></tr>
             <tr><th>Min inspection time</th><td>{{FormatMilliseconds(result.MinInspectionMilliseconds)}}</td></tr>
             <tr><th>Max inspection time</th><td>{{FormatMilliseconds(result.MaxInspectionMilliseconds)}}</td></tr>
+            <tr><th>P95 inspection time</th><td>{{FormatMilliseconds(result.P95InspectionMilliseconds)}}</td></tr>
             <tr><th>Count over 1 second</th><td>{{result.CountOverOneSecond}}</td></tr>
             <tr><th>Managed memory start/end</th><td>{{result.StartManagedMemoryMegabytes:F1}} MB / {{result.EndManagedMemoryMegabytes:F1}} MB</td></tr>
             <tr><th>Working set start/end/peak</th><td>{{result.StartWorkingSetMegabytes:F1}} MB / {{result.EndWorkingSetMegabytes:F1}} MB / {{result.PeakWorkingSetMegabytes:F1}} MB</td></tr>
@@ -279,7 +389,7 @@ public static class SoakTestService
 
           <h2>Cycle Samples</h2>
           <p>First 200 cycle records are shown for readability. Full stability summary is in the metrics above.</p>
-          <table><tr><th>Cycle</th><th>Frame</th><th>Image</th><th>Verdict</th><th>Total time</th><th>Status</th><th>Message</th></tr>{{cycleRows}}</table>
+          <table><tr><th>Cycle</th><th>UTC timestamp</th><th>Frame</th><th>Image</th><th>Engine</th><th>Verdict</th><th>Total time</th><th>Working set</th><th>Status</th><th>Error / Message</th></tr>{{cycleRows}}</table>
         </body>
         </html>
         """;
@@ -296,6 +406,39 @@ public static class SoakTestService
 
     private static double BytesToMegabytes(long bytes)
         => bytes / 1024.0 / 1024.0;
+
+    private static double CurrentWorkingSetMegabytes(Process process)
+    {
+        process.Refresh();
+        return BytesToMegabytes(process.WorkingSet64);
+    }
+
+    public static double Percentile(IEnumerable<double> values, double percentile)
+    {
+        var ordered = values.Where(value => value >= 0).OrderBy(value => value).ToArray();
+        if (ordered.Length == 0)
+            return 0;
+
+        var rank = Math.Clamp(percentile, 0, 1) * (ordered.Length - 1);
+        var lower = (int)Math.Floor(rank);
+        var upper = (int)Math.Ceiling(rank);
+        if (lower == upper)
+            return ordered[lower];
+
+        var weight = rank - lower;
+        return ordered[lower] + ((ordered[upper] - ordered[lower]) * weight);
+    }
+
+    private static SoakTestProfile InferProfile(TimeSpan duration)
+    {
+        if (duration == TimeSpan.FromMinutes(5))
+            return SoakTestProfile.QuickSmoke;
+        if (duration == TimeSpan.FromMinutes(30))
+            return SoakTestProfile.ShortStability;
+        if (duration == TimeSpan.FromHours(8))
+            return SoakTestProfile.FactoryPoc;
+        return SoakTestProfile.Custom;
+    }
 
     private static string FormatMilliseconds(double value)
         => value <= 0 ? "--" : $"{value:F0} ms";

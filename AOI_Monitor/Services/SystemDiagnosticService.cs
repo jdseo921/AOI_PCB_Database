@@ -179,8 +179,28 @@ public static class SystemDiagnosticService
     {
         AddIntegration(report, "Lighting", IntegrationBoundaryRegistry.LightingController, "Lighting is optional for Stage 1. Simulated or NotConnected is acceptable.");
         AddIntegration(report, "Robot", IntegrationBoundaryRegistry.RobotController, "Robot/handler is optional for Stage 1. Simulated or NotConnected is acceptable.");
-        AddIntegration(report, "MES / Traceability", IntegrationBoundaryRegistry.MesClient, "MES writeback is optional for Stage 1. Local exports remain available.");
+        AddMesReadiness(report);
         AddIntegration(report, "E-Stop", IntegrationBoundaryRegistry.EmergencyStopMonitor, "No safety-certified interlock is claimed in this prototype.");
+    }
+
+    private static void AddMesReadiness(SystemDiagnosticReport report)
+    {
+        var readiness = MesSpoolService.EvaluateReadiness();
+        var status = readiness.Status switch
+        {
+            "MES REST Ready" or "MES Mock Only" or "MES Not Configured" => DiagnosticStatus.OK,
+            "MES Queue Pending" => DiagnosticStatus.Warn,
+            _ => DiagnosticStatus.Error,
+        };
+        Add(
+            report,
+            "MES / Traceability",
+            "MES REST / spool readiness",
+            status,
+            $"{readiness.Status}; mode={readiness.Mode}; pending={readiness.PendingCount}; failed={readiness.FailedCount}; sent={readiness.SentCount}; abandoned={readiness.AbandonedCount}",
+            readiness.PendingCount > 0 || readiness.FailedCount > 0
+                ? "Open Log & Export > MES Queue and retry or resolve failed spool items."
+                : "MES writeback is optional for Stage 1. Local exports remain available.");
     }
 
     private static void AddModelRegistryChecks(SystemDiagnosticReport report)

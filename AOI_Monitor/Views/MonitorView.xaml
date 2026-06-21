@@ -95,6 +95,7 @@
                   <TextBlock x:Name="RobotCycleModeText" Text="No real robot connected" Foreground="#9AA6AF" FontSize="11" Margin="0,0,14,0"/>
                   <TextBlock x:Name="RobotCycleTimeText" Text="Last cycle --" Foreground="#9AA6AF" FontSize="11"/>
                 </WrapPanel>
+                <TextBlock x:Name="RobotAcceptanceStatusText" Text="Robot acceptance: not validated" Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,4,0,0"/>
                 <TextBlock x:Name="RobotFaultText" Text="Fault: none" Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap" Margin="0,4,0,0"/>
               </StackPanel>
               <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="12,0,0,0">
@@ -104,7 +105,9 @@
                 <Button x:Name="RobotCancelButton" Style="{StaticResource MiniBtn}" Content="Cancel" Margin="0,0,5,0" Click="OnRobotCancelClick"/>
                 <Button x:Name="RobotResetButton" Style="{StaticResource MiniBtn}" Content="Reset" Margin="0,0,5,0" Click="OnRobotResetClick"/>
                 <Button x:Name="RobotEmergencyStopButton" Style="{StaticResource MiniBtn}" Content="E-Stop Sim" Margin="0,0,5,0" Click="OnRobotEmergencyStopClick"/>
-                <Button x:Name="RunRobotCycleButton" Style="{StaticResource MiniBtn}" Content="Run Cycle" Click="OnRobotCycleClick"/>
+                <Button x:Name="RunRobotCycleButton" Style="{StaticResource MiniBtn}" Content="Run Cycle" Margin="0,0,5,0" Click="OnRobotCycleClick"/>
+                <Button x:Name="RunRobotAcceptanceButton" Style="{StaticResource MiniBtn}" Content="Run Robot Acceptance Test" Margin="0,0,5,0" Click="OnRobotAcceptanceClick"/>
+                <Button x:Name="ExportRobotAcceptanceButton" Style="{StaticResource MiniBtn}" Content="Export Report" Click="OnExportRobotAcceptanceClick"/>
               </WrapPanel>
             </Grid>
           </Border>

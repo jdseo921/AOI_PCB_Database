@@ -33,6 +33,9 @@ public sealed class CustomerValidationPackageRequest
     public IReadOnlyCollection<BatchTestRow> Rows { get; init; } = Array.Empty<BatchTestRow>();
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
     public ValidationAcceptanceCriteria Criteria { get; init; } = new();
+    public ValidationDatasetQualityCriteria DatasetQualityCriteria { get; init; } = new();
+    public DatasetQualitySummary? DatasetQualitySummary { get; init; }
+    public FalseCallReductionRun? FalseCallReductionRun { get; init; }
 }
 
 public sealed class CustomerValidationPackageResult
@@ -84,7 +87,8 @@ public static class CustomerValidationPackageService
         BatchPerformanceSummary performance,
         int totalRows,
         bool isFormalManifest,
-        ValidationAcceptanceCriteria? criteria = null)
+        ValidationAcceptanceCriteria? criteria = null,
+        DatasetQualitySummary? datasetQuality = null)
     {
         criteria ??= new ValidationAcceptanceCriteria();
         var messages = new List<string>();
@@ -119,6 +123,19 @@ public static class CustomerValidationPackageService
             messages.Add("Formal validation manifest was not present; acceptance is conditional until manifest evidence is supplied.");
         if (criteria.RequireFormalManifest && !isFormalManifest)
             failures.Add("Formal validation manifest is required by the active criteria.");
+        if (datasetQuality is not null)
+        {
+            if (string.Equals(datasetQuality.Status, "FAIL", StringComparison.OrdinalIgnoreCase))
+            {
+                failures.Add("Dataset quality gate failed; validation package cannot be accepted as PASS.");
+                messages.AddRange(datasetQuality.BlockingFailures);
+            }
+            else if (string.Equals(datasetQuality.Status, "CONDITIONAL", StringComparison.OrdinalIgnoreCase))
+            {
+                messages.Add("Dataset quality gate is conditional; validation package cannot be accepted as PASS.");
+                messages.AddRange(datasetQuality.Warnings);
+            }
+        }
 
         var status = failures.Count > 0
             ? "FAIL"
@@ -136,6 +153,7 @@ public static class CustomerValidationPackageService
             MetricsComputed = metricsComputed,
             FormalManifestPresent = isFormalManifest,
             NumericGatesPassed = failures.Count == 0,
+            DatasetQualityStatus = datasetQuality?.Status ?? "CONDITIONAL",
             Messages = allMessages,
         };
     }
@@ -156,6 +174,7 @@ public static class CustomerValidationPackageService
         Directory.CreateDirectory(packageFolder);
 
         var csvPath = Path.Combine(packageFolder, "validation_results.csv");
+        var breakdownCsvPath = Path.Combine(packageFolder, "validation_breakdown.csv");
         var reportPath = Path.Combine(packageFolder, "customer_validation_report.html");
         var instructionsPath = Path.Combine(packageFolder, "print_to_pdf_instructions.txt");
         var readmePath = Path.Combine(packageFolder, "README.txt");
@@ -163,6 +182,12 @@ public static class CustomerValidationPackageService
         var annotatedFolder = Path.Combine(packageFolder, "annotated_images");
 
         File.WriteAllText(csvPath, BatchValidationService.BuildResultsCsv(rows), Encoding.UTF8);
+        var breakdownSummary = ClassMetricsService.Calculate(rows);
+        var datasetQuality = request.DatasetQualitySummary ?? DatasetQualityService.Analyze(rows, null, request.DatasetQualityCriteria);
+        var cameraAcceptance = CameraAcceptanceTestService.ToSummary(AoiDatabase.GetLatestCameraAcceptanceRun(realHardwareOnly: true));
+        var robotAcceptance = RobotAcceptanceTestService.ToSummary(AoiDatabase.GetLatestRobotAcceptanceRun());
+        var mesReadiness = MesSpoolService.EvaluateReadiness();
+        File.WriteAllText(breakdownCsvPath, ClassMetricsService.BuildCsv(breakdownSummary), Encoding.UTF8);
         cancellationToken.ThrowIfCancellationRequested();
 
         var assetResult = ValidationReportAssetService.ExportSampleAnnotatedImages(
@@ -182,7 +207,8 @@ public static class CustomerValidationPackageService
             request.PerformanceSummary,
             rows.Length,
             request.IsFormalManifest,
-            criteria);
+            criteria,
+            datasetQuality);
 
         var reportContext = new CustomerValidationReportContext
         {
@@ -210,13 +236,19 @@ public static class CustomerValidationPackageService
             Rows = rows,
             SampleAnnotatedImages = assetResult.Images,
             Warnings = warnings,
+            FalseCallRecommendation = FalseCallReductionService.ToSummary(request.FalseCallReductionRun),
+            BreakdownSummary = breakdownSummary,
+            DatasetQualitySummary = datasetQuality,
+            CameraAcceptanceSummary = cameraAcceptance,
+            RobotAcceptanceSummary = robotAcceptance,
+            MesReadinessSummary = mesReadiness,
         };
 
         File.WriteAllText(reportPath, CustomerValidationReportService.BuildHtml(reportContext), Encoding.UTF8);
         File.WriteAllText(instructionsPath, CustomerValidationReportService.BuildPrintToPdfInstructions(reportPath), Encoding.UTF8);
         File.WriteAllText(readmePath, BuildReadme(packageId, acceptance, warnings), Encoding.UTF8);
 
-        var manifest = BuildManifest(request, criteria, acceptance, warnings, generatedAtUtc, packageId);
+        var manifest = BuildManifest(request, criteria, acceptance, warnings, generatedAtUtc, packageId, breakdownSummary, datasetQuality, cameraAcceptance, robotAcceptance, mesReadiness);
         manifest.IncludedFiles = EnumerateIncludedFiles(packageFolder).ToList();
         WriteManifest(manifestPath, manifest);
         manifest.IncludedFiles = EnumerateIncludedFiles(packageFolder).ToList();
@@ -251,7 +283,12 @@ public static class CustomerValidationPackageService
         ValidationAcceptanceSummary acceptance,
         IReadOnlyList<string> warnings,
         DateTime generatedAtUtc,
-        string packageId)
+        string packageId,
+        ValidationBreakdownSummary breakdownSummary,
+        DatasetQualitySummary datasetQuality,
+        CameraAcceptanceSummary cameraAcceptance,
+        RobotAcceptanceSummary robotAcceptance,
+        MesReadinessSummary mesReadiness)
     {
         return new ValidationPackageManifest
         {
@@ -259,6 +296,7 @@ public static class CustomerValidationPackageService
             PackageId = packageId,
             GeneratedAtUtc = generatedAtUtc,
             AppVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0",
+            DeploymentProfile = DeploymentProfileSettingsService.Load().ToString(),
             StationId = request.StationId,
             OperatorId = request.OperatorId,
             BoardModel = request.BoardModel,
@@ -300,8 +338,14 @@ public static class CustomerValidationPackageService
                 CountOverOneSecond = request.PerformanceSummary.CountOverOneSecond,
                 TimedImageCount = request.PerformanceSummary.TimedImageCount,
             },
+            BreakdownSummary = breakdownSummary,
+            DatasetQualitySummary = datasetQuality,
+            CameraAcceptanceSummary = cameraAcceptance,
+            RobotAcceptanceSummary = robotAcceptance,
+            MesReadinessSummary = mesReadiness,
             AcceptanceStatus = acceptance.Status,
             Criteria = criteria,
+            FalseCallRecommendation = FalseCallReductionService.ToSummary(request.FalseCallReductionRun),
             Warnings = warnings.Concat(acceptance.Messages).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             Limitations = CustomerValidationReportContext.DefaultPrototypeLimitations.ToList(),
         };
@@ -327,6 +371,8 @@ public static class CustomerValidationPackageService
             return "Manifest";
         if (string.Equals(fileName, "validation_results.csv", StringComparison.OrdinalIgnoreCase))
             return "CSV results";
+        if (string.Equals(fileName, "validation_breakdown.csv", StringComparison.OrdinalIgnoreCase))
+            return "CSV validation breakdown";
         if (string.Equals(fileName, "customer_validation_report.html", StringComparison.OrdinalIgnoreCase))
             return "HTML report";
         if (string.Equals(fileName, "print_to_pdf_instructions.txt", StringComparison.OrdinalIgnoreCase))
@@ -362,6 +408,7 @@ public static class CustomerValidationPackageService
         Contents:
         - validation_manifest.json: versioned manifest and acceptance summary.
         - validation_results.csv: per-image validation results exported from the batch run.
+        - validation_breakdown.csv: per-class, per-side, and per-ROI validation breakdown.
         - customer_validation_report.html: browser-readable customer validation report.
         - print_to_pdf_instructions.txt: browser print-to-PDF workflow.
         - annotated_images/: generated overlays only. Raw source customer datasets are not copied into this package.

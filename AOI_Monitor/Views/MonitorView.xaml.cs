@@ -23,6 +23,7 @@ public partial class MonitorView : UserControl
     private readonly SimulatedRobotController _robotController = new();
     private readonly SimulatedEmergencyStopMonitor _emergencyStopMonitor;
     private readonly RobotCycleService _robotCycleService;
+    private RobotAcceptanceRun? _lastRobotAcceptanceRun;
 
     private ICameraSource _cameraSource = CameraSourceFactory.ActiveSource;
     private bool _isRunning;
@@ -307,6 +308,61 @@ public partial class MonitorView : UserControl
         finally
         {
             EndRobotOperation();
+        }
+    }
+
+    private async void OnRobotAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryBeginRobotOperation("ROBOT ACCEPTANCE", out var token))
+            return;
+
+        try
+        {
+            RobotAcceptanceStatusText.Text = "Robot acceptance: running...";
+            var run = await RobotAcceptanceTestService.RunAsync(progress: new Progress<string>(message => RobotAcceptanceStatusText.Text = message), cancellationToken: token);
+            AoiDatabase.RecordRobotAcceptanceRun(run, WorkflowState.Instance.OperatorWithRole);
+            _lastRobotAcceptanceRun = run;
+            RobotAcceptanceStatusText.Text = BuildRobotAcceptanceStatus(run);
+            LogEvent("ROBOT ACCEPTANCE", RobotAcceptanceStatusText.Text);
+            MessageBox.Show(
+                RobotAcceptanceStatusText.Text,
+                "Robot Acceptance Test",
+                MessageBoxButton.OK,
+                run.Status == "FAIL" ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+        catch (OperationCanceledException)
+        {
+            RobotAcceptanceStatusText.Text = "Robot acceptance: canceled";
+            LogEvent("ROBOT ACCEPTANCE", "Robot acceptance canceled.");
+        }
+        finally
+        {
+            EndRobotOperation();
+        }
+    }
+
+    private void OnExportRobotAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        var run = _lastRobotAcceptanceRun ?? AoiDatabase.GetLatestRobotAcceptanceRun();
+        if (run is null)
+        {
+            MessageBox.Show("No robot acceptance run is available to export.", "Robot Acceptance", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var export = RobotAcceptanceTestService.ExportReport(run);
+            LogEvent("ROBOT ACCEPTANCE", $"Robot acceptance report exported: {Path.GetFileName(export.JsonPath)}.");
+            MessageBox.Show(
+                $"Robot acceptance report exported.\n\nJSON: {export.JsonPath}\nHTML: {export.HtmlPath}",
+                "Robot Acceptance",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            MessageBox.Show($"Robot acceptance export failed:\n{ex.Message}", "Robot Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -868,6 +924,18 @@ public partial class MonitorView : UserControl
             ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9AA6AF"))
             : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F27777"));
 
+        var latestAcceptance = _lastRobotAcceptanceRun ?? AoiDatabase.GetLatestRobotAcceptanceRun();
+        RobotAcceptanceStatusText.Text = latestAcceptance is null
+            ? "Robot acceptance: not validated"
+            : BuildRobotAcceptanceStatus(latestAcceptance);
+        RobotAcceptanceStatusText.Foreground = latestAcceptance?.Status switch
+        {
+            "PASS" => Brushes.LightGreen,
+            "WARN" => Brushes.Gold,
+            "FAIL" => Brushes.IndianRed,
+            _ => Brushes.Gold,
+        };
+
         RobotLoadButton.IsEnabled = !busy && (state is RobotCycleState.Idle or RobotCycleState.Completed or RobotCycleState.Canceled);
         RobotInspectButton.IsEnabled = !busy && (state is RobotCycleState.Loaded or RobotCycleState.ReadyToInspect);
         RobotUnloadButton.IsEnabled = !busy && (state is RobotCycleState.Loaded or RobotCycleState.ReadyToInspect or RobotCycleState.Inspecting);
@@ -875,6 +943,16 @@ public partial class MonitorView : UserControl
         RobotResetButton.IsEnabled = !busy;
         RobotEmergencyStopButton.IsEnabled = controller is SimulatedRobotController;
         RunRobotCycleButton.IsEnabled = !busy && (state is RobotCycleState.Idle or RobotCycleState.Completed or RobotCycleState.Canceled);
+        RunRobotAcceptanceButton.IsEnabled = !busy && (state is RobotCycleState.Idle or RobotCycleState.Completed or RobotCycleState.Canceled);
+        ExportRobotAcceptanceButton.IsEnabled = !busy;
+    }
+
+    private static string BuildRobotAcceptanceStatus(RobotAcceptanceRun run)
+    {
+        var boundary = run.SourceKind == "Simulated"
+            ? " Simulation evidence only; no production robot movement was validated."
+            : string.Empty;
+        return $"Robot acceptance: {run.Status}; {run.SourceKind}; full cycle {run.FullCycleMs:F0} ms; e-stop {(run.EmergencyStopBlocked ? "blocked" : "not verified")}; invalid transition {(run.InvalidTransitionRejected ? "rejected" : "not verified")}.{boundary}";
     }
 
     private string CurrentBoardId()

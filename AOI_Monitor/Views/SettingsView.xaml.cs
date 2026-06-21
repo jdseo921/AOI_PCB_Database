@@ -19,6 +19,11 @@ public partial class SettingsView : UserControl
 {
     private readonly MainViewModel _vm;
     private readonly ObservableCollection<ModelRegistryRow> _modelRegistryRows = new();
+    private readonly ObservableCollection<ThresholdProfileRow> _thresholdProfileRows = new();
+    private CancellationTokenSource? _cameraAcceptanceCancellation;
+    private CameraAcceptanceRun? _lastCameraAcceptanceRun;
+    private CancellationTokenSource? _lightingAcceptanceCancellation;
+    private LightingAcceptanceRun? _lastLightingAcceptanceRun;
     private bool _isKorean;
 
     public SettingsView(MainViewModel vm)
@@ -26,6 +31,7 @@ public partial class SettingsView : UserControl
         InitializeComponent();
         _vm = vm;
         ModelRegistryGrid.ItemsSource = _modelRegistryRows;
+        ThresholdProfilesGrid.ItemsSource = _thresholdProfileRows;
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -40,6 +46,7 @@ public partial class SettingsView : UserControl
         LightingSettingsService.SettingsChanged += OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
         RefreshWorkflowUi();
+        RefreshThresholdProfilesUi();
         ApplyLanguageVisuals();
         ApplyFontPreset();
     }
@@ -72,6 +79,8 @@ public partial class SettingsView : UserControl
         var newLighting = BuildLightingSettingsFromUi();
         var existingMes = MesIntegrationSettingsService.Load();
         var newMes = BuildMesIntegrationSettingsFromUi();
+        var existingDeploymentProfile = DeploymentProfileSettingsService.Load();
+        var newDeploymentProfile = ComboToDeploymentProfile(DeploymentProfileCombo.SelectedIndex);
         var newStorageRoot = string.IsNullOrWhiteSpace(StorageRootText.Text)
             ? AoiDatabase.DefaultStorageRoot
             : StorageRootText.Text.Trim();
@@ -130,11 +139,12 @@ public partial class SettingsView : UserControl
             !string.Equals(existingLighting.BottomProgram, newLighting.BottomProgram, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingLighting.CommandTemplate, newLighting.CommandTemplate, StringComparison.Ordinal) ||
             existingLighting.ResponseTimeoutMs != newLighting.ResponseTimeoutMs;
+        var deploymentProfileChanged = existingDeploymentProfile != newDeploymentProfile;
         var thresholdChanged =
             ComboToPriority(DetectionPriorityCombo.SelectedIndex) != state.DetectionPriority ||
             Math.Abs(existingConfig.ConfidenceThreshold - newConfig.ConfidenceThreshold) > 0.0001;
 
-        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || lightingConfigChanged || mesConfigChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, camera source, lighting sync, or MES integration settings"))
+        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || lightingConfigChanged || mesConfigChanged || deploymentProfileChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, deployment target, camera source, lighting sync, or MES integration settings"))
             return;
 
         if (thresholdChanged && !Authorize(RoleAuthorization.CanChangeThresholds, "Changing inspection thresholds or detection priority"))
@@ -149,6 +159,8 @@ public partial class SettingsView : UserControl
         SaveCameraSourceSettings(newCamera);
         SaveLightingSettings(newLighting);
         SaveMesIntegrationSettings(newMes);
+        if (deploymentProfileChanged)
+            DeploymentProfileSettingsService.Save(newDeploymentProfile);
 
         if (!state.TrySetDetectionPriority(ComboToPriority(DetectionPriorityCombo.SelectedIndex), out var message))
         {
@@ -169,6 +181,7 @@ public partial class SettingsView : UserControl
         LangCombo.SelectedIndex = 0;
         FontCombo.SelectedIndex = 1;
         DetectionPriorityCombo.SelectedIndex = 0;
+        DeploymentProfileCombo.SelectedIndex = 0;
         InspectionEngineCombo.SelectedIndex = 0;
         ModelPathText.Text = string.Empty;
         StorageRootText.Text = AoiDatabase.DefaultStorageRoot;
@@ -221,6 +234,7 @@ public partial class SettingsView : UserControl
         MesRetryBackoffText.Text = "500";
         MesAutoUploadCheck.IsChecked = false;
         MesIntegrationSettingsService.Save(new MesIntegrationSettings());
+        DeploymentProfileSettingsService.Save(DeploymentProfile.Stage1ImageValidation);
 
         ApplyLanguageVisuals();
         ApplyFontPreset();
@@ -526,6 +540,111 @@ public partial class SettingsView : UserControl
             source.ConnectionStatus is CameraSourceStatus.Ready or CameraSourceStatus.Simulated ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
 
+    private async void OnRunCameraAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Running camera acceptance test"))
+            return;
+
+        if (_cameraAcceptanceCancellation is not null)
+            return;
+
+        var settings = BuildCameraSourceSettingsFromUi();
+        var criteria = new CameraAcceptanceCriteria
+        {
+            FramesPerView = 5,
+            RequiredViews = new() { "Top", "Side", "Bottom" },
+        };
+        _cameraAcceptanceCancellation = new CancellationTokenSource();
+        RefreshRoleControls();
+        CameraAcceptanceStatusText.Text = "Acceptance: RUNNING";
+        CameraAcceptanceStatusText.Foreground = Brushes.Gold;
+        CameraDiagnosticsText.Text = "Camera acceptance test running...";
+
+        var progress = new Progress<string>(message => CameraDiagnosticsText.Text = message);
+        try
+        {
+            var token = _cameraAcceptanceCancellation.Token;
+            var run = await Task.Run(() => CameraAcceptanceTestService.Run(settings, criteria, progress: progress, cancellationToken: token), token);
+            AoiDatabase.RecordCameraAcceptanceRun(run, WorkflowState.Instance.OperatorWithRole);
+            _lastCameraAcceptanceRun = run;
+            WorkflowState.Instance.AddEvent("CAMERA_ACCEPTANCE", $"Camera acceptance: {run.Status}; readiness {run.FactoryReadinessStatus}; frames {run.TotalReceivedFrames}/{run.TotalRequestedFrames}.");
+            CameraAcceptanceStatusText.Text = $"Acceptance: {run.Status} / {run.FactoryReadinessStatus}";
+            CameraAcceptanceStatusText.Foreground = run.Status switch
+            {
+                "PASS" => Brushes.LightGreen,
+                "WARN" => Brushes.Gold,
+                _ => Brushes.IndianRed,
+            };
+            CameraDiagnosticsText.Text = BuildCameraAcceptanceUiSummary(run);
+            MessageBox.Show(
+                CameraDiagnosticsText.Text,
+                "Camera Acceptance Test",
+                MessageBoxButton.OK,
+                run.Status == "FAIL" ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+        catch (OperationCanceledException)
+        {
+            CameraAcceptanceStatusText.Text = "Acceptance: CANCELED";
+            CameraAcceptanceStatusText.Foreground = Brushes.Gold;
+            CameraDiagnosticsText.Text = "Camera acceptance test canceled.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            CameraAcceptanceStatusText.Text = "Acceptance: ERROR";
+            CameraAcceptanceStatusText.Foreground = Brushes.IndianRed;
+            CameraDiagnosticsText.Text = $"Camera acceptance failed: {ex.Message}";
+            MessageBox.Show(CameraDiagnosticsText.Text, "Camera Acceptance Test", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _cameraAcceptanceCancellation?.Dispose();
+            _cameraAcceptanceCancellation = null;
+            RefreshRoleControls();
+        }
+    }
+
+    private void OnCancelCameraAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        _cameraAcceptanceCancellation?.Cancel();
+    }
+
+    private void OnExportCameraAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Exporting camera acceptance report"))
+            return;
+
+        var run = _lastCameraAcceptanceRun ?? AoiDatabase.GetLatestCameraAcceptanceRun();
+        if (run is null)
+        {
+            MessageBox.Show("No camera acceptance run is available to export.", "Camera Acceptance", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var export = CameraAcceptanceTestService.ExportReport(run);
+            WorkflowState.Instance.AddEvent("CAMERA_ACCEPTANCE_EXPORT", $"Camera acceptance report exported: {Path.GetFileName(export.JsonPath)}.");
+            MessageBox.Show(
+                $"Camera acceptance report exported.\n\nJSON: {export.JsonPath}\nHTML: {export.HtmlPath}",
+                "Camera Acceptance",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            MessageBox.Show($"Camera acceptance export failed:\n{ex.Message}", "Camera Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static string BuildCameraAcceptanceUiSummary(CameraAcceptanceRun run)
+    {
+        var firstMessage = run.Failures.Concat(run.Warnings).FirstOrDefault();
+        var evidenceBoundary = run.IsRealHardware
+            ? "Real hardware acceptance evidence recorded."
+            : "Simulation-only evidence; real GigE/USB3 camera readiness is NOT VALIDATED.";
+        return $"Camera acceptance {run.Status}; readiness {run.FactoryReadinessStatus}; frames {run.TotalReceivedFrames}/{run.TotalRequestedFrames}; dropped {run.DroppedFrameCount}; trigger failures {run.TriggerFailureCount}; timeouts {run.TimeoutCount}. {evidenceBoundary} {firstMessage}";
+    }
+
     private void OnOpenTrainingFolderClick(object sender, RoutedEventArgs e)
     {
         var trainingDir = AoiDatabase.TrainingVaultPath;
@@ -551,6 +670,7 @@ public partial class SettingsView : UserControl
         };
 
         ReviewDefaultText.Text = DetectionPriorityDisplay(state.DetectionPriority, _isKorean);
+        DeploymentProfileCombo.SelectedIndex = DeploymentProfileToCombo(DeploymentProfileSettingsService.Load());
         TrainingStatusText.Text = state.Training.IsRunning ? "RUNNING" : "IDLE";
         TrainingQueueText.Text = state.Training.QueuedSamples.ToString();
         TrainingEpochText.Text = state.Training.EpochsCompleted.ToString();
@@ -574,6 +694,7 @@ public partial class SettingsView : UserControl
         var canChangeThresholds = RoleAuthorization.CanChangeThresholds(role);
 
         DetectionPriorityCombo.IsEnabled = canChangeThresholds;
+        DeploymentProfileCombo.IsEnabled = canManageSettings;
         InspectionEngineCombo.IsEnabled = canManageSettings;
         CameraSourceCombo.IsEnabled = canManageSettings;
         CameraTopFolderText.IsEnabled = canManageSettings;
@@ -599,6 +720,9 @@ public partial class SettingsView : UserControl
         LightingBottomProgramText.IsEnabled = canManageSettings;
         LightingCommandTemplateText.IsEnabled = canManageSettings;
         LightingTimeoutMsText.IsEnabled = canManageSettings;
+        RunLightingAcceptanceBtn.IsEnabled = canManageSettings && _lightingAcceptanceCancellation is null;
+        CancelLightingAcceptanceBtn.IsEnabled = _lightingAcceptanceCancellation is not null;
+        ExportLightingAcceptanceBtn.IsEnabled = canManageSettings;
         StorageRootText.IsEnabled = canManageSettings;
         BrowseStorageRootBtn.IsEnabled = canManageSettings;
         MesModeCombo.IsEnabled = canManageSettings;
@@ -621,6 +745,9 @@ public partial class SettingsView : UserControl
         BrowseCameraSideBtn.IsEnabled = canManageSettings;
         BrowseCameraBottomBtn.IsEnabled = canManageSettings;
         TestCameraSourceBtn.IsEnabled = canManageSettings;
+        RunCameraAcceptanceBtn.IsEnabled = canManageSettings && _cameraAcceptanceCancellation is null;
+        CancelCameraAcceptanceBtn.IsEnabled = _cameraAcceptanceCancellation is not null;
+        ExportCameraAcceptanceBtn.IsEnabled = canManageSettings;
         TestLightingBtn.IsEnabled = canManageSettings;
         ModelPathText.IsEnabled = canManageSettings;
         ModelVersionText.IsEnabled = canManageSettings;
@@ -638,6 +765,72 @@ public partial class SettingsView : UserControl
         ConfidenceThresholdText.IsEnabled = canChangeThresholds;
         TestModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
         ValidateRegisteredModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
+        ApproveThresholdProfileBtn.IsEnabled = canChangeThresholds;
+        DeployThresholdProfileBtn.IsEnabled = canChangeThresholds;
+    }
+
+    private void RefreshThresholdProfilesUi()
+    {
+        var selected = (ThresholdProfilesGrid.SelectedItem as ThresholdProfileRow)?.ProfileId;
+        _thresholdProfileRows.Clear();
+        try
+        {
+            foreach (var profile in AoiDatabase.GetThresholdProfiles())
+                _thresholdProfileRows.Add(new ThresholdProfileRow(profile));
+
+            if (!string.IsNullOrWhiteSpace(selected))
+                ThresholdProfilesGrid.SelectedItem = _thresholdProfileRows.FirstOrDefault(row => row.ProfileId == selected);
+
+            var active = AoiDatabase.GetActiveThresholdProfile("ANY", WorkflowState.Instance.BoardProgram, "ANY")
+                ?? AoiDatabase.GetActiveThresholdProfile("ANY", "ANY", "ANY");
+            ActiveThresholdProfileText.Text = active is null
+                ? "Active profile: none"
+                : $"Active profile: {active.ProfileId} / {active.Revision} ({active.Status})";
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        {
+            ActiveThresholdProfileText.Text = $"Active profile: unavailable ({ex.Message})";
+        }
+    }
+
+    private void OnApproveThresholdProfileClick(object sender, RoutedEventArgs e)
+    {
+        if (ThresholdProfilesGrid.SelectedItem is not ThresholdProfileRow row)
+        {
+            MessageBox.Show("Select a threshold profile first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            ThresholdProfileService.ApproveProfile(row.ProfileId, row.Revision, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
+            RefreshThresholdProfilesUi();
+            MessageBox.Show("Threshold profile approved.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(ex.Message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnDeployThresholdProfileClick(object sender, RoutedEventArgs e)
+    {
+        if (ThresholdProfilesGrid.SelectedItem is not ThresholdProfileRow row)
+        {
+            MessageBox.Show("Select a threshold profile first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            ThresholdProfileService.DeployProfile(row.ProfileId, row.Revision, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
+            RefreshThresholdProfilesUi();
+            MessageBox.Show("Threshold profile deployed.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(ex.Message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void RefreshInspectionConfigurationUi()
@@ -848,7 +1041,20 @@ public partial class SettingsView : UserControl
         var source = CameraSourceFactory.Create(settings);
         CameraSourceStatusText.Text = $"Camera: {CameraStatusDisplay(source.ConnectionStatus)}";
         CameraSourceStatusText.Foreground = StatusBrush(source.ConnectionStatus);
-        CameraDiagnosticsText.Text = source.StatusMessage;
+        var latest = _lastCameraAcceptanceRun ?? AoiDatabase.GetLatestCameraAcceptanceRun();
+        CameraAcceptanceStatusText.Text = latest is null
+            ? "Acceptance: Not validated"
+            : $"Acceptance: {latest.Status} / {latest.FactoryReadinessStatus}";
+        CameraAcceptanceStatusText.Foreground = latest?.Status switch
+        {
+            "PASS" => Brushes.LightGreen,
+            "WARN" => Brushes.Gold,
+            "FAIL" => Brushes.IndianRed,
+            _ => Brushes.Gold,
+        };
+        CameraDiagnosticsText.Text = latest is null
+            ? source.StatusMessage
+            : $"{source.StatusMessage} Latest acceptance: {latest.Status}; readiness {latest.FactoryReadinessStatus}; frames {latest.TotalReceivedFrames}/{latest.TotalRequestedFrames}.";
     }
 
     private CameraSourceSettings BuildCameraSourceSettingsFromUi()
@@ -931,9 +1137,23 @@ public partial class SettingsView : UserControl
         LightingSettingsStatusText.Text = $"Lighting: {IntegrationStatusDisplay(controller.Status)}";
         LightingSettingsStatusText.Foreground = IntegrationStatusBrush(controller.Status);
         var validation = LightingSettingsService.Validate(settings);
-        LightingDiagnosticsText.Text = validation.Count == 0
+        var latest = _lastLightingAcceptanceRun ?? AoiDatabase.GetLatestLightingAcceptanceRun();
+        LightingAcceptanceStatusText.Text = latest is null
+            ? "Sync: Not validated"
+            : $"Sync: {latest.Status} ({(latest.IsSimulated ? "simulated" : "configured")})";
+        LightingAcceptanceStatusText.Foreground = latest?.Status switch
+        {
+            "PASS" => Brushes.LightGreen,
+            "WARN" => Brushes.Gold,
+            "FAIL" => Brushes.IndianRed,
+            _ => Brushes.Gold,
+        };
+        var baseMessage = validation.Count == 0
             ? controller.StatusMessage
             : string.Join(" ", validation);
+        LightingDiagnosticsText.Text = latest is null
+            ? baseMessage
+            : $"{baseMessage} Latest sync acceptance: {latest.Status}; steps {latest.PassedStepCount}/{latest.StepCount}; simulated={latest.IsSimulated}.";
     }
 
     private async void OnTestLightingClick(object sender, RoutedEventArgs e)
@@ -960,6 +1180,119 @@ public partial class SettingsView : UserControl
             "Lighting Test",
             MessageBoxButton.OK,
             result.Status is IntegrationConnectionStatus.Ready or IntegrationConnectionStatus.Simulated ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
+    private async void OnRunLightingAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Running lighting sync acceptance test"))
+            return;
+
+        if (_lightingAcceptanceCancellation is not null)
+            return;
+
+        var settings = BuildLightingSettingsFromUi();
+        var validation = LightingSettingsService.Validate(settings);
+        if (validation.Count > 0)
+        {
+            LightingDiagnosticsText.Text = string.Join(" ", validation);
+            MessageBox.Show(LightingDiagnosticsText.Text, "Lighting Sync Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        _lightingAcceptanceCancellation = new CancellationTokenSource();
+        RefreshRoleControls();
+        LightingAcceptanceStatusText.Text = "Sync: RUNNING";
+        LightingAcceptanceStatusText.Foreground = Brushes.Gold;
+        LightingDiagnosticsText.Text = "Lighting sync acceptance test running...";
+
+        var progress = new Progress<string>(message => LightingDiagnosticsText.Text = message);
+        try
+        {
+            var token = _lightingAcceptanceCancellation.Token;
+            var run = await LightingAcceptanceTestService.RunAsync(
+                settings,
+                new LightingAcceptanceCriteria { RequiredViews = new() { "Top", "Side", "Bottom" } },
+                cameraSource: CameraSourceFactory.ActiveSource,
+                progress: progress,
+                cancellationToken: token);
+            AoiDatabase.RecordLightingAcceptanceRun(run, WorkflowState.Instance.OperatorWithRole);
+            _lastLightingAcceptanceRun = run;
+            WorkflowState.Instance.AddEvent("LIGHTING_ACCEPTANCE", $"Lighting sync acceptance: {run.Status}; steps {run.PassedStepCount}/{run.StepCount}; simulated={run.IsSimulated}.");
+            LightingAcceptanceStatusText.Text = $"Sync: {run.Status} ({(run.IsSimulated ? "simulated" : "configured")})";
+            LightingAcceptanceStatusText.Foreground = run.Status switch
+            {
+                "PASS" => Brushes.LightGreen,
+                "WARN" => Brushes.Gold,
+                _ => Brushes.IndianRed,
+            };
+            LightingDiagnosticsText.Text = BuildLightingAcceptanceUiSummary(run);
+            MessageBox.Show(
+                LightingDiagnosticsText.Text,
+                "Lighting Sync Acceptance",
+                MessageBoxButton.OK,
+                run.Status == "FAIL" ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+        catch (OperationCanceledException)
+        {
+            LightingAcceptanceStatusText.Text = "Sync: CANCELED";
+            LightingAcceptanceStatusText.Foreground = Brushes.Gold;
+            LightingDiagnosticsText.Text = "Lighting sync acceptance test canceled.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            LightingAcceptanceStatusText.Text = "Sync: ERROR";
+            LightingAcceptanceStatusText.Foreground = Brushes.IndianRed;
+            LightingDiagnosticsText.Text = $"Lighting sync acceptance failed: {ex.Message}";
+            MessageBox.Show(LightingDiagnosticsText.Text, "Lighting Sync Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _lightingAcceptanceCancellation?.Dispose();
+            _lightingAcceptanceCancellation = null;
+            RefreshRoleControls();
+        }
+    }
+
+    private void OnCancelLightingAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        _lightingAcceptanceCancellation?.Cancel();
+    }
+
+    private void OnExportLightingAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Exporting lighting sync acceptance report"))
+            return;
+
+        var run = _lastLightingAcceptanceRun ?? AoiDatabase.GetLatestLightingAcceptanceRun();
+        if (run is null)
+        {
+            MessageBox.Show("No lighting sync acceptance run is available to export.", "Lighting Sync Acceptance", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var export = LightingAcceptanceTestService.ExportReport(run);
+            WorkflowState.Instance.AddEvent("LIGHTING_ACCEPTANCE_EXPORT", $"Lighting sync acceptance report exported: {Path.GetFileName(export.JsonPath)}.");
+            MessageBox.Show(
+                $"Lighting sync acceptance report exported.\n\nJSON: {export.JsonPath}\nHTML: {export.HtmlPath}",
+                "Lighting Sync Acceptance",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            MessageBox.Show($"Lighting sync acceptance export failed:\n{ex.Message}", "Lighting Sync Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static string BuildLightingAcceptanceUiSummary(LightingAcceptanceRun run)
+    {
+        var firstMessage = run.Failures.Concat(run.Warnings).FirstOrDefault();
+        var boundary = run.IsSimulated
+            ? "Simulated result; real lighting controller readiness is not claimed."
+            : "Configured controller result; verify physical wiring and light output externally.";
+        return $"Lighting sync acceptance {run.Status}; steps {run.PassedStepCount}/{run.StepCount}; max command {run.MaxCommandLatencyMs:F1} ms; max trigger-to-frame {run.MaxTriggerToFrameLatencyMs:F1} ms. {boundary} {firstMessage}";
     }
 
     private LightingSettings BuildLightingSettingsFromUi()
@@ -1454,6 +1787,26 @@ public partial class SettingsView : UserControl
         _ => Models.DetectionPriority.MinimizeFalsePositives,
     };
 
+    private static DeploymentProfile ComboToDeploymentProfile(int selectedIndex) => selectedIndex switch
+    {
+        0 => DeploymentProfile.Stage1ImageValidation,
+        1 => DeploymentProfile.Stage2CameraPilot,
+        2 => DeploymentProfile.Stage3RobotPilot,
+        3 => DeploymentProfile.Stage4MesPilot,
+        4 => DeploymentProfile.FullFactoryAutomation,
+        _ => DeploymentProfile.Stage1ImageValidation,
+    };
+
+    private static int DeploymentProfileToCombo(DeploymentProfile profile) => profile switch
+    {
+        DeploymentProfile.Stage1ImageValidation => 0,
+        DeploymentProfile.Stage2CameraPilot => 1,
+        DeploymentProfile.Stage3RobotPilot => 2,
+        DeploymentProfile.Stage4MesPilot => 3,
+        DeploymentProfile.FullFactoryAutomation => 4,
+        _ => 0,
+    };
+
     private sealed class ModelRegistryRow
     {
         public ModelRegistryRow(ModelRegistryEntry entry)
@@ -1476,5 +1829,25 @@ public partial class SettingsView : UserControl
         public string ThresholdDisplay { get; }
         public string LastValidatedDisplay { get; }
         public string ActiveDisplay { get; }
+    }
+
+    private sealed class ThresholdProfileRow
+    {
+        public ThresholdProfileRow(ThresholdProfile profile)
+        {
+            ProfileId = profile.ProfileId;
+            Revision = profile.Revision;
+            BoardProgram = profile.BoardProgram;
+            RecipeName = profile.RecipeName;
+            Status = profile.Status;
+            RuleCount = profile.Rules.Count;
+        }
+
+        public string ProfileId { get; }
+        public string Revision { get; }
+        public string BoardProgram { get; }
+        public string RecipeName { get; }
+        public string Status { get; }
+        public int RuleCount { get; }
     }
 }

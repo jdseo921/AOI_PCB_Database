@@ -214,11 +214,13 @@ public static class AoiDatabase
             """
             INSERT INTO InspectionResults
                 (SampleImagePath, GoldenImagePath, BoardProgram, OperatorId, InspectionEngine, DifferenceScore, MeanBrightness, Verdict, Confidence,
-                 SuggestedDefect, PolicyName, ModelVersion, ModelFilePath, ConfidenceThreshold, DecisionReason, HotspotX, HotspotY, HotspotWidth,
+                 SuggestedDefect, PolicyName, ModelVersion, ModelFilePath, ConfidenceThreshold, ThresholdProfileId, ThresholdProfileRevision,
+                 ThresholdSource, DecisionReason, HotspotX, HotspotY, HotspotWidth,
                  HotspotHeight, ImageLoadMs, PreprocessingMs, InferenceMs, OverlayRenderingMs, TotalInspectionMs, CreatedAtUtc)
             VALUES
                 ($sampleImagePath, $goldenImagePath, $boardProgram, $operatorId, $inspectionEngine, $differenceScore, $meanBrightness, $verdict, $confidence,
-                 $suggestedDefect, $policyName, $modelVersion, $modelFilePath, $confidenceThreshold, $decisionReason, $hotspotX, $hotspotY, $hotspotWidth,
+                 $suggestedDefect, $policyName, $modelVersion, $modelFilePath, $confidenceThreshold, $thresholdProfileId, $thresholdProfileRevision,
+                 $thresholdSource, $decisionReason, $hotspotX, $hotspotY, $hotspotWidth,
                  $hotspotHeight, $imageLoadMs, $preprocessingMs, $inferenceMs, $overlayRenderingMs, $totalInspectionMs, $createdAtUtc);
             SELECT last_insert_rowid();
             """;
@@ -237,6 +239,9 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$modelVersion", result.ModelVersion);
         command.Parameters.AddWithValue("$modelFilePath", result.ModelFilePath);
         command.Parameters.AddWithValue("$confidenceThreshold", result.ConfidenceThreshold);
+        command.Parameters.AddWithValue("$thresholdProfileId", result.ThresholdProfileId);
+        command.Parameters.AddWithValue("$thresholdProfileRevision", result.ThresholdProfileRevision);
+        command.Parameters.AddWithValue("$thresholdSource", result.ThresholdSource);
         command.Parameters.AddWithValue("$decisionReason", result.DecisionReason);
         command.Parameters.AddWithValue("$hotspotX", result.Hotspot.X);
         command.Parameters.AddWithValue("$hotspotY", result.Hotspot.Y);
@@ -303,7 +308,9 @@ public static class AoiDatabase
         double precision,
         double recall,
         double falseCallRate,
-        IReadOnlyList<BatchTestResultRecord> results)
+        IReadOnlyList<BatchTestResultRecord> results,
+        string thresholdProfileId = "",
+        string thresholdProfileRevision = "")
     {
         EnsureInitialized();
 
@@ -314,10 +321,10 @@ public static class AoiDatabase
         command.CommandText =
             """
             INSERT INTO BatchTestRuns
-                (ImageFolder, GroundTruthCsvPath, EngineName, ModelVersion, Accuracy, Precision, Recall,
+                (ImageFolder, GroundTruthCsvPath, EngineName, ModelVersion, ThresholdProfileId, ThresholdProfileRevision, Accuracy, Precision, Recall,
                  FalseCallRate, TotalImages, FailedCount, CreatedAtUtc)
             VALUES
-                ($imageFolder, $groundTruthCsvPath, $engineName, $modelVersion, $accuracy, $precision, $recall,
+                ($imageFolder, $groundTruthCsvPath, $engineName, $modelVersion, $thresholdProfileId, $thresholdProfileRevision, $accuracy, $precision, $recall,
                  $falseCallRate, $totalImages, $failedCount, $createdAtUtc);
             SELECT last_insert_rowid();
             """;
@@ -326,6 +333,8 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$groundTruthCsvPath", (object?)groundTruthCsvPath ?? DBNull.Value);
         command.Parameters.AddWithValue("$engineName", engineName);
         command.Parameters.AddWithValue("$modelVersion", modelVersion);
+        command.Parameters.AddWithValue("$thresholdProfileId", thresholdProfileId);
+        command.Parameters.AddWithValue("$thresholdProfileRevision", thresholdProfileRevision);
         command.Parameters.AddWithValue("$accuracy", accuracy);
         command.Parameters.AddWithValue("$precision", precision);
         command.Parameters.AddWithValue("$recall", recall);
@@ -344,11 +353,13 @@ public static class AoiDatabase
                 """
                 INSERT INTO BatchTestResults
                     (RunId, ImagePath, ImageName, GroundTruth, EngineResult, InspectionEngine, ModelVersion, Score, PassFail,
-                     DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel, Notes,
+                     DefectType, NormalizedDefectClass, NormalizedSide, RoiId, RoiType, FailureCategory,
+                     RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel, Notes,
                      ImageLoadMs, PreprocessingMs, InferenceMs, OverlayRenderingMs, TotalInspectionMs, CreatedAtUtc)
                 VALUES
                     ($runId, $imagePath, $imageName, $groundTruth, $engineResult, $inspectionEngine, $modelVersion, $score, $passFail,
-                     $defectType, $roiX, $roiY, $roiWidth, $roiHeight, $side, $refDes, $lotId, $boardModel, $notes,
+                     $defectType, $normalizedDefectClass, $normalizedSide, $roiId, $roiType, $failureCategory,
+                     $roiX, $roiY, $roiWidth, $roiHeight, $side, $refDes, $lotId, $boardModel, $notes,
                      $imageLoadMs, $preprocessingMs, $inferenceMs, $overlayRenderingMs, $totalInspectionMs, $createdAtUtc);
                 """;
 
@@ -362,6 +373,11 @@ public static class AoiDatabase
             resultCommand.Parameters.AddWithValue("$score", result.Score);
             resultCommand.Parameters.AddWithValue("$passFail", result.PassFail);
             resultCommand.Parameters.AddWithValue("$defectType", result.DefectType);
+            resultCommand.Parameters.AddWithValue("$normalizedDefectClass", result.NormalizedDefectClass);
+            resultCommand.Parameters.AddWithValue("$normalizedSide", result.NormalizedSide);
+            resultCommand.Parameters.AddWithValue("$roiId", result.RoiId);
+            resultCommand.Parameters.AddWithValue("$roiType", result.RoiType);
+            resultCommand.Parameters.AddWithValue("$failureCategory", result.FailureCategory);
             resultCommand.Parameters.AddWithValue("$roiX", result.RoiX);
             resultCommand.Parameters.AddWithValue("$roiY", result.RoiY);
             resultCommand.Parameters.AddWithValue("$roiWidth", result.RoiWidth);
@@ -380,6 +396,25 @@ public static class AoiDatabase
             resultCommand.ExecuteNonQuery();
         }
 
+        foreach (var metric in ClassMetricsService.Flatten(ClassMetricsService.Calculate(results.Select(BatchTestRow.FromRecord).ToArray())))
+        {
+            using var metricCommand = connection.CreateCommand();
+            metricCommand.Transaction = transaction;
+            metricCommand.CommandText =
+                """
+                INSERT INTO ValidationBreakdownMetrics
+                    (RunId, BreakdownType, Key, DisplayName, Total, TruePositive, TrueNegative,
+                     FalsePositive, FalseNegative, WrongDefectClass, WrongSide, UnknownGroundTruth,
+                     Precision, Recall, FalseCallRate, CreatedAtUtc)
+                VALUES
+                    ($runId, $breakdownType, $key, $displayName, $total, $truePositive, $trueNegative,
+                     $falsePositive, $falseNegative, $wrongDefectClass, $wrongSide, $unknownGroundTruth,
+                     $precision, $recall, $falseCallRate, $createdAtUtc);
+                """;
+            BindValidationBreakdownMetric(metricCommand, runId, metric);
+            metricCommand.ExecuteNonQuery();
+        }
+
         transaction.Commit();
         return runId;
     }
@@ -393,7 +428,7 @@ public static class AoiDatabase
         command.CommandText =
             """
             SELECT Id, ImageFolder, GroundTruthCsvPath, EngineName, ModelVersion, CreatedAtUtc, Accuracy, Precision,
-                   Recall, FalseCallRate, TotalImages, FailedCount
+                   Recall, FalseCallRate, TotalImages, FailedCount, ThresholdProfileId, ThresholdProfileRevision
             FROM BatchTestRuns
             ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
             LIMIT 1;
@@ -415,6 +450,7 @@ public static class AoiDatabase
             SELECT Id, RunId, ImagePath, ImageName, GroundTruth, EngineResult, Score, PassFail,
                    DefectType, RoiX, RoiY, RoiWidth, RoiHeight, Side, RefDes, LotId, BoardModel,
                    InspectionEngine, ModelVersion, Notes, ImageLoadMs, PreprocessingMs, InferenceMs,
+                   NormalizedDefectClass, NormalizedSide, RoiId, RoiType, FailureCategory,
                    OverlayRenderingMs, TotalInspectionMs, CreatedAtUtc
             FROM BatchTestResults
             WHERE RunId = $runId
@@ -595,6 +631,847 @@ public static class AoiDatabase
             records.Add(ReadValidationPackage(reader));
 
         return records;
+    }
+
+    public static IReadOnlyList<ValidationBreakdownMetric> GetValidationBreakdownMetrics(long runId)
+    {
+        EnsureInitialized();
+
+        var metrics = new List<ValidationBreakdownMetric>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, RunId, BreakdownType, Key, DisplayName, Total, TruePositive, TrueNegative,
+                   FalsePositive, FalseNegative, WrongDefectClass, WrongSide, UnknownGroundTruth,
+                   Precision, Recall, FalseCallRate
+            FROM ValidationBreakdownMetrics
+            WHERE RunId = $runId
+            ORDER BY BreakdownType ASC, (FalsePositive + FalseNegative + WrongDefectClass + WrongSide) DESC, Key ASC;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            metrics.Add(new ValidationBreakdownMetric
+            {
+                Id = reader.GetInt64(0),
+                RunId = reader.GetInt64(1),
+                BreakdownType = reader.GetString(2),
+                Key = reader.GetString(3),
+                DisplayName = reader.GetString(4),
+                Total = reader.GetInt32(5),
+                TruePositive = reader.GetInt32(6),
+                TrueNegative = reader.GetInt32(7),
+                FalsePositive = reader.GetInt32(8),
+                FalseNegative = reader.GetInt32(9),
+                WrongDefectClass = reader.GetInt32(10),
+                WrongSide = reader.GetInt32(11),
+                UnknownGroundTruth = reader.GetInt32(12),
+                Precision = reader.GetDouble(13),
+                Recall = reader.GetDouble(14),
+                FalseCallRate = reader.GetDouble(15),
+            });
+        }
+
+        return metrics;
+    }
+
+    public static void SaveThresholdProfile(ThresholdProfile profile)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO ThresholdProfiles
+                (ProfileId, Revision, BoardModel, BoardProgram, RecipeName, RecipeRevision, Status,
+                 SourceValidationRunId, SourceFalseCallReductionRunId, CreatedBy, CreatedAtUtc, ApprovedBy, ApprovedAtUtc)
+            VALUES
+                ($profileId, $revision, $boardModel, $boardProgram, $recipeName, $recipeRevision, $status,
+                 $sourceValidationRunId, $sourceFalseCallReductionRunId, $createdBy, $createdAtUtc, $approvedBy, $approvedAtUtc)
+            ON CONFLICT(ProfileId, Revision) DO UPDATE SET
+                BoardModel = excluded.BoardModel,
+                BoardProgram = excluded.BoardProgram,
+                RecipeName = excluded.RecipeName,
+                RecipeRevision = excluded.RecipeRevision,
+                Status = excluded.Status,
+                SourceValidationRunId = excluded.SourceValidationRunId,
+                SourceFalseCallReductionRunId = excluded.SourceFalseCallReductionRunId,
+                CreatedBy = excluded.CreatedBy,
+                CreatedAtUtc = excluded.CreatedAtUtc,
+                ApprovedBy = excluded.ApprovedBy,
+                ApprovedAtUtc = excluded.ApprovedAtUtc;
+            """;
+        BindThresholdProfile(command, profile);
+        command.ExecuteNonQuery();
+
+        using var deleteRules = connection.CreateCommand();
+        deleteRules.Transaction = transaction;
+        deleteRules.CommandText = "DELETE FROM ThresholdProfileRules WHERE ProfileId = $profileId AND Revision = $revision;";
+        deleteRules.Parameters.AddWithValue("$profileId", profile.ProfileId);
+        deleteRules.Parameters.AddWithValue("$revision", profile.Revision);
+        deleteRules.ExecuteNonQuery();
+
+        foreach (var rule in profile.Rules)
+        {
+            using var ruleCommand = connection.CreateCommand();
+            ruleCommand.Transaction = transaction;
+            ruleCommand.CommandText =
+                """
+                INSERT INTO ThresholdProfileRules
+                    (ProfileId, Revision, ViewType, RoiType, DefectClass, ReviewThreshold, NgThreshold,
+                     ConfidenceThreshold, MinimumAreaPixels, MaxAllowedFalseCallRate)
+                VALUES
+                    ($profileId, $revision, $viewType, $roiType, $defectClass, $reviewThreshold, $ngThreshold,
+                     $confidenceThreshold, $minimumAreaPixels, $maxAllowedFalseCallRate);
+                """;
+            BindThresholdProfileRule(ruleCommand, profile, rule);
+            ruleCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
+    public static ThresholdProfile? GetThresholdProfile(string profileId, string revision)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT ProfileId, Revision, BoardModel, BoardProgram, RecipeName, RecipeRevision, Status,
+                   SourceValidationRunId, SourceFalseCallReductionRunId, CreatedBy, CreatedAtUtc, ApprovedBy, ApprovedAtUtc
+            FROM ThresholdProfiles
+            WHERE ProfileId = $profileId AND Revision = $revision
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$profileId", profileId);
+        command.Parameters.AddWithValue("$revision", revision);
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        var profile = ReadThresholdProfile(reader);
+        profile.Rules = GetThresholdProfileRules(profile.ProfileId, profile.Revision).ToList();
+        return profile;
+    }
+
+    public static IReadOnlyList<ThresholdProfile> GetThresholdProfiles()
+    {
+        EnsureInitialized();
+
+        var profiles = new List<ThresholdProfile>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT ProfileId, Revision, BoardModel, BoardProgram, RecipeName, RecipeRevision, Status,
+                   SourceValidationRunId, SourceFalseCallReductionRunId, CreatedBy, CreatedAtUtc, ApprovedBy, ApprovedAtUtc
+            FROM ThresholdProfiles
+            ORDER BY datetime(CreatedAtUtc) DESC, ProfileId ASC, Revision DESC;
+            """;
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var profile = ReadThresholdProfile(reader);
+            profile.Rules = GetThresholdProfileRules(profile.ProfileId, profile.Revision).ToList();
+            profiles.Add(profile);
+        }
+
+        return profiles;
+    }
+
+    public static ThresholdProfile? GetActiveThresholdProfile(string boardModel, string boardProgram, string recipeName)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT p.ProfileId, p.Revision, p.BoardModel, p.BoardProgram, p.RecipeName, p.RecipeRevision, p.Status,
+                   p.SourceValidationRunId, p.SourceFalseCallReductionRunId, p.CreatedBy, p.CreatedAtUtc, p.ApprovedBy, p.ApprovedAtUtc
+            FROM ThresholdProfileDeployments d
+            INNER JOIN ThresholdProfiles p ON p.ProfileId = d.ProfileId AND p.Revision = d.Revision
+            WHERE d.IsActive = 1
+              AND (d.BoardModel = $boardModel OR d.BoardModel = 'ANY')
+              AND (d.BoardProgram = $boardProgram OR d.BoardProgram = 'ANY')
+              AND (d.RecipeName = $recipeName OR d.RecipeName = 'ANY')
+            ORDER BY
+              CASE WHEN d.BoardModel = $boardModel THEN 1 ELSE 0 END +
+              CASE WHEN d.BoardProgram = $boardProgram THEN 1 ELSE 0 END +
+              CASE WHEN d.RecipeName = $recipeName THEN 1 ELSE 0 END DESC,
+              datetime(d.DeployedAtUtc) DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$boardModel", NormalizeProfileScope(boardModel));
+        command.Parameters.AddWithValue("$boardProgram", NormalizeProfileScope(boardProgram));
+        command.Parameters.AddWithValue("$recipeName", NormalizeProfileScope(recipeName));
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        var profile = ReadThresholdProfile(reader);
+        profile.Rules = GetThresholdProfileRules(profile.ProfileId, profile.Revision).ToList();
+        return profile;
+    }
+
+    public static void UpdateThresholdProfileStatus(string profileId, string revision, string status, string? approvedBy = null, DateTime? approvedAtUtc = null)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE ThresholdProfiles
+            SET Status = $status,
+                ApprovedBy = COALESCE($approvedBy, ApprovedBy),
+                ApprovedAtUtc = COALESCE($approvedAtUtc, ApprovedAtUtc)
+            WHERE ProfileId = $profileId AND Revision = $revision;
+            """;
+        command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$approvedBy", string.IsNullOrWhiteSpace(approvedBy) ? DBNull.Value : approvedBy);
+        command.Parameters.AddWithValue("$approvedAtUtc", approvedAtUtc is { } at ? at.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
+        command.Parameters.AddWithValue("$profileId", profileId);
+        command.Parameters.AddWithValue("$revision", revision);
+        command.ExecuteNonQuery();
+    }
+
+    public static void DeployThresholdProfile(ThresholdProfile profile, string deployedBy)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var deactivate = connection.CreateCommand();
+        deactivate.Transaction = transaction;
+        deactivate.CommandText =
+            """
+            UPDATE ThresholdProfileDeployments
+            SET IsActive = 0
+            WHERE BoardModel = $boardModel AND BoardProgram = $boardProgram AND RecipeName = $recipeName;
+            """;
+        deactivate.Parameters.AddWithValue("$boardModel", NormalizeProfileScope(profile.BoardModel));
+        deactivate.Parameters.AddWithValue("$boardProgram", NormalizeProfileScope(profile.BoardProgram));
+        deactivate.Parameters.AddWithValue("$recipeName", NormalizeProfileScope(profile.RecipeName));
+        deactivate.ExecuteNonQuery();
+
+        using var insert = connection.CreateCommand();
+        insert.Transaction = transaction;
+        insert.CommandText =
+            """
+            INSERT INTO ThresholdProfileDeployments
+                (ProfileId, Revision, BoardModel, BoardProgram, RecipeName, DeployedAtUtc, DeployedBy, IsActive)
+            VALUES
+                ($profileId, $revision, $boardModel, $boardProgram, $recipeName, $deployedAtUtc, $deployedBy, 1);
+            """;
+        insert.Parameters.AddWithValue("$profileId", profile.ProfileId);
+        insert.Parameters.AddWithValue("$revision", profile.Revision);
+        insert.Parameters.AddWithValue("$boardModel", NormalizeProfileScope(profile.BoardModel));
+        insert.Parameters.AddWithValue("$boardProgram", NormalizeProfileScope(profile.BoardProgram));
+        insert.Parameters.AddWithValue("$recipeName", NormalizeProfileScope(profile.RecipeName));
+        insert.Parameters.AddWithValue("$deployedAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        insert.Parameters.AddWithValue("$deployedBy", deployedBy);
+        insert.ExecuteNonQuery();
+
+        using var updateProfile = connection.CreateCommand();
+        updateProfile.Transaction = transaction;
+        updateProfile.CommandText = "UPDATE ThresholdProfiles SET Status = 'Deployed' WHERE ProfileId = $profileId AND Revision = $revision;";
+        updateProfile.Parameters.AddWithValue("$profileId", profile.ProfileId);
+        updateProfile.Parameters.AddWithValue("$revision", profile.Revision);
+        updateProfile.ExecuteNonQuery();
+
+        transaction.Commit();
+    }
+
+    public static long RecordFalseCallReductionRun(FalseCallReductionRun run, string? operatorId = null)
+    {
+        EnsureInitialized();
+
+        var effectiveOperator = string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId;
+        var selected = run.Recommendation.Point;
+        var auditEventId = RecordAuditEvent(
+            "FALSE_CALL_RECOMMENDATION",
+            selected is null
+                ? $"False-call reduction recommendation generated: status={run.Recommendation.Status}; mode={run.Recommendation.Mode}."
+                : string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"False-call reduction recommendation generated: status={run.Recommendation.Status}; mode={run.Recommendation.Mode}; threshold={selected.ConfidenceThreshold:F3}; falseCallRate={selected.FalseCallRate:P1}; possibleEscapes={selected.FalseNegative}."),
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "FalseCallReductionRun",
+            relatedEntityId: run.BatchRunId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO FalseCallReductionRuns
+                (BatchRunId, CreatedAtUtc, EngineName, ModelVersion, ModelId, ModelSha256,
+                 CriteriaJson, RecommendationStatus, RecommendationMode, SelectedThreshold,
+                 SelectedFalseCallRate, SelectedPossibleEscapeRate, SelectedReviewRate,
+                 SelectedManualReviewMinutes, SelectedPossibleEscapeCount, RecommendationMessagesJson,
+                 OperatorId, AuditEventId)
+            VALUES
+                ($batchRunId, $createdAtUtc, $engineName, $modelVersion, $modelId, $modelSha256,
+                 $criteriaJson, $recommendationStatus, $recommendationMode, $selectedThreshold,
+                 $selectedFalseCallRate, $selectedPossibleEscapeRate, $selectedReviewRate,
+                 $selectedManualReviewMinutes, $selectedPossibleEscapeCount, $recommendationMessagesJson,
+                 $operatorId, $auditEventId);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$batchRunId", run.BatchRunId is { } batchRunId ? (object)batchRunId : DBNull.Value);
+        command.Parameters.AddWithValue("$createdAtUtc", run.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$engineName", run.EngineName);
+        command.Parameters.AddWithValue("$modelVersion", run.ModelVersion);
+        command.Parameters.AddWithValue("$modelId", run.ModelId);
+        command.Parameters.AddWithValue("$modelSha256", run.ModelSha256);
+        command.Parameters.AddWithValue("$criteriaJson", JsonSerializer.Serialize(run.Criteria));
+        command.Parameters.AddWithValue("$recommendationStatus", run.Recommendation.Status);
+        command.Parameters.AddWithValue("$recommendationMode", run.Recommendation.Mode);
+        command.Parameters.AddWithValue("$selectedThreshold", selected is null ? DBNull.Value : selected.ConfidenceThreshold);
+        command.Parameters.AddWithValue("$selectedFalseCallRate", selected is null ? DBNull.Value : selected.FalseCallRate);
+        command.Parameters.AddWithValue("$selectedPossibleEscapeRate", selected is null ? DBNull.Value : selected.PossibleEscapeRate);
+        command.Parameters.AddWithValue("$selectedReviewRate", selected is null ? DBNull.Value : selected.ReviewRate);
+        command.Parameters.AddWithValue("$selectedManualReviewMinutes", selected is null ? DBNull.Value : selected.EstimatedManualReviewMinutes);
+        command.Parameters.AddWithValue("$selectedPossibleEscapeCount", selected is null ? DBNull.Value : selected.FalseNegative);
+        command.Parameters.AddWithValue("$recommendationMessagesJson", JsonSerializer.Serialize(run.Recommendation.Messages));
+        command.Parameters.AddWithValue("$operatorId", effectiveOperator);
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
+
+        var runId = (long)(command.ExecuteScalar() ?? 0L);
+        foreach (var point in run.Points)
+        {
+            using var pointCommand = connection.CreateCommand();
+            pointCommand.Transaction = transaction;
+            pointCommand.CommandText =
+                """
+                INSERT INTO FalseCallReductionPoints
+                    (RunId, ConfidenceThreshold, DifferenceThreshold, TruePositive, TrueNegative,
+                     FalsePositive, FalseNegative, Precision, Recall, FalseCallRate, PossibleEscapeRate,
+                     ReviewRate, NgRate, ReviewCount, NgCount, EstimatedManualReviewMinutes,
+                     MeetsConstraints, Status)
+                VALUES
+                    ($runId, $confidenceThreshold, $differenceThreshold, $truePositive, $trueNegative,
+                     $falsePositive, $falseNegative, $precision, $recall, $falseCallRate, $possibleEscapeRate,
+                     $reviewRate, $ngRate, $reviewCount, $ngCount, $estimatedManualReviewMinutes,
+                     $meetsConstraints, $status);
+                """;
+            pointCommand.Parameters.AddWithValue("$runId", runId);
+            BindFalseCallReductionPoint(pointCommand, point);
+            pointCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return runId;
+    }
+
+    public static FalseCallReductionRun? GetLatestFalseCallReductionRun(long? batchRunId = null)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = batchRunId is null
+            ? """
+              SELECT Id, BatchRunId, CreatedAtUtc, EngineName, ModelVersion, ModelId, ModelSha256,
+                     CriteriaJson, RecommendationStatus, RecommendationMode, SelectedThreshold,
+                     RecommendationMessagesJson
+              FROM FalseCallReductionRuns
+              ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+              LIMIT 1;
+              """
+            : """
+              SELECT Id, BatchRunId, CreatedAtUtc, EngineName, ModelVersion, ModelId, ModelSha256,
+                     CriteriaJson, RecommendationStatus, RecommendationMode, SelectedThreshold,
+                     RecommendationMessagesJson
+              FROM FalseCallReductionRuns
+              WHERE BatchRunId = $batchRunId
+              ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+              LIMIT 1;
+              """;
+        if (batchRunId is { } id)
+            command.Parameters.AddWithValue("$batchRunId", id);
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        var run = ReadFalseCallReductionRun(reader);
+        run.Points = GetFalseCallReductionPoints(run.Id);
+        run.Recommendation.Point = run.Points
+            .OrderBy(point => Math.Abs(point.ConfidenceThreshold - (run.Recommendation.Point?.ConfidenceThreshold ?? point.ConfidenceThreshold)))
+            .FirstOrDefault(point => string.Equals(point.Status, run.Recommendation.Status, StringComparison.OrdinalIgnoreCase)) ?? run.Points.FirstOrDefault();
+        return run;
+    }
+
+    public static long RecordCameraAcceptanceRun(CameraAcceptanceRun run, string? operatorId = null)
+    {
+        EnsureInitialized();
+
+        var effectiveOperator = string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId;
+        var auditEventId = RecordAuditEvent(
+            "CAMERA_ACCEPTANCE_TEST",
+            $"Camera acceptance test completed: status={run.Status}; readiness={run.FactoryReadinessStatus}; adapter={run.AdapterName}; realHardware={run.IsRealHardware}.",
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "CameraAcceptanceRun");
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO CameraAcceptanceRuns
+                (CreatedAtUtc, AdapterName, SourceKey, SettingsSummary, CriteriaJson,
+                 Status, FactoryReadinessStatus, IsRealHardware, TotalRequestedFrames,
+                 TotalReceivedFrames, DroppedFrameCount, TriggerFailureCount, TimeoutCount,
+                 MaxConnectMs, MaxFirstFrameMs, AverageFrameIntervalMs, WarningsJson,
+                 FailuresJson, ViewMetricsJson, OperatorId, AuditEventId)
+            VALUES
+                ($createdAtUtc, $adapterName, $sourceKey, $settingsSummary, $criteriaJson,
+                 $status, $factoryReadinessStatus, $isRealHardware, $totalRequestedFrames,
+                 $totalReceivedFrames, $droppedFrameCount, $triggerFailureCount, $timeoutCount,
+                 $maxConnectMs, $maxFirstFrameMs, $averageFrameIntervalMs, $warningsJson,
+                 $failuresJson, $viewMetricsJson, $operatorId, $auditEventId);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$createdAtUtc", run.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$adapterName", run.AdapterName);
+        command.Parameters.AddWithValue("$sourceKey", run.SourceKey);
+        command.Parameters.AddWithValue("$settingsSummary", run.SettingsSummary);
+        command.Parameters.AddWithValue("$criteriaJson", JsonSerializer.Serialize(run.Criteria));
+        command.Parameters.AddWithValue("$status", run.Status);
+        command.Parameters.AddWithValue("$factoryReadinessStatus", run.FactoryReadinessStatus);
+        command.Parameters.AddWithValue("$isRealHardware", run.IsRealHardware ? 1 : 0);
+        command.Parameters.AddWithValue("$totalRequestedFrames", run.TotalRequestedFrames);
+        command.Parameters.AddWithValue("$totalReceivedFrames", run.TotalReceivedFrames);
+        command.Parameters.AddWithValue("$droppedFrameCount", run.DroppedFrameCount);
+        command.Parameters.AddWithValue("$triggerFailureCount", run.TriggerFailureCount);
+        command.Parameters.AddWithValue("$timeoutCount", run.TimeoutCount);
+        command.Parameters.AddWithValue("$maxConnectMs", run.MaxConnectMs);
+        command.Parameters.AddWithValue("$maxFirstFrameMs", run.MaxFirstFrameMs);
+        command.Parameters.AddWithValue("$averageFrameIntervalMs", run.AverageFrameIntervalMs);
+        command.Parameters.AddWithValue("$warningsJson", JsonSerializer.Serialize(run.Warnings));
+        command.Parameters.AddWithValue("$failuresJson", JsonSerializer.Serialize(run.Failures));
+        command.Parameters.AddWithValue("$viewMetricsJson", JsonSerializer.Serialize(run.ViewMetrics));
+        command.Parameters.AddWithValue("$operatorId", effectiveOperator);
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
+        var runId = (long)(command.ExecuteScalar() ?? 0L);
+
+        foreach (var frame in run.Frames)
+        {
+            using var frameCommand = connection.CreateCommand();
+            frameCommand.Transaction = transaction;
+            frameCommand.CommandText =
+                """
+                INSERT INTO CameraAcceptanceFrames
+                    (RunId, ViewType, Sequence, FrameId, CameraId, CapturedAtUtc,
+                     Width, Height, PixelFormat, SourceKind, IsSimulated, LatencyMs,
+                     IntervalMs, MetadataValid, Message)
+                VALUES
+                    ($runId, $viewType, $sequence, $frameId, $cameraId, $capturedAtUtc,
+                     $width, $height, $pixelFormat, $sourceKind, $isSimulated, $latencyMs,
+                     $intervalMs, $metadataValid, $message);
+                """;
+            frameCommand.Parameters.AddWithValue("$runId", runId);
+            frameCommand.Parameters.AddWithValue("$viewType", frame.ViewType);
+            frameCommand.Parameters.AddWithValue("$sequence", frame.Sequence);
+            frameCommand.Parameters.AddWithValue("$frameId", frame.FrameId);
+            frameCommand.Parameters.AddWithValue("$cameraId", frame.CameraId);
+            frameCommand.Parameters.AddWithValue("$capturedAtUtc", frame.CapturedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            frameCommand.Parameters.AddWithValue("$width", frame.Width);
+            frameCommand.Parameters.AddWithValue("$height", frame.Height);
+            frameCommand.Parameters.AddWithValue("$pixelFormat", frame.PixelFormat);
+            frameCommand.Parameters.AddWithValue("$sourceKind", frame.SourceKind);
+            frameCommand.Parameters.AddWithValue("$isSimulated", frame.IsSimulated ? 1 : 0);
+            frameCommand.Parameters.AddWithValue("$latencyMs", frame.LatencyMs);
+            frameCommand.Parameters.AddWithValue("$intervalMs", frame.IntervalMs);
+            frameCommand.Parameters.AddWithValue("$metadataValid", frame.MetadataValid ? 1 : 0);
+            frameCommand.Parameters.AddWithValue("$message", frame.Message);
+            frameCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return runId;
+    }
+
+    public static CameraAcceptanceRun? GetLatestCameraAcceptanceRun(bool realHardwareOnly = false)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, AdapterName, SourceKey, SettingsSummary, CriteriaJson,
+                   Status, FactoryReadinessStatus, IsRealHardware, TotalRequestedFrames,
+                   TotalReceivedFrames, DroppedFrameCount, TriggerFailureCount, TimeoutCount,
+                   MaxConnectMs, MaxFirstFrameMs, AverageFrameIntervalMs, WarningsJson,
+                   FailuresJson, ViewMetricsJson
+            FROM CameraAcceptanceRuns
+            WHERE ($realHardwareOnly = 0 OR IsRealHardware = 1)
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$realHardwareOnly", realHardwareOnly ? 1 : 0);
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        var run = ReadCameraAcceptanceRun(reader);
+        run.Frames = GetCameraAcceptanceFrames(run.Id).ToList();
+        return run;
+    }
+
+    public static long RecordLightingAcceptanceRun(LightingAcceptanceRun run, string? operatorId = null)
+    {
+        EnsureInitialized();
+
+        var effectiveOperator = string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId;
+        var auditEventId = RecordAuditEvent(
+            "LIGHTING_ACCEPTANCE_TEST",
+            $"Lighting sync acceptance completed: status={run.Status}; mode={run.Mode}; simulated={run.IsSimulated}; steps={run.PassedStepCount}/{run.StepCount}.",
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "LightingAcceptanceRun");
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO LightingAcceptanceRuns
+                (CreatedAtUtc, ControllerName, Mode, SettingsSummary, CriteriaJson, Status,
+                 IsSimulated, StepCount, PassedStepCount, FailedStepCount, MaxCommandLatencyMs,
+                 MaxTriggerToFrameLatencyMs, WarningsJson, FailuresJson, OperatorId, AuditEventId)
+            VALUES
+                ($createdAtUtc, $controllerName, $mode, $settingsSummary, $criteriaJson, $status,
+                 $isSimulated, $stepCount, $passedStepCount, $failedStepCount, $maxCommandLatencyMs,
+                 $maxTriggerToFrameLatencyMs, $warningsJson, $failuresJson, $operatorId, $auditEventId);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$createdAtUtc", run.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$controllerName", run.ControllerName);
+        command.Parameters.AddWithValue("$mode", run.Mode);
+        command.Parameters.AddWithValue("$settingsSummary", run.SettingsSummary);
+        command.Parameters.AddWithValue("$criteriaJson", JsonSerializer.Serialize(run.Criteria));
+        command.Parameters.AddWithValue("$status", run.Status);
+        command.Parameters.AddWithValue("$isSimulated", run.IsSimulated ? 1 : 0);
+        command.Parameters.AddWithValue("$stepCount", run.StepCount);
+        command.Parameters.AddWithValue("$passedStepCount", run.PassedStepCount);
+        command.Parameters.AddWithValue("$failedStepCount", run.FailedStepCount);
+        command.Parameters.AddWithValue("$maxCommandLatencyMs", run.MaxCommandLatencyMs);
+        command.Parameters.AddWithValue("$maxTriggerToFrameLatencyMs", run.MaxTriggerToFrameLatencyMs);
+        command.Parameters.AddWithValue("$warningsJson", JsonSerializer.Serialize(run.Warnings));
+        command.Parameters.AddWithValue("$failuresJson", JsonSerializer.Serialize(run.Failures));
+        command.Parameters.AddWithValue("$operatorId", effectiveOperator);
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
+        var runId = (long)(command.ExecuteScalar() ?? 0L);
+
+        foreach (var step in run.Steps)
+        {
+            using var stepCommand = connection.CreateCommand();
+            stepCommand.Transaction = transaction;
+            stepCommand.CommandText =
+                """
+                INSERT INTO LightingAcceptanceSteps
+                    (RunId, ViewType, ProgramName, CommandText, CommandLatencyMs,
+                     TriggerToFrameLatencyMs, CommandAccepted, FrameReceived, FrameId,
+                     CameraId, Status, Message)
+                VALUES
+                    ($runId, $viewType, $programName, $commandText, $commandLatencyMs,
+                     $triggerToFrameLatencyMs, $commandAccepted, $frameReceived, $frameId,
+                     $cameraId, $status, $message);
+                """;
+            stepCommand.Parameters.AddWithValue("$runId", runId);
+            stepCommand.Parameters.AddWithValue("$viewType", step.ViewType);
+            stepCommand.Parameters.AddWithValue("$programName", step.ProgramName);
+            stepCommand.Parameters.AddWithValue("$commandText", step.CommandText);
+            stepCommand.Parameters.AddWithValue("$commandLatencyMs", step.CommandLatencyMs);
+            stepCommand.Parameters.AddWithValue("$triggerToFrameLatencyMs", step.TriggerToFrameLatencyMs);
+            stepCommand.Parameters.AddWithValue("$commandAccepted", step.CommandAccepted ? 1 : 0);
+            stepCommand.Parameters.AddWithValue("$frameReceived", step.FrameReceived ? 1 : 0);
+            stepCommand.Parameters.AddWithValue("$frameId", step.FrameId);
+            stepCommand.Parameters.AddWithValue("$cameraId", step.CameraId);
+            stepCommand.Parameters.AddWithValue("$status", step.Status);
+            stepCommand.Parameters.AddWithValue("$message", step.Message);
+            stepCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return runId;
+    }
+
+    public static LightingAcceptanceRun? GetLatestLightingAcceptanceRun()
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, ControllerName, Mode, SettingsSummary, CriteriaJson,
+                   Status, IsSimulated, StepCount, PassedStepCount, FailedStepCount,
+                   MaxCommandLatencyMs, MaxTriggerToFrameLatencyMs, WarningsJson, FailuresJson
+            FROM LightingAcceptanceRuns
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        var run = ReadLightingAcceptanceRun(reader);
+        run.Steps = GetLightingAcceptanceSteps(run.Id).ToList();
+        return run;
+    }
+
+    public static long RecordRobotAcceptanceRun(RobotAcceptanceRun run, string? operatorId = null)
+    {
+        EnsureInitialized();
+
+        var effectiveOperator = string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId;
+        var auditEventId = RecordAuditEvent(
+            "ROBOT_ACCEPTANCE_TEST",
+            $"Robot acceptance completed: status={run.Status}; source={run.SourceKind}; controller={run.ControllerName}; cycleMs={run.FullCycleMs:F1}.",
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "RobotAcceptanceRun");
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO RobotAcceptanceRuns
+                (CreatedAtUtc, ControllerName, EmergencyStopName, SourceKind, CriteriaJson,
+                 Status, FinalState, LoadMs, MoveToInspectMs, InspectionMs, UnloadMs,
+                 FullCycleMs, InvalidTransitionRejected, EmergencyStopBlocked, ResetReturnedIdle,
+                 AuditEventCount, WarningsJson, FailuresJson, OperatorId, AuditEventId)
+            VALUES
+                ($createdAtUtc, $controllerName, $emergencyStopName, $sourceKind, $criteriaJson,
+                 $status, $finalState, $loadMs, $moveToInspectMs, $inspectionMs, $unloadMs,
+                 $fullCycleMs, $invalidTransitionRejected, $emergencyStopBlocked, $resetReturnedIdle,
+                 $auditEventCount, $warningsJson, $failuresJson, $operatorId, $auditEventId);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$createdAtUtc", run.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$controllerName", run.ControllerName);
+        command.Parameters.AddWithValue("$emergencyStopName", run.EmergencyStopName);
+        command.Parameters.AddWithValue("$sourceKind", run.SourceKind);
+        command.Parameters.AddWithValue("$criteriaJson", JsonSerializer.Serialize(run.Criteria));
+        command.Parameters.AddWithValue("$status", run.Status);
+        command.Parameters.AddWithValue("$finalState", run.FinalState);
+        command.Parameters.AddWithValue("$loadMs", run.LoadMs);
+        command.Parameters.AddWithValue("$moveToInspectMs", run.MoveToInspectMs);
+        command.Parameters.AddWithValue("$inspectionMs", run.InspectionMs);
+        command.Parameters.AddWithValue("$unloadMs", run.UnloadMs);
+        command.Parameters.AddWithValue("$fullCycleMs", run.FullCycleMs);
+        command.Parameters.AddWithValue("$invalidTransitionRejected", run.InvalidTransitionRejected ? 1 : 0);
+        command.Parameters.AddWithValue("$emergencyStopBlocked", run.EmergencyStopBlocked ? 1 : 0);
+        command.Parameters.AddWithValue("$resetReturnedIdle", run.ResetReturnedIdle ? 1 : 0);
+        command.Parameters.AddWithValue("$auditEventCount", run.AuditEventCount);
+        command.Parameters.AddWithValue("$warningsJson", JsonSerializer.Serialize(run.Warnings));
+        command.Parameters.AddWithValue("$failuresJson", JsonSerializer.Serialize(run.Failures));
+        command.Parameters.AddWithValue("$operatorId", effectiveOperator);
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
+        var runId = (long)(command.ExecuteScalar() ?? 0L);
+
+        foreach (var step in run.Steps)
+        {
+            using var stepCommand = connection.CreateCommand();
+            stepCommand.Transaction = transaction;
+            stepCommand.CommandText =
+                """
+                INSERT INTO RobotAcceptanceSteps
+                    (RunId, StepName, FromState, ToState, ElapsedMs, Accepted, Status, Message)
+                VALUES
+                    ($runId, $stepName, $fromState, $toState, $elapsedMs, $accepted, $status, $message);
+                """;
+            stepCommand.Parameters.AddWithValue("$runId", runId);
+            stepCommand.Parameters.AddWithValue("$stepName", step.StepName);
+            stepCommand.Parameters.AddWithValue("$fromState", step.FromState);
+            stepCommand.Parameters.AddWithValue("$toState", step.ToState);
+            stepCommand.Parameters.AddWithValue("$elapsedMs", step.ElapsedMs);
+            stepCommand.Parameters.AddWithValue("$accepted", step.Accepted ? 1 : 0);
+            stepCommand.Parameters.AddWithValue("$status", step.Status);
+            stepCommand.Parameters.AddWithValue("$message", step.Message);
+            stepCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return runId;
+    }
+
+    public static RobotAcceptanceRun? GetLatestRobotAcceptanceRun()
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, ControllerName, EmergencyStopName, SourceKind, CriteriaJson,
+                   Status, FinalState, LoadMs, MoveToInspectMs, InspectionMs, UnloadMs,
+                   FullCycleMs, InvalidTransitionRejected, EmergencyStopBlocked, ResetReturnedIdle,
+                   AuditEventCount, WarningsJson, FailuresJson
+            FROM RobotAcceptanceRuns
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        var run = ReadRobotAcceptanceRun(reader);
+        run.Steps = GetRobotAcceptanceSteps(run.Id).ToList();
+        return run;
+    }
+
+    public static long RecordSoakTestRun(SoakTestResult run, string? operatorId = null)
+    {
+        EnsureInitialized();
+
+        var effectiveOperator = string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? run.OperatorId : operatorId;
+        var auditEventId = RecordAuditEvent(
+            "SOAK_TEST",
+            $"Soak test persisted: run={run.RunId}; cycles={run.TotalCycles}; failures={run.FailedCycles}; canceled={run.WasCanceled}; factoryEvidence={run.IsCompletedFactoryEvidence}.",
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "SoakTestRun",
+            relatedEntityId: run.RunId);
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO SoakTestRuns
+                (RunId, StartedAtUtc, EndedAtUtc, ImageFolder, OutputFolder, EngineKey, EngineName,
+                 EngineVersion, SourceKind, IsRealCameraSource, ProfileName, RequestedDurationSeconds,
+                 ActualDurationSeconds, DelayBetweenInspectionsMs, OperatorId, BoardModel, LotId,
+                 WasCanceled, TotalCycles, SuccessfulCycles, FailedCycles, AverageInspectionMs,
+                 MinInspectionMs, MaxInspectionMs, P95InspectionMs, CountOverOneSecond,
+                 StartManagedMemoryMb, EndManagedMemoryMb, StartWorkingSetMb, EndWorkingSetMb,
+                 PeakWorkingSetMb, IsCompletedFactoryEvidence, ErrorsJson, AuditEventId)
+            VALUES
+                ($runId, $startedAtUtc, $endedAtUtc, $imageFolder, $outputFolder, $engineKey, $engineName,
+                 $engineVersion, $sourceKind, $isRealCameraSource, $profileName, $requestedDurationSeconds,
+                 $actualDurationSeconds, $delayBetweenInspectionsMs, $operatorId, $boardModel, $lotId,
+                 $wasCanceled, $totalCycles, $successfulCycles, $failedCycles, $averageInspectionMs,
+                 $minInspectionMs, $maxInspectionMs, $p95InspectionMs, $countOverOneSecond,
+                 $startManagedMemoryMb, $endManagedMemoryMb, $startWorkingSetMb, $endWorkingSetMb,
+                 $peakWorkingSetMb, $isCompletedFactoryEvidence, $errorsJson, $auditEventId);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$runId", run.RunId);
+        command.Parameters.AddWithValue("$startedAtUtc", run.StartTime.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$endedAtUtc", run.EndTime.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$imageFolder", run.ImageFolder);
+        command.Parameters.AddWithValue("$outputFolder", run.OutputFolder);
+        command.Parameters.AddWithValue("$engineKey", run.EngineKey);
+        command.Parameters.AddWithValue("$engineName", run.EngineName);
+        command.Parameters.AddWithValue("$engineVersion", run.EngineVersion);
+        command.Parameters.AddWithValue("$sourceKind", run.SourceKind);
+        command.Parameters.AddWithValue("$isRealCameraSource", run.IsRealCameraSource ? 1 : 0);
+        command.Parameters.AddWithValue("$profileName", run.ProfileName);
+        command.Parameters.AddWithValue("$requestedDurationSeconds", run.RequestedDuration.TotalSeconds);
+        command.Parameters.AddWithValue("$actualDurationSeconds", Math.Max(0, run.ActualDuration.TotalSeconds));
+        command.Parameters.AddWithValue("$delayBetweenInspectionsMs", run.DelayBetweenInspections.TotalMilliseconds);
+        command.Parameters.AddWithValue("$operatorId", effectiveOperator);
+        command.Parameters.AddWithValue("$boardModel", run.BoardModel);
+        command.Parameters.AddWithValue("$lotId", run.LotId);
+        command.Parameters.AddWithValue("$wasCanceled", run.WasCanceled ? 1 : 0);
+        command.Parameters.AddWithValue("$totalCycles", run.TotalCycles);
+        command.Parameters.AddWithValue("$successfulCycles", run.SuccessfulCycles);
+        command.Parameters.AddWithValue("$failedCycles", run.FailedCycles);
+        command.Parameters.AddWithValue("$averageInspectionMs", run.AverageInspectionMilliseconds);
+        command.Parameters.AddWithValue("$minInspectionMs", run.MinInspectionMilliseconds);
+        command.Parameters.AddWithValue("$maxInspectionMs", run.MaxInspectionMilliseconds);
+        command.Parameters.AddWithValue("$p95InspectionMs", run.P95InspectionMilliseconds);
+        command.Parameters.AddWithValue("$countOverOneSecond", run.CountOverOneSecond);
+        command.Parameters.AddWithValue("$startManagedMemoryMb", run.StartManagedMemoryMegabytes);
+        command.Parameters.AddWithValue("$endManagedMemoryMb", run.EndManagedMemoryMegabytes);
+        command.Parameters.AddWithValue("$startWorkingSetMb", run.StartWorkingSetMegabytes);
+        command.Parameters.AddWithValue("$endWorkingSetMb", run.EndWorkingSetMegabytes);
+        command.Parameters.AddWithValue("$peakWorkingSetMb", run.PeakWorkingSetMegabytes);
+        command.Parameters.AddWithValue("$isCompletedFactoryEvidence", run.IsCompletedFactoryEvidence ? 1 : 0);
+        command.Parameters.AddWithValue("$errorsJson", JsonSerializer.Serialize(run.Errors));
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
+
+        var runRowId = (long)(command.ExecuteScalar() ?? 0L);
+        run.Id = runRowId;
+
+        using var iterationCommand = connection.CreateCommand();
+        iterationCommand.Transaction = transaction;
+        iterationCommand.CommandText =
+            """
+            INSERT INTO SoakTestIterations
+                (RunId, CycleNumber, TimestampUtc, FrameId, ImagePath, EngineName, Verdict,
+                 TotalInspectionMs, WorkingSetMb, Success, Message, Error)
+            VALUES
+                ($runId, $cycleNumber, $timestampUtc, $frameId, $imagePath, $engineName, $verdict,
+                 $totalInspectionMs, $workingSetMb, $success, $message, $error);
+            """;
+        foreach (var cycle in run.Cycles)
+        {
+            iterationCommand.Parameters.Clear();
+            iterationCommand.Parameters.AddWithValue("$runId", runRowId);
+            iterationCommand.Parameters.AddWithValue("$cycleNumber", cycle.CycleNumber);
+            iterationCommand.Parameters.AddWithValue("$timestampUtc", (cycle.TimestampUtc ?? run.StartTime.ToUniversalTime()).ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            iterationCommand.Parameters.AddWithValue("$frameId", cycle.FrameId);
+            iterationCommand.Parameters.AddWithValue("$imagePath", cycle.ImagePath);
+            iterationCommand.Parameters.AddWithValue("$engineName", cycle.EngineName);
+            iterationCommand.Parameters.AddWithValue("$verdict", cycle.Verdict);
+            iterationCommand.Parameters.AddWithValue("$totalInspectionMs", cycle.TotalMilliseconds);
+            iterationCommand.Parameters.AddWithValue("$workingSetMb", cycle.WorkingSetMegabytes);
+            iterationCommand.Parameters.AddWithValue("$success", cycle.Success ? 1 : 0);
+            iterationCommand.Parameters.AddWithValue("$message", cycle.Message);
+            iterationCommand.Parameters.AddWithValue("$error", cycle.Error);
+            iterationCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return runRowId;
+    }
+
+    public static SoakTestResult? GetLatestSoakTestRun()
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, RunId, StartedAtUtc, EndedAtUtc, ImageFolder, OutputFolder, EngineKey, EngineName,
+                   EngineVersion, SourceKind, IsRealCameraSource, ProfileName, RequestedDurationSeconds,
+                   ActualDurationSeconds, DelayBetweenInspectionsMs, OperatorId, BoardModel, LotId,
+                   WasCanceled, TotalCycles, SuccessfulCycles, FailedCycles, AverageInspectionMs,
+                   MinInspectionMs, MaxInspectionMs, P95InspectionMs, CountOverOneSecond,
+                   StartManagedMemoryMb, EndManagedMemoryMb, StartWorkingSetMb, EndWorkingSetMb,
+                   PeakWorkingSetMb, IsCompletedFactoryEvidence, ErrorsJson
+            FROM SoakTestRuns
+            ORDER BY datetime(StartedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        var run = ReadSoakTestRun(reader);
+        run.Cycles.AddRange(GetSoakTestIterations(run.Id));
+        return run;
     }
 
     public static IReadOnlyList<ModelRegistryRecord> GetModelRegistryRecords()
@@ -872,9 +1749,14 @@ public static class AoiDatabase
             CountTable(connection, "CalibrationProfiles", "OK"),
             CountTable(connection, "CalibrationPoints", "OK"),
             CountTable(connection, "BatchTestRuns", "OK"),
+            CountTable(connection, "ValidationBreakdownMetrics", "OK"),
+            CountTable(connection, "FalseCallReductionRuns", "OK"),
+            CountTable(connection, "ThresholdProfiles", "OK"),
             CountTable(connection, "ModelRegistry", "OK"),
             CountTable(connection, "ExportHistory", "OK"),
             CountTable(connection, "ValidationPackages", "OK"),
+            CountTable(connection, "SoakTestRuns", "OK"),
+            CountTable(connection, "SoakTestIterations", "OK"),
             CountTable(connection, "MesUploadAttempts", "OK"),
             CountTable(connection, "LogArchive", "OK"),
         };
@@ -1330,22 +2212,35 @@ public static class AoiDatabase
         return records;
     }
 
-    public static void DeleteMesSpoolItem(long id, string message)
+    public static void MarkMesSpoolItemSent(long id, string message)
     {
         EnsureInitialized();
 
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM MesSpoolQueue WHERE Id = $id;";
+        command.CommandText =
+            """
+            UPDATE MesSpoolQueue
+            SET Status = 'Sent',
+                LastAttemptAtUtc = $lastAttemptAtUtc,
+                NextAttemptAtUtc = NULL,
+                LastError = $message
+            WHERE Id = $id;
+            """;
         command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$lastAttemptAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$message", message);
         command.ExecuteNonQuery();
 
         RecordAuditEvent(
             "MES_SPOOL",
-            $"MES spool item {id} completed and was removed. {message}",
+            $"MES spool item {id} marked Sent. {message}",
             relatedEntityType: "MesSpoolQueue",
             relatedEntityId: id.ToString(CultureInfo.InvariantCulture));
     }
+
+    public static void DeleteMesSpoolItem(long id, string message)
+        => MarkMesSpoolItemSent(id, message);
 
     public static void RecordMesSpoolRetryFailure(long id, string message, int retryBackoffMs)
     {
@@ -1373,6 +2268,34 @@ public static class AoiDatabase
         RecordAuditEvent(
             "MES_SPOOL",
             $"MES spool item {id} retry failed: {message}",
+            relatedEntityType: "MesSpoolQueue",
+            relatedEntityId: id.ToString(CultureInfo.InvariantCulture));
+    }
+
+    public static void MarkMesSpoolItemAbandoned(long id, string message, string operatorId)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE MesSpoolQueue
+            SET Status = 'Abandoned',
+                LastAttemptAtUtc = $lastAttemptAtUtc,
+                NextAttemptAtUtc = NULL,
+                LastError = $message
+            WHERE Id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$lastAttemptAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$message", message);
+        command.ExecuteNonQuery();
+
+        RecordAuditEvent(
+            "MES_SPOOL_ABANDON",
+            $"MES spool item {id} marked Abandoned. {message}",
+            operatorWithRole: operatorId,
             relatedEntityType: "MesSpoolQueue",
             relatedEntityId: id.ToString(CultureInfo.InvariantCulture));
     }
@@ -1628,7 +2551,9 @@ public static class AoiDatabase
             reader.GetDouble(8),
             reader.GetDouble(9),
             reader.GetInt32(10),
-            reader.GetInt32(11));
+            reader.GetInt32(11),
+            reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
+            reader.IsDBNull(13) ? string.Empty : reader.GetString(13));
     }
 
     private static BatchTestResultRecord ReadBatchTestResult(SqliteDataReader reader)
@@ -1645,6 +2570,11 @@ public static class AoiDatabase
             reader.GetDouble(6),
             reader.GetString(7),
             reader.GetString(8),
+            reader.IsDBNull(23) ? "UNASSIGNED" : reader.GetString(23),
+            reader.IsDBNull(24) ? "UNASSIGNED" : reader.GetString(24),
+            reader.IsDBNull(25) ? "UNASSIGNED" : reader.GetString(25),
+            reader.IsDBNull(26) ? "UNASSIGNED" : reader.GetString(26),
+            reader.IsDBNull(27) ? "UNKNOWN_GT" : reader.GetString(27),
             reader.GetDouble(9),
             reader.GetDouble(10),
             reader.GetDouble(11),
@@ -1657,9 +2587,9 @@ public static class AoiDatabase
             reader.IsDBNull(20) ? 0 : reader.GetDouble(20),
             reader.IsDBNull(21) ? 0 : reader.GetDouble(21),
             reader.IsDBNull(22) ? 0 : reader.GetDouble(22),
-            reader.IsDBNull(23) ? 0 : reader.GetDouble(23),
-            reader.IsDBNull(24) ? 0 : reader.GetDouble(24),
-            ParseDateTime(reader.GetString(25)));
+            reader.IsDBNull(28) ? 0 : reader.GetDouble(28),
+            reader.IsDBNull(29) ? 0 : reader.GetDouble(29),
+            ParseDateTime(reader.GetString(30)));
     }
 
     private static InspectionHistoryRecord ReadInspectionHistory(SqliteDataReader reader)
@@ -1742,6 +2672,388 @@ public static class AoiDatabase
             reader.IsDBNull(7) ? null : reader.GetInt64(7),
             reader.IsDBNull(8) ? "UNKNOWN" : reader.GetString(8),
             reader.IsDBNull(9) ? null : reader.GetInt64(9));
+    }
+
+    private static FalseCallReductionRun ReadFalseCallReductionRun(SqliteDataReader reader)
+    {
+        var criteria = DeserializeOrDefault(reader.IsDBNull(7) ? "{}" : reader.GetString(7), new FalseCallReductionCriteria());
+        var selectedThreshold = reader.IsDBNull(10) ? (double?)null : reader.GetDouble(10);
+        return new FalseCallReductionRun
+        {
+            Id = reader.GetInt64(0),
+            BatchRunId = reader.IsDBNull(1) ? null : reader.GetInt64(1),
+            CreatedAtUtc = ParseDateTime(reader.GetString(2)),
+            EngineName = reader.GetString(3),
+            ModelVersion = reader.GetString(4),
+            ModelId = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+            ModelSha256 = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            Criteria = criteria,
+            Recommendation = new OperatingPointRecommendation
+            {
+                Status = reader.IsDBNull(8) ? "INVALID" : reader.GetString(8),
+                Mode = reader.IsDBNull(9) ? criteria.Mode.ToString() : reader.GetString(9),
+                Point = selectedThreshold is null ? null : new ThresholdSweepPoint { ConfidenceThreshold = selectedThreshold.Value },
+                Messages = DeserializeStringList(reader.IsDBNull(11) ? "[]" : reader.GetString(11)).ToList(),
+            },
+        };
+    }
+
+    private static CameraAcceptanceRun ReadCameraAcceptanceRun(SqliteDataReader reader)
+        => new()
+        {
+            Id = reader.GetInt64(0),
+            CreatedAtUtc = ParseDateTime(reader.GetString(1)),
+            AdapterName = reader.GetString(2),
+            SourceKey = reader.GetString(3),
+            SettingsSummary = reader.GetString(4),
+            Criteria = DeserializeOrDefault(reader.IsDBNull(5) ? "{}" : reader.GetString(5), new CameraAcceptanceCriteria()),
+            Status = reader.GetString(6),
+            FactoryReadinessStatus = reader.GetString(7),
+            IsRealHardware = reader.GetInt32(8) != 0,
+            TotalRequestedFrames = reader.GetInt32(9),
+            TotalReceivedFrames = reader.GetInt32(10),
+            DroppedFrameCount = reader.GetInt32(11),
+            TriggerFailureCount = reader.GetInt32(12),
+            TimeoutCount = reader.GetInt32(13),
+            MaxConnectMs = reader.GetDouble(14),
+            MaxFirstFrameMs = reader.GetDouble(15),
+            AverageFrameIntervalMs = reader.GetDouble(16),
+            Warnings = DeserializeOrDefault(reader.IsDBNull(17) ? "[]" : reader.GetString(17), new List<string>()),
+            Failures = DeserializeOrDefault(reader.IsDBNull(18) ? "[]" : reader.GetString(18), new List<string>()),
+            ViewMetrics = DeserializeOrDefault(reader.IsDBNull(19) ? "[]" : reader.GetString(19), new List<CameraAcceptanceViewMetrics>()),
+        };
+
+    private static IReadOnlyList<CameraAcceptanceFrameRecord> GetCameraAcceptanceFrames(long runId)
+    {
+        var frames = new List<CameraAcceptanceFrameRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT ViewType, Sequence, FrameId, CameraId, CapturedAtUtc, Width, Height,
+                   PixelFormat, SourceKind, IsSimulated, LatencyMs, IntervalMs,
+                   MetadataValid, Message
+            FROM CameraAcceptanceFrames
+            WHERE RunId = $runId
+            ORDER BY Id;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            frames.Add(new CameraAcceptanceFrameRecord
+            {
+                ViewType = reader.GetString(0),
+                Sequence = reader.GetInt32(1),
+                FrameId = reader.GetString(2),
+                CameraId = reader.GetString(3),
+                CapturedAtUtc = ParseDateTime(reader.GetString(4)),
+                Width = reader.GetInt32(5),
+                Height = reader.GetInt32(6),
+                PixelFormat = reader.GetString(7),
+                SourceKind = reader.GetString(8),
+                IsSimulated = reader.GetInt32(9) != 0,
+                LatencyMs = reader.GetDouble(10),
+                IntervalMs = reader.GetDouble(11),
+                MetadataValid = reader.GetInt32(12) != 0,
+                Message = reader.GetString(13),
+            });
+        }
+
+        return frames;
+    }
+
+    private static LightingAcceptanceRun ReadLightingAcceptanceRun(SqliteDataReader reader)
+        => new()
+        {
+            Id = reader.GetInt64(0),
+            CreatedAtUtc = ParseDateTime(reader.GetString(1)),
+            ControllerName = reader.GetString(2),
+            Mode = reader.GetString(3),
+            SettingsSummary = reader.GetString(4),
+            Criteria = DeserializeOrDefault(reader.IsDBNull(5) ? "{}" : reader.GetString(5), new LightingAcceptanceCriteria()),
+            Status = reader.GetString(6),
+            IsSimulated = reader.GetInt32(7) != 0,
+            StepCount = reader.GetInt32(8),
+            PassedStepCount = reader.GetInt32(9),
+            FailedStepCount = reader.GetInt32(10),
+            MaxCommandLatencyMs = reader.GetDouble(11),
+            MaxTriggerToFrameLatencyMs = reader.GetDouble(12),
+            Warnings = DeserializeOrDefault(reader.IsDBNull(13) ? "[]" : reader.GetString(13), new List<string>()),
+            Failures = DeserializeOrDefault(reader.IsDBNull(14) ? "[]" : reader.GetString(14), new List<string>()),
+        };
+
+    private static IReadOnlyList<LightingAcceptanceStep> GetLightingAcceptanceSteps(long runId)
+    {
+        var steps = new List<LightingAcceptanceStep>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT ViewType, ProgramName, CommandText, CommandLatencyMs,
+                   TriggerToFrameLatencyMs, CommandAccepted, FrameReceived, FrameId,
+                   CameraId, Status, Message
+            FROM LightingAcceptanceSteps
+            WHERE RunId = $runId
+            ORDER BY Id;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            steps.Add(new LightingAcceptanceStep
+            {
+                ViewType = reader.GetString(0),
+                ProgramName = reader.GetString(1),
+                CommandText = reader.GetString(2),
+                CommandLatencyMs = reader.GetDouble(3),
+                TriggerToFrameLatencyMs = reader.GetDouble(4),
+                CommandAccepted = reader.GetInt32(5) != 0,
+                FrameReceived = reader.GetInt32(6) != 0,
+                FrameId = reader.GetString(7),
+                CameraId = reader.GetString(8),
+                Status = reader.GetString(9),
+                Message = reader.GetString(10),
+            });
+        }
+
+        return steps;
+    }
+
+    private static RobotAcceptanceRun ReadRobotAcceptanceRun(SqliteDataReader reader)
+        => new()
+        {
+            Id = reader.GetInt64(0),
+            CreatedAtUtc = ParseDateTime(reader.GetString(1)),
+            ControllerName = reader.GetString(2),
+            EmergencyStopName = reader.GetString(3),
+            SourceKind = reader.GetString(4),
+            Criteria = DeserializeOrDefault(reader.IsDBNull(5) ? "{}" : reader.GetString(5), new RobotAcceptanceCriteria()),
+            Status = reader.GetString(6),
+            FinalState = reader.GetString(7),
+            LoadMs = reader.GetDouble(8),
+            MoveToInspectMs = reader.GetDouble(9),
+            InspectionMs = reader.GetDouble(10),
+            UnloadMs = reader.GetDouble(11),
+            FullCycleMs = reader.GetDouble(12),
+            InvalidTransitionRejected = reader.GetInt32(13) != 0,
+            EmergencyStopBlocked = reader.GetInt32(14) != 0,
+            ResetReturnedIdle = reader.GetInt32(15) != 0,
+            AuditEventCount = reader.GetInt32(16),
+            Warnings = DeserializeOrDefault(reader.IsDBNull(17) ? "[]" : reader.GetString(17), new List<string>()),
+            Failures = DeserializeOrDefault(reader.IsDBNull(18) ? "[]" : reader.GetString(18), new List<string>()),
+        };
+
+    private static IReadOnlyList<RobotAcceptanceStep> GetRobotAcceptanceSteps(long runId)
+    {
+        var steps = new List<RobotAcceptanceStep>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT StepName, FromState, ToState, ElapsedMs, Accepted, Status, Message
+            FROM RobotAcceptanceSteps
+            WHERE RunId = $runId
+            ORDER BY Id;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            steps.Add(new RobotAcceptanceStep
+            {
+                StepName = reader.GetString(0),
+                FromState = reader.GetString(1),
+                ToState = reader.GetString(2),
+                ElapsedMs = reader.GetDouble(3),
+                Accepted = reader.GetInt32(4) != 0,
+                Status = reader.GetString(5),
+                Message = reader.GetString(6),
+            });
+        }
+
+        return steps;
+    }
+
+    private static SoakTestResult ReadSoakTestRun(SqliteDataReader reader)
+    {
+        var run = new SoakTestResult
+        {
+            Id = reader.GetInt64(0),
+            RunId = reader.GetString(1),
+            StartTime = ParseDateTime(reader.GetString(2)).ToLocalTime(),
+            EndTime = ParseDateTime(reader.GetString(3)).ToLocalTime(),
+            ImageFolder = reader.GetString(4),
+            OutputFolder = reader.GetString(5),
+            EngineKey = reader.GetString(6),
+            EngineName = reader.GetString(7),
+            EngineVersion = reader.GetString(8),
+            SourceKind = reader.GetString(9),
+            IsRealCameraSource = reader.GetInt32(10) != 0,
+            ProfileName = reader.GetString(11),
+            RequestedDuration = TimeSpan.FromSeconds(reader.GetDouble(12)),
+            DelayBetweenInspections = TimeSpan.FromMilliseconds(reader.GetDouble(14)),
+            OperatorId = reader.GetString(15),
+            BoardModel = reader.GetString(16),
+            LotId = reader.GetString(17),
+            WasCanceled = reader.GetInt32(18) != 0,
+            TotalCycles = reader.GetInt32(19),
+            SuccessfulCycles = reader.GetInt32(20),
+            FailedCycles = reader.GetInt32(21),
+            AverageInspectionMilliseconds = reader.GetDouble(22),
+            MinInspectionMilliseconds = reader.GetDouble(23),
+            MaxInspectionMilliseconds = reader.GetDouble(24),
+            P95InspectionMilliseconds = reader.GetDouble(25),
+            CountOverOneSecond = reader.GetInt32(26),
+            StartManagedMemoryMegabytes = reader.GetDouble(27),
+            EndManagedMemoryMegabytes = reader.GetDouble(28),
+            StartWorkingSetMegabytes = reader.GetDouble(29),
+            EndWorkingSetMegabytes = reader.GetDouble(30),
+            PeakWorkingSetMegabytes = reader.GetDouble(31),
+        };
+        run.Errors.AddRange(DeserializeOrDefault(reader.IsDBNull(33) ? "[]" : reader.GetString(33), new List<string>()));
+        return run;
+    }
+
+    private static IReadOnlyList<SoakTestCycleRecord> GetSoakTestIterations(long runId)
+    {
+        var cycles = new List<SoakTestCycleRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT CycleNumber, TimestampUtc, FrameId, ImagePath, EngineName, Verdict,
+                   TotalInspectionMs, WorkingSetMb, Success, Message, Error
+            FROM SoakTestIterations
+            WHERE RunId = $runId
+            ORDER BY CycleNumber ASC, Id ASC;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            cycles.Add(new SoakTestCycleRecord(
+                reader.GetInt32(0),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(5),
+                reader.GetDouble(6),
+                reader.GetInt32(8) != 0,
+                reader.GetString(9),
+                ParseDateTime(reader.GetString(1)),
+                reader.GetString(4),
+                reader.GetDouble(7),
+                reader.GetString(10)));
+        }
+
+        return cycles;
+    }
+
+    private static ThresholdProfile ReadThresholdProfile(SqliteDataReader reader)
+    {
+        return new ThresholdProfile
+        {
+            ProfileId = reader.GetString(0),
+            Revision = reader.GetString(1),
+            BoardModel = reader.GetString(2),
+            BoardProgram = reader.GetString(3),
+            RecipeName = reader.GetString(4),
+            RecipeRevision = reader.GetString(5),
+            Status = reader.GetString(6),
+            SourceValidationRunId = reader.IsDBNull(7) ? null : reader.GetInt64(7),
+            SourceFalseCallReductionRunId = reader.IsDBNull(8) ? null : reader.GetInt64(8),
+            CreatedBy = reader.GetString(9),
+            CreatedAtUtc = ParseDateTime(reader.GetString(10)),
+            ApprovedBy = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+            ApprovedAtUtc = reader.IsDBNull(12) ? null : ParseDateTime(reader.GetString(12)),
+        };
+    }
+
+    private static IReadOnlyList<ThresholdProfileRule> GetThresholdProfileRules(string profileId, string revision)
+    {
+        var rules = new List<ThresholdProfileRule>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ProfileId, Revision, ViewType, RoiType, DefectClass, ReviewThreshold, NgThreshold,
+                   ConfidenceThreshold, MinimumAreaPixels, MaxAllowedFalseCallRate
+            FROM ThresholdProfileRules
+            WHERE ProfileId = $profileId AND Revision = $revision
+            ORDER BY Id ASC;
+            """;
+        command.Parameters.AddWithValue("$profileId", profileId);
+        command.Parameters.AddWithValue("$revision", revision);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            rules.Add(new ThresholdProfileRule
+            {
+                Id = reader.GetInt64(0),
+                ProfileId = reader.GetString(1),
+                Revision = reader.GetString(2),
+                ViewType = reader.GetString(3),
+                RoiType = reader.GetString(4),
+                DefectClass = reader.GetString(5),
+                ReviewThreshold = reader.GetDouble(6),
+                NgThreshold = reader.GetDouble(7),
+                ConfidenceThreshold = reader.GetDouble(8),
+                MinimumAreaPixels = reader.GetDouble(9),
+                MaxAllowedFalseCallRate = reader.GetDouble(10),
+            });
+        }
+
+        return rules;
+    }
+
+    private static IReadOnlyList<ThresholdSweepPoint> GetFalseCallReductionPoints(long runId)
+    {
+        var points = new List<ThresholdSweepPoint>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT ConfidenceThreshold, DifferenceThreshold, TruePositive, TrueNegative,
+                   FalsePositive, FalseNegative, Precision, Recall, FalseCallRate, PossibleEscapeRate,
+                   ReviewRate, NgRate, ReviewCount, NgCount, EstimatedManualReviewMinutes,
+                   MeetsConstraints, Status
+            FROM FalseCallReductionPoints
+            WHERE RunId = $runId
+            ORDER BY ConfidenceThreshold ASC, Id ASC;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            points.Add(new ThresholdSweepPoint
+            {
+                ConfidenceThreshold = reader.GetDouble(0),
+                DifferenceThreshold = reader.GetDouble(1),
+                TruePositive = reader.GetInt32(2),
+                TrueNegative = reader.GetInt32(3),
+                FalsePositive = reader.GetInt32(4),
+                FalseNegative = reader.GetInt32(5),
+                Precision = reader.GetDouble(6),
+                Recall = reader.GetDouble(7),
+                FalseCallRate = reader.GetDouble(8),
+                PossibleEscapeRate = reader.GetDouble(9),
+                ReviewRate = reader.GetDouble(10),
+                NgRate = reader.GetDouble(11),
+                ReviewCount = reader.GetInt32(12),
+                NgCount = reader.GetInt32(13),
+                EstimatedManualReviewMinutes = reader.GetDouble(14),
+                MeetsConstraints = reader.GetInt32(15) != 0,
+                Status = reader.GetString(16),
+            });
+        }
+
+        return points;
     }
 
     private static ModelRegistryRecord ReadModelRegistryRecord(SqliteDataReader reader)
@@ -1890,6 +3202,81 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$isActive", record.IsActive ? 1 : 0);
         command.Parameters.AddWithValue("$auditEventId", record.AuditEventId is { } id ? (object)id : DBNull.Value);
     }
+
+    private static void BindFalseCallReductionPoint(SqliteCommand command, ThresholdSweepPoint point)
+    {
+        command.Parameters.AddWithValue("$confidenceThreshold", point.ConfidenceThreshold);
+        command.Parameters.AddWithValue("$differenceThreshold", point.DifferenceThreshold);
+        command.Parameters.AddWithValue("$truePositive", point.TruePositive);
+        command.Parameters.AddWithValue("$trueNegative", point.TrueNegative);
+        command.Parameters.AddWithValue("$falsePositive", point.FalsePositive);
+        command.Parameters.AddWithValue("$falseNegative", point.FalseNegative);
+        command.Parameters.AddWithValue("$precision", point.Precision);
+        command.Parameters.AddWithValue("$recall", point.Recall);
+        command.Parameters.AddWithValue("$falseCallRate", point.FalseCallRate);
+        command.Parameters.AddWithValue("$possibleEscapeRate", point.PossibleEscapeRate);
+        command.Parameters.AddWithValue("$reviewRate", point.ReviewRate);
+        command.Parameters.AddWithValue("$ngRate", point.NgRate);
+        command.Parameters.AddWithValue("$reviewCount", point.ReviewCount);
+        command.Parameters.AddWithValue("$ngCount", point.NgCount);
+        command.Parameters.AddWithValue("$estimatedManualReviewMinutes", point.EstimatedManualReviewMinutes);
+        command.Parameters.AddWithValue("$meetsConstraints", point.MeetsConstraints ? 1 : 0);
+        command.Parameters.AddWithValue("$status", point.Status);
+    }
+
+    private static void BindValidationBreakdownMetric(SqliteCommand command, long runId, ValidationBreakdownMetric metric)
+    {
+        command.Parameters.AddWithValue("$runId", runId);
+        command.Parameters.AddWithValue("$breakdownType", metric.BreakdownType);
+        command.Parameters.AddWithValue("$key", metric.Key);
+        command.Parameters.AddWithValue("$displayName", metric.DisplayName);
+        command.Parameters.AddWithValue("$total", metric.Total);
+        command.Parameters.AddWithValue("$truePositive", metric.TruePositive);
+        command.Parameters.AddWithValue("$trueNegative", metric.TrueNegative);
+        command.Parameters.AddWithValue("$falsePositive", metric.FalsePositive);
+        command.Parameters.AddWithValue("$falseNegative", metric.FalseNegative);
+        command.Parameters.AddWithValue("$wrongDefectClass", metric.WrongDefectClass);
+        command.Parameters.AddWithValue("$wrongSide", metric.WrongSide);
+        command.Parameters.AddWithValue("$unknownGroundTruth", metric.UnknownGroundTruth);
+        command.Parameters.AddWithValue("$precision", metric.Precision);
+        command.Parameters.AddWithValue("$recall", metric.Recall);
+        command.Parameters.AddWithValue("$falseCallRate", metric.FalseCallRate);
+        command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+    }
+
+    private static void BindThresholdProfile(SqliteCommand command, ThresholdProfile profile)
+    {
+        command.Parameters.AddWithValue("$profileId", profile.ProfileId);
+        command.Parameters.AddWithValue("$revision", profile.Revision);
+        command.Parameters.AddWithValue("$boardModel", NormalizeProfileScope(profile.BoardModel));
+        command.Parameters.AddWithValue("$boardProgram", NormalizeProfileScope(profile.BoardProgram));
+        command.Parameters.AddWithValue("$recipeName", NormalizeProfileScope(profile.RecipeName));
+        command.Parameters.AddWithValue("$recipeRevision", NormalizeProfileScope(profile.RecipeRevision));
+        command.Parameters.AddWithValue("$status", profile.Status);
+        command.Parameters.AddWithValue("$sourceValidationRunId", profile.SourceValidationRunId is { } validationRunId ? (object)validationRunId : DBNull.Value);
+        command.Parameters.AddWithValue("$sourceFalseCallReductionRunId", profile.SourceFalseCallReductionRunId is { } falseCallRunId ? (object)falseCallRunId : DBNull.Value);
+        command.Parameters.AddWithValue("$createdBy", profile.CreatedBy);
+        command.Parameters.AddWithValue("$createdAtUtc", profile.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$approvedBy", string.IsNullOrWhiteSpace(profile.ApprovedBy) ? DBNull.Value : profile.ApprovedBy);
+        command.Parameters.AddWithValue("$approvedAtUtc", profile.ApprovedAtUtc is { } approvedAt ? approvedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
+    }
+
+    private static void BindThresholdProfileRule(SqliteCommand command, ThresholdProfile profile, ThresholdProfileRule rule)
+    {
+        command.Parameters.AddWithValue("$profileId", profile.ProfileId);
+        command.Parameters.AddWithValue("$revision", profile.Revision);
+        command.Parameters.AddWithValue("$viewType", NormalizeProfileScope(rule.ViewType));
+        command.Parameters.AddWithValue("$roiType", NormalizeProfileScope(rule.RoiType));
+        command.Parameters.AddWithValue("$defectClass", NormalizeProfileScope(rule.DefectClass));
+        command.Parameters.AddWithValue("$reviewThreshold", rule.ReviewThreshold);
+        command.Parameters.AddWithValue("$ngThreshold", rule.NgThreshold);
+        command.Parameters.AddWithValue("$confidenceThreshold", rule.ConfidenceThreshold);
+        command.Parameters.AddWithValue("$minimumAreaPixels", rule.MinimumAreaPixels);
+        command.Parameters.AddWithValue("$maxAllowedFalseCallRate", rule.MaxAllowedFalseCallRate);
+    }
+
+    private static string NormalizeProfileScope(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "ANY" : value.Trim();
 
     private static IReadOnlyList<CalibrationPointRecord> GetCalibrationPoints(long profileId)
     {
@@ -2050,6 +3437,18 @@ public static class AoiDatabase
         }
     }
 
+    private static T DeserializeOrDefault<T>(string json, T fallback)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<T>(json) ?? fallback;
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
     private static void EnsureSchemaCompatibility(SqliteConnection connection)
     {
         AoiDatabaseMigrations.ApplyPending(connection);
@@ -2110,6 +3509,394 @@ public static class AoiDatabase
 
             CREATE INDEX IF NOT EXISTS IX_ValidationPackages_CreatedAtUtc ON ValidationPackages(CreatedAtUtc);
             CREATE INDEX IF NOT EXISTS IX_ValidationPackages_PackageId ON ValidationPackages(PackageId);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureFalseCallReductionTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS FalseCallReductionRuns
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                BatchRunId INTEGER NULL,
+                CreatedAtUtc TEXT NOT NULL,
+                EngineName TEXT NOT NULL,
+                ModelVersion TEXT NOT NULL DEFAULT 'UNKNOWN',
+                ModelId TEXT NOT NULL DEFAULT '',
+                ModelSha256 TEXT NOT NULL DEFAULT '',
+                CriteriaJson TEXT NOT NULL DEFAULT '{}',
+                RecommendationStatus TEXT NOT NULL DEFAULT 'INVALID',
+                RecommendationMode TEXT NOT NULL DEFAULT 'Balanced',
+                SelectedThreshold REAL NULL,
+                SelectedFalseCallRate REAL NULL,
+                SelectedPossibleEscapeRate REAL NULL,
+                SelectedReviewRate REAL NULL,
+                SelectedManualReviewMinutes REAL NULL,
+                SelectedPossibleEscapeCount INTEGER NULL,
+                RecommendationMessagesJson TEXT NOT NULL DEFAULT '[]',
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                AuditEventId INTEGER NULL,
+                FOREIGN KEY (BatchRunId) REFERENCES BatchTestRuns(Id)
+            );
+
+            CREATE TABLE IF NOT EXISTS FalseCallReductionPoints
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                RunId INTEGER NOT NULL,
+                ConfidenceThreshold REAL NOT NULL,
+                DifferenceThreshold REAL NOT NULL,
+                TruePositive INTEGER NOT NULL,
+                TrueNegative INTEGER NOT NULL,
+                FalsePositive INTEGER NOT NULL,
+                FalseNegative INTEGER NOT NULL,
+                Precision REAL NOT NULL,
+                Recall REAL NOT NULL,
+                FalseCallRate REAL NOT NULL,
+                PossibleEscapeRate REAL NOT NULL,
+                ReviewRate REAL NOT NULL,
+                NgRate REAL NOT NULL,
+                ReviewCount INTEGER NOT NULL,
+                NgCount INTEGER NOT NULL,
+                EstimatedManualReviewMinutes REAL NOT NULL,
+                MeetsConstraints INTEGER NOT NULL DEFAULT 0,
+                Status TEXT NOT NULL DEFAULT 'CONDITIONAL',
+                FOREIGN KEY (RunId) REFERENCES FalseCallReductionRuns(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_FalseCallReductionRuns_CreatedAtUtc ON FalseCallReductionRuns(CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_FalseCallReductionRuns_BatchRunId ON FalseCallReductionRuns(BatchRunId);
+            CREATE INDEX IF NOT EXISTS IX_FalseCallReductionPoints_RunId ON FalseCallReductionPoints(RunId);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureValidationBreakdownMetricsTable(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS ValidationBreakdownMetrics
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                RunId INTEGER NOT NULL,
+                BreakdownType TEXT NOT NULL,
+                Key TEXT NOT NULL,
+                DisplayName TEXT NOT NULL DEFAULT '',
+                Total INTEGER NOT NULL DEFAULT 0,
+                TruePositive INTEGER NOT NULL DEFAULT 0,
+                TrueNegative INTEGER NOT NULL DEFAULT 0,
+                FalsePositive INTEGER NOT NULL DEFAULT 0,
+                FalseNegative INTEGER NOT NULL DEFAULT 0,
+                WrongDefectClass INTEGER NOT NULL DEFAULT 0,
+                WrongSide INTEGER NOT NULL DEFAULT 0,
+                UnknownGroundTruth INTEGER NOT NULL DEFAULT 0,
+                Precision REAL NOT NULL DEFAULT 0,
+                Recall REAL NOT NULL DEFAULT 0,
+                FalseCallRate REAL NOT NULL DEFAULT 0,
+                CreatedAtUtc TEXT NOT NULL,
+                FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_ValidationBreakdownMetrics_RunId ON ValidationBreakdownMetrics(RunId);
+            CREATE INDEX IF NOT EXISTS IX_ValidationBreakdownMetrics_Type ON ValidationBreakdownMetrics(BreakdownType, Key);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureThresholdProfileTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS ThresholdProfiles
+            (
+                ProfileId TEXT NOT NULL,
+                Revision TEXT NOT NULL,
+                BoardModel TEXT NOT NULL DEFAULT 'ANY',
+                BoardProgram TEXT NOT NULL DEFAULT 'ANY',
+                RecipeName TEXT NOT NULL DEFAULT 'ANY',
+                RecipeRevision TEXT NOT NULL DEFAULT 'ANY',
+                Status TEXT NOT NULL DEFAULT 'Draft',
+                SourceValidationRunId INTEGER NULL,
+                SourceFalseCallReductionRunId INTEGER NULL,
+                CreatedBy TEXT NOT NULL DEFAULT 'UNKNOWN',
+                CreatedAtUtc TEXT NOT NULL,
+                ApprovedBy TEXT NULL,
+                ApprovedAtUtc TEXT NULL,
+                PRIMARY KEY (ProfileId, Revision)
+            );
+
+            CREATE TABLE IF NOT EXISTS ThresholdProfileRules
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ProfileId TEXT NOT NULL,
+                Revision TEXT NOT NULL,
+                ViewType TEXT NOT NULL DEFAULT 'Any',
+                RoiType TEXT NOT NULL DEFAULT 'Any',
+                DefectClass TEXT NOT NULL DEFAULT 'Any',
+                ReviewThreshold REAL NOT NULL,
+                NgThreshold REAL NOT NULL,
+                ConfidenceThreshold REAL NOT NULL DEFAULT 0.65,
+                MinimumAreaPixels REAL NOT NULL DEFAULT 0,
+                MaxAllowedFalseCallRate REAL NOT NULL DEFAULT 1,
+                FOREIGN KEY (ProfileId, Revision) REFERENCES ThresholdProfiles(ProfileId, Revision)
+            );
+
+            CREATE TABLE IF NOT EXISTS ThresholdProfileDeployments
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ProfileId TEXT NOT NULL,
+                Revision TEXT NOT NULL,
+                BoardModel TEXT NOT NULL DEFAULT 'ANY',
+                BoardProgram TEXT NOT NULL DEFAULT 'ANY',
+                RecipeName TEXT NOT NULL DEFAULT 'ANY',
+                DeployedAtUtc TEXT NOT NULL,
+                DeployedBy TEXT NOT NULL DEFAULT 'UNKNOWN',
+                IsActive INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (ProfileId, Revision) REFERENCES ThresholdProfiles(ProfileId, Revision)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_ThresholdProfiles_Status ON ThresholdProfiles(Status);
+            CREATE INDEX IF NOT EXISTS IX_ThresholdProfileRules_Profile ON ThresholdProfileRules(ProfileId, Revision);
+            CREATE INDEX IF NOT EXISTS IX_ThresholdProfileDeployments_Active ON ThresholdProfileDeployments(BoardModel, BoardProgram, RecipeName, IsActive);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureCameraAcceptanceTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS CameraAcceptanceRuns
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CreatedAtUtc TEXT NOT NULL,
+                AdapterName TEXT NOT NULL,
+                SourceKey TEXT NOT NULL,
+                SettingsSummary TEXT NOT NULL,
+                CriteriaJson TEXT NOT NULL,
+                Status TEXT NOT NULL,
+                FactoryReadinessStatus TEXT NOT NULL,
+                IsRealHardware INTEGER NOT NULL DEFAULT 0,
+                TotalRequestedFrames INTEGER NOT NULL DEFAULT 0,
+                TotalReceivedFrames INTEGER NOT NULL DEFAULT 0,
+                DroppedFrameCount INTEGER NOT NULL DEFAULT 0,
+                TriggerFailureCount INTEGER NOT NULL DEFAULT 0,
+                TimeoutCount INTEGER NOT NULL DEFAULT 0,
+                MaxConnectMs REAL NOT NULL DEFAULT 0,
+                MaxFirstFrameMs REAL NOT NULL DEFAULT 0,
+                AverageFrameIntervalMs REAL NOT NULL DEFAULT 0,
+                WarningsJson TEXT NOT NULL DEFAULT '[]',
+                FailuresJson TEXT NOT NULL DEFAULT '[]',
+                ViewMetricsJson TEXT NOT NULL DEFAULT '[]',
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                AuditEventId INTEGER NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS CameraAcceptanceFrames
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                RunId INTEGER NOT NULL,
+                ViewType TEXT NOT NULL,
+                Sequence INTEGER NOT NULL,
+                FrameId TEXT NOT NULL,
+                CameraId TEXT NOT NULL,
+                CapturedAtUtc TEXT NOT NULL,
+                Width INTEGER NOT NULL DEFAULT 0,
+                Height INTEGER NOT NULL DEFAULT 0,
+                PixelFormat TEXT NOT NULL DEFAULT '',
+                SourceKind TEXT NOT NULL DEFAULT '',
+                IsSimulated INTEGER NOT NULL DEFAULT 0,
+                LatencyMs REAL NOT NULL DEFAULT 0,
+                IntervalMs REAL NOT NULL DEFAULT 0,
+                MetadataValid INTEGER NOT NULL DEFAULT 0,
+                Message TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (RunId) REFERENCES CameraAcceptanceRuns(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_CameraAcceptanceRuns_CreatedAtUtc ON CameraAcceptanceRuns(CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_CameraAcceptanceRuns_RealHardware ON CameraAcceptanceRuns(IsRealHardware, CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_CameraAcceptanceFrames_RunId ON CameraAcceptanceFrames(RunId);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureLightingAcceptanceTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS LightingAcceptanceRuns
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CreatedAtUtc TEXT NOT NULL,
+                ControllerName TEXT NOT NULL,
+                Mode TEXT NOT NULL,
+                SettingsSummary TEXT NOT NULL,
+                CriteriaJson TEXT NOT NULL,
+                Status TEXT NOT NULL,
+                IsSimulated INTEGER NOT NULL DEFAULT 0,
+                StepCount INTEGER NOT NULL DEFAULT 0,
+                PassedStepCount INTEGER NOT NULL DEFAULT 0,
+                FailedStepCount INTEGER NOT NULL DEFAULT 0,
+                MaxCommandLatencyMs REAL NOT NULL DEFAULT 0,
+                MaxTriggerToFrameLatencyMs REAL NOT NULL DEFAULT 0,
+                WarningsJson TEXT NOT NULL DEFAULT '[]',
+                FailuresJson TEXT NOT NULL DEFAULT '[]',
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                AuditEventId INTEGER NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS LightingAcceptanceSteps
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                RunId INTEGER NOT NULL,
+                ViewType TEXT NOT NULL,
+                ProgramName TEXT NOT NULL,
+                CommandText TEXT NOT NULL,
+                CommandLatencyMs REAL NOT NULL DEFAULT 0,
+                TriggerToFrameLatencyMs REAL NOT NULL DEFAULT 0,
+                CommandAccepted INTEGER NOT NULL DEFAULT 0,
+                FrameReceived INTEGER NOT NULL DEFAULT 0,
+                FrameId TEXT NOT NULL DEFAULT '',
+                CameraId TEXT NOT NULL DEFAULT '',
+                Status TEXT NOT NULL,
+                Message TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (RunId) REFERENCES LightingAcceptanceRuns(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_LightingAcceptanceRuns_CreatedAtUtc ON LightingAcceptanceRuns(CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_LightingAcceptanceSteps_RunId ON LightingAcceptanceSteps(RunId);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureRobotAcceptanceTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS RobotAcceptanceRuns
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CreatedAtUtc TEXT NOT NULL,
+                ControllerName TEXT NOT NULL,
+                EmergencyStopName TEXT NOT NULL,
+                SourceKind TEXT NOT NULL,
+                CriteriaJson TEXT NOT NULL,
+                Status TEXT NOT NULL,
+                FinalState TEXT NOT NULL,
+                LoadMs REAL NOT NULL DEFAULT 0,
+                MoveToInspectMs REAL NOT NULL DEFAULT 0,
+                InspectionMs REAL NOT NULL DEFAULT 0,
+                UnloadMs REAL NOT NULL DEFAULT 0,
+                FullCycleMs REAL NOT NULL DEFAULT 0,
+                InvalidTransitionRejected INTEGER NOT NULL DEFAULT 0,
+                EmergencyStopBlocked INTEGER NOT NULL DEFAULT 0,
+                ResetReturnedIdle INTEGER NOT NULL DEFAULT 0,
+                AuditEventCount INTEGER NOT NULL DEFAULT 0,
+                WarningsJson TEXT NOT NULL DEFAULT '[]',
+                FailuresJson TEXT NOT NULL DEFAULT '[]',
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                AuditEventId INTEGER NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS RobotAcceptanceSteps
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                RunId INTEGER NOT NULL,
+                StepName TEXT NOT NULL,
+                FromState TEXT NOT NULL,
+                ToState TEXT NOT NULL,
+                ElapsedMs REAL NOT NULL DEFAULT 0,
+                Accepted INTEGER NOT NULL DEFAULT 0,
+                Status TEXT NOT NULL,
+                Message TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (RunId) REFERENCES RobotAcceptanceRuns(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_RobotAcceptanceRuns_CreatedAtUtc ON RobotAcceptanceRuns(CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_RobotAcceptanceSteps_RunId ON RobotAcceptanceSteps(RunId);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureSoakTestTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS SoakTestRuns
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                RunId TEXT NOT NULL,
+                StartedAtUtc TEXT NOT NULL,
+                EndedAtUtc TEXT NOT NULL,
+                ImageFolder TEXT NOT NULL,
+                OutputFolder TEXT NOT NULL,
+                EngineKey TEXT NOT NULL,
+                EngineName TEXT NOT NULL,
+                EngineVersion TEXT NOT NULL,
+                SourceKind TEXT NOT NULL DEFAULT 'Simulated source',
+                IsRealCameraSource INTEGER NOT NULL DEFAULT 0,
+                ProfileName TEXT NOT NULL DEFAULT 'Custom',
+                RequestedDurationSeconds REAL NOT NULL DEFAULT 0,
+                ActualDurationSeconds REAL NOT NULL DEFAULT 0,
+                DelayBetweenInspectionsMs REAL NOT NULL DEFAULT 0,
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                BoardModel TEXT NOT NULL DEFAULT 'UNKNOWN',
+                LotId TEXT NOT NULL DEFAULT 'SOAK-TEST',
+                WasCanceled INTEGER NOT NULL DEFAULT 0,
+                TotalCycles INTEGER NOT NULL DEFAULT 0,
+                SuccessfulCycles INTEGER NOT NULL DEFAULT 0,
+                FailedCycles INTEGER NOT NULL DEFAULT 0,
+                AverageInspectionMs REAL NOT NULL DEFAULT 0,
+                MinInspectionMs REAL NOT NULL DEFAULT 0,
+                MaxInspectionMs REAL NOT NULL DEFAULT 0,
+                P95InspectionMs REAL NOT NULL DEFAULT 0,
+                CountOverOneSecond INTEGER NOT NULL DEFAULT 0,
+                StartManagedMemoryMb REAL NOT NULL DEFAULT 0,
+                EndManagedMemoryMb REAL NOT NULL DEFAULT 0,
+                StartWorkingSetMb REAL NOT NULL DEFAULT 0,
+                EndWorkingSetMb REAL NOT NULL DEFAULT 0,
+                PeakWorkingSetMb REAL NOT NULL DEFAULT 0,
+                IsCompletedFactoryEvidence INTEGER NOT NULL DEFAULT 0,
+                ErrorsJson TEXT NOT NULL DEFAULT '[]',
+                AuditEventId INTEGER NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS SoakTestIterations
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                RunId INTEGER NOT NULL,
+                CycleNumber INTEGER NOT NULL,
+                TimestampUtc TEXT NOT NULL,
+                FrameId TEXT NOT NULL,
+                ImagePath TEXT NOT NULL,
+                EngineName TEXT NOT NULL,
+                Verdict TEXT NOT NULL,
+                TotalInspectionMs REAL NOT NULL DEFAULT 0,
+                WorkingSetMb REAL NOT NULL DEFAULT 0,
+                Success INTEGER NOT NULL DEFAULT 0,
+                Message TEXT NOT NULL DEFAULT '',
+                Error TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (RunId) REFERENCES SoakTestRuns(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_SoakTestRuns_StartedAtUtc ON SoakTestRuns(StartedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_SoakTestRuns_FactoryEvidence ON SoakTestRuns(IsCompletedFactoryEvidence, StartedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_SoakTestIterations_RunId ON SoakTestIterations(RunId);
             """;
         command.ExecuteNonQuery();
     }
@@ -2358,6 +4145,9 @@ public static class AoiDatabase
             ModelVersion TEXT NOT NULL,
             ModelFilePath TEXT NOT NULL DEFAULT '',
             ConfidenceThreshold REAL NOT NULL DEFAULT 0,
+            ThresholdProfileId TEXT NOT NULL DEFAULT '',
+            ThresholdProfileRevision TEXT NOT NULL DEFAULT '',
+            ThresholdSource TEXT NOT NULL DEFAULT 'Built-in policy default',
             DecisionReason TEXT NOT NULL,
             HotspotX REAL NOT NULL,
             HotspotY REAL NOT NULL,
@@ -2479,6 +4269,8 @@ public static class AoiDatabase
             GroundTruthCsvPath TEXT NULL,
             EngineName TEXT NOT NULL,
             ModelVersion TEXT NOT NULL DEFAULT 'UNKNOWN',
+            ThresholdProfileId TEXT NOT NULL DEFAULT '',
+            ThresholdProfileRevision TEXT NOT NULL DEFAULT '',
             Accuracy REAL NOT NULL,
             Precision REAL NOT NULL,
             Recall REAL NOT NULL,
@@ -2501,6 +4293,11 @@ public static class AoiDatabase
             Score REAL NOT NULL,
             PassFail TEXT NOT NULL,
             DefectType TEXT NOT NULL,
+            NormalizedDefectClass TEXT NOT NULL DEFAULT 'UNASSIGNED',
+            NormalizedSide TEXT NOT NULL DEFAULT 'UNASSIGNED',
+            RoiId TEXT NOT NULL DEFAULT 'UNASSIGNED',
+            RoiType TEXT NOT NULL DEFAULT 'UNASSIGNED',
+            FailureCategory TEXT NOT NULL DEFAULT 'UNKNOWN_GT',
             RoiX REAL NOT NULL,
             RoiY REAL NOT NULL,
             RoiWidth REAL NOT NULL,
@@ -2517,6 +4314,76 @@ public static class AoiDatabase
             TotalInspectionMs REAL NOT NULL DEFAULT 0,
             CreatedAtUtc TEXT NOT NULL,
             FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
+        );
+
+        CREATE TABLE IF NOT EXISTS ValidationBreakdownMetrics
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            RunId INTEGER NOT NULL,
+            BreakdownType TEXT NOT NULL,
+            Key TEXT NOT NULL,
+            DisplayName TEXT NOT NULL DEFAULT '',
+            Total INTEGER NOT NULL DEFAULT 0,
+            TruePositive INTEGER NOT NULL DEFAULT 0,
+            TrueNegative INTEGER NOT NULL DEFAULT 0,
+            FalsePositive INTEGER NOT NULL DEFAULT 0,
+            FalseNegative INTEGER NOT NULL DEFAULT 0,
+            WrongDefectClass INTEGER NOT NULL DEFAULT 0,
+            WrongSide INTEGER NOT NULL DEFAULT 0,
+            UnknownGroundTruth INTEGER NOT NULL DEFAULT 0,
+            Precision REAL NOT NULL DEFAULT 0,
+            Recall REAL NOT NULL DEFAULT 0,
+            FalseCallRate REAL NOT NULL DEFAULT 0,
+            CreatedAtUtc TEXT NOT NULL,
+            FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
+        );
+
+        CREATE TABLE IF NOT EXISTS ThresholdProfiles
+        (
+            ProfileId TEXT NOT NULL,
+            Revision TEXT NOT NULL,
+            BoardModel TEXT NOT NULL DEFAULT 'ANY',
+            BoardProgram TEXT NOT NULL DEFAULT 'ANY',
+            RecipeName TEXT NOT NULL DEFAULT 'ANY',
+            RecipeRevision TEXT NOT NULL DEFAULT 'ANY',
+            Status TEXT NOT NULL DEFAULT 'Draft',
+            SourceValidationRunId INTEGER NULL,
+            SourceFalseCallReductionRunId INTEGER NULL,
+            CreatedBy TEXT NOT NULL DEFAULT 'UNKNOWN',
+            CreatedAtUtc TEXT NOT NULL,
+            ApprovedBy TEXT NULL,
+            ApprovedAtUtc TEXT NULL,
+            PRIMARY KEY (ProfileId, Revision)
+        );
+
+        CREATE TABLE IF NOT EXISTS ThresholdProfileRules
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ProfileId TEXT NOT NULL,
+            Revision TEXT NOT NULL,
+            ViewType TEXT NOT NULL DEFAULT 'Any',
+            RoiType TEXT NOT NULL DEFAULT 'Any',
+            DefectClass TEXT NOT NULL DEFAULT 'Any',
+            ReviewThreshold REAL NOT NULL,
+            NgThreshold REAL NOT NULL,
+            ConfidenceThreshold REAL NOT NULL DEFAULT 0.65,
+            MinimumAreaPixels REAL NOT NULL DEFAULT 0,
+            MaxAllowedFalseCallRate REAL NOT NULL DEFAULT 1,
+            FOREIGN KEY (ProfileId, Revision) REFERENCES ThresholdProfiles(ProfileId, Revision)
+        );
+
+        CREATE TABLE IF NOT EXISTS ThresholdProfileDeployments
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ProfileId TEXT NOT NULL,
+            Revision TEXT NOT NULL,
+            BoardModel TEXT NOT NULL DEFAULT 'ANY',
+            BoardProgram TEXT NOT NULL DEFAULT 'ANY',
+            RecipeName TEXT NOT NULL DEFAULT 'ANY',
+            DeployedAtUtc TEXT NOT NULL,
+            DeployedBy TEXT NOT NULL DEFAULT 'UNKNOWN',
+            IsActive INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (ProfileId, Revision) REFERENCES ThresholdProfiles(ProfileId, Revision)
         );
 
         CREATE TABLE IF NOT EXISTS ModelRegistry
@@ -2587,6 +4454,236 @@ public static class AoiDatabase
             FOREIGN KEY (RunId) REFERENCES BatchTestRuns(Id)
         );
 
+        CREATE TABLE IF NOT EXISTS FalseCallReductionRuns
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            BatchRunId INTEGER NULL,
+            CreatedAtUtc TEXT NOT NULL,
+            EngineName TEXT NOT NULL,
+            ModelVersion TEXT NOT NULL DEFAULT 'UNKNOWN',
+            ModelId TEXT NOT NULL DEFAULT '',
+            ModelSha256 TEXT NOT NULL DEFAULT '',
+            CriteriaJson TEXT NOT NULL DEFAULT '{}',
+            RecommendationStatus TEXT NOT NULL DEFAULT 'INVALID',
+            RecommendationMode TEXT NOT NULL DEFAULT 'Balanced',
+            SelectedThreshold REAL NULL,
+            SelectedFalseCallRate REAL NULL,
+            SelectedPossibleEscapeRate REAL NULL,
+            SelectedReviewRate REAL NULL,
+            SelectedManualReviewMinutes REAL NULL,
+            SelectedPossibleEscapeCount INTEGER NULL,
+            RecommendationMessagesJson TEXT NOT NULL DEFAULT '[]',
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            AuditEventId INTEGER NULL,
+            FOREIGN KEY (BatchRunId) REFERENCES BatchTestRuns(Id)
+        );
+
+        CREATE TABLE IF NOT EXISTS FalseCallReductionPoints
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            RunId INTEGER NOT NULL,
+            ConfidenceThreshold REAL NOT NULL,
+            DifferenceThreshold REAL NOT NULL,
+            TruePositive INTEGER NOT NULL,
+            TrueNegative INTEGER NOT NULL,
+            FalsePositive INTEGER NOT NULL,
+            FalseNegative INTEGER NOT NULL,
+            Precision REAL NOT NULL,
+            Recall REAL NOT NULL,
+            FalseCallRate REAL NOT NULL,
+            PossibleEscapeRate REAL NOT NULL,
+            ReviewRate REAL NOT NULL,
+            NgRate REAL NOT NULL,
+            ReviewCount INTEGER NOT NULL,
+            NgCount INTEGER NOT NULL,
+            EstimatedManualReviewMinutes REAL NOT NULL,
+            MeetsConstraints INTEGER NOT NULL DEFAULT 0,
+            Status TEXT NOT NULL DEFAULT 'CONDITIONAL',
+            FOREIGN KEY (RunId) REFERENCES FalseCallReductionRuns(Id)
+        );
+
+        CREATE TABLE IF NOT EXISTS CameraAcceptanceRuns
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CreatedAtUtc TEXT NOT NULL,
+            AdapterName TEXT NOT NULL,
+            SourceKey TEXT NOT NULL,
+            SettingsSummary TEXT NOT NULL,
+            CriteriaJson TEXT NOT NULL,
+            Status TEXT NOT NULL,
+            FactoryReadinessStatus TEXT NOT NULL,
+            IsRealHardware INTEGER NOT NULL DEFAULT 0,
+            TotalRequestedFrames INTEGER NOT NULL DEFAULT 0,
+            TotalReceivedFrames INTEGER NOT NULL DEFAULT 0,
+            DroppedFrameCount INTEGER NOT NULL DEFAULT 0,
+            TriggerFailureCount INTEGER NOT NULL DEFAULT 0,
+            TimeoutCount INTEGER NOT NULL DEFAULT 0,
+            MaxConnectMs REAL NOT NULL DEFAULT 0,
+            MaxFirstFrameMs REAL NOT NULL DEFAULT 0,
+            AverageFrameIntervalMs REAL NOT NULL DEFAULT 0,
+            WarningsJson TEXT NOT NULL DEFAULT '[]',
+            FailuresJson TEXT NOT NULL DEFAULT '[]',
+            ViewMetricsJson TEXT NOT NULL DEFAULT '[]',
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            AuditEventId INTEGER NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS CameraAcceptanceFrames
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            RunId INTEGER NOT NULL,
+            ViewType TEXT NOT NULL,
+            Sequence INTEGER NOT NULL,
+            FrameId TEXT NOT NULL,
+            CameraId TEXT NOT NULL,
+            CapturedAtUtc TEXT NOT NULL,
+            Width INTEGER NOT NULL DEFAULT 0,
+            Height INTEGER NOT NULL DEFAULT 0,
+            PixelFormat TEXT NOT NULL DEFAULT '',
+            SourceKind TEXT NOT NULL DEFAULT '',
+            IsSimulated INTEGER NOT NULL DEFAULT 0,
+            LatencyMs REAL NOT NULL DEFAULT 0,
+            IntervalMs REAL NOT NULL DEFAULT 0,
+            MetadataValid INTEGER NOT NULL DEFAULT 0,
+            Message TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY (RunId) REFERENCES CameraAcceptanceRuns(Id)
+        );
+
+        CREATE TABLE IF NOT EXISTS LightingAcceptanceRuns
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CreatedAtUtc TEXT NOT NULL,
+            ControllerName TEXT NOT NULL,
+            Mode TEXT NOT NULL,
+            SettingsSummary TEXT NOT NULL,
+            CriteriaJson TEXT NOT NULL,
+            Status TEXT NOT NULL,
+            IsSimulated INTEGER NOT NULL DEFAULT 0,
+            StepCount INTEGER NOT NULL DEFAULT 0,
+            PassedStepCount INTEGER NOT NULL DEFAULT 0,
+            FailedStepCount INTEGER NOT NULL DEFAULT 0,
+            MaxCommandLatencyMs REAL NOT NULL DEFAULT 0,
+            MaxTriggerToFrameLatencyMs REAL NOT NULL DEFAULT 0,
+            WarningsJson TEXT NOT NULL DEFAULT '[]',
+            FailuresJson TEXT NOT NULL DEFAULT '[]',
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            AuditEventId INTEGER NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS LightingAcceptanceSteps
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            RunId INTEGER NOT NULL,
+            ViewType TEXT NOT NULL,
+            ProgramName TEXT NOT NULL,
+            CommandText TEXT NOT NULL,
+            CommandLatencyMs REAL NOT NULL DEFAULT 0,
+            TriggerToFrameLatencyMs REAL NOT NULL DEFAULT 0,
+            CommandAccepted INTEGER NOT NULL DEFAULT 0,
+            FrameReceived INTEGER NOT NULL DEFAULT 0,
+            FrameId TEXT NOT NULL DEFAULT '',
+            CameraId TEXT NOT NULL DEFAULT '',
+            Status TEXT NOT NULL,
+            Message TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY (RunId) REFERENCES LightingAcceptanceRuns(Id)
+        );
+
+        CREATE TABLE IF NOT EXISTS RobotAcceptanceRuns
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CreatedAtUtc TEXT NOT NULL,
+            ControllerName TEXT NOT NULL,
+            EmergencyStopName TEXT NOT NULL,
+            SourceKind TEXT NOT NULL,
+            CriteriaJson TEXT NOT NULL,
+            Status TEXT NOT NULL,
+            FinalState TEXT NOT NULL,
+            LoadMs REAL NOT NULL DEFAULT 0,
+            MoveToInspectMs REAL NOT NULL DEFAULT 0,
+            InspectionMs REAL NOT NULL DEFAULT 0,
+            UnloadMs REAL NOT NULL DEFAULT 0,
+            FullCycleMs REAL NOT NULL DEFAULT 0,
+            InvalidTransitionRejected INTEGER NOT NULL DEFAULT 0,
+            EmergencyStopBlocked INTEGER NOT NULL DEFAULT 0,
+            ResetReturnedIdle INTEGER NOT NULL DEFAULT 0,
+            AuditEventCount INTEGER NOT NULL DEFAULT 0,
+            WarningsJson TEXT NOT NULL DEFAULT '[]',
+            FailuresJson TEXT NOT NULL DEFAULT '[]',
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            AuditEventId INTEGER NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS RobotAcceptanceSteps
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            RunId INTEGER NOT NULL,
+            StepName TEXT NOT NULL,
+            FromState TEXT NOT NULL,
+            ToState TEXT NOT NULL,
+            ElapsedMs REAL NOT NULL DEFAULT 0,
+            Accepted INTEGER NOT NULL DEFAULT 0,
+            Status TEXT NOT NULL,
+            Message TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY (RunId) REFERENCES RobotAcceptanceRuns(Id)
+        );
+
+        CREATE TABLE IF NOT EXISTS SoakTestRuns
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            RunId TEXT NOT NULL,
+            StartedAtUtc TEXT NOT NULL,
+            EndedAtUtc TEXT NOT NULL,
+            ImageFolder TEXT NOT NULL,
+            OutputFolder TEXT NOT NULL,
+            EngineKey TEXT NOT NULL,
+            EngineName TEXT NOT NULL,
+            EngineVersion TEXT NOT NULL,
+            SourceKind TEXT NOT NULL DEFAULT 'Simulated source',
+            IsRealCameraSource INTEGER NOT NULL DEFAULT 0,
+            ProfileName TEXT NOT NULL DEFAULT 'Custom',
+            RequestedDurationSeconds REAL NOT NULL DEFAULT 0,
+            ActualDurationSeconds REAL NOT NULL DEFAULT 0,
+            DelayBetweenInspectionsMs REAL NOT NULL DEFAULT 0,
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            BoardModel TEXT NOT NULL DEFAULT 'UNKNOWN',
+            LotId TEXT NOT NULL DEFAULT 'SOAK-TEST',
+            WasCanceled INTEGER NOT NULL DEFAULT 0,
+            TotalCycles INTEGER NOT NULL DEFAULT 0,
+            SuccessfulCycles INTEGER NOT NULL DEFAULT 0,
+            FailedCycles INTEGER NOT NULL DEFAULT 0,
+            AverageInspectionMs REAL NOT NULL DEFAULT 0,
+            MinInspectionMs REAL NOT NULL DEFAULT 0,
+            MaxInspectionMs REAL NOT NULL DEFAULT 0,
+            P95InspectionMs REAL NOT NULL DEFAULT 0,
+            CountOverOneSecond INTEGER NOT NULL DEFAULT 0,
+            StartManagedMemoryMb REAL NOT NULL DEFAULT 0,
+            EndManagedMemoryMb REAL NOT NULL DEFAULT 0,
+            StartWorkingSetMb REAL NOT NULL DEFAULT 0,
+            EndWorkingSetMb REAL NOT NULL DEFAULT 0,
+            PeakWorkingSetMb REAL NOT NULL DEFAULT 0,
+            IsCompletedFactoryEvidence INTEGER NOT NULL DEFAULT 0,
+            ErrorsJson TEXT NOT NULL DEFAULT '[]',
+            AuditEventId INTEGER NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS SoakTestIterations
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            RunId INTEGER NOT NULL,
+            CycleNumber INTEGER NOT NULL,
+            TimestampUtc TEXT NOT NULL,
+            FrameId TEXT NOT NULL,
+            ImagePath TEXT NOT NULL,
+            EngineName TEXT NOT NULL,
+            Verdict TEXT NOT NULL,
+            TotalInspectionMs REAL NOT NULL DEFAULT 0,
+            WorkingSetMb REAL NOT NULL DEFAULT 0,
+            Success INTEGER NOT NULL DEFAULT 0,
+            Message TEXT NOT NULL DEFAULT '',
+            Error TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY (RunId) REFERENCES SoakTestRuns(Id)
+        );
+
         CREATE TABLE IF NOT EXISTS MesUploadAttempts
         (
             Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2647,6 +4744,11 @@ public static class AoiDatabase
         CREATE INDEX IF NOT EXISTS IX_CalibrationProfiles_BoardModel_CreatedAtUtc ON CalibrationProfiles(BoardModel, CreatedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_CalibrationPoints_ProfileId ON CalibrationPoints(ProfileId);
         CREATE INDEX IF NOT EXISTS IX_BatchTestResults_RunId ON BatchTestResults(RunId);
+        CREATE INDEX IF NOT EXISTS IX_ValidationBreakdownMetrics_RunId ON ValidationBreakdownMetrics(RunId);
+        CREATE INDEX IF NOT EXISTS IX_ValidationBreakdownMetrics_Type ON ValidationBreakdownMetrics(BreakdownType, Key);
+        CREATE INDEX IF NOT EXISTS IX_ThresholdProfiles_Status ON ThresholdProfiles(Status);
+        CREATE INDEX IF NOT EXISTS IX_ThresholdProfileRules_Profile ON ThresholdProfileRules(ProfileId, Revision);
+        CREATE INDEX IF NOT EXISTS IX_ThresholdProfileDeployments_Active ON ThresholdProfileDeployments(BoardModel, BoardProgram, RecipeName, IsActive);
         CREATE INDEX IF NOT EXISTS IX_ModelRegistry_ModelId ON ModelRegistry(ModelId);
         CREATE INDEX IF NOT EXISTS IX_ModelRegistry_IsActive ON ModelRegistry(IsActive);
         CREATE INDEX IF NOT EXISTS IX_ModelRegistry_RegisteredAtUtc ON ModelRegistry(RegisteredAtUtc);
@@ -2656,6 +4758,19 @@ public static class AoiDatabase
         CREATE INDEX IF NOT EXISTS IX_ExportVerification_Status ON ExportVerification(Status);
         CREATE INDEX IF NOT EXISTS IX_ValidationPackages_CreatedAtUtc ON ValidationPackages(CreatedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_ValidationPackages_PackageId ON ValidationPackages(PackageId);
+        CREATE INDEX IF NOT EXISTS IX_FalseCallReductionRuns_CreatedAtUtc ON FalseCallReductionRuns(CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_FalseCallReductionRuns_BatchRunId ON FalseCallReductionRuns(BatchRunId);
+        CREATE INDEX IF NOT EXISTS IX_FalseCallReductionPoints_RunId ON FalseCallReductionPoints(RunId);
+        CREATE INDEX IF NOT EXISTS IX_CameraAcceptanceRuns_CreatedAtUtc ON CameraAcceptanceRuns(CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_CameraAcceptanceRuns_RealHardware ON CameraAcceptanceRuns(IsRealHardware, CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_CameraAcceptanceFrames_RunId ON CameraAcceptanceFrames(RunId);
+        CREATE INDEX IF NOT EXISTS IX_LightingAcceptanceRuns_CreatedAtUtc ON LightingAcceptanceRuns(CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_LightingAcceptanceSteps_RunId ON LightingAcceptanceSteps(RunId);
+        CREATE INDEX IF NOT EXISTS IX_RobotAcceptanceRuns_CreatedAtUtc ON RobotAcceptanceRuns(CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_RobotAcceptanceSteps_RunId ON RobotAcceptanceSteps(RunId);
+        CREATE INDEX IF NOT EXISTS IX_SoakTestRuns_StartedAtUtc ON SoakTestRuns(StartedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_SoakTestRuns_FactoryEvidence ON SoakTestRuns(IsCompletedFactoryEvidence, StartedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_SoakTestIterations_RunId ON SoakTestIterations(RunId);
         CREATE INDEX IF NOT EXISTS IX_MesUploadAttempts_CreatedAtUtc ON MesUploadAttempts(CreatedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_MesSpoolQueue_Status_NextAttempt ON MesSpoolQueue(Status, NextAttemptAtUtc);
         CREATE INDEX IF NOT EXISTS IX_MesSpoolQueue_CreatedAtUtc ON MesSpoolQueue(CreatedAtUtc);

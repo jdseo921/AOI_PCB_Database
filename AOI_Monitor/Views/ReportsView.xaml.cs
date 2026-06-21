@@ -28,6 +28,7 @@ public partial class ReportsView : UserControl
     private readonly ObservableCollection<ExportHistoryRow> _exportRows = new();
     private readonly ObservableCollection<AuditLogRow> _auditRows = new();
     private readonly ObservableCollection<MesSpoolQueueRow> _mesSpoolRows = new();
+    private readonly ObservableCollection<FactoryReadinessRow> _factoryReadinessRows = new();
     private CancellationTokenSource? _workCts;
 
     public ReportsView()
@@ -38,6 +39,7 @@ public partial class ReportsView : UserControl
         ExportGrid.ItemsSource = _exportRows;
         AuditGrid.ItemsSource = _auditRows;
         MesSpoolGrid.ItemsSource = _mesSpoolRows;
+        FactoryReadinessGrid.ItemsSource = _factoryReadinessRows;
         FromDatePicker.SelectedDate = DateTime.Today.AddDays(-30);
         ToDatePicker.SelectedDate = DateTime.Today;
         LoadLogs();
@@ -69,14 +71,17 @@ public partial class ReportsView : UserControl
             .ToArray();
         var audits = AoiDatabase.GetAuditEvents(filter).Select(AuditLogRow.FromRecord).ToArray();
         var mesSpool = AoiDatabase.GetMesSpoolQueue().Select(MesSpoolQueueRow.FromRecord).ToArray();
+        var readinessReport = FactoryReadinessService.Evaluate();
+        var readiness = readinessReport.Categories.Select(FactoryReadinessRow.FromCategory).ToArray();
 
         ReplaceRows(_inspectionRows, inspections);
         ReplaceRows(_reviewRows, reviews);
         ReplaceRows(_exportRows, exports);
         ReplaceRows(_auditRows, audits);
         ReplaceRows(_mesSpoolRows, mesSpool);
+        ReplaceRows(_factoryReadinessRows, readiness);
 
-        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows / {mesSpool.Length} MES spool";
+        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows / {mesSpool.Length} MES spool / readiness {readinessReport.OverallStatus}";
         StatusText.Text = "Loaded real SQLite log records.";
     }
 
@@ -382,6 +387,29 @@ public partial class ReportsView : UserControl
         }
     }
 
+    private void OnExportFactoryReadinessPackageClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting factory readiness Go/No-Go package", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!ConfirmExport("Export a management/customer Factory Readiness Go/No-Go package?"))
+            return;
+
+        try
+        {
+            var result = FactoryReadinessService.ExportGoNoGoPackage();
+            WorkflowState.Instance.AddEvent("FACTORY_READINESS_EXPORT", $"Factory readiness package exported: {Path.GetFileName(result.PackageFolder)}.");
+            RefreshAfterExport($"Factory readiness package exported: {result.PackageFolder}. Summary: {result.SummaryHtmlPath}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Factory readiness package export failed", ex, "FACTORY_READINESS_EXPORT_ERROR");
+        }
+    }
+
     private void OnVerifyImagePathsClick(object sender, RoutedEventArgs e)
     {
         if (!ConfirmExport("Run image path verification and record the utility report?"))
@@ -579,16 +607,19 @@ public partial class ReportsView : UserControl
         try
         {
             var result = await SoakTestService.RunAsync(options, progress, cts.Token);
+            SoakTestService.Persist(result, state.OperatorWithRole);
             var reportPath = SoakTestService.WriteHtmlReport(result, options.OutputFolder);
+            var jsonReportPath = SoakTestService.WriteJsonReport(result, options.OutputFolder);
             var status = result.WasCanceled
                 ? "CANCELED"
                 : result.Errors.Count == 0 ? "OK" : "WARN";
 
             var verified = ExportVerificationService.RecordVerifiedExport("SoakTestReport", reportPath, status);
-            WorkflowState.Instance.AddEvent("SOAK_TEST", $"Soak test {status}: cycles={result.TotalCycles}, success={result.SuccessfulCycles}, failed={result.FailedCycles}, report={Path.GetFileName(reportPath)}.");
+            ExportVerificationService.RecordVerifiedExport("SoakTestJsonReport", jsonReportPath, status);
+            WorkflowState.Instance.AddEvent("SOAK_TEST", $"Soak test {status}: cycles={result.TotalCycles}, success={result.SuccessfulCycles}, failed={result.FailedCycles}, p95={result.P95InspectionMilliseconds:F0} ms, source={result.SourceKind}, report={Path.GetFileName(reportPath)}.");
             LogErrors("SOAK_TEST_ERROR", result.Errors);
             SoakReportPathText.Text = $"Latest soak-test report: {reportPath}";
-            RefreshAfterExport($"Soak test {status}. Cycles={result.TotalCycles}, failed={result.FailedCycles}. Report: {reportPath}. Verification: {verified.Verification.Status}.");
+            RefreshAfterExport($"Soak test {status}. Cycles={result.TotalCycles}, failed={result.FailedCycles}, p95={result.P95InspectionMilliseconds:F0} ms, source={result.SourceKind}. HTML: {reportPath}. JSON: {jsonReportPath}. Verification: {verified.Verification.Status}.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -680,7 +711,7 @@ public partial class ReportsView : UserControl
         var cts = BeginWork("Retrying pending MES spool uploads...");
         try
         {
-            var summary = await TraceabilityUploadService.RetryPendingMesUploadsAsync(100, cts.Token);
+            var summary = await MesSpoolService.RetryEligibleAsync(100, cts.Token);
             var message = $"MES spool retry complete: attempted={summary.Attempted}, succeeded={summary.Succeeded}, failed={summary.Failed}.";
             WorkflowState.Instance.AddEvent("MES_SPOOL", message);
             RefreshAfterExport(message);
@@ -693,6 +724,128 @@ public partial class ReportsView : UserControl
         finally
         {
             EndWork();
+        }
+    }
+
+    private async void OnRetrySelectedMesSpoolClick(object sender, RoutedEventArgs e)
+    {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Retrying selected MES queue items", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var selected = MesSpoolGrid.SelectedItems.OfType<MesSpoolQueueRow>().ToArray();
+        if (selected.Length == 0)
+        {
+            MessageBox.Show("Select one or more MES queue items to retry.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var retryable = selected
+            .Where(row => row.Status is "Pending" or "Failed")
+            .Select(row => row.Id)
+            .ToArray();
+        if (retryable.Length == 0)
+        {
+            MessageBox.Show("Selected MES queue items are not retryable. Only Pending or Failed items can be retried.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var cts = BeginWork("Retrying selected MES queue items...");
+        try
+        {
+            var summary = await MesSpoolService.RetryItemsAsync(retryable, cts.Token);
+            var message = $"Selected MES retry complete: attempted={summary.Attempted}, succeeded={summary.Succeeded}, failed={summary.Failed}.";
+            WorkflowState.Instance.AddEvent("MES_SPOOL", message);
+            RefreshAfterExport(message);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Selected MES retry canceled.";
+            WorkflowState.Instance.AddEvent("MES_SPOOL", "Selected MES retry canceled by user.");
+        }
+        finally
+        {
+            EndWork();
+        }
+    }
+
+    private void OnExportMesQueueReportClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting MES queue report", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            var report = MesSpoolService.ExportQueueReport();
+            WorkflowState.Instance.AddEvent("MES_SPOOL_EXPORT", $"MES queue report exported: {Path.GetFileName(report.HtmlPath)}.");
+            RefreshAfterExport($"MES queue report exported. HTML: {report.HtmlPath}. JSON: {report.JsonPath}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("MES queue report export failed", ex, "MES_SPOOL_EXPORT_ERROR");
+        }
+    }
+
+    private void OnAbandonMesSpoolClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanUseMaintenanceActions, "Abandoning MES queue items", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var selected = MesSpoolGrid.SelectedItems.OfType<MesSpoolQueueRow>().ToArray();
+        if (selected.Length == 0)
+        {
+            MessageBox.Show("Select one or more MES queue items to mark Abandoned.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var candidates = selected
+            .Where(row => row.Status is "Pending" or "Failed")
+            .ToArray();
+        if (candidates.Length == 0)
+        {
+            MessageBox.Show("Selected MES queue items are already terminal. Only Pending or Failed items can be abandoned.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"Mark {candidates.Length} MES queue item(s) Abandoned? This is an Admin-only audit action and does not upload payloads.",
+            "Confirm MES queue abandon",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            foreach (var row in candidates)
+            {
+                MesSpoolService.MarkAbandoned(
+                    row.Id,
+                    WorkflowState.Instance.CurrentRole,
+                    WorkflowState.Instance.OperatorWithRole,
+                    "Abandoned from MES Queue UI.");
+            }
+
+            WorkflowState.Instance.AddEvent("MES_SPOOL_ABANDON", $"Marked {candidates.Length} MES queue item(s) Abandoned.");
+            RefreshAfterExport($"Marked {candidates.Length} MES queue item(s) Abandoned.");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            MessageBox.Show(ex.Message, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -934,6 +1087,10 @@ public partial class ReportsView : UserControl
             Rows = rows.ToArray(),
             SampleAnnotatedImages = sampleImages,
             Warnings = warnings.ToArray(),
+            DatasetQualitySummary = DatasetQualityService.Analyze(rows),
+            CameraAcceptanceSummary = CameraAcceptanceTestService.ToSummary(AoiDatabase.GetLatestCameraAcceptanceRun(realHardwareOnly: true)),
+            RobotAcceptanceSummary = RobotAcceptanceTestService.ToSummary(AoiDatabase.GetLatestRobotAcceptanceRun()),
+            MesReadinessSummary = MesSpoolService.EvaluateReadiness(),
         };
     }
 
@@ -1517,6 +1674,7 @@ public partial class ReportsView : UserControl
         private readonly TextBox _imageFolderText = new();
         private readonly TextBox _durationMinutesText = new() { Text = "2" };
         private readonly TextBox _delayMillisecondsText = new() { Text = "250" };
+        private readonly ComboBox _profileCombo = new();
         private readonly ComboBox _engineCombo = new();
         private readonly TextBox _outputFolderText = new();
 
@@ -1526,7 +1684,7 @@ public partial class ReportsView : UserControl
         {
             Title = "Run Local Soak Test";
             Width = 640;
-            Height = 390;
+            Height = 430;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.NoResize;
             Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#11161A"));
@@ -1534,6 +1692,7 @@ public partial class ReportsView : UserControl
 
             _outputFolderText.Text = defaultOutputFolder;
             ConfigureEngineOptions(defaultEngineKey);
+            ConfigureProfileOptions();
             Content = BuildContent();
         }
 
@@ -1548,17 +1707,19 @@ public partial class ReportsView : UserControl
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
 
             AddText(root, "Controlled local soak test using Folder Camera Simulation frames. This does not connect to real camera hardware.", 0, 0, 3, "#DCE5EB", bold: true);
             AddLabeledFolder(root, "Image folder", _imageFolderText, 1, "Select", OnSelectImageFolder);
-            AddLabeledText(root, "Duration (minutes)", _durationMinutesText, 2);
-            AddLabeledText(root, "Delay between inspections (ms)", _delayMillisecondsText, 3);
-            AddLabeledControl(root, "Selected engine", _engineCombo, 4);
-            AddLabeledFolder(root, "Output folder", _outputFolderText, 5, "Select", OnSelectOutputFolder);
-            AddText(root, "Recommended short proof run: 2 minutes. For acceptance soak evidence, use 480 minutes for 8 hours and confirm the output folder has enough free space.", 6, 0, 3, "#9AA6AF");
+            AddLabeledControl(root, "Test profile", _profileCombo, 2);
+            AddLabeledText(root, "Duration (minutes)", _durationMinutesText, 3);
+            AddLabeledText(root, "Delay between inspections (ms)", _delayMillisecondsText, 4);
+            AddLabeledControl(root, "Selected engine", _engineCombo, 5);
+            AddLabeledFolder(root, "Output folder", _outputFolderText, 6, "Select", OnSelectOutputFolder);
+            AddText(root, "Factory PoC profile runs for 480 minutes. Folder Camera Simulation evidence is not real camera validation.", 7, 0, 3, "#9AA6AF");
 
             var buttons = new StackPanel
             {
@@ -1571,7 +1732,7 @@ public partial class ReportsView : UserControl
             run.Click += OnRunClick;
             buttons.Children.Add(cancel);
             buttons.Children.Add(run);
-            Grid.SetRow(buttons, 7);
+            Grid.SetRow(buttons, 8);
             Grid.SetColumnSpan(buttons, 3);
             root.Children.Add(buttons);
 
@@ -1584,6 +1745,29 @@ public partial class ReportsView : UserControl
             _engineCombo.Items.Add(new ComboBoxItem { Content = "ONNX ML Model (configured)", Tag = InspectionEngineFactory.OnnxEngineKey });
             var normalized = InspectionEngineFactory.NormalizeEngineKey(defaultEngineKey);
             _engineCombo.SelectedIndex = normalized == InspectionEngineFactory.OnnxEngineKey ? 1 : 0;
+        }
+
+        private void ConfigureProfileOptions()
+        {
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "Quick smoke (5 min)", Tag = SoakTestProfile.QuickSmoke });
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "Short stability (30 min)", Tag = SoakTestProfile.ShortStability });
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "Factory PoC (8 hours)", Tag = SoakTestProfile.FactoryPoc });
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "Custom", Tag = SoakTestProfile.Custom });
+            _profileCombo.SelectedIndex = 0;
+            _durationMinutesText.Text = "5";
+            _durationMinutesText.IsEnabled = false;
+            _profileCombo.SelectionChanged += (_, _) =>
+            {
+                var profile = SelectedProfile();
+                _durationMinutesText.IsEnabled = profile == SoakTestProfile.Custom;
+                _durationMinutesText.Text = profile switch
+                {
+                    SoakTestProfile.QuickSmoke => "5",
+                    SoakTestProfile.ShortStability => "30",
+                    SoakTestProfile.FactoryPoc => "480",
+                    _ => _durationMinutesText.Text,
+                };
+            };
         }
 
         private void OnSelectImageFolder(object sender, RoutedEventArgs e)
@@ -1637,6 +1821,11 @@ public partial class ReportsView : UserControl
                 "SOAK-TEST");
             DialogResult = true;
         }
+
+        private SoakTestProfile SelectedProfile()
+            => (_profileCombo.SelectedItem as ComboBoxItem)?.Tag is SoakTestProfile profile
+                ? profile
+                : SoakTestProfile.Custom;
 
         private static string? SelectFolder(string title)
         {
@@ -1867,6 +2056,23 @@ public partial class ReportsView : UserControl
                 Result = record.Result,
             };
         }
+    }
+
+    public sealed class FactoryReadinessRow
+    {
+        public string Name { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public string Evidence { get; init; } = string.Empty;
+        public string NextAction { get; init; } = string.Empty;
+
+        public static FactoryReadinessRow FromCategory(FactoryReadinessCategory category)
+            => new()
+            {
+                Name = category.Name,
+                Status = category.Status,
+                Evidence = category.Evidence,
+                NextAction = category.NextAction,
+            };
     }
 
     public sealed class AuditLogRow

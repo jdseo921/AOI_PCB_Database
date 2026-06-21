@@ -33,6 +33,12 @@ public sealed class CustomerValidationReportContext
     public IReadOnlyList<ReportImageReference> SampleAnnotatedImages { get; init; } = Array.Empty<ReportImageReference>();
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> PrototypeLimitations { get; init; } = DefaultPrototypeLimitations;
+    public FalseCallRecommendationSummary? FalseCallRecommendation { get; init; }
+    public ValidationBreakdownSummary BreakdownSummary { get; init; } = new();
+    public DatasetQualitySummary DatasetQualitySummary { get; init; } = new();
+    public CameraAcceptanceSummary CameraAcceptanceSummary { get; init; } = new();
+    public RobotAcceptanceSummary RobotAcceptanceSummary { get; init; } = new();
+    public MesReadinessSummary MesReadinessSummary { get; init; } = new();
 
     public static IReadOnlyList<string> DefaultPrototypeLimitations { get; } =
     [
@@ -148,6 +154,13 @@ public static class CustomerValidationReportService
         sb.AppendLine("  </div>");
         if (context.PerformanceSummary.CountOverOneSecond > 0)
             sb.AppendLine("  <div class=\"notice\"><strong>Performance warning:</strong> One or more images exceeded the 1 second per-image visualization target.</div>");
+
+        AppendDatasetQualitySection(sb, context.DatasetQualitySummary);
+        AppendCameraAcceptanceSection(sb, context.CameraAcceptanceSummary);
+        AppendRobotAcceptanceSection(sb, context.RobotAcceptanceSummary);
+        AppendMesReadinessSection(sb, context.MesReadinessSummary);
+        AppendFalseCallLaborImpact(sb, context.FalseCallRecommendation);
+        AppendBreakdownSection(sb, context.BreakdownSummary);
 
         sb.AppendLine("  <h2>Confusion Matrix</h2>");
         sb.AppendLine("  <table><tr><th></th><th>Predicted NG</th><th>Predicted OK</th></tr>");
@@ -267,6 +280,12 @@ public static class CustomerValidationReportService
         sb.AppendLine($"- Max time: {FormatMilliseconds(context.PerformanceSummary.MaxMilliseconds)}");
         sb.AppendLine($"- Min time: {FormatMilliseconds(context.PerformanceSummary.MinMilliseconds)}");
         sb.AppendLine($"- Count over 1 second: {context.PerformanceSummary.CountOverOneSecond}");
+        AppendMarkdownDatasetQualitySection(sb, context.DatasetQualitySummary);
+        AppendMarkdownCameraAcceptanceSection(sb, context.CameraAcceptanceSummary);
+        AppendMarkdownRobotAcceptanceSection(sb, context.RobotAcceptanceSummary);
+        AppendMarkdownMesReadinessSection(sb, context.MesReadinessSummary);
+        AppendMarkdownFalseCallLaborImpact(sb, context.FalseCallRecommendation);
+        AppendMarkdownBreakdownSection(sb, context.BreakdownSummary);
         sb.AppendLine();
         sb.AppendLine("## Confusion Matrix");
         sb.AppendLine();
@@ -406,6 +425,253 @@ public static class CustomerValidationReportService
         foreach (var item in items)
             sb.AppendLine($"    <li>{Html(item)}</li>");
         sb.AppendLine("  </ul>");
+    }
+
+    private static void AppendFalseCallLaborImpact(StringBuilder sb, FalseCallRecommendationSummary? summary)
+    {
+        sb.AppendLine("  <h2>False Call Reduction / Labor Impact</h2>");
+        if (summary is null || string.Equals(summary.Status, "Not available", StringComparison.OrdinalIgnoreCase))
+        {
+            sb.AppendLine("  <p>No false-call reduction recommendation was available for this package.</p>");
+            return;
+        }
+
+        sb.AppendLine("  <table class=\"details\">");
+        AppendDetailRow(sb, "Recommendation status", summary.Status);
+        AppendDetailRow(sb, "Operating mode", summary.Mode);
+        AppendDetailRow(sb, "Selected threshold", summary.SelectedThreshold.ToString("F3", CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "False call rate", FormatPercent(summary.FalseCallRate));
+        AppendDetailRow(sb, "Possible escape count", summary.PossibleEscapeCount.ToString(CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "Possible escape rate", FormatPercent(summary.PossibleEscapeRate));
+        AppendDetailRow(sb, "Review burden estimate", $"{summary.EstimatedManualReviewMinutes:F1} minutes ({FormatPercent(summary.ReviewRate)} review rate)");
+        sb.AppendLine("  </table>");
+        if (summary.Limitations.Count > 0)
+            AppendList(sb, summary.Limitations);
+    }
+
+    private static void AppendMarkdownFalseCallLaborImpact(StringBuilder sb, FalseCallRecommendationSummary? summary)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## False Call Reduction / Labor Impact");
+        sb.AppendLine();
+        if (summary is null || string.Equals(summary.Status, "Not available", StringComparison.OrdinalIgnoreCase))
+        {
+            sb.AppendLine("No false-call reduction recommendation was available for this package.");
+            return;
+        }
+
+        sb.AppendLine($"- Recommendation status: {EscapeMarkdown(summary.Status)}");
+        sb.AppendLine($"- Operating mode: {EscapeMarkdown(summary.Mode)}");
+        sb.AppendLine($"- Selected threshold: {summary.SelectedThreshold:F3}");
+        sb.AppendLine($"- False call rate: {FormatPercent(summary.FalseCallRate)}");
+        sb.AppendLine($"- Possible escape count: {summary.PossibleEscapeCount}");
+        sb.AppendLine($"- Possible escape rate: {FormatPercent(summary.PossibleEscapeRate)}");
+        sb.AppendLine($"- Review burden estimate: {summary.EstimatedManualReviewMinutes:F1} minutes ({FormatPercent(summary.ReviewRate)} review rate)");
+        foreach (var limitation in summary.Limitations)
+            sb.AppendLine($"- {EscapeMarkdown(limitation)}");
+    }
+
+    private static void AppendDatasetQualitySection(StringBuilder sb, DatasetQualitySummary summary)
+    {
+        sb.AppendLine("  <h2>Dataset Quality Gate</h2>");
+        sb.AppendLine("  <table class=\"details\">");
+        AppendDetailRow(sb, "Status", summary.Status);
+        AppendDetailRow(sb, "Total images", summary.TotalImages.ToString(CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "Known ground truth", summary.KnownGroundTruthImages.ToString(CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "OK / NG images", $"{summary.OkImages} / {summary.NgImages}");
+        AppendDetailRow(sb, "Defect classes", summary.DefectClassCount.ToString(CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "Unknown label rate", FormatPercent(summary.UnknownLabelRate));
+        AppendDetailRow(sb, "Missing golden rate", FormatPercent(summary.MissingGoldenRate));
+        AppendDetailRow(sb, "Duplicate names / hashes", $"{summary.DuplicateImageNames} / {summary.DuplicateFileHashes}");
+        sb.AppendLine("  </table>");
+        if (summary.BlockingFailures.Count > 0)
+        {
+            sb.AppendLine("  <div class=\"notice\"><strong>Dataset not sufficient for factory acceptance.</strong></div>");
+            AppendList(sb, summary.BlockingFailures);
+        }
+        if (summary.Warnings.Count > 0)
+            AppendList(sb, summary.Warnings);
+    }
+
+    private static void AppendMarkdownDatasetQualitySection(StringBuilder sb, DatasetQualitySummary summary)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## Dataset Quality Gate");
+        sb.AppendLine();
+        sb.AppendLine($"- Status: {EscapeMarkdown(summary.Status)}");
+        sb.AppendLine($"- Total images: {summary.TotalImages}");
+        sb.AppendLine($"- Known ground truth: {summary.KnownGroundTruthImages}");
+        sb.AppendLine($"- OK / NG images: {summary.OkImages} / {summary.NgImages}");
+        sb.AppendLine($"- Defect classes: {summary.DefectClassCount}");
+        sb.AppendLine($"- Unknown label rate: {FormatPercent(summary.UnknownLabelRate)}");
+        sb.AppendLine($"- Missing golden rate: {FormatPercent(summary.MissingGoldenRate)}");
+        if (summary.BlockingFailures.Count > 0)
+        {
+            sb.AppendLine("- Dataset not sufficient for factory acceptance.");
+            foreach (var failure in summary.BlockingFailures)
+                sb.AppendLine($"- {EscapeMarkdown(failure)}");
+        }
+        foreach (var warning in summary.Warnings)
+            sb.AppendLine($"- {EscapeMarkdown(warning)}");
+    }
+
+    private static void AppendCameraAcceptanceSection(StringBuilder sb, CameraAcceptanceSummary summary)
+    {
+        sb.AppendLine("  <h2>Stage 2 Camera Acceptance / Factory Readiness</h2>");
+        sb.AppendLine("  <table class=\"details\">");
+        AppendDetailRow(sb, "Factory readiness", summary.Status);
+        AppendDetailRow(sb, "Acceptance run", summary.AcceptanceStatus);
+        AppendDetailRow(sb, "Real hardware", summary.IsRealHardware ? "Yes" : "No");
+        AppendDetailRow(sb, "Adapter", string.IsNullOrWhiteSpace(summary.AdapterName) ? "Not available" : summary.AdapterName);
+        AppendDetailRow(sb, "Frames received / requested", $"{summary.TotalReceivedFrames} / {summary.TotalRequestedFrames}");
+        AppendDetailRow(sb, "Dropped / trigger / timeout", $"{summary.DroppedFrameCount} / {summary.TriggerFailureCount} / {summary.TimeoutCount}");
+        sb.AppendLine("  </table>");
+        if (!summary.IsRealHardware)
+            sb.AppendLine("  <div class=\"notice\"><strong>Real camera acceptance is NOT VALIDATED.</strong> Fake, null, and folder adapters do not prove GigE/USB3 production camera readiness.</div>");
+        if (summary.Messages.Count > 0)
+            AppendList(sb, summary.Messages.Take(6).ToArray());
+    }
+
+    private static void AppendMarkdownCameraAcceptanceSection(StringBuilder sb, CameraAcceptanceSummary summary)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## Stage 2 Camera Acceptance / Factory Readiness");
+        sb.AppendLine();
+        sb.AppendLine($"- Factory readiness: {EscapeMarkdown(summary.Status)}");
+        sb.AppendLine($"- Acceptance run: {EscapeMarkdown(summary.AcceptanceStatus)}");
+        sb.AppendLine($"- Real hardware: {(summary.IsRealHardware ? "Yes" : "No")}");
+        sb.AppendLine($"- Adapter: {EscapeMarkdown(string.IsNullOrWhiteSpace(summary.AdapterName) ? "Not available" : summary.AdapterName)}");
+        sb.AppendLine($"- Frames received / requested: {summary.TotalReceivedFrames} / {summary.TotalRequestedFrames}");
+        sb.AppendLine($"- Dropped / trigger / timeout: {summary.DroppedFrameCount} / {summary.TriggerFailureCount} / {summary.TimeoutCount}");
+        if (!summary.IsRealHardware)
+            sb.AppendLine("- Real camera acceptance is NOT VALIDATED. Fake, null, and folder adapters do not prove GigE/USB3 production camera readiness.");
+        foreach (var message in summary.Messages.Take(6))
+            sb.AppendLine($"- {EscapeMarkdown(message)}");
+    }
+
+    private static void AppendRobotAcceptanceSection(StringBuilder sb, RobotAcceptanceSummary summary)
+    {
+        sb.AppendLine("  <h2>Robot Cell Acceptance / Factory Readiness</h2>");
+        sb.AppendLine("  <table class=\"details\">");
+        AppendDetailRow(sb, "Status", summary.Status);
+        AppendDetailRow(sb, "Source kind", summary.SourceKind);
+        AppendDetailRow(sb, "Controller", string.IsNullOrWhiteSpace(summary.ControllerName) ? "Not available" : summary.ControllerName);
+        AppendDetailRow(sb, "Full cycle time", FormatMilliseconds(summary.FullCycleMs));
+        AppendDetailRow(sb, "Emergency stop blocked cycle", summary.EmergencyStopBlocked ? "Yes" : "No");
+        AppendDetailRow(sb, "Invalid transition rejected", summary.InvalidTransitionRejected ? "Yes" : "No");
+        AppendDetailRow(sb, "Reset returned Idle", summary.ResetReturnedIdle ? "Yes" : "No");
+        sb.AppendLine("  </table>");
+        if (string.Equals(summary.SourceKind, "Simulated", StringComparison.OrdinalIgnoreCase))
+            sb.AppendLine("  <div class=\"notice\"><strong>Simulation evidence only; no production robot movement was validated.</strong></div>");
+        sb.AppendLine("  <div class=\"notice\"><strong>No safety-certified emergency-stop validation is claimed by this prototype evidence.</strong></div>");
+        if (summary.Messages.Count > 0)
+            AppendList(sb, summary.Messages.Take(6).ToArray());
+    }
+
+    private static void AppendMarkdownRobotAcceptanceSection(StringBuilder sb, RobotAcceptanceSummary summary)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## Robot Cell Acceptance / Factory Readiness");
+        sb.AppendLine();
+        sb.AppendLine($"- Status: {EscapeMarkdown(summary.Status)}");
+        sb.AppendLine($"- Source kind: {EscapeMarkdown(summary.SourceKind)}");
+        sb.AppendLine($"- Controller: {EscapeMarkdown(string.IsNullOrWhiteSpace(summary.ControllerName) ? "Not available" : summary.ControllerName)}");
+        sb.AppendLine($"- Full cycle time: {FormatMilliseconds(summary.FullCycleMs)}");
+        sb.AppendLine($"- Emergency stop blocked cycle: {(summary.EmergencyStopBlocked ? "Yes" : "No")}");
+        sb.AppendLine($"- Invalid transition rejected: {(summary.InvalidTransitionRejected ? "Yes" : "No")}");
+        sb.AppendLine($"- Reset returned Idle: {(summary.ResetReturnedIdle ? "Yes" : "No")}");
+        if (string.Equals(summary.SourceKind, "Simulated", StringComparison.OrdinalIgnoreCase))
+            sb.AppendLine("- Simulation evidence only; no production robot movement was validated.");
+        sb.AppendLine("- No safety-certified emergency-stop validation is claimed by this prototype evidence.");
+        foreach (var message in summary.Messages.Take(6))
+            sb.AppendLine($"- {EscapeMarkdown(message)}");
+    }
+
+    private static void AppendMesReadinessSection(StringBuilder sb, MesReadinessSummary summary)
+    {
+        sb.AppendLine("  <h2>MES REST / Spool Readiness</h2>");
+        sb.AppendLine("  <table class=\"details\">");
+        AppendDetailRow(sb, "Status", summary.Status);
+        AppendDetailRow(sb, "Mode", summary.Mode);
+        AppendDetailRow(sb, "Queue pending / failed / sent / abandoned", $"{summary.PendingCount} / {summary.FailedCount} / {summary.SentCount} / {summary.AbandonedCount}");
+        sb.AppendLine("  </table>");
+        if (summary.PendingCount > 0 || summary.FailedCount > 0)
+            sb.AppendLine("  <div class=\"notice\"><strong>MES queue requires attention before factory readiness can be treated as clean.</strong></div>");
+        if (string.Equals(summary.Status, "MES Mock Only", StringComparison.OrdinalIgnoreCase))
+            sb.AppendLine("  <div class=\"notice\"><strong>Mock MES is not production MES writeback.</strong></div>");
+        if (summary.Messages.Count > 0)
+            AppendList(sb, summary.Messages.Take(6).ToArray());
+    }
+
+    private static void AppendMarkdownMesReadinessSection(StringBuilder sb, MesReadinessSummary summary)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## MES REST / Spool Readiness");
+        sb.AppendLine();
+        sb.AppendLine($"- Status: {EscapeMarkdown(summary.Status)}");
+        sb.AppendLine($"- Mode: {EscapeMarkdown(summary.Mode)}");
+        sb.AppendLine($"- Queue pending / failed / sent / abandoned: {summary.PendingCount} / {summary.FailedCount} / {summary.SentCount} / {summary.AbandonedCount}");
+        if (summary.PendingCount > 0 || summary.FailedCount > 0)
+            sb.AppendLine("- MES queue requires attention before factory readiness can be treated as clean.");
+        if (string.Equals(summary.Status, "MES Mock Only", StringComparison.OrdinalIgnoreCase))
+            sb.AppendLine("- Mock MES is not production MES writeback.");
+        foreach (var message in summary.Messages.Take(6))
+            sb.AppendLine($"- {EscapeMarkdown(message)}");
+    }
+
+    private static void AppendBreakdownSection(StringBuilder sb, ValidationBreakdownSummary summary)
+    {
+        sb.AppendLine("  <h2>Validation Breakdown Evidence</h2>");
+        sb.AppendLine("  <p>Breakdowns are derived from customer-labeled Stage 1 rows and do not prove production accuracy.</p>");
+        AppendBreakdownTable(sb, "Defect Class", summary.DefectClassMetrics);
+        AppendBreakdownTable(sb, "Side / View", summary.SideMetrics);
+        AppendBreakdownTable(sb, "ROI ID", summary.RoiMetrics);
+        AppendBreakdownTable(sb, "ROI Type", summary.RoiTypeMetrics);
+        AppendBreakdownTable(sb, "Worst False Call Sources", summary.TopFalseCallContributors);
+        AppendBreakdownTable(sb, "Possible Escape Sources", summary.TopPossibleEscapeContributors);
+    }
+
+    private static void AppendBreakdownTable(StringBuilder sb, string title, IReadOnlyList<ValidationBreakdownMetric> metrics)
+    {
+        sb.AppendLine($"  <h3>{Html(title)}</h3>");
+        sb.AppendLine("  <table><tr><th>Source</th><th>Total</th><th>TP</th><th>TN</th><th>FP</th><th>FN</th><th>Wrong class</th><th>Wrong side</th><th>Precision</th><th>Recall</th><th>False call rate</th></tr>");
+        if (metrics.Count == 0)
+        {
+            sb.AppendLine("  <tr><td colspan=\"11\">No breakdown rows available.</td></tr>");
+        }
+        else
+        {
+            foreach (var metric in metrics.Take(12))
+            {
+                sb.AppendLine($"  <tr><td>{Html(metric.DisplayName)}</td><td>{metric.Total}</td><td>{metric.TruePositive}</td><td>{metric.TrueNegative}</td><td>{metric.FalsePositive}</td><td>{metric.FalseNegative}</td><td>{metric.WrongDefectClass}</td><td>{metric.WrongSide}</td><td>{FormatPercent(metric.Precision)}</td><td>{FormatPercent(metric.Recall)}</td><td>{FormatPercent(metric.FalseCallRate)}</td></tr>");
+            }
+        }
+
+        sb.AppendLine("  </table>");
+    }
+
+    private static void AppendMarkdownBreakdownSection(StringBuilder sb, ValidationBreakdownSummary summary)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## Validation Breakdown Evidence");
+        sb.AppendLine();
+        sb.AppendLine("Breakdowns are derived from customer-labeled Stage 1 rows and do not prove production accuracy.");
+        AppendMarkdownBreakdownTable(sb, "Defect Class", summary.DefectClassMetrics);
+        AppendMarkdownBreakdownTable(sb, "Side / View", summary.SideMetrics);
+        AppendMarkdownBreakdownTable(sb, "ROI ID", summary.RoiMetrics);
+    }
+
+    private static void AppendMarkdownBreakdownTable(StringBuilder sb, string title, IReadOnlyList<ValidationBreakdownMetric> metrics)
+    {
+        sb.AppendLine();
+        sb.AppendLine($"### {EscapeMarkdown(title)}");
+        sb.AppendLine();
+        sb.AppendLine("| Source | Total | TP | TN | FP | FN | Wrong class | Wrong side | Precision | Recall | False call |");
+        sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        foreach (var metric in metrics.Take(12))
+        {
+            sb.AppendLine($"| {EscapeMarkdown(metric.DisplayName)} | {metric.Total} | {metric.TruePositive} | {metric.TrueNegative} | {metric.FalsePositive} | {metric.FalseNegative} | {metric.WrongDefectClass} | {metric.WrongSide} | {FormatPercent(metric.Precision)} | {FormatPercent(metric.Recall)} | {FormatPercent(metric.FalseCallRate)} |");
+        }
     }
 
     private static string FormatThreshold(double value)

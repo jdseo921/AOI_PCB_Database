@@ -91,65 +91,7 @@ public static class TraceabilityUploadService
     public static async Task<MesSpoolRetrySummary> RetryPendingMesUploadsAsync(
         int limit = 100,
         CancellationToken cancellationToken = default)
-    {
-        var settings = MesIntegrationSettingsService.Load();
-        MesIntegrationSettingsService.ApplyIntegrationBoundary();
-        var pending = AoiDatabase.GetPendingMesSpoolItems(limit);
-        var attempted = 0;
-        var succeeded = 0;
-        var failed = 0;
-
-        foreach (var item in pending)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            attempted++;
-
-            IntegrationCommandResult result;
-            try
-            {
-                result = item.PayloadType switch
-                {
-                    "UploadResultCommand" => await IntegrationBoundaryRegistry.MesClient.UploadResultAsync(
-                        JsonSerializer.Deserialize<UploadResultCommand>(item.PayloadJson, JsonOptions)!,
-                        cancellationToken),
-                    "UploadImageCommand" => await IntegrationBoundaryRegistry.MesClient.UploadImageAsync(
-                        JsonSerializer.Deserialize<UploadImageCommand>(item.PayloadJson, JsonOptions)!,
-                        cancellationToken),
-                    _ => await IntegrationBoundaryRegistry.MesClient.UploadTraceabilityAsync(
-                        JsonSerializer.Deserialize<TraceabilityPayload>(item.PayloadJson, JsonOptions)!,
-                        cancellationToken),
-                };
-            }
-            catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
-            {
-                result = new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, $"MES spool retry could not read payload: {ex.Message}");
-            }
-
-            AoiDatabase.RecordMesUploadAttempt(
-                ToDisplay(settings.Mode),
-                item.EndpointUrl,
-                item.PayloadPath,
-                result.Accepted ? "OK" : "ERROR",
-                $"Retry spool item {item.Id}: {result.Message}",
-                item.OperatorId,
-                item.LotId,
-                item.BoardModel,
-                item.Result);
-
-            if (result.Accepted)
-            {
-                succeeded++;
-                AoiDatabase.DeleteMesSpoolItem(item.Id, result.Message);
-            }
-            else
-            {
-                failed++;
-                AoiDatabase.RecordMesSpoolRetryFailure(item.Id, result.Message, settings.RetryBackoffMs);
-            }
-        }
-
-        return new MesSpoolRetrySummary(attempted, succeeded, failed);
-    }
+        => await MesSpoolService.RetryEligibleAsync(limit, cancellationToken).ConfigureAwait(false);
 
     public static string WritePayload(TraceabilityPayload payload)
     {

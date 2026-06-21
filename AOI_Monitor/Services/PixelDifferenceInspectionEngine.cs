@@ -163,7 +163,9 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
                 maxRoi = roi;
             }
 
-            var (roiNgThreshold, roiReviewThreshold) = GetRoiThresholds(priority, roi);
+            var threshold = ResolveRoiThreshold(result, recipe, priority, roi);
+            var roiNgThreshold = threshold.NgThreshold;
+            var roiReviewThreshold = threshold.ReviewThreshold;
             if (score < roiReviewThreshold)
                 continue;
 
@@ -197,8 +199,8 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         {
             result.Verdict = "OK";
             result.SuggestedDefect = "No Recipe ROI Difference Above Threshold";
-            result.Confidence = ComputeConfidence("OK", maxScore, defaultReviewThreshold, defaultNgThreshold);
-            result.DecisionMargin = defaultReviewThreshold - maxScore;
+            result.Confidence = ComputeConfidence("OK", maxScore, result.ReviewThreshold, result.NgThreshold);
+            result.DecisionMargin = result.ReviewThreshold - maxScore;
             result.DecisionReason = $"All {checkedCount} enabled recipe ROI(s) were below review threshold.";
             return;
         }
@@ -361,6 +363,7 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         return new List<string>
         {
             $"Difference score: {result.DifferenceScore:F1}% (Review >= {result.ReviewThreshold:F1}%, NG >= {result.NgThreshold:F1}%).",
+            $"Threshold source: {result.ThresholdSource}.",
             $"Policy: {ToPolicyDisplay(priority)}.",
             $"Hotspot: x={result.Hotspot.X:P0}, y={result.Hotspot.Y:P0}, w={result.Hotspot.Width:P0}, h={result.Hotspot.Height:P0}.",
             $"Mean brightness (sample): {result.MeanBrightness:F1}.",
@@ -389,6 +392,49 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         roiReviewThreshold = Math.Min(defaultReviewThreshold, roiReviewThreshold);
         var roiNgThreshold = Math.Min(defaultNgThreshold, Math.Max(roiReviewThreshold, roiReviewThreshold * 2.0));
         return (roiNgThreshold, roiReviewThreshold);
+    }
+
+    private static EffectiveThresholdRule ResolveRoiThreshold(
+        AnalysisResult result,
+        RecipeDefinition recipe,
+        DetectionPriority priority,
+        RecipeRoi roi)
+    {
+        var profileRule = ThresholdProfileService.GetEffectiveThreshold(
+            result.BoardId,
+            recipe.BoardProgram,
+            recipe.RecipeName,
+            result.ViewType,
+            roi.RoiType,
+            roi.RoiType);
+        if (profileRule is not null)
+        {
+            ApplyThresholdProfile(result, profileRule);
+            result.Evidence.Add($"Threshold source for ROI {roi.RoiId}: Active threshold profile {profileRule.ProfileId}/{profileRule.Revision} (Review >= {profileRule.ReviewThreshold:F1}%, NG >= {profileRule.NgThreshold:F1}%).");
+            return profileRule;
+        }
+
+        var (ngThreshold, reviewThreshold) = GetRoiThresholds(priority, roi);
+        var source = roi.Thresholds.AiScoreThreshold > 0 ? "Recipe ROI threshold" : "Built-in policy default";
+        result.ThresholdSource = source;
+        result.Evidence.Add($"Threshold source for ROI {roi.RoiId}: {source} (Review >= {reviewThreshold:F1}%, NG >= {ngThreshold:F1}%).");
+        return new EffectiveThresholdRule
+        {
+            Source = source,
+            ReviewThreshold = reviewThreshold,
+            NgThreshold = ngThreshold,
+            ConfidenceThreshold = Math.Clamp(reviewThreshold / 100.0, 0.0, 1.0),
+        };
+    }
+
+    private static void ApplyThresholdProfile(AnalysisResult result, EffectiveThresholdRule threshold)
+    {
+        result.ThresholdSource = threshold.Source;
+        result.ThresholdProfileId = threshold.ProfileId;
+        result.ThresholdProfileRevision = threshold.Revision;
+        result.ReviewThreshold = threshold.ReviewThreshold;
+        result.NgThreshold = threshold.NgThreshold;
+        result.ConfidenceThreshold = threshold.ConfidenceThreshold;
     }
 
     private static void AppendRecipeWarnings(AnalysisResult result, RecipeLoadResult recipeLoad)

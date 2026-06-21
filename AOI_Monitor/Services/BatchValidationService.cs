@@ -13,20 +13,30 @@ public static class BatchValidationService
         var expected = string.IsNullOrWhiteSpace(manifest.Label) ? "UNKNOWN" : manifest.Label.Trim().ToUpperInvariant();
         var passFail = CalculatePassFail(expected, analysis.Verdict);
         var roi = defect?.BoundingBox ?? analysis.Hotspot;
+        var predictedDefectClass = NormalizeDefectClass(defect?.DefectType ?? analysis.SuggestedDefect);
+        var expectedDefectClass = NormalizeDefectClass(manifest.DefectType);
+        var expectedSide = NormalizeSide(manifest.Side);
+        var actualSide = NormalizeSide(defect?.SideOrViewType ?? string.Empty);
+        var roiId = NormalizeAssignment(string.IsNullOrWhiteSpace(manifest.RoiId) ? defect?.RoiId : manifest.RoiId);
+        var roiType = NormalizeAssignment(string.IsNullOrWhiteSpace(manifest.RoiType) ? defect?.RoiType : manifest.RoiType);
 
         return new BatchTestRow
         {
             ImagePath = imagePath,
             Image = Path.GetFileName(imagePath),
+            GoldenImagePath = manifest.GoldenPath ?? string.Empty,
             GroundTruth = expected,
             EngineResult = analysis.Verdict,
             InspectionEngine = analysis.InspectionEngine,
             ModelVersion = analysis.ModelVersion,
+            ThresholdProfileId = analysis.ThresholdProfileId,
+            ThresholdProfileRevision = analysis.ThresholdProfileRevision,
             Score = analysis.DifferenceScore,
             PassFail = passFail,
-            DefectType = string.IsNullOrWhiteSpace(manifest.DefectType)
-                ? defect?.DefectType ?? analysis.SuggestedDefect
-                : manifest.DefectType,
+            DefectType = string.IsNullOrWhiteSpace(defect?.DefectType) ? analysis.SuggestedDefect : defect.DefectType,
+            NormalizedDefectClass = expectedDefectClass,
+            NormalizedSide = expectedSide,
+            FailureCategory = DetermineFailureCategory(expected, analysis.Verdict, expectedDefectClass, predictedDefectClass, expectedSide, actualSide, false),
             Side = manifest.Side,
             RefDes = manifest.RefDes,
             LotId = manifest.LotId,
@@ -34,8 +44,8 @@ public static class BatchValidationService
             Notes = manifest.Notes,
             RecipeName = analysis.RecipeName,
             RecipeRevision = analysis.RecipeRevision,
-            RoiId = defect?.RoiId ?? string.Empty,
-            RoiType = defect?.RoiType ?? string.Empty,
+            RoiId = roiId,
+            RoiType = roiType,
             RoiX = roi.X,
             RoiY = roi.Y,
             RoiWidth = roi.Width,
@@ -59,6 +69,7 @@ public static class BatchValidationService
         {
             ImagePath = imagePath,
             Image = string.IsNullOrWhiteSpace(imagePath) ? "(missing)" : Path.GetFileName(imagePath),
+            GoldenImagePath = manifest.GoldenPath ?? string.Empty,
             GroundTruth = string.IsNullOrWhiteSpace(manifest.Label) ? "UNKNOWN" : manifest.Label.Trim().ToUpperInvariant(),
             EngineResult = "REVIEW",
             InspectionEngine = inspectionEngine,
@@ -66,6 +77,11 @@ public static class BatchValidationService
             Score = 0,
             PassFail = "N/A",
             DefectType = message,
+            NormalizedDefectClass = NormalizeDefectClass(manifest.DefectType),
+            NormalizedSide = NormalizeSide(manifest.Side),
+            RoiId = NormalizeAssignment(manifest.RoiId),
+            RoiType = NormalizeAssignment(manifest.RoiType),
+            FailureCategory = "ERROR",
             Side = manifest.Side,
             RefDes = manifest.RefDes,
             LotId = manifest.LotId,
@@ -124,6 +140,84 @@ public static class BatchValidationService
     private static int CountResult(IEnumerable<BatchTestRow> rows, string result)
         => rows.Count(r => string.Equals(r.EngineResult, result, StringComparison.OrdinalIgnoreCase));
 
+    public static string NormalizeDefectClass(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "UNASSIGNED";
+
+        var normalized = value.Trim().ToUpperInvariant()
+            .Replace("-", "_", StringComparison.Ordinal)
+            .Replace(" ", "_", StringComparison.Ordinal);
+        return normalized switch
+        {
+            "OK" or "PASS" or "GOOD" => "OK",
+            "NG" or "FAIL" or "FAILED" or "DEFECT" or "DEFECTIVE" or "BAD" => "DEFECT",
+            "UNKNOWN" or "N/A" or "NA" => "UNASSIGNED",
+            _ => normalized,
+        };
+    }
+
+    public static string NormalizeSide(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "UNASSIGNED";
+
+        var normalized = value.Trim().ToUpperInvariant();
+        return normalized switch
+        {
+            "TOP" or "T" => "TOP",
+            "BOTTOM" or "BOT" or "B" => "BOTTOM",
+            "SIDE" or "SIDE_VIEW" => "SIDE",
+            "SAMPLE" or "UNKNOWN" or "N/A" or "NA" => "UNASSIGNED",
+            _ => normalized.Replace(" ", "_", StringComparison.Ordinal),
+        };
+    }
+
+    public static string NormalizeAssignment(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "UNASSIGNED" : value.Trim();
+
+    public static string DetermineFailureCategory(
+        string groundTruth,
+        string engineResult,
+        string expectedDefectClass,
+        string actualDefectClass,
+        string expectedSide,
+        string actualSide,
+        bool isError)
+    {
+        if (isError)
+            return "ERROR";
+
+        var expected = NormalizeBinaryLabel(groundTruth);
+        if (expected == "UNKNOWN")
+            return "UNKNOWN_GT";
+
+        var actual = NormalizeBinaryLabel(engineResult);
+        if (expected == "OK" && actual == "NG")
+            return "FALSE_CALL";
+        if (expected == "NG" && actual == "OK")
+            return "POSSIBLE_ESCAPE";
+
+        if (expected == "NG" && actual == "NG")
+        {
+            if (expectedDefectClass != "UNASSIGNED" &&
+                actualDefectClass != "UNASSIGNED" &&
+                !string.Equals(expectedDefectClass, actualDefectClass, StringComparison.OrdinalIgnoreCase))
+            {
+                return "WRONG_DEFECT_CLASS";
+            }
+
+            if (expectedSide != "UNASSIGNED" &&
+                actualSide != "UNASSIGNED" &&
+                !string.Equals(expectedSide, actualSide, StringComparison.OrdinalIgnoreCase))
+            {
+                return "WRONG_SIDE";
+            }
+        }
+
+        return "PASS";
+    }
+
     public static string NormalizeBinaryLabel(string label)
     {
         var normalized = label.Trim().ToUpperInvariant();
@@ -163,7 +257,7 @@ public static class BatchValidationService
         var entries = new Dictionary<string, GroundTruthEntry>(StringComparer.OrdinalIgnoreCase);
         var ordered = new List<GroundTruthEntry>();
         if (string.IsNullOrWhiteSpace(csvPath) || !File.Exists(csvPath))
-            return new ValidationManifest(entries, ordered, false);
+            return new ValidationManifest(entries, ordered, false, Array.Empty<string>());
 
         var lines = File.ReadAllLines(csvPath);
         if (lines.Length < 2)
@@ -176,6 +270,8 @@ public static class BatchValidationService
         var defectIndex = FindHeader(headers, "defecttype", "defect_type", "defect");
         var sideIndex = FindHeader(headers, "side", "view", "viewtype", "view_type");
         var refDesIndex = FindHeader(headers, "refdes", "ref_des", "reference", "reference_designator");
+        var roiIdIndex = FindHeader(headers, "roiid", "roi_id", "roi");
+        var roiTypeIndex = FindHeader(headers, "roitype", "roi_type");
         var lotIndex = FindHeader(headers, "lotid", "lot_id", "lot");
         var boardIndex = FindHeader(headers, "boardmodel", "board_model", "model", "board");
         var notesIndex = FindHeader(headers, "notes", "note", "comment", "comments");
@@ -185,11 +281,15 @@ public static class BatchValidationService
             && HasHeader(headers, "defect_type", "defecttype")
             && HasHeader(headers, "side")
             && HasHeader(headers, "refdes")
+            && HasHeader(headers, "roi_id", "roiid")
+            && HasHeader(headers, "roi_type", "roitype")
             && HasHeader(headers, "lot_id", "lotid")
             && HasHeader(headers, "board_model", "boardmodel");
 
         if (imageIndex < 0 || truthIndex < 0)
             throw new InvalidDataException("Ground-truth CSV must include image and ground_truth/label columns.");
+
+        var warnings = BuildManifestWarnings(headers);
 
         var csvDir = Path.GetDirectoryName(csvPath) ?? imageFolder;
         foreach (var line in lines.Skip(1))
@@ -213,6 +313,8 @@ public static class BatchValidationService
                 Cell(cells, defectIndex),
                 Cell(cells, sideIndex),
                 Cell(cells, refDesIndex),
+                Cell(cells, roiIdIndex),
+                Cell(cells, roiTypeIndex),
                 Cell(cells, lotIndex),
                 Cell(cells, boardIndex),
                 Cell(cells, notesIndex),
@@ -225,13 +327,13 @@ public static class BatchValidationService
             }
         }
 
-        return new ValidationManifest(entries, ordered, isFormalManifest);
+        return new ValidationManifest(entries, ordered, isFormalManifest, warnings);
     }
 
     public static string BuildResultsCsv(IEnumerable<BatchTestRow> rows)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Image,Ground Truth,AI/Engine Result,Inspection Engine,Model Version,Recipe Name,Recipe Revision,Score,Pass/Fail,Defect Type,ROI ID,ROI Type,Side,RefDes,LotId,BoardModel,Notes,Image Path,RoiX,RoiY,RoiWidth,RoiHeight,ImageLoadMs,PreprocessingMs,InferenceMs,OverlayRenderingMs,TotalInspectionMs");
+        sb.AppendLine("Image,Ground Truth,AI/Engine Result,Inspection Engine,Model Version,Recipe Name,Recipe Revision,Score,Pass/Fail,Defect Type,Normalized Defect Class,Normalized Side,Failure Category,ROI ID,ROI Type,Side,RefDes,LotId,BoardModel,Notes,Image Path,RoiX,RoiY,RoiWidth,RoiHeight,ImageLoadMs,PreprocessingMs,InferenceMs,OverlayRenderingMs,TotalInspectionMs");
         foreach (var row in rows)
         {
             sb.AppendLine(string.Join(",",
@@ -245,6 +347,9 @@ public static class BatchValidationService
                 row.Score.ToString("F4", CultureInfo.InvariantCulture),
                 EscapeCsv(row.PassFail),
                 EscapeCsv(row.DefectType),
+                EscapeCsv(row.NormalizedDefectClass),
+                EscapeCsv(row.NormalizedSide),
+                EscapeCsv(row.FailureCategory),
                 EscapeCsv(row.RoiId),
                 EscapeCsv(row.RoiType),
                 EscapeCsv(row.Side),
@@ -269,6 +374,27 @@ public static class BatchValidationService
 
     private static bool HasHeader(string[] headers, params string[] names)
         => names.Any(name => headers.Contains(name, StringComparer.OrdinalIgnoreCase));
+
+    private static IReadOnlyList<string> BuildManifestWarnings(string[] headers)
+    {
+        var warnings = new List<string>();
+        AddMissingColumnWarning(headers, warnings, "golden_image", "goldenimage");
+        AddMissingColumnWarning(headers, warnings, "defect_type", "defecttype");
+        AddMissingColumnWarning(headers, warnings, "side");
+        AddMissingColumnWarning(headers, warnings, "refdes");
+        AddMissingColumnWarning(headers, warnings, "roi_id", "roiid");
+        AddMissingColumnWarning(headers, warnings, "roi_type", "roitype");
+        AddMissingColumnWarning(headers, warnings, "lot_id", "lotid");
+        AddMissingColumnWarning(headers, warnings, "board_model", "boardmodel");
+        AddMissingColumnWarning(headers, warnings, "notes");
+        return warnings;
+    }
+
+    private static void AddMissingColumnWarning(string[] headers, List<string> warnings, params string[] names)
+    {
+        if (!HasHeader(headers, names))
+            warnings.Add($"Ground-truth CSV is missing optional column '{names[0]}'; related breakdown evidence will use UNASSIGNED/UNKNOWN where needed.");
+    }
 
     private static string Cell(IReadOnlyList<string> cells, int index)
         => index >= 0 && cells.Count > index ? cells[index].Trim() : string.Empty;
@@ -377,7 +503,8 @@ public sealed record BatchPerformanceSummary(
 public sealed record ValidationManifest(
     IReadOnlyDictionary<string, GroundTruthEntry> ByImageName,
     IReadOnlyList<GroundTruthEntry> OrderedEntries,
-    bool IsFormalManifest);
+    bool IsFormalManifest,
+    IReadOnlyList<string> Warnings);
 
 public sealed record RunItem(string ImagePath, GroundTruthEntry Manifest);
 
@@ -387,27 +514,35 @@ public sealed record GroundTruthEntry(
     string DefectType,
     string Side,
     string RefDes,
+    string RoiId,
+    string RoiType,
     string LotId,
     string BoardModel,
     string Notes,
     string? ImagePath)
 {
-    public static GroundTruthEntry Unknown { get; } = new("UNKNOWN", null, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, null);
+    public static GroundTruthEntry Unknown { get; } = new("UNKNOWN", null, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, null);
 }
 
 public sealed class BatchTestRow
 {
     public string ImagePath { get; set; } = string.Empty;
     public string Image { get; set; } = string.Empty;
+    public string GoldenImagePath { get; set; } = string.Empty;
     public string GroundTruth { get; set; } = "UNKNOWN";
     public string EngineResult { get; set; } = "REVIEW";
     public string InspectionEngine { get; set; } = "Pixel Difference Prototype Engine";
     public string ModelVersion { get; set; } = "PIXEL_DIFF_0.1";
+    public string ThresholdProfileId { get; set; } = string.Empty;
+    public string ThresholdProfileRevision { get; set; } = string.Empty;
     public double Score { get; set; }
     public string ScoreDisplay => $"{Score:F1}%";
     public string PassFail { get; set; } = "N/A";
     public bool IsFailed => PassFail == "FAIL";
     public string DefectType { get; set; } = "Unknown";
+    public string NormalizedDefectClass { get; set; } = "UNASSIGNED";
+    public string NormalizedSide { get; set; } = "UNASSIGNED";
+    public string FailureCategory { get; set; } = "UNKNOWN_GT";
     public string Side { get; set; } = string.Empty;
     public string RefDes { get; set; } = string.Empty;
     public string LotId { get; set; } = string.Empty;
@@ -445,6 +580,11 @@ public sealed class BatchTestRow
             Score,
             PassFail,
             DefectType,
+            NormalizedDefectClass,
+            NormalizedSide,
+            RoiId,
+            RoiType,
+            FailureCategory,
             RoiX,
             RoiY,
             RoiWidth,
@@ -475,6 +615,11 @@ public sealed class BatchTestRow
             Score = record.Score,
             PassFail = record.PassFail,
             DefectType = record.DefectType,
+            NormalizedDefectClass = record.NormalizedDefectClass,
+            NormalizedSide = record.NormalizedSide,
+            RoiId = record.RoiId,
+            RoiType = record.RoiType,
+            FailureCategory = record.FailureCategory,
             Side = record.Side,
             RefDes = record.RefDes,
             LotId = record.LotId,

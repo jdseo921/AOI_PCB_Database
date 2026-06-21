@@ -26,6 +26,7 @@ public sealed class CustomerValidationReportContext
     public string GroundTruthFile { get; init; } = "Not available";
     public BatchMetrics Metrics { get; init; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     public BatchPerformanceSummary PerformanceSummary { get; init; } = new(0, 0, 0, 0, 0);
+    public InspectionLatencySummary LatencySummary { get; init; } = new();
     public string AcceptanceStatus { get; init; } = "CONDITIONAL";
     public IReadOnlyList<string> AcceptanceMessages { get; init; } = Array.Empty<string>();
     public ValidationAcceptanceCriteria AcceptanceCriteria { get; init; } = new();
@@ -155,6 +156,17 @@ public static class CustomerValidationReportService
         sb.AppendLine("  </div>");
         if (context.PerformanceSummary.CountOverOneSecond > 0)
             sb.AppendLine("  <div class=\"notice\"><strong>Performance warning:</strong> One or more images exceeded the 1 second per-image visualization target.</div>");
+        sb.AppendLine("  <h2>End-to-End Latency Trace Summary</h2>");
+        sb.AppendLine("  <div class=\"metric-grid\">");
+        AppendMetric(sb, "Trace status", context.LatencySummary.Status);
+        AppendMetric(sb, "Trace count", context.LatencySummary.TraceCount.ToString(CultureInfo.InvariantCulture));
+        AppendMetric(sb, "P95 frame-to-overlay", FormatMilliseconds(context.LatencySummary.P95FrameToOverlayMs));
+        AppendMetric(sb, "P95 frame-to-saved-result", FormatMilliseconds(context.LatencySummary.P95FrameToSavedResultMs));
+        AppendMetric(sb, "Max frame-to-overlay", FormatMilliseconds(context.LatencySummary.MaxFrameToOverlayMs));
+        AppendMetric(sb, "Over 1 second", context.LatencySummary.OverOneSecondCount.ToString(CultureInfo.InvariantCulture));
+        sb.AppendLine("  </div>");
+        if (context.LatencySummary.Warnings.Count > 0)
+            AppendList(sb, context.LatencySummary.Warnings);
 
         AppendDatasetQualitySection(sb, context.DatasetQualitySummary);
         AppendCameraAcceptanceSection(sb, context.CameraAcceptanceSummary);

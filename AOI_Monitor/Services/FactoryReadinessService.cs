@@ -52,6 +52,7 @@ public static class FactoryReadinessService
         AddValidationPackage(report, criteria, latestPackage, latestRun);
         AddFalseCall(report, criteria, latestFalseCall);
         AddDatasetQuality(report, criteria, latestPackage);
+        AddLatency(report, criteria);
         AddExportVerification(report, criteria, latestVerifications);
         AddSoakTest(report, criteria);
         AddCamera(report, criteria, camera);
@@ -60,6 +61,7 @@ public static class FactoryReadinessService
         AddRobot(report, criteria, robot);
         AddMes(report, criteria, mes);
         AddCentralSync(report, criteria, centralSync);
+        AddAuthenticationMode(report);
         AddSecurityAudit(report);
         AddKnownLimitations(report, criteria);
 
@@ -283,16 +285,51 @@ public static class FactoryReadinessService
 
         if (status == InspectionEngineStatus.MlModelReady)
         {
+            var activeModel = ModelRegistryService.GetActiveModel();
             var acceptance = AoiDatabase.GetLatestPassingProductionModelAcceptance(configuration.ActiveModelId);
-            if (criteria.RequireProductionModel && acceptance is null)
+            var latestAcceptance = AoiDatabase.GetLatestModelAcceptanceRun(configuration.ActiveModelId);
+            var hasPassAcceptance = latestAcceptance is not null &&
+                string.Equals(latestAcceptance.Status, "PASS", StringComparison.OrdinalIgnoreCase);
+            if (!criteria.RequireProductionModel && !string.IsNullOrWhiteSpace(activeModel?.DeploymentWaiverReason))
             {
-                Add(report, "Active model readiness", "No-Go", $"Active ONNX model is runtime-ready but has no passing promoted model acceptance run. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}.", "Run model acceptance on customer validation data, create a release package, and promote the PASS run to production candidate.");
+                Add(report, "Active model readiness", "Conditional", $"Active ONNX model is deployed with Admin waiver by {activeModel.DeploymentWaivedBy}: {activeModel.DeploymentWaiverReason}", "Keep Stage 1/customer evidence scoped; complete PASS model acceptance before production readiness claims.");
                 return;
             }
 
-            Add(report, "Active model readiness", "Go", acceptance is null
-                ? $"Active model is runtime-ready for non-production profile. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}."
-                : $"Active model has passing production-candidate acceptance run {acceptance.Id}. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}; dataset={acceptance.DatasetName}.",
+            if (criteria.RequireProductionModel)
+            {
+                if (activeModel is null)
+                {
+                    Add(report, "Active model readiness", "No-Go", $"Active ONNX model configuration has no matching model registry lifecycle record. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}.", "Register the model and complete lifecycle promotion before full factory automation.");
+                    return;
+                }
+
+                var hasWaiver = !string.IsNullOrWhiteSpace(activeModel.DeploymentWaiverReason);
+                if (hasWaiver)
+                {
+                    Add(report, "Active model readiness", "No-Go", $"Model {activeModel.ModelId} is deployed with Admin waiver by {activeModel.DeploymentWaivedBy}: {activeModel.DeploymentWaiverReason}", "Replace waiver with PASS model acceptance, release package, and approved lifecycle promotion before full factory automation.");
+                    return;
+                }
+
+                if (!hasPassAcceptance)
+                {
+                    Add(report, "Active model readiness", "No-Go", $"Active ONNX model is runtime-ready but has no PASS model acceptance run. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}.", "Run model acceptance on customer validation data, create a release package, and promote the PASS run to production candidate.");
+                    return;
+                }
+
+                var lifecycleOk = activeModel.LifecycleState == ModelLifecycleState.Deployed ||
+                    activeModel.LifecycleState == ModelLifecycleState.ProductionCandidate;
+                if (!lifecycleOk)
+                {
+                    Add(report, "Active model readiness", "No-Go", $"Active model lifecycle state is {activeModel.LifecycleState}; latest acceptance={activeModel.LatestAcceptanceStatus}; releasePackage={activeModel.LatestReleasePackagePath}.", "Promote a PASS model acceptance run to ProductionCandidate or deploy the model through lifecycle approval.");
+                    return;
+                }
+            }
+
+            var evidenceRun = acceptance ?? latestAcceptance;
+            Add(report, "Active model readiness", "Go", evidenceRun is null
+                ? $"Active model is runtime-ready for non-production profile. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}; lifecycle={activeModel?.LifecycleState.ToString() ?? "unregistered"}."
+                : $"Active model has PASS acceptance run {evidenceRun.Id}. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}; lifecycle={activeModel?.LifecycleState.ToString() ?? "unregistered"}; releasePackage={activeModel?.LatestReleasePackagePath ?? string.Empty}; dataset={evidenceRun.DatasetName}.",
                 "No action required.");
         }
         else
@@ -358,6 +395,26 @@ public static class FactoryReadinessService
         var warns = verifications.Count(item => item.Status.Equals("WARN", StringComparison.OrdinalIgnoreCase));
         var status = errors > 0 && criteria.RequireNoExportVerificationErrors ? "No-Go" : warns > 0 || errors > 0 ? "Conditional" : "Go";
         Add(report, "Export verification status", status, $"Latest {verifications.Count} verification record(s): errors={errors}, warnings={warns}.", status == "Go" ? "No action required." : "Re-export failed artifacts and resolve checksum/manifest/header errors.");
+    }
+
+    private static void AddLatency(FactoryReadinessReport report, FactoryReadinessCriteria criteria)
+    {
+        var summary = InspectionLatencyService.GetRecentSummary();
+        if (summary.TraceCount == 0)
+        {
+            Add(report, "Inspection latency trace", criteria.Stage1Only ? "Conditional" : "No-Go", "No end-to-end inspection latency traces have been recorded.", "Run main inspection or validation with latency tracing before claiming the one-second visualization target.");
+            return;
+        }
+
+        var status = summary.OverOneSecondCount > 0
+            ? (criteria.Stage1Only ? "Conditional" : "No-Go")
+            : "Go";
+        Add(
+            report,
+            "Inspection latency trace",
+            status,
+            $"Traces={summary.TraceCount}; p50 frame-to-overlay={summary.P50FrameToOverlayMs:F0} ms; p95 frame-to-overlay={summary.P95FrameToOverlayMs:F0} ms; max={summary.MaxFrameToOverlayMs:F0} ms; p95 saved-result={summary.P95FrameToSavedResultMs:F0} ms; over1s={summary.OverOneSecondCount}; warnings={string.Join(" ", summary.Warnings.Take(5))}",
+            status == "Go" ? "No action required." : "Reduce preprocessing/inference/overlay/persist latency and rerun timed inspection evidence.");
     }
 
     private static void AddSoakTest(FactoryReadinessReport report, FactoryReadinessCriteria criteria)
@@ -473,6 +530,22 @@ public static class FactoryReadinessService
         var audits = AoiDatabase.GetAuditEvents(new LogFilter()).Take(50).ToArray();
         var denied = audits.Count(item => item.ActionCategory.Equals("ACCESS_DENIED", StringComparison.OrdinalIgnoreCase));
         Add(report, "Security/role audit status", audits.Length == 0 ? "Conditional" : "Go", $"Audit rows available={audits.Length}; recent access-denied events={denied}. Admin-only actions remain role-gated in the local audit trail.", audits.Length == 0 ? "Exercise role-gated workflows and export audit evidence." : "No action required.");
+    }
+
+    private static void AddAuthenticationMode(FactoryReadinessReport report)
+    {
+        var mode = AuthenticationSettingsService.CurrentMode;
+        var status = mode == AuthenticationMode.LocalUsers ? "Go" : "Conditional";
+        var evidence = mode switch
+        {
+            AuthenticationMode.LocalUsers => "LocalUsers mode active. Local users authenticate with salted password hashes; roles come from the local user store.",
+            AuthenticationMode.MesAuthenticationBoundary => "MES authentication boundary selected. This PoC documents the MES identity boundary but does not authenticate against a production MES identity provider.",
+            _ => "DemoLocalRoleSelector mode active. The top-bar role selector is for demonstration only and is not production authentication.",
+        };
+        var next = mode == AuthenticationMode.LocalUsers
+            ? "No action required for PoC local accountability."
+            : "Switch to LocalUsers for PoC accountability, or integrate the customer MES/identity provider before production readiness claims.";
+        Add(report, "Authentication mode", status, evidence, next);
     }
 
     private static void AddKnownLimitations(FactoryReadinessReport report, FactoryReadinessCriteria criteria)

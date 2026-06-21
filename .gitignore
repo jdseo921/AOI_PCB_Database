@@ -27,6 +27,14 @@ Release/
 **/Release/
 publish/
 artifacts/
+Templates/**/plugin/
+Templates/**/plugins/
+Templates/**/package/
+Templates/**/*.dll
+Templates/**/*.exe
+Templates/**/*.pdb
+Templates/**/*.deps.json
+Templates/**/*.runtimeconfig.json
 
 # Local SQLite databases and sidecar files
 *.sqlite

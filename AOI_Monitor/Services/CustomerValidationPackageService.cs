@@ -35,7 +35,9 @@ public sealed class CustomerValidationPackageRequest
     public ValidationAcceptanceCriteria Criteria { get; init; } = new();
     public ValidationDatasetQualityCriteria DatasetQualityCriteria { get; init; } = new();
     public DatasetQualitySummary? DatasetQualitySummary { get; init; }
+    public CustomerDatasetPreflightResult? DatasetPreflightResult { get; init; }
     public FalseCallReductionRun? FalseCallReductionRun { get; init; }
+    public InspectionLatencySummary? LatencySummary { get; init; }
 }
 
 public sealed class CustomerValidationPackageResult
@@ -180,6 +182,7 @@ public static class CustomerValidationPackageService
         var instructionsPath = Path.Combine(packageFolder, "print_to_pdf_instructions.txt");
         var readmePath = Path.Combine(packageFolder, "README.txt");
         var manifestPath = Path.Combine(packageFolder, "validation_manifest.json");
+        var preflightPath = Path.Combine(packageFolder, "dataset_preflight_summary.json");
         var annotatedFolder = Path.Combine(packageFolder, "annotated_images");
 
         File.WriteAllText(csvPath, BatchValidationService.BuildResultsCsv(rows), Encoding.UTF8);
@@ -189,7 +192,10 @@ public static class CustomerValidationPackageService
         var robotAcceptance = RobotAcceptanceTestService.ToSummary(AoiDatabase.GetLatestRobotAcceptanceRun());
         var mesReadiness = MesSpoolService.EvaluateReadiness();
         var thresholdProfileEvidence = ThresholdProfileService.GetActiveEvidenceSummary(request.BoardModel, request.BoardModel, "ANY");
+        var preflight = request.DatasetPreflightResult ?? BuildPreflight(request);
+        var latencySummary = request.LatencySummary ?? InspectionLatencyService.SummarizeBatchRows(rows);
         File.WriteAllText(breakdownCsvPath, ClassMetricsService.BuildCsv(breakdownSummary), Encoding.UTF8);
+        File.WriteAllText(preflightPath, JsonSerializer.Serialize(preflight, JsonOptions), Encoding.UTF8);
         cancellationToken.ThrowIfCancellationRequested();
 
         var assetResult = ValidationReportAssetService.ExportSampleAnnotatedImages(
@@ -199,6 +205,8 @@ public static class CustomerValidationPackageService
             maxCount: 25,
             cancellationToken);
         var warnings = request.Warnings
+            .Concat(preflight.Warnings)
+            .Concat(preflight.BlockingFailures.Select(failure => $"Dataset preflight FAIL: {failure}"))
             .Concat(assetResult.Warnings)
             .Where(warning => !string.IsNullOrWhiteSpace(warning))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -245,6 +253,7 @@ public static class CustomerValidationPackageService
             RobotAcceptanceSummary = robotAcceptance,
             MesReadinessSummary = mesReadiness,
             ThresholdProfileEvidence = thresholdProfileEvidence,
+            LatencySummary = latencySummary,
         };
 
         File.WriteAllText(reportPath, CustomerValidationReportService.BuildHtml(reportContext), Encoding.UTF8);
@@ -252,7 +261,7 @@ public static class CustomerValidationPackageService
         File.WriteAllText(instructionsPath, CustomerValidationReportService.BuildPrintToPdfInstructions(reportPath), Encoding.UTF8);
         File.WriteAllText(readmePath, BuildReadme(packageId, acceptance, warnings), Encoding.UTF8);
 
-        var manifest = BuildManifest(request, criteria, acceptance, warnings, generatedAtUtc, packageId, breakdownSummary, datasetQuality, cameraAcceptance, robotAcceptance, mesReadiness, thresholdProfileEvidence);
+        var manifest = BuildManifest(request, criteria, acceptance, warnings, generatedAtUtc, packageId, breakdownSummary, datasetQuality, cameraAcceptance, robotAcceptance, mesReadiness, thresholdProfileEvidence, preflight, latencySummary);
         manifest.IncludedFiles = EnumerateIncludedFiles(packageFolder).ToList();
         WriteManifest(manifestPath, manifest);
         manifest.IncludedFiles = EnumerateIncludedFiles(packageFolder).ToList();
@@ -293,7 +302,9 @@ public static class CustomerValidationPackageService
         CameraAcceptanceSummary cameraAcceptance,
         RobotAcceptanceSummary robotAcceptance,
         MesReadinessSummary mesReadiness,
-        ThresholdProfileEvidenceSummary thresholdProfileEvidence)
+        ThresholdProfileEvidenceSummary thresholdProfileEvidence,
+        CustomerDatasetPreflightResult preflight,
+        InspectionLatencySummary latencySummary)
     {
         return new ValidationPackageManifest
         {
@@ -343,6 +354,7 @@ public static class CustomerValidationPackageService
                 CountOverOneSecond = request.PerformanceSummary.CountOverOneSecond,
                 TimedImageCount = request.PerformanceSummary.TimedImageCount,
             },
+            LatencySummary = latencySummary,
             BreakdownSummary = breakdownSummary,
             DatasetQualitySummary = datasetQuality,
             CameraAcceptanceSummary = cameraAcceptance,
@@ -352,9 +364,28 @@ public static class CustomerValidationPackageService
             Criteria = criteria,
             FalseCallRecommendation = FalseCallReductionService.ToSummary(request.FalseCallReductionRun),
             ThresholdProfileEvidence = thresholdProfileEvidence,
+            DatasetPreflightStatus = preflight.Status,
+            DatasetPreflightFailures = preflight.BlockingFailures,
+            DatasetPreflightWarnings = preflight.Warnings,
             Warnings = warnings.Concat(acceptance.Messages).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             Limitations = CustomerValidationReportContext.DefaultPrototypeLimitations.ToList(),
         };
+    }
+
+    private static CustomerDatasetPreflightResult BuildPreflight(CustomerValidationPackageRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.DatasetFolder) || string.IsNullOrWhiteSpace(request.GroundTruthCsvPath))
+        {
+            return new CustomerDatasetPreflightResult
+            {
+                Status = "CONDITIONAL",
+                DatasetFolder = request.DatasetFolder,
+                ManifestPath = request.GroundTruthCsvPath,
+                Warnings = { "Dataset preflight was not run because the dataset folder or manifest path is unavailable." },
+            };
+        }
+
+        return CustomerDatasetPreflightService.Validate(request.DatasetFolder, request.GroundTruthCsvPath);
     }
 
     private static IEnumerable<ValidationIncludedFile> EnumerateIncludedFiles(string packageFolder)

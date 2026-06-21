@@ -32,6 +32,7 @@ public static class MesIntegrationSettingsService
         {
             var json = File.ReadAllText(SettingsPath);
             _cached = JsonSerializer.Deserialize<MesIntegrationSettings>(json) ?? new MesIntegrationSettings();
+            UnprotectSecrets(_cached);
         }
         catch
         {
@@ -124,11 +125,7 @@ public static class MesIntegrationSettingsService
     {
         var redacted = text ?? string.Empty;
         var source = settings ?? _cached ?? new MesIntegrationSettings();
-        foreach (var secret in new[] { source.ApiKey, source.BearerToken, source.Password })
-        {
-            if (!string.IsNullOrWhiteSpace(secret))
-                redacted = redacted.Replace(secret, "***", StringComparison.Ordinal);
-        }
+        redacted = SecretProtectionService.RedactKnownSecrets(redacted, source.ApiKey, source.BearerToken, source.Password);
 
         if (!string.IsNullOrWhiteSpace(source.Username) && source.AuthMode == MesRestAuthMode.Basic)
             redacted = redacted.Replace(source.Username, "***", StringComparison.Ordinal);
@@ -139,7 +136,7 @@ public static class MesIntegrationSettingsService
     {
         Normalize(settings);
         Directory.CreateDirectory(AoiDatabase.StorageRoot);
-        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, JsonOptions));
+        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(ProtectedClone(settings), JsonOptions));
         _cached = Clone(settings);
         ApplyIntegrationBoundary();
 
@@ -190,6 +187,22 @@ public static class MesIntegrationSettingsService
             MaxRetryCount = source.MaxRetryCount,
             RetryBackoffMs = source.RetryBackoffMs,
         };
+
+    private static MesIntegrationSettings ProtectedClone(MesIntegrationSettings source)
+    {
+        var clone = Clone(source);
+        clone.ApiKey = SecretProtectionService.Protect(clone.ApiKey);
+        clone.BearerToken = SecretProtectionService.Protect(clone.BearerToken);
+        clone.Password = SecretProtectionService.Protect(clone.Password);
+        return clone;
+    }
+
+    private static void UnprotectSecrets(MesIntegrationSettings settings)
+    {
+        settings.ApiKey = SecretProtectionService.Unprotect(settings.ApiKey);
+        settings.BearerToken = SecretProtectionService.Unprotect(settings.BearerToken);
+        settings.Password = SecretProtectionService.Unprotect(settings.Password);
+    }
 
     private static string NormalizePath(string? path, string fallback)
     {

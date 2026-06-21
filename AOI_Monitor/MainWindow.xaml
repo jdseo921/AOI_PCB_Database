@@ -113,13 +113,13 @@
                       <TextBlock Grid.Column="1" Text="A" FontWeight="SemiBold" Foreground="#E7ECEF" FontSize="11.5" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </Grid>
                   </Border>
-                  <Border Width="162" BorderBrush="#2D343A" BorderThickness="0,0,1,0" Padding="10,0">
+                  <Border Width="180" BorderBrush="#2D343A" BorderThickness="0,0,1,0" Padding="10,0">
                     <Grid VerticalAlignment="Center">
                       <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="66"/>
+                        <ColumnDefinition Width="84"/>
                         <ColumnDefinition Width="*"/>
                       </Grid.ColumnDefinitions>
-                      <TextBlock Text="Role" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
+                      <TextBlock Text="Demo Role" Foreground="#E1A334" FontSize="11.5" VerticalAlignment="Center" ToolTip="DemoLocalRoleSelector mode only. LocalUsers mode authenticates against local hashed users."/>
                       <ComboBox Grid.Column="1" x:Name="RoleCombo" SelectedIndex="0" MinHeight="24" Margin="4,0,0,0" SelectionChanged="OnRoleSelectionChanged">
                         <ComboBoxItem Content="Operator"/>
                         <ComboBoxItem Content="Engineer"/>
@@ -127,17 +127,32 @@
                       </ComboBox>
                     </Grid>
                   </Border>
-                  <Border Width="254" Padding="10,0">
+                  <Border Width="238" BorderBrush="#2D343A" BorderThickness="0,0,1,0" Padding="10,0">
                     <Grid VerticalAlignment="Center">
                       <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="46"/>
+                        <ColumnDefinition Width="38"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="68"/>
                       </Grid.ColumnDefinitions>
-                      <TextBlock Text="Mode" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
-                      <TextBlock Grid.Column="1" Text="Local Review" FontWeight="SemiBold" Foreground="#E7ECEF" FontSize="11.5"
-                                 TextTrimming="CharacterEllipsis" ToolTip="Local Review" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                      <TextBlock Text="Auth" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
+                      <ComboBox Grid.Column="1" x:Name="AuthModeCombo" SelectedIndex="0" MinHeight="24" Margin="4,0,0,0" SelectionChanged="OnAuthModeSelectionChanged">
+                        <ComboBoxItem Content="DemoLocalRoleSelector"/>
+                        <ComboBoxItem Content="LocalUsers"/>
+                        <ComboBoxItem Content="MesAuthenticationBoundary"/>
+                      </ComboBox>
+                    </Grid>
+                  </Border>
+                  <Border Width="250" Padding="10,0">
+                    <Grid VerticalAlignment="Center">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="62"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="58"/>
+                        <ColumnDefinition Width="48"/>
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="Password" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
+                      <PasswordBox Grid.Column="1" x:Name="LoginPasswordBox" MinHeight="24" Margin="4,0,0,0"/>
                       <Button Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Login" Margin="6,4,0,4" Click="OnLocalLoginClick"/>
+                      <Button Grid.Column="3" x:Name="CreateUserBtn" Style="{StaticResource MiniBtn}" Content="Add" Margin="6,4,0,4" Click="OnCreateLocalUserClick" ToolTip="Admin only: create local user with selected role."/>
                     </Grid>
                   </Border>
                 </StackPanel>

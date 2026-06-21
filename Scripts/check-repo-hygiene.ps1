@@ -39,15 +39,17 @@ function Add-Issue {
 
 Write-Host "AOI Monitor repository hygiene check"
 Write-Host "Repository: $repoRoot"
-Write-Host "Max tracked/staged image size: $([Math]::Round($MaxImageBytes / 1MB, 2)) MB"
+Write-Host "Max tracked/staged/untracked image size: $([Math]::Round($MaxImageBytes / 1MB, 2)) MB"
 
 $trackedFiles = Invoke-GitLines @("ls-files")
 $stagedFiles = Invoke-GitLines @("diff", "--cached", "--name-only", "--diff-filter=ACMRT")
+$untrackedFiles = Invoke-GitLines @("ls-files", "--others", "--exclude-standard")
 
 $forbiddenPatterns = @(
     @{ Reason = "build output"; Pattern = '(^|/)(bin|obj)/' },
     @{ Reason = "Visual Studio workspace state"; Pattern = '(^|/)\.vs/' },
     @{ Reason = "generated release/package output"; Pattern = '(^|/)(Release|publish|artifacts)/' },
+    @{ Reason = "generated template plugin binary"; Pattern = '^Templates/.+\.(dll|exe|pdb|deps\.json|runtimeconfig\.json)$|^Templates/.+/(plugin|plugins|package)/' },
     @{ Reason = "SQLite database or sidecar"; Pattern = '\.(sqlite|sqlite3|db|db3)(-(wal|shm))?$' },
     @{ Reason = "generated export artifact"; Pattern = '(^|/)exports/' },
     @{ Reason = "image vault runtime folder"; Pattern = '(^|/)image_vault/' },
@@ -62,7 +64,8 @@ $issues = [System.Collections.Generic.List[string]]::new()
 
 foreach ($entry in @(
     @{ Scope = "tracked"; Files = $trackedFiles },
-    @{ Scope = "staged"; Files = $stagedFiles }
+    @{ Scope = "staged"; Files = $stagedFiles },
+    @{ Scope = "untracked"; Files = $untrackedFiles }
 )) {
     foreach ($file in $entry.Files) {
         $path = Normalize-RepoPath $file
@@ -74,12 +77,29 @@ foreach ($entry in @(
     }
 }
 
+$templateProjectFiles = @($trackedFiles + $stagedFiles + $untrackedFiles |
+    Sort-Object -Unique |
+    ForEach-Object { Normalize-RepoPath $_ } |
+    Where-Object { $_ -match '^Templates/.+\.csproj$' })
+
+foreach ($path in $templateProjectFiles) {
+    $fullPath = Join-Path $repoRoot $path
+    if (!(Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        continue
+    }
+
+    $projectXml = Get-Content -LiteralPath $fullPath -Raw
+    if ($projectXml -match '<PackageReference\b') {
+        Add-Issue $issues "templates" $path "template projects must not add vendor SDK or NuGet package dependencies"
+    }
+}
+
 $imageExtensions = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($extension in @(".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp", ".gif")) {
     [void]$imageExtensions.Add($extension)
 }
 
-foreach ($file in ($trackedFiles + $stagedFiles | Sort-Object -Unique)) {
+foreach ($file in ($trackedFiles + $stagedFiles + $untrackedFiles | Sort-Object -Unique)) {
     $path = Normalize-RepoPath $file
     $extension = [System.IO.Path]::GetExtension($path)
     if (!$imageExtensions.Contains($extension)) {
@@ -97,7 +117,7 @@ foreach ($file in ($trackedFiles + $stagedFiles | Sort-Object -Unique)) {
     }
 }
 
-$markdownFiles = @($trackedFiles + $stagedFiles |
+$markdownFiles = @($trackedFiles + $stagedFiles + $untrackedFiles |
     Sort-Object -Unique |
     ForEach-Object { Normalize-RepoPath $_ } |
     Where-Object { $_ -match '\.md$' })
@@ -151,7 +171,7 @@ if ($issues.Count -gt 0) {
         Write-Host "  $issue" -ForegroundColor Red
     }
 
-    throw "Forbidden runtime/customer/build artifacts were found in tracked or staged files."
+    throw "Forbidden runtime/customer/build artifacts were found in tracked, staged, or untracked files."
 }
 
-Write-Host "Repository hygiene check passed. No forbidden tracked or staged runtime artifacts found."
+Write-Host "Repository hygiene check passed. No forbidden tracked, staged, or untracked runtime artifacts found."

@@ -1,0 +1,8 @@
+{
+  "driverId": "template.fake-lighting",
+  "displayName": "Template Fake Lighting Controller",
+  "version": "0.1.0",
+  "assemblyFile": "LightingAdapterTemplate.dll",
+  "factoryTypeName": "LightingAdapterTemplate.FakeLightingControllerFactory",
+  "supportedModes": [ "template-fake", "simulated" ]
+}

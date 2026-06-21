@@ -1,0 +1,10 @@
+{
+  "controllerId": "template.fake-robot",
+  "displayName": "Template Fake Robot Controller",
+  "version": "0.1.0",
+  "assemblyFile": "RobotControllerTemplate.dll",
+  "registrationTypeName": "RobotControllerTemplate.RobotTemplateRegistration",
+  "robotControllerTypeName": "RobotControllerTemplate.FakeRobotController",
+  "plcSafetyControllerTypeName": "RobotControllerTemplate.FakePlcSafetyController",
+  "registrationProcess": "Load the assembly from a reviewed commissioning bootstrap and call RobotTemplateRegistration.RegisterFakeControllers(). The main app does not auto-load robot motion plugins from a folder."
+}

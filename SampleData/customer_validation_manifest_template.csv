@@ -1,0 +1,3 @@
+image,ground_truth,golden_image,defect_type,side,refdes,roi_id,roi_type,lot_id,board_model,notes
+images/board_0001_top_ok.png,OK,golden/board_ref_top.png,OK,top,U1,ROI-U1,component,LOT-EXAMPLE,TBOX,known-good top view
+images/board_0002_top_bridge.png,NG,golden/board_ref_top.png,solder_bridge,top,U2,ROI-U2,pad,LOT-EXAMPLE,TBOX,example NG row

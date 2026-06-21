@@ -21,6 +21,7 @@ public sealed class WorkflowState
         set => CurrentUser.UserId = NormalizeUserId(value);
     }
     public UserRole CurrentRole => CurrentUser.Role;
+    public AuthenticationMode AuthenticationMode => CurrentUser.AuthenticationMode;
     public string BoardProgram { get; } = "TBOX-MAIN";
     public string ModelVersion { get; } = "PIXEL_DIFF_0.1";
     public bool IsRecipeLocked { get; set; }
@@ -40,11 +41,22 @@ public sealed class WorkflowState
     }
 
     public void SetCurrentUser(string userId, UserRole role)
+        => SetCurrentUser(userId, role, CurrentUser.AuthenticationMode);
+
+    public void SetCurrentUser(string userId, UserRole role, AuthenticationMode authenticationMode)
     {
         var previousUser = OperatorWithRole;
         CurrentUser.UserId = NormalizeUserId(userId);
         CurrentUser.Role = role;
-        AddEvent("LOGIN", $"Local user set to {OperatorWithRole}. Previous local user: {previousUser}. MES authentication is Stage 4 planned.");
+        CurrentUser.AuthenticationMode = authenticationMode;
+        AddEvent("LOGIN", $"User set to {OperatorWithRole}; authMode={authenticationMode}. Previous user: {previousUser}.");
+        Notify();
+    }
+
+    public void SetAuthenticationMode(AuthenticationMode mode)
+    {
+        CurrentUser.AuthenticationMode = mode;
+        AddEvent("AUTHENTICATION_MODE", $"Authentication mode active: {mode}.");
         Notify();
     }
 

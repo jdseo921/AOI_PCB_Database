@@ -4,6 +4,8 @@ param(
     [string]$OutputRoot = "",
     [switch]$SelfContained,
     [switch]$ValidationOnly,
+    [switch]$IncludeTemplates,
+    [switch]$IncludeDocs,
     [switch]$NoRestore
 )
 
@@ -14,6 +16,7 @@ $repoRoot = Resolve-Path (Join-Path $scriptRoot "..")
 $projectPath = Join-Path $repoRoot "AOI_Monitor\AOI_Monitor.csproj"
 $solutionPath = Join-Path $repoRoot "AOI_PCB_Database.slnx"
 $docsPath = Join-Path $repoRoot "Docs"
+$templatesPath = Join-Path $repoRoot "Templates"
 $featureDocPath = Join-Path $repoRoot "IMPLEMENTED_FEATURES.md"
 $rootReadmePath = Join-Path $repoRoot "README.md"
 $releaseRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
@@ -31,6 +34,7 @@ $releaseName = "AOI_Monitor_PoC_$timestamp"
 $releaseDir = Join-Path $releaseRoot $releaseName
 $publishDir = Join-Path $releaseDir "app"
 $releaseDocsDir = Join-Path $releaseDir "Docs"
+$releaseTemplatesDir = Join-Path $releaseDir "Templates"
 
 function Invoke-Step {
     param(
@@ -51,6 +55,8 @@ Write-Host "Release:    $releaseDir"
 Write-Host "Runtime:    $Runtime"
 Write-Host "Mode:       $(if ($SelfContained) { 'self-contained' } else { 'framework-dependent' })"
 Write-Host "Validation: $(if ($ValidationOnly) { 'yes' } else { 'no' })"
+Write-Host "Docs:       $(if ($IncludeDocs -or !$ValidationOnly) { 'include' } else { 'skip for validation-only package' })"
+Write-Host "Templates:  $(if ($IncludeTemplates) { 'include adapter templates' } else { 'skip' })"
 Write-Host "Restore:    $(if ($NoRestore) { 'skip; use existing restore assets' } else { 'allow dotnet commands to restore as needed' })"
 
 if (!(Test-Path $projectPath)) {
@@ -120,11 +126,28 @@ foreach ($item in $excludedRuntimeItems) {
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "Copying documentation..."
-Copy-Item -LiteralPath $docsPath -Destination $releaseDocsDir -Recurse -Force
-Copy-Item -LiteralPath $rootReadmePath -Destination (Join-Path $releaseDir "README.md") -Force
-if (Test-Path $featureDocPath) {
-    Copy-Item -LiteralPath $featureDocPath -Destination (Join-Path $releaseDir "IMPLEMENTED_FEATURES.md") -Force
+if ($IncludeDocs -or !$ValidationOnly) {
+    Write-Host "Copying documentation..."
+    Copy-Item -LiteralPath $docsPath -Destination $releaseDocsDir -Recurse -Force
+    Copy-Item -LiteralPath $rootReadmePath -Destination (Join-Path $releaseDir "README.md") -Force
+    if (Test-Path $featureDocPath) {
+        Copy-Item -LiteralPath $featureDocPath -Destination (Join-Path $releaseDir "IMPLEMENTED_FEATURES.md") -Force
+    }
+} else {
+    Write-Host "Skipping documentation copy. Pass -IncludeDocs to include docs during validation-only packaging."
+}
+
+if ($IncludeTemplates) {
+    if (!(Test-Path $templatesPath)) {
+        throw "Templates folder was requested but not found: $templatesPath"
+    }
+
+    Write-Host "Copying adapter templates..."
+    Copy-Item -LiteralPath $templatesPath -Destination $releaseTemplatesDir -Recurse -Force
+    Get-ChildItem -LiteralPath $releaseTemplatesDir -Directory -Recurse -Include bin,obj -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -LiteralPath $releaseTemplatesDir -Recurse -Include *.dll,*.exe,*.pdb,*.deps.json,*.runtimeconfig.json -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
 $releaseReadme = @"
@@ -143,9 +166,8 @@ Publish mode: $(if ($SelfContained) { "Self-contained" } else { "Framework-depen
 ## Included
 
 - app/ - Published Windows desktop application files.
-- Docs/ - Installation guide, user manual, stage mapping, integration boundaries, and acceptance checklist.
-- README.md - Repository-level overview and operating notes.
-- IMPLEMENTED_FEATURES.md - Current PoC feature inventory.
+$(if ($IncludeDocs -or !$ValidationOnly) { "- Docs/ - Installation guide, deployment package guide, user manual, stage mapping, integration boundaries, and acceptance checklist.`n- README.md - Repository-level overview and operating notes.`n- IMPLEMENTED_FEATURES.md - Current PoC feature inventory." } else { "- Docs were skipped for this validation-only package. Pass -IncludeDocs to include them." })
+$(if ($IncludeTemplates) { "- Templates/ - Fake/no-op adapter template source projects for camera, lighting, and robot integrations." } else { "- Adapter templates were not included. Pass -IncludeTemplates for developer handoff packages." })
 
 ## Not Included
 

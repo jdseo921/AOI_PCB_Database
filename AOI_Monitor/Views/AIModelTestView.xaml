@@ -86,7 +86,8 @@
           <StackPanel Grid.Column="4">
             <TextBlock Text="Engine" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
             <TextBox x:Name="EngineText" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference Prototype Engine"/>
-            <Button Style="{StaticResource ActionBtnGreen}" Content="Run Batch Inspection" Margin="0,8,0,0" Click="OnRunBatchClick"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Run Dataset Preflight" Margin="0,8,0,0" Click="OnRunDatasetPreflightClick"/>
+            <Button Style="{StaticResource ActionBtnGreen}" Content="Run Batch Inspection" Margin="0,6,0,0" Click="OnRunBatchClick"/>
           </StackPanel>
         </Grid>
       </Grid>
@@ -144,6 +145,7 @@
         <StackPanel>
           <TextBlock Text="Dataset Quality Gate" Foreground="#7F8C95" FontSize="10"/>
           <TextBlock x:Name="DatasetQualityText" Text="--" FontWeight="Bold" FontSize="14"/>
+          <TextBlock x:Name="DatasetPreflightText" Text="Preflight: not run" Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap"/>
           <TextBlock x:Name="DatasetQualityWarningsText" Text="" Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap"/>
         </StackPanel>
       </Border>

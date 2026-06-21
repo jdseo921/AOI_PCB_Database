@@ -25,6 +25,8 @@ public partial class SettingsView : UserControl
     private CameraAcceptanceRun? _lastCameraAcceptanceRun;
     private CancellationTokenSource? _lightingAcceptanceCancellation;
     private LightingAcceptanceRun? _lastLightingAcceptanceRun;
+    private CancellationTokenSource? _robotAcceptanceCancellation;
+    private RobotAcceptanceRun? _lastRobotAcceptanceRun;
     private bool _isKorean;
 
     public SettingsView(MainViewModel vm)
@@ -318,6 +320,77 @@ public partial class SettingsView : UserControl
         }
     }
 
+    private void OnBackupConfigurationClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Backing up workstation configuration"))
+            return;
+
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select configuration backup folder",
+            InitialDirectory = AoiDatabase.StorageRoot,
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var result = ConfigurationBackupService.Export(dialog.FolderName, WorkflowState.Instance.OperatorWithRole);
+            MessageBox.Show(
+                $"Configuration backup exported.\n\n{result.BackupPath}\n\nRaw/customer images are excluded by default.",
+                "AOI Monitor Configuration Backup",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        {
+            MessageBox.Show($"Configuration backup failed:\n{ex.Message}", "AOI Monitor Configuration Backup", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnRestoreConfigurationPreviewClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Previewing and restoring workstation configuration"))
+            return;
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select AOI configuration backup",
+            Filter = "AOI configuration backup (*.json)|*.json|All files (*.*)|*.*",
+            InitialDirectory = AoiDatabase.StorageRoot,
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var preview = ConfigurationBackupService.Preview(dialog.FileName);
+            var details = BuildRestorePreviewMessage(preview);
+            if (!preview.IsCompatible)
+            {
+                MessageBox.Show(details, "AOI Monitor Restore Preview", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var apply = MessageBox.Show(
+                $"{details}\n\nApply this configuration backup now?",
+                "AOI Monitor Restore Preview",
+                MessageBoxButton.YesNo,
+                preview.Warnings.Count == 0 ? MessageBoxImage.Question : MessageBoxImage.Warning);
+            if (apply != MessageBoxResult.Yes)
+                return;
+
+            ConfigurationBackupService.Import(dialog.FileName, WorkflowState.Instance.OperatorWithRole);
+            RefreshWorkflowUi();
+            RefreshThresholdProfilesUi();
+            MessageBox.Show("Configuration restored. Restart the app before production use so all integration boundaries reload cleanly.", "AOI Monitor Restore", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        {
+            MessageBox.Show($"Configuration restore preview failed:\n{ex.Message}", "AOI Monitor Restore Preview", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void OnStartTrainingClick(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
@@ -458,7 +531,7 @@ public partial class SettingsView : UserControl
 
         try
         {
-            var result = ModelRegistryService.Validate(row.ModelId);
+            var result = ModelLifecycleService.ValidateRuntime(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
             RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
             RefreshModelRegistryUi();
             WorkflowState.Instance.AddEvent("MODEL_CHECK", $"Registered model validation: {row.ModelId}; {result.DisplayStatus}. {result.Message}");
@@ -501,7 +574,7 @@ public partial class SettingsView : UserControl
             MessageBoxImage.Information);
     }
 
-    private void OnRunModelAcceptanceClick(object sender, RoutedEventArgs e)
+    private async void OnRunModelAcceptanceClick(object sender, RoutedEventArgs e)
     {
         if (!Authorize(RoleAuthorization.CanTestModelConfiguration, "Running model acceptance"))
             return;
@@ -520,7 +593,12 @@ public partial class SettingsView : UserControl
 
         try
         {
-            var run = ModelAcceptanceService.RunAcceptance(datasetDialog.FolderName, csvDialog.FileName, operatorId: WorkflowState.Instance.OperatorWithRole);
+            RunModelAcceptanceBtn.IsEnabled = false;
+            ModelCheckMessageText.Text = "Model acceptance running...";
+            var datasetFolder = datasetDialog.FolderName;
+            var csvPath = csvDialog.FileName;
+            var operatorId = WorkflowState.Instance.OperatorWithRole;
+            var run = await Task.Run(() => ModelAcceptanceService.RunAcceptance(datasetFolder, csvPath, operatorId: operatorId));
             RefreshModelAcceptanceRunsUi();
             WorkflowState.Instance.AddEvent("MODEL_ACCEPTANCE", $"Model acceptance {run.Status}: model={run.ModelId}; run={run.Id}; dataset={run.DatasetName}.");
             MessageBox.Show($"Model acceptance {run.Status}.\n\nRun ID: {run.Id}\n{string.Join(Environment.NewLine, run.Messages.Take(5))}", "Model Acceptance", MessageBoxButton.OK, run.Status == "PASS" ? MessageBoxImage.Information : MessageBoxImage.Warning);
@@ -528,6 +606,10 @@ public partial class SettingsView : UserControl
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or InvalidDataException)
         {
             MessageBox.Show($"Model acceptance failed:\n{ex.Message}", "Model Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            RefreshRoleControls();
         }
     }
 
@@ -551,6 +633,7 @@ public partial class SettingsView : UserControl
         {
             var package = ModelAcceptanceService.CreateReleasePackage(latest.Id, outputDialog.FolderName, WorkflowState.Instance.OperatorWithRole);
             RefreshModelAcceptanceRunsUi();
+            RefreshModelRegistryUi();
             WorkflowState.Instance.AddEvent("MODEL_RELEASE_PACKAGE", $"Model release package created: model={package.ModelId}; status={package.Status}.");
             MessageBox.Show($"Model release package created:\n{package.PackagePath}", "Model Release", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -584,6 +667,7 @@ public partial class SettingsView : UserControl
         {
             ModelAcceptanceService.PromoteToProductionCandidate(latest.Id, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
             RefreshModelAcceptanceRunsUi();
+            RefreshModelRegistryUi();
             WorkflowState.Instance.AddEvent("MODEL_PRODUCTION_CANDIDATE", $"Promoted model acceptance run {latest.Id} for {latest.ModelId}.");
             MessageBox.Show("Model acceptance run promoted to production candidate.", "Model Acceptance", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -595,6 +679,89 @@ public partial class SettingsView : UserControl
 
     private void OnViewModelAcceptanceRunsClick(object sender, RoutedEventArgs e)
         => RefreshModelAcceptanceRunsUi(showMessage: true);
+
+    private void OnDeployModelClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Deploying model lifecycle state"))
+            return;
+
+        if (ModelRegistryGrid.SelectedItem is not ModelRegistryRow row)
+        {
+            MessageBox.Show("Select a registered model first.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            ModelLifecycleService.DeployModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
+            RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
+            RefreshModelRegistryUi();
+            WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT", $"Deployed model {row.ModelId} through lifecycle approval.");
+            MessageBox.Show("Model deployed. Full automation readiness still depends on PASS acceptance and other factory evidence.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(ex.Message, "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnWaiveDeployModelClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Deploying model with Admin waiver"))
+            return;
+
+        if (ModelRegistryGrid.SelectedItem is not ModelRegistryRow row)
+        {
+            MessageBox.Show("Select a registered model first.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var reason = PromptForText("Deployment Waiver", "Admin waiver reason");
+        if (string.IsNullOrWhiteSpace(reason))
+            return;
+
+        try
+        {
+            ModelLifecycleService.DeployModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole, reason);
+            RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
+            RefreshModelRegistryUi();
+            WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT_WAIVER", $"Deployed model {row.ModelId} with Admin waiver. Full automation remains blocked without real PASS evidence.");
+            MessageBox.Show("Model deployed with waiver. Readiness packages will show this waiver and will not claim full production readiness.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(ex.Message, "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnRetireModelClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Retiring model lifecycle state"))
+            return;
+
+        if (ModelRegistryGrid.SelectedItem is not ModelRegistryRow row)
+        {
+            MessageBox.Show("Select a registered model first.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var reason = PromptForText("Retire Model", "Retirement reason");
+        if (string.IsNullOrWhiteSpace(reason))
+            return;
+
+        try
+        {
+            ModelLifecycleService.RetireModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole, reason);
+            RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
+            RefreshModelRegistryUi();
+            WorkflowState.Instance.AddEvent("MODEL_RETIRED", $"Retired model {row.ModelId}.");
+            MessageBox.Show("Model retired and removed from active use.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(ex.Message, "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 
     private void OnBrowseCameraTopClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Top);
     private void OnBrowseCameraSideClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Side);
@@ -974,6 +1141,9 @@ public partial class SettingsView : UserControl
         RunLightingAcceptanceBtn.IsEnabled = canManageSettings && _lightingAcceptanceCancellation is null;
         CancelLightingAcceptanceBtn.IsEnabled = _lightingAcceptanceCancellation is not null;
         ExportLightingAcceptanceBtn.IsEnabled = canManageSettings;
+        RunRobotCellAcceptanceBtn.IsEnabled = canManageSettings && _robotAcceptanceCancellation is null;
+        CancelRobotCellAcceptanceBtn.IsEnabled = _robotAcceptanceCancellation is not null;
+        ExportRobotCellAcceptanceBtn.IsEnabled = canManageSettings;
         StorageRootText.IsEnabled = canManageSettings;
         BrowseStorageRootBtn.IsEnabled = canManageSettings;
         MesModeCombo.IsEnabled = canManageSettings;
@@ -1026,6 +1196,8 @@ public partial class SettingsView : UserControl
         SetActiveModelBtn.IsEnabled = canManageSettings;
         RunSetupWizardBtn.IsEnabled = canManageSettings;
         ExportDiagnosticsBtn.IsEnabled = canManageSettings;
+        BackupConfigurationBtn.IsEnabled = canManageSettings;
+        RestoreConfigurationPreviewBtn.IsEnabled = canManageSettings;
         ConfidenceThresholdText.IsEnabled = canChangeThresholds;
         TestModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
         ValidateRegisteredModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
@@ -1033,6 +1205,9 @@ public partial class SettingsView : UserControl
         ViewModelAcceptanceRunsBtn.IsEnabled = canManageSettings;
         CreateModelReleasePackageBtn.IsEnabled = canChangeThresholds;
         PromoteProductionCandidateBtn.IsEnabled = canChangeThresholds;
+        DeployModelBtn.IsEnabled = canManageSettings;
+        WaiveDeployModelBtn.IsEnabled = canManageSettings;
+        RetireModelBtn.IsEnabled = canManageSettings;
         ApproveThresholdProfileBtn.IsEnabled = canChangeThresholds;
         DeployThresholdProfileBtn.IsEnabled = canChangeThresholds;
     }
@@ -1596,6 +1771,104 @@ public partial class SettingsView : UserControl
             ? "Simulated result; real lighting controller readiness is not claimed."
             : "Configured controller result; verify physical wiring and light output externally.";
         return $"Lighting sync acceptance {run.Status}; steps {run.PassedStepCount}/{run.StepCount}; max command {run.MaxCommandLatencyMs:F1} ms; max trigger-to-frame {run.MaxTriggerToFrameLatencyMs:F1} ms. {boundary} {firstMessage}";
+    }
+
+    private async void OnRunRobotCellAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Running robot cell acceptance"))
+            return;
+
+        if (_robotAcceptanceCancellation is not null)
+            return;
+
+        _robotAcceptanceCancellation = new CancellationTokenSource();
+        RefreshRoleControls();
+        RobotAcceptanceStatusText.Text = "Acceptance: RUNNING";
+        RobotAcceptanceStatusText.Foreground = Brushes.Gold;
+        RobotAcceptanceDiagnosticsText.Text = "Robot cell acceptance running...";
+        var progress = new Progress<string>(message => RobotAcceptanceDiagnosticsText.Text = message);
+
+        try
+        {
+            var token = _robotAcceptanceCancellation.Token;
+            var run = await RobotCellAcceptanceTestService.RunAsync(progress: progress, cancellationToken: token);
+            AoiDatabase.RecordRobotAcceptanceRun(run, WorkflowState.Instance.OperatorWithRole);
+            _lastRobotAcceptanceRun = run;
+            WorkflowState.Instance.AddEvent("ROBOT_CELL_ACCEPTANCE", $"Robot cell acceptance {run.Status}; source={run.SourceKind}; safety={run.SafetySourceKind}; eStopBlocked={run.EmergencyStopBlocked}; safetyFaultBlocked={run.SafetyFaultBlocked}.");
+            RobotAcceptanceStatusText.Text = $"Acceptance: {run.Status} ({run.SourceKind}/{run.SafetySourceKind})";
+            RobotAcceptanceStatusText.Foreground = run.Status == "PASS" ? Brushes.LightGreen : Brushes.IndianRed;
+            RobotAcceptanceDiagnosticsText.Text = BuildRobotAcceptanceUiSummary(run);
+            MessageBox.Show(
+                RobotAcceptanceDiagnosticsText.Text,
+                "Robot Cell Acceptance",
+                MessageBoxButton.OK,
+                run.Status == "PASS" ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (OperationCanceledException)
+        {
+            RobotAcceptanceStatusText.Text = "Acceptance: CANCELED";
+            RobotAcceptanceStatusText.Foreground = Brushes.Gold;
+            RobotAcceptanceDiagnosticsText.Text = "Robot cell acceptance canceled.";
+            WorkflowState.Instance.AddEvent("ROBOT_CELL_ACCEPTANCE", "Robot cell acceptance canceled by user.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            RobotAcceptanceStatusText.Text = "Acceptance: ERROR";
+            RobotAcceptanceStatusText.Foreground = Brushes.IndianRed;
+            RobotAcceptanceDiagnosticsText.Text = $"Robot cell acceptance failed: {ex.Message}";
+            WorkflowState.Instance.AddEvent("ROBOT_CELL_ACCEPTANCE_ERROR", RobotAcceptanceDiagnosticsText.Text);
+            MessageBox.Show(RobotAcceptanceDiagnosticsText.Text, "Robot Cell Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _robotAcceptanceCancellation?.Dispose();
+            _robotAcceptanceCancellation = null;
+            RefreshRoleControls();
+        }
+    }
+
+    private void OnCancelRobotCellAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        _robotAcceptanceCancellation?.Cancel();
+    }
+
+    private void OnExportRobotCellAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Exporting robot cell acceptance report"))
+            return;
+
+        var run = _lastRobotAcceptanceRun ?? AoiDatabase.GetLatestRobotAcceptanceRun();
+        if (run is null)
+        {
+            MessageBox.Show("No robot cell acceptance run is available to export.", "Robot Cell Acceptance", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var export = RobotCellAcceptanceTestService.ExportReport(run);
+            ExportVerificationService.RecordVerifiedExport("RobotCellAcceptanceJson", export.JsonPath, run.Status == "PASS" ? "OK" : "WARN");
+            ExportVerificationService.RecordVerifiedExport("RobotCellAcceptanceHtml", export.HtmlPath, run.Status == "PASS" ? "OK" : "WARN");
+            WorkflowState.Instance.AddEvent("ROBOT_CELL_ACCEPTANCE_EXPORT", $"Robot cell acceptance report exported: {Path.GetFileName(export.JsonPath)}.");
+            MessageBox.Show(
+                $"Robot cell acceptance report exported.\n\nJSON: {export.JsonPath}\nHTML: {export.HtmlPath}",
+                "Robot Cell Acceptance",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            MessageBox.Show($"Robot cell acceptance export failed:\n{ex.Message}", "Robot Cell Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static string BuildRobotAcceptanceUiSummary(RobotAcceptanceRun run)
+    {
+        var firstMessage = run.Failures.Concat(run.Warnings).FirstOrDefault() ?? string.Empty;
+        var boundary = run.SourceKind == "Real" && run.SafetySourceKind == "Real"
+            ? "Configured real robot/PLC boundary evidence recorded; safety certification remains external."
+            : "Simulation/not-connected evidence only; no real production robot movement or safety certification was validated.";
+        return $"Robot cell acceptance {run.Status}; source={run.SourceKind}; safety={run.SafetySourceKind}; fullCycle={run.FullCycleMs:F1} ms; emergencyStopBlocked={run.EmergencyStopBlocked}; safetyFaultBlocked={run.SafetyFaultBlocked}. {boundary} {firstMessage}";
     }
 
     private LightingSettings BuildLightingSettingsFromUi()
@@ -2186,6 +2459,76 @@ public partial class SettingsView : UserControl
         _ => 0,
     };
 
+    private static string PromptForText(string title, string label)
+    {
+        var input = new TextBox
+        {
+            Margin = new Thickness(0, 6, 0, 10),
+            MinWidth = 360,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinLines = 3,
+            MaxLines = 5,
+        };
+        var ok = new Button { Content = "OK", Width = 78, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+        var cancel = new Button { Content = "Cancel", Width = 78, IsCancel = true };
+        var dialog = new Window
+        {
+            Title = title,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Children =
+                {
+                    new TextBlock { Text = label, FontWeight = FontWeights.SemiBold },
+                    input,
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Children = { ok, cancel },
+                    },
+                },
+            },
+        };
+        ok.Click += (_, _) =>
+        {
+            dialog.DialogResult = true;
+            dialog.Close();
+        };
+        return dialog.ShowDialog() == true ? input.Text.Trim() : string.Empty;
+    }
+
+    private static string BuildRestorePreviewMessage(ConfigurationRestorePreview preview)
+    {
+        var lines = new List<string>
+        {
+            preview.Summary,
+            $"Schema: {preview.SchemaVersion}",
+            $"Database schema: {preview.DatabaseSchemaVersion}",
+            $"Settings: {string.Join(", ", preview.SettingsKeys.DefaultIfEmpty("--"))}",
+        };
+
+        if (preview.Warnings.Count > 0)
+        {
+            lines.Add(string.Empty);
+            lines.Add("Warnings:");
+            lines.AddRange(preview.Warnings.Select(warning => $"- {warning}"));
+        }
+
+        if (preview.BlockingIssues.Count > 0)
+        {
+            lines.Add(string.Empty);
+            lines.Add("Blocking issues:");
+            lines.AddRange(preview.BlockingIssues.Select(issue => $"- {issue}"));
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
     private sealed class ModelRegistryRow
     {
         public ModelRegistryRow(ModelRegistryEntry entry)
@@ -2194,6 +2537,11 @@ public partial class SettingsView : UserControl
             DisplayName = entry.DisplayName;
             Version = entry.Version;
             ValidationStatus = ModelConfigurationValidator.ToDisplay(entry.ValidationStatus);
+            LifecycleState = entry.LifecycleState.ToString();
+            LatestAcceptanceStatus = string.IsNullOrWhiteSpace(entry.LatestAcceptanceStatus) ? "--" : entry.LatestAcceptanceStatus;
+            ReleasePackageDisplay = string.IsNullOrWhiteSpace(entry.LatestReleasePackagePath)
+                ? "--"
+                : Path.GetFileName(entry.LatestReleasePackagePath);
             ThresholdDisplay = entry.ConfidenceThreshold.ToString("P0", CultureInfo.InvariantCulture);
             LastValidatedDisplay = entry.LastValidatedAtUtc is { } timestamp
                 ? timestamp.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture)
@@ -2205,6 +2553,9 @@ public partial class SettingsView : UserControl
         public string DisplayName { get; }
         public string Version { get; }
         public string ValidationStatus { get; }
+        public string LifecycleState { get; }
+        public string LatestAcceptanceStatus { get; }
+        public string ReleasePackageDisplay { get; }
         public string ThresholdDisplay { get; }
         public string LastValidatedDisplay { get; }
         public string ActiveDisplay { get; }

@@ -31,6 +31,7 @@ public static class CentralSyncSettingsService
         try
         {
             _cached = JsonSerializer.Deserialize<CentralSyncSettings>(File.ReadAllText(SettingsPath)) ?? new CentralSyncSettings();
+            _cached.SharedSecret = SecretProtectionService.Unprotect(_cached.SharedSecret);
         }
         catch
         {
@@ -72,16 +73,16 @@ public static class CentralSyncSettingsService
     {
         var redacted = text ?? string.Empty;
         var source = settings ?? _cached ?? new CentralSyncSettings();
-        if (!string.IsNullOrWhiteSpace(source.SharedSecret))
-            redacted = redacted.Replace(source.SharedSecret, "***", StringComparison.Ordinal);
-        return redacted;
+        return SecretProtectionService.RedactKnownSecrets(redacted, source.SharedSecret);
     }
 
     private static void Save(CentralSyncSettings settings, bool notify)
     {
         Normalize(settings);
         Directory.CreateDirectory(AoiDatabase.StorageRoot);
-        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, JsonOptions), Encoding.UTF8);
+        var stored = Clone(settings);
+        stored.SharedSecret = SecretProtectionService.Protect(stored.SharedSecret);
+        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(stored, JsonOptions), Encoding.UTF8);
         _cached = Clone(settings);
         if (notify)
             SettingsChanged?.Invoke();

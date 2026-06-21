@@ -210,9 +210,11 @@
                 <DataGrid.Columns>
                   <DataGridTextColumn Header="Model" Binding="{Binding DisplayName}" Width="*"/>
                   <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="85"/>
-                  <DataGridTextColumn Header="Status" Binding="{Binding ValidationStatus}" Width="105"/>
+                  <DataGridTextColumn Header="Lifecycle" Binding="{Binding LifecycleState}" Width="128"/>
+                  <DataGridTextColumn Header="Runtime" Binding="{Binding ValidationStatus}" Width="90"/>
+                  <DataGridTextColumn Header="Acceptance" Binding="{Binding LatestAcceptanceStatus}" Width="92"/>
+                  <DataGridTextColumn Header="Release" Binding="{Binding ReleasePackageDisplay}" Width="92"/>
                   <DataGridTextColumn Header="Threshold" Binding="{Binding ThresholdDisplay}" Width="78"/>
-                  <DataGridTextColumn Header="Validated" Binding="{Binding LastValidatedDisplay}" Width="92"/>
                   <DataGridTextColumn Header="Active" Binding="{Binding ActiveDisplay}" Width="58"/>
                 </DataGrid.Columns>
               </DataGrid>
@@ -223,7 +225,10 @@
                 <Button x:Name="RunModelAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Run Model Acceptance" Margin="0,0,6,6" Click="OnRunModelAcceptanceClick"/>
                 <Button x:Name="ViewModelAcceptanceRunsBtn" Style="{StaticResource MiniBtn}" Content="View Acceptance Runs" Margin="0,0,6,6" Click="OnViewModelAcceptanceRunsClick"/>
                 <Button x:Name="CreateModelReleasePackageBtn" Style="{StaticResource MiniBtnGreen}" Content="Create Model Release Package" Margin="0,0,6,6" Click="OnCreateModelReleasePackageClick"/>
-                <Button x:Name="PromoteProductionCandidateBtn" Style="{StaticResource MiniBtnAmber}" Content="Promote to Production Candidate" Margin="0,0,0,6" Click="OnPromoteProductionCandidateClick"/>
+                <Button x:Name="PromoteProductionCandidateBtn" Style="{StaticResource MiniBtnAmber}" Content="Promote to Production Candidate" Margin="0,0,6,6" Click="OnPromoteProductionCandidateClick"/>
+                <Button x:Name="DeployModelBtn" Style="{StaticResource MiniBtnGreen}" Content="Deploy" Margin="0,0,6,6" Click="OnDeployModelClick"/>
+                <Button x:Name="WaiveDeployModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Deploy with Waiver" Margin="0,0,6,6" Click="OnWaiveDeployModelClick"/>
+                <Button x:Name="RetireModelBtn" Style="{StaticResource MiniBtn}" Content="Retire" Margin="0,0,0,6" Click="OnRetireModelClick"/>
               </WrapPanel>
               <DataGrid x:Name="ModelAcceptanceRunsGrid" Height="82" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" CanUserAddRows="False" Margin="0,4,0,0">
                 <DataGrid.Columns>
@@ -241,7 +246,9 @@
             <Button x:Name="TestModelBtn" Style="{StaticResource ActionBtnBlue}" Content="Test Model Configuration" Click="OnTestModelConfigurationClick" Margin="0,0,8,0"/>
             <Button x:Name="ResetBtn" Style="{StaticResource ActionBtn}" Content="Reset" Click="OnReset" Margin="0,0,8,0"/>
             <Button x:Name="RunSetupWizardBtn" Style="{StaticResource ActionBtnAmber}" Content="Run Setup Wizard Again" Click="OnRunSetupWizardClick" Margin="0,0,8,0"/>
-            <Button x:Name="ExportDiagnosticsBtn" Style="{StaticResource ActionBtn}" Content="Export Diagnostics Report" Click="OnExportDiagnosticsClick"/>
+            <Button x:Name="ExportDiagnosticsBtn" Style="{StaticResource ActionBtn}" Content="Export Diagnostics Report" Click="OnExportDiagnosticsClick" Margin="0,0,8,0"/>
+            <Button x:Name="BackupConfigurationBtn" Style="{StaticResource ActionBtnGreen}" Content="Backup Configuration" Click="OnBackupConfigurationClick" Margin="0,0,8,0"/>
+            <Button x:Name="RestoreConfigurationPreviewBtn" Style="{StaticResource ActionBtnAmber}" Content="Restore Configuration Preview" Click="OnRestoreConfigurationPreviewClick"/>
           </StackPanel>
         </StackPanel>
       </Grid>
@@ -445,6 +452,23 @@
                 <Button x:Name="ExportLightingAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" Margin="0,0,0,6" Click="OnExportLightingAcceptanceClick"/>
               </WrapPanel>
               <TextBlock x:Name="LightingDiagnosticsText" Text="Simulated mode is not real hardware. TCP/serial commands are sent only when explicitly configured." Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
+            <StackPanel>
+              <TextBlock Text="Robot Cell Acceptance (Stage 3 Boundary)" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
+              <UniformGrid Columns="2">
+                <TextBlock Text="Robot acceptance" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock x:Name="RobotAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
+                <TextBlock Text="Evidence boundary" Foreground="#9AA6AF" FontSize="11"/>
+                <TextBlock Text="Simulation is not production robot validation" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
+              </UniformGrid>
+              <WrapPanel Margin="0,6,0,0">
+                <Button x:Name="RunRobotCellAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Robot Cell Acceptance" Margin="0,0,6,6" Click="OnRunRobotCellAcceptanceClick"/>
+                <Button x:Name="CancelRobotCellAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,6,6" Click="OnCancelRobotCellAcceptanceClick" IsEnabled="False"/>
+                <Button x:Name="ExportRobotCellAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" Margin="0,0,0,6" Click="OnExportRobotCellAcceptanceClick"/>
+              </WrapPanel>
+              <TextBlock x:Name="RobotAcceptanceDiagnosticsText" Text="Robot/PLC controls default to Not Connected. Simulated evidence never claims real hardware readiness or safety certification." Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
             </StackPanel>
           </Border>
           <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">

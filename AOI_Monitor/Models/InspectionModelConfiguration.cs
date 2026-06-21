@@ -104,6 +104,26 @@ public sealed class ModelRegistryEntry
     public string ValidationMessage { get; set; } = "Not validated.";
     public string Notes { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+    public ModelLifecycleState LifecycleState { get; set; } = ModelLifecycleState.Registered;
+    public string LatestAcceptanceStatus { get; set; } = string.Empty;
+    public string LatestReleasePackagePath { get; set; } = string.Empty;
+    public string DeploymentWaiverReason { get; set; } = string.Empty;
+    public string DeploymentWaivedBy { get; set; } = string.Empty;
+    public DateTime? DeploymentWaivedAtUtc { get; set; }
+    public string RetiredReason { get; set; } = string.Empty;
+    public DateTime? RetiredAtUtc { get; set; }
+}
+
+public enum ModelLifecycleState
+{
+    Registered,
+    RuntimeValidated,
+    AcceptanceFailed,
+    AcceptanceConditional,
+    AcceptancePassed,
+    ProductionCandidate,
+    Deployed,
+    Retired,
 }
 
 public record ModelRegistryRecord(
@@ -129,4 +149,12 @@ public record ModelRegistryRecord(
     string ValidationMessage,
     string Notes,
     bool IsActive,
-    long? AuditEventId);
+    long? AuditEventId,
+    ModelLifecycleState LifecycleState,
+    string LatestAcceptanceStatus,
+    string LatestReleasePackagePath,
+    string DeploymentWaiverReason,
+    string DeploymentWaivedBy,
+    DateTime? DeploymentWaivedAtUtc,
+    string RetiredReason,
+    DateTime? RetiredAtUtc);

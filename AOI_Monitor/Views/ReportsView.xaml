@@ -176,6 +176,94 @@
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
+          <TabItem Header="Management Dashboard">
+            <Grid Margin="8">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="120"/>
+                  <ColumnDefinition Width="8"/>
+                  <ColumnDefinition Width="130"/>
+                  <ColumnDefinition Width="8"/>
+                  <ColumnDefinition Width="150"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                  <TextBlock Text="Lot" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+                  <TextBox x:Name="ManagementLotFilterText"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                  <TextBlock Text="Model Version" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+                  <TextBox x:Name="ManagementModelFilterText"/>
+                </StackPanel>
+                <StackPanel Grid.Column="4">
+                  <TextBlock Text="Board Model" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+                  <TextBlock Text="Uses top Board filter" Foreground="#DCE5EB" FontSize="11.5" VerticalAlignment="Center" Margin="0,5,0,0"/>
+                </StackPanel>
+                <WrapPanel Grid.Column="6" VerticalAlignment="Bottom">
+                  <Button Style="{StaticResource ActionBtnGreen}" Content="Refresh Dashboard" Margin="0,0,6,0" Click="OnRefreshManagementDashboardClick"/>
+                  <Button Style="{StaticResource ActionBtnAmber}" Content="Export Dashboard HTML/CSV/PDF" Click="OnExportManagementDashboardClick"/>
+                </WrapPanel>
+              </Grid>
+              <TextBlock Grid.Row="1" x:Name="ManagementDashboardSummaryText" Text="Dashboard not loaded." Foreground="#DCE5EB" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,8"/>
+              <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="8"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="*"/>
+                  <RowDefinition Height="8"/>
+                  <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <DataGrid x:Name="ManagementDefectGrid" Grid.Row="0" Grid.Column="0" CanUserSortColumns="True">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Defect Class" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="70"/>
+                    <DataGridTextColumn Header="False Calls" Binding="{Binding FalseCalls}" Width="90"/>
+                    <DataGridTextColumn Header="Escapes" Binding="{Binding PossibleEscapes}" Width="80"/>
+                    <DataGridTextColumn Header="Reviews" Binding="{Binding Reviews}" Width="80"/>
+                  </DataGrid.Columns>
+                </DataGrid>
+                <DataGrid x:Name="ManagementRoiGrid" Grid.Row="0" Grid.Column="2" CanUserSortColumns="True">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="ROI / RefDes" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="70"/>
+                    <DataGridTextColumn Header="False Calls" Binding="{Binding FalseCalls}" Width="90"/>
+                    <DataGridTextColumn Header="Escapes" Binding="{Binding PossibleEscapes}" Width="80"/>
+                    <DataGridTextColumn Header="Reviews" Binding="{Binding Reviews}" Width="80"/>
+                  </DataGrid.Columns>
+                </DataGrid>
+                <DataGrid x:Name="ManagementModelTrendGrid" Grid.Row="2" Grid.Column="0" CanUserSortColumns="True">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Model Version" Binding="{Binding ModelVersion}" Width="*"/>
+                    <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="70"/>
+                    <DataGridTextColumn Header="OK" Binding="{Binding Ok}" Width="60"/>
+                    <DataGridTextColumn Header="NG" Binding="{Binding Ng}" Width="60"/>
+                    <DataGridTextColumn Header="Review" Binding="{Binding Review}" Width="70"/>
+                    <DataGridTextColumn Header="Avg ms" Binding="{Binding AverageInspectionTimeMs}" Width="80"/>
+                  </DataGrid.Columns>
+                </DataGrid>
+                <DataGrid x:Name="ManagementLotModelGrid" Grid.Row="2" Grid.Column="2" CanUserSortColumns="True">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="95"/>
+                    <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
+                    <DataGridTextColumn Header="Model" Binding="{Binding ModelVersion}" Width="*"/>
+                    <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="65"/>
+                    <DataGridTextColumn Header="False Calls" Binding="{Binding FalseCalls}" Width="90"/>
+                    <DataGridTextColumn Header="Escapes" Binding="{Binding PossibleEscapes}" Width="80"/>
+                    <DataGridTextColumn Header="False-call Rate" Binding="{Binding FalseCallRate}" Width="105"/>
+                  </DataGrid.Columns>
+                </DataGrid>
+              </Grid>
+            </Grid>
+          </TabItem>
           <TabItem Header="Factory Readiness">
             <DataGrid x:Name="FactoryReadinessGrid" CanUserSortColumns="True">
               <DataGrid.Columns>
@@ -185,6 +273,26 @@
                 <DataGridTextColumn Header="Next Action" Binding="{Binding NextAction}" Width="240"/>
               </DataGrid.Columns>
             </DataGrid>
+          </TabItem>
+          <TabItem Header="Completion Matrix">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <StackPanel Orientation="Horizontal" Margin="8">
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Refresh Completion Matrix" Click="OnRefreshCompletionMatrixClick"/>
+                <TextBlock x:Name="CompletionMatrixSummaryText" Text="Completion matrix not loaded." Foreground="#DCE5EB" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="12,0,0,0"/>
+              </StackPanel>
+              <DataGrid x:Name="CompletionMatrixGrid" Grid.Row="1" CanUserSortColumns="True">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Stage" Binding="{Binding Stage}" Width="210"/>
+                  <DataGridTextColumn Header="Complete" Binding="{Binding PercentDisplay}" Width="90"/>
+                  <DataGridTextColumn Header="Evidence Score" Binding="{Binding EvidenceSummary}" Width="300"/>
+                  <DataGridTextColumn Header="Missing Evidence" Binding="{Binding MissingEvidenceDisplay}" Width="*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
           </TabItem>
           <TabItem Header="Factory Acceptance">
             <Grid>

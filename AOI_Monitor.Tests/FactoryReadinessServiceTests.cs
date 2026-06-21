@@ -308,11 +308,13 @@ public sealed class FactoryReadinessServiceTests : IDisposable
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         Assert.True(File.Exists(Path.Combine(result.PackageFolder, "package_manifest.json")));
-        Assert.Equal(17, categories.Length);
+        Assert.Equal(19, categories.Length);
         Assert.Contains("Build/Test status", names);
+        Assert.Contains("Inspection latency trace", names);
         Assert.Contains("3D profile acceptance status", names);
         Assert.Contains("MES/spool status", names);
         Assert.Contains("Central sync status", names);
+        Assert.Contains("Authentication mode", names);
         Assert.Contains("Known limitations", names);
         Assert.Equal("Stage1ImageValidation", document.RootElement.GetProperty("deploymentProfile").GetString());
         Assert.True(document.RootElement.TryGetProperty("unmetCriteria", out _));

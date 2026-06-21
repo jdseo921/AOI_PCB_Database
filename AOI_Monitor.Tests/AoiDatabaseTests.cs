@@ -71,6 +71,7 @@ public sealed class AoiDatabaseTests : IDisposable
         var tables = ReadTableNames();
         Assert.Contains("Images", tables);
         Assert.Contains("InspectionResults", tables);
+        Assert.Contains("InspectionLatencyTraces", tables);
         Assert.Contains("BatchTestRuns", tables);
         Assert.Contains("ModelRegistry", tables);
         Assert.Contains("ModelAcceptanceMetrics", tables);
@@ -1487,7 +1488,7 @@ public sealed class AoiDatabaseTests : IDisposable
             row.StationId == WorkflowState.Instance.StationId &&
             row.TimestampUtc != DateTime.MinValue &&
             row.LocalTimestamp != DateTime.MinValue &&
-            row.ActionDetail.Contains("MES authentication is Stage 4 planned", StringComparison.OrdinalIgnoreCase));
+            row.ActionDetail.Contains("authMode=DemoLocalRoleSelector", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -2567,30 +2568,15 @@ public sealed class AoiDatabaseTests : IDisposable
     public void FactoryReadinessRecognizesAcceptedProductionCandidateModel()
     {
         AoiDatabase.Initialize();
-        var modelPath = Path.Combine(_root, "accepted.onnx");
-        File.WriteAllText(modelPath, "placeholder model bytes");
-        var configuration = new InspectionModelConfiguration
-        {
-            SelectedEngineKey = InspectionEngineFactory.OnnxEngineKey,
-            ActiveModelId = "MODEL-ACCEPTED",
-            ActiveModelSha256 = "abc123",
-            ActiveModelValidationStatus = ModelConfigurationTestStatus.Ready.ToString(),
-            ModelFilePath = modelPath,
-            ModelVersion = "1.0.0",
-            InputTensorName = "input",
-            OutputTensorName = "output",
-            LastModelCheckResult = ModelConfigurationTestStatus.Ready,
-        };
-        configuration.LastModelCheckConfigurationHash = ModelConfigurationValidator.ComputeConfigurationHash(configuration);
-        InspectionModelConfigurationService.Save(configuration);
+        var model = RegisterLifecycleModel();
+        Assert.True(ModelRegistryService.SetActiveModel(model.ModelId));
         var run = PassingModelAcceptanceRun();
-        run.ModelId = configuration.ActiveModelId;
-        run.ModelVersion = configuration.ModelVersion;
-        run.ModelSha256 = configuration.ActiveModelSha256;
-        run.IsProductionCandidate = true;
-        run.ApprovedBy = "Engineer01 [Engineer]";
-        run.ApprovedAtUtc = DateTime.UtcNow;
+        run.ModelId = model.ModelId;
+        run.ModelVersion = model.Version;
+        run.ModelSha256 = model.Sha256;
         run.Id = AoiDatabase.RecordModelAcceptanceRun(run);
+        ModelLifecycleService.RecordAcceptanceResult(run, run.OperatorId);
+        ModelLifecycleService.PromoteProductionCandidate(run.Id, UserRole.Engineer, "Engineer01 [Engineer]");
 
         var report = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
         {
@@ -2604,7 +2590,89 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Contains(report.Categories, category =>
             category.Name == "Active model readiness" &&
             category.Status == "Go" &&
-            category.Evidence.Contains("production-candidate acceptance run", StringComparison.OrdinalIgnoreCase));
+            category.Evidence.Contains("PASS acceptance run", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void RegisteredModelCannotBeDeployedDirectly()
+    {
+        AoiDatabase.Initialize();
+        var model = RegisterLifecycleModel(validateRuntime: false);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]"));
+
+        Assert.Contains("PASS model acceptance", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ModelLifecycleState.Registered, ModelRegistryService.GetModel(model.ModelId)!.LifecycleState);
+    }
+
+    [Fact]
+    public void PassAcceptanceAllowsProductionCandidateLifecycleState()
+    {
+        AoiDatabase.Initialize();
+        var model = RegisterLifecycleModel();
+        var run = PassingModelAcceptanceRun();
+        run.ModelId = model.ModelId;
+        run.ModelVersion = model.Version;
+        run.ModelSha256 = model.Sha256;
+        run.Id = AoiDatabase.RecordModelAcceptanceRun(run);
+        ModelLifecycleService.RecordAcceptanceResult(run, run.OperatorId);
+
+        ModelLifecycleService.PromoteProductionCandidate(run.Id, UserRole.Engineer, "Engineer01 [Engineer]");
+
+        var updated = ModelRegistryService.GetModel(model.ModelId)!;
+        Assert.Equal(ModelLifecycleState.ProductionCandidate, updated.LifecycleState);
+        Assert.Equal("PASS", updated.LatestAcceptanceStatus);
+    }
+
+    [Fact]
+    public void WaiverIsConditionalForStage1ButNoGoForFullFactoryAutomation()
+    {
+        AoiDatabase.Initialize();
+        var model = RegisterLifecycleModel();
+        ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]", "Customer pilot waiver while acceptance dataset is pending.");
+
+        var stage1 = FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(DeploymentProfile.Stage1ImageValidation));
+        var full = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
+        {
+            DeploymentProfile = DeploymentProfile.FullFactoryAutomation,
+            Stage1Only = false,
+            RequireProductionModel = true,
+            RequireSuccessfulLatestValidationPackage = false,
+            RequireDatasetQualityEvidence = false,
+        });
+
+        Assert.Contains(stage1.Categories, category =>
+            category.Name == "Active model readiness" &&
+            category.Status == "Conditional" &&
+            category.Evidence.Contains("waiver", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(full.Categories, category =>
+            category.Name == "Active model readiness" &&
+            category.Status == "No-Go" &&
+            category.Evidence.Contains("waiver", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void RetiredModelCannotRemainActive()
+    {
+        AoiDatabase.Initialize();
+        var model = RegisterLifecycleModel();
+        var run = PassingModelAcceptanceRun();
+        run.ModelId = model.ModelId;
+        run.ModelVersion = model.Version;
+        run.ModelSha256 = model.Sha256;
+        run.Id = AoiDatabase.RecordModelAcceptanceRun(run);
+        ModelLifecycleService.RecordAcceptanceResult(run, run.OperatorId);
+        ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]");
+
+        Assert.NotNull(ModelRegistryService.GetActiveModel());
+
+        ModelLifecycleService.RetireModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]", "Superseded by newer model.");
+
+        var retired = ModelRegistryService.GetModel(model.ModelId)!;
+        Assert.Equal(ModelLifecycleState.Retired, retired.LifecycleState);
+        Assert.False(retired.IsActive);
+        Assert.Null(ModelRegistryService.GetActiveModel());
     }
 
     [Fact]
@@ -3193,6 +3261,32 @@ public sealed class AoiDatabaseTests : IDisposable
                 "No raw customer images are included in the model release package.",
             ],
         };
+    }
+
+    private ModelRegistryEntry RegisterLifecycleModel(bool validateRuntime = true)
+    {
+        var modelPath = Path.Combine(_root, $"lifecycle-{Guid.NewGuid():N}.onnx");
+        File.WriteAllText(modelPath, "placeholder model bytes");
+        var model = ModelRegistryService.Register(new ModelRegistrationRequest
+        {
+            ModelFilePath = modelPath,
+            DisplayName = "Lifecycle Model",
+            Version = "1.0.0",
+            InputTensorName = "input",
+            OutputTensorName = "output",
+            InputWidth = 640,
+            InputHeight = 640,
+            ConfidenceThreshold = 0.65,
+        });
+        if (validateRuntime)
+        {
+            AoiDatabase.UpdateModelRegistryValidation(
+                model.ModelId,
+                ModelConfigurationTestStatus.Ready,
+                DateTime.UtcNow,
+                "Runtime validated for lifecycle test.");
+        }
+        return ModelRegistryService.GetModel(model.ModelId)!;
     }
 
     private static BatchTestRow ScoredRow(

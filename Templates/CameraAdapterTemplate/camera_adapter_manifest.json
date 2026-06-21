@@ -1,0 +1,10 @@
+{
+  "adapterId": "template.fake-camera",
+  "displayName": "Template Fake Vision Camera Adapter",
+  "version": "0.1.0",
+  "assemblyFile": "CameraAdapterTemplate.dll",
+  "factoryTypeName": "CameraAdapterTemplate.FakeVisionCameraAdapterFactory",
+  "supportedInterfaces": [ "Template", "GigE Vision", "USB3 Vision" ],
+  "supportedViews": [ "Top", "Side", "Bottom" ],
+  "supportedPixelFormats": [ "Mono8", "BayerRG8", "RGB24" ]
+}

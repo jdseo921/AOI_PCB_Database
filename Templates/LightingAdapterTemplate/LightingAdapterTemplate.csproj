@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>LightingAdapterTemplate</AssemblyName>
+    <RootNamespace>LightingAdapterTemplate</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\AOI_Monitor\AOI_Monitor.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="lighting_adapter_manifest.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

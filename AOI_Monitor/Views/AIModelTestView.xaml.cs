@@ -42,6 +42,7 @@ public partial class AIModelTestView : UserControl
     private bool _currentRunUsedFormalManifest;
     private FalseCallReductionRun? _currentFalseCallRun;
     private DatasetQualitySummary? _currentDatasetQuality;
+    private CustomerDatasetPreflightResult? _currentPreflightResult;
     private CancellationTokenSource? _workCts;
 
     public AIModelTestView()
@@ -103,6 +104,42 @@ public partial class AIModelTestView : UserControl
         StatusText.Text = $"Loaded validation CSV: {Path.GetFileName(_groundTruthCsvPath)}";
     }
 
+    private void OnRunDatasetPreflightClick(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_selectedFolder) || !Directory.Exists(_selectedFolder))
+        {
+            MessageBox.Show("Select a valid customer dataset image folder first.", "Dataset Preflight", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_groundTruthCsvPath) || !File.Exists(_groundTruthCsvPath))
+        {
+            MessageBox.Show("Select the customer validation manifest CSV first.", "Dataset Preflight", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            _currentPreflightResult = CustomerDatasetPreflightService.Validate(_selectedFolder, _groundTruthCsvPath);
+            ApplyPreflightResult(_currentPreflightResult);
+            WorkflowState.Instance.AddEvent("DATASET_PREFLIGHT", $"Customer dataset preflight {_currentPreflightResult.Status}: rows={_currentPreflightResult.ManifestRows}; failures={_currentPreflightResult.BlockingFailures.Count}; warnings={_currentPreflightResult.Warnings.Count}.");
+            var issues = _currentPreflightResult.BlockingFailures.Concat(_currentPreflightResult.Warnings).Take(8).ToArray();
+            MessageBox.Show(
+                issues.Length == 0
+                    ? "Dataset preflight PASS. Dataset is ready for Stage 1 validation execution."
+                    : $"Dataset preflight {_currentPreflightResult.Status}:{Environment.NewLine}{string.Join(Environment.NewLine, issues)}",
+                "Dataset Preflight",
+                MessageBoxButton.OK,
+                _currentPreflightResult.Status == "FAIL" ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            StatusText.Text = $"Dataset preflight failed: {ex.Message}";
+            WorkflowState.Instance.AddEvent("DATASET_PREFLIGHT_ERROR", StatusText.Text);
+            MessageBox.Show(StatusText.Text, "Dataset Preflight", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private async void OnRunBatchClick(object sender, RoutedEventArgs e)
     {
         if (_workCts is not null)
@@ -153,6 +190,7 @@ public partial class AIModelTestView : UserControl
                 try
                 {
                     manifest = BatchValidationService.LoadValidationManifest(_groundTruthCsvPath, _selectedFolder);
+                    _currentPreflightResult = CustomerDatasetPreflightService.Validate(_selectedFolder, _groundTruthCsvPath ?? string.Empty);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
                 {
@@ -261,6 +299,8 @@ public partial class AIModelTestView : UserControl
                 ? $" Performance warning: {performance.CountOverOneSecond} image(s) exceeded 1 second."
                 : string.Empty;
             ApplyDatasetQuality(_currentDatasetQuality);
+            if (_currentPreflightResult is not null)
+                ApplyPreflightResult(_currentPreflightResult);
             var qualitySuffix = _currentDatasetQuality.Status == "FAIL"
                 ? " Dataset not sufficient for factory acceptance."
                 : string.Empty;
@@ -652,6 +692,7 @@ public partial class AIModelTestView : UserControl
             Rows = _rows.ToArray(),
             FalseCallReductionRun = _currentFalseCallRun ?? AoiDatabase.GetLatestFalseCallReductionRun(_currentRunId),
             DatasetQualitySummary = _currentDatasetQuality ?? DatasetQualityService.Analyze(_rows, TryLoadManifest(_groundTruthCsvPath, _selectedFolder ?? string.Empty)),
+            DatasetPreflightResult = _currentPreflightResult,
         };
     }
 
@@ -833,6 +874,20 @@ public partial class AIModelTestView : UserControl
         DatasetQualityWarningsText.Text = topMessages.Length == 0
             ? "Dataset quality criteria satisfied."
             : string.Join(" ", topMessages);
+    }
+
+    private void ApplyPreflightResult(CustomerDatasetPreflightResult result)
+    {
+        DatasetPreflightText.Text = $"Preflight {result.Status}: rows {result.ManifestRows}, OK {result.OkCount}, NG {result.NgCount}, defect classes {result.DefectClassCount}, missing images {result.MissingImageCount}, missing golden {result.MissingGoldenCount}.";
+        DatasetPreflightText.Foreground = result.Status switch
+        {
+            "PASS" => Brushes.LightGreen,
+            "FAIL" => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFCDD0")),
+            _ => new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334")),
+        };
+        var issues = result.BlockingFailures.Concat(result.Warnings).Take(3).ToArray();
+        if (issues.Length > 0)
+            DatasetQualityWarningsText.Text = string.Join(" ", issues);
     }
 
     private void ApplyBreakdown(ValidationBreakdownSummary summary)

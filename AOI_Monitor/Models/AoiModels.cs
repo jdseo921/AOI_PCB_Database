@@ -76,6 +76,55 @@ public record BatchTestRunRecord(
     string ThresholdProfileId = "",
     string ThresholdProfileRevision = "");
 
+public sealed class InspectionLatencyTrace
+{
+    public long Id { get; set; }
+    public string TraceId { get; set; } = Guid.NewGuid().ToString("N");
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? FrameCapturedAtUtc { get; set; }
+    public DateTime? FrameReceivedAtUtc { get; set; }
+    public DateTime? PreprocessingStartUtc { get; set; }
+    public DateTime? PreprocessingEndUtc { get; set; }
+    public DateTime? InferenceStartUtc { get; set; }
+    public DateTime? InferenceEndUtc { get; set; }
+    public DateTime? PostprocessStartUtc { get; set; }
+    public DateTime? PostprocessEndUtc { get; set; }
+    public DateTime? OverlayRenderStartUtc { get; set; }
+    public DateTime? OverlayRenderEndUtc { get; set; }
+    public DateTime? ResultPersistStartUtc { get; set; }
+    public DateTime? ResultPersistEndUtc { get; set; }
+    public double TotalFrameToOverlayMs { get; set; }
+    public double TotalFrameToSavedResultMs { get; set; }
+    public string SourceKind { get; set; } = string.Empty;
+    public string Engine { get; set; } = string.Empty;
+    public string ModelId { get; set; } = string.Empty;
+    public int ImageWidth { get; set; }
+    public int ImageHeight { get; set; }
+    public List<string> Warnings { get; set; } = new();
+}
+
+public sealed class InspectionLatencySummary
+{
+    public int TraceCount { get; set; }
+    public int OverOneSecondCount { get; set; }
+    public double P50FrameToOverlayMs { get; set; }
+    public double P95FrameToOverlayMs { get; set; }
+    public double MaxFrameToOverlayMs { get; set; }
+    public double P50FrameToSavedResultMs { get; set; }
+    public double P95FrameToSavedResultMs { get; set; }
+    public double MaxFrameToSavedResultMs { get; set; }
+    public double P95InferenceMs { get; set; }
+    public double P95OverlayMs { get; set; }
+    public double P95SaveMs { get; set; }
+    public List<string> Warnings { get; set; } = new();
+
+    public string Status => TraceCount == 0
+        ? "NOT RECORDED"
+        : OverOneSecondCount > 0
+            ? "WARN"
+            : "PASS";
+}
+
 public record BatchTestResultRecord(
     long Id,
     long RunId,
@@ -739,6 +788,7 @@ public sealed class ValidationPackageManifest
     public string RunId { get; set; } = string.Empty;
     public ValidationMetricSummary MetricSummary { get; set; } = new();
     public ValidationPackagePerformanceSummary PerformanceSummary { get; set; } = new();
+    public InspectionLatencySummary LatencySummary { get; set; } = new();
     public ValidationBreakdownSummary BreakdownSummary { get; set; } = new();
     public DatasetQualitySummary DatasetQualitySummary { get; set; } = new();
     public CameraAcceptanceSummary CameraAcceptanceSummary { get; set; } = new();
@@ -748,6 +798,9 @@ public sealed class ValidationPackageManifest
     public ValidationAcceptanceCriteria Criteria { get; set; } = new();
     public FalseCallRecommendationSummary? FalseCallRecommendation { get; set; }
     public ThresholdProfileEvidenceSummary ThresholdProfileEvidence { get; set; } = new();
+    public string DatasetPreflightStatus { get; set; } = "CONDITIONAL";
+    public List<string> DatasetPreflightFailures { get; set; } = new();
+    public List<string> DatasetPreflightWarnings { get; set; } = new();
     public List<ValidationIncludedFile> IncludedFiles { get; set; } = new();
     public List<string> Warnings { get; set; } = new();
     public List<string> Limitations { get; set; } = new();

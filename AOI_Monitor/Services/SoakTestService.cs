@@ -264,18 +264,31 @@ public static class SoakTestService
             result.TotalCycles++;
             try
             {
+                var trace = InspectionLatencyService.StartTrace(
+                    result.SourceKind,
+                    engine.Name,
+                    engine.Version,
+                    frame.Width,
+                    frame.Height,
+                    frame.CapturedAtUtc ?? frame.CapturedAt.ToUniversalTime());
+                var analysisStartUtc = DateTime.UtcNow;
                 var analysis = await Task.Run(
                     () => engine.Analyze(frame.ImagePath, null, DetectionPriority.Balanced),
                     cancellationToken);
+                var analysisEndUtc = DateTime.UtcNow;
+                PopulateLatencyTrace(trace, analysis.Timing, analysisStartUtc, analysisEndUtc);
+                InspectionLatencyService.Persist(trace, saved: false);
                 cycleStopwatch.Stop();
                 analysis.BoardProgram = result.BoardModel;
                 analysis.OperatorId = result.OperatorId;
 
-                var totalMs = analysis.Timing.TotalInspectionMilliseconds;
+                var totalMs = trace.Trace.TotalFrameToOverlayMs > 0
+                    ? trace.Trace.TotalFrameToOverlayMs
+                    : analysis.Timing.TotalInspectionMilliseconds;
                 cycleTimings.Add(totalMs);
                 totalCycleTimings.Add(cycleStopwatch.Elapsed.TotalMilliseconds);
                 result.SuccessfulCycles++;
-                if (analysis.Timing.IsOverOneSecond)
+                if (totalMs > 1000)
                     result.CountOverOneSecond++;
 
                 result.Cycles.Add(new SoakTestCycleRecord(
@@ -513,6 +526,23 @@ public static class SoakTestService
         result.Errors.Add(message);
         if (string.IsNullOrWhiteSpace(result.FirstCriticalError))
             result.FirstCriticalError = message;
+    }
+
+    private static void PopulateLatencyTrace(InspectionLatencyTraceBuilder trace, InspectionTiming timing, DateTime analysisStartUtc, DateTime analysisEndUtc)
+    {
+        var cursor = analysisStartUtc.AddMilliseconds(Math.Max(0, timing.ImageLoadMilliseconds));
+        trace.StartSpan("preprocessing", cursor);
+        cursor = cursor.AddMilliseconds(Math.Max(0, timing.PreprocessingMilliseconds));
+        trace.StopSpan("preprocessing", cursor);
+        trace.StartSpan("inference", cursor);
+        cursor = cursor.AddMilliseconds(Math.Max(0, timing.InferenceMilliseconds));
+        if (cursor > analysisEndUtc)
+            cursor = analysisEndUtc;
+        trace.StopSpan("inference", cursor);
+        trace.StartSpan("postprocess", cursor);
+        trace.StopSpan("postprocess", analysisEndUtc);
+        trace.StartSpan("overlay", analysisEndUtc);
+        trace.StopSpan("overlay", analysisEndUtc);
     }
 
     private static string Csv(string value)

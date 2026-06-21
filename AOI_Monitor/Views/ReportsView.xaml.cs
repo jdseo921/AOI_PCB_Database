@@ -31,7 +31,13 @@ public partial class ReportsView : UserControl
     private readonly ObservableCollection<MesSpoolQueueRow> _mesSpoolRows = new();
     private readonly ObservableCollection<CentralSyncQueueRow> _centralSyncRows = new();
     private readonly ObservableCollection<FactoryReadinessRow> _factoryReadinessRows = new();
+    private readonly ObservableCollection<CompletionMatrixRow> _completionMatrixRows = new();
     private readonly ObservableCollection<FactoryAcceptanceChecklistItem> _factoryAcceptanceRows = new();
+    private readonly ObservableCollection<ManagementDashboardContributor> _managementDefectRows = new();
+    private readonly ObservableCollection<ManagementDashboardContributor> _managementRoiRows = new();
+    private readonly ObservableCollection<ManagementDashboardTrendPoint> _managementTrendRows = new();
+    private readonly ObservableCollection<ManagementDashboardBreakdown> _managementBreakdownRows = new();
+    private ManagementDashboardReport? _managementDashboardReport;
     private CancellationTokenSource? _workCts;
 
     public ReportsView()
@@ -44,7 +50,12 @@ public partial class ReportsView : UserControl
         MesSpoolGrid.ItemsSource = _mesSpoolRows;
         CentralSyncGrid.ItemsSource = _centralSyncRows;
         FactoryReadinessGrid.ItemsSource = _factoryReadinessRows;
+        CompletionMatrixGrid.ItemsSource = _completionMatrixRows;
         FactoryAcceptanceGrid.ItemsSource = _factoryAcceptanceRows;
+        ManagementDefectGrid.ItemsSource = _managementDefectRows;
+        ManagementRoiGrid.ItemsSource = _managementRoiRows;
+        ManagementModelTrendGrid.ItemsSource = _managementTrendRows;
+        ManagementLotModelGrid.ItemsSource = _managementBreakdownRows;
         PopulateFactoryAcceptanceProfiles();
         FromDatePicker.SelectedDate = DateTime.Today.AddDays(-30);
         ToDatePicker.SelectedDate = DateTime.Today;
@@ -107,6 +118,8 @@ public partial class ReportsView : UserControl
         var centralSync = AoiDatabase.GetCentralSyncQueue().Select(CentralSyncQueueRow.FromRecord).ToArray();
         var readinessReport = FactoryReadinessService.Evaluate();
         var readiness = readinessReport.Categories.Select(FactoryReadinessRow.FromCategory).ToArray();
+        var completionReport = CompletionAssessmentService.Assess();
+        var completionRows = completionReport.Categories.Select(CompletionMatrixRow.FromCategory).ToArray();
         var buildEvidence = BuildTestEvidenceService.GetSummary();
 
         ReplaceRows(_inspectionRows, inspections);
@@ -116,13 +129,90 @@ public partial class ReportsView : UserControl
         ReplaceRows(_mesSpoolRows, mesSpool);
         ReplaceRows(_centralSyncRows, centralSync);
         ReplaceRows(_factoryReadinessRows, readiness);
+        ReplaceRows(_completionMatrixRows, completionRows);
         if (_factoryAcceptanceRows.Count == 0)
             ReplaceRows(_factoryAcceptanceRows, FactoryAcceptanceChecklistService.Generate(SelectedFactoryAcceptanceProfile()).Items);
 
         LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows / {mesSpool.Length} MES spool / {centralSync.Length} central sync / readiness {readinessReport.OverallStatus}";
+        CompletionMatrixSummaryText.Text = $"Overall evidence completion {completionReport.OverallPercent:F1}% across {completionRows.Length} readiness areas.";
         BuildEvidenceSummaryText.Text = BuildEvidenceSummaryTextFor(buildEvidence);
         StatusText.Text = "Loaded real SQLite log records.";
+        LoadManagementDashboard();
     }
+
+    private void OnRefreshCompletionMatrixClick(object sender, RoutedEventArgs e)
+    {
+        var completionReport = CompletionAssessmentService.Assess();
+        ReplaceRows(_completionMatrixRows, completionReport.Categories.Select(CompletionMatrixRow.FromCategory));
+        CompletionMatrixSummaryText.Text = $"Overall evidence completion {completionReport.OverallPercent:F1}% across {completionReport.Categories.Count} readiness areas.";
+        StatusText.Text = "Completion matrix refreshed from evidence records.";
+    }
+
+    private void OnRefreshManagementDashboardClick(object sender, RoutedEventArgs e)
+    {
+        LoadManagementDashboard();
+        StatusText.Text = "Management dashboard refreshed from local SQLite.";
+    }
+
+    private void OnExportManagementDashboardClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting management dashboard", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var report = _managementDashboardReport ?? ManagementDashboardService.Build(BuildManagementDashboardFilter());
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select management dashboard export folder",
+            Multiselect = false,
+        };
+
+        if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.FolderName))
+            return;
+
+        try
+        {
+            var result = ManagementDashboardService.Export(report, dialog.FolderName, WorkflowState.Instance.OperatorWithRole);
+            WorkflowState.Instance.AddEvent("MANAGEMENT_DASHBOARD_EXPORT", $"Management dashboard exported: {Path.GetFileName(result.Folder)}.", relatedPath: result.Folder);
+            RefreshAfterExport($"Management dashboard exported. HTML: {result.HtmlPath}; CSV: {result.CsvPath}; PDF: {result.PdfPath}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Management dashboard export failed", ex, "EXPORT_ERROR");
+        }
+    }
+
+    private void LoadManagementDashboard()
+    {
+        try
+        {
+            _managementDashboardReport = ManagementDashboardService.Build(BuildManagementDashboardFilter());
+            ReplaceRows(_managementDefectRows, _managementDashboardReport.TopDefectClasses);
+            ReplaceRows(_managementRoiRows, _managementDashboardReport.TopRoiRefdesContributors);
+            ReplaceRows(_managementTrendRows, _managementDashboardReport.ModelVersionTrend);
+            ReplaceRows(_managementBreakdownRows, _managementDashboardReport.LotModelBreakdown);
+            ManagementDashboardSummaryText.Text =
+                $"Boards={_managementDashboardReport.TotalBoardsInspected:N0}; OK/NG/REVIEW={_managementDashboardReport.OkCount:N0}/{_managementDashboardReport.NgCount:N0}/{_managementDashboardReport.ReviewCount:N0}; " +
+                $"false-call={_managementDashboardReport.FalseCallRate:P1}; escapes={_managementDashboardReport.PossibleEscapeCount:N0}; review burden={_managementDashboardReport.ManualReviewBurdenMinutes:F1} min; " +
+                $"avg/p95={_managementDashboardReport.AverageInspectionTimeMs:F0}/{_managementDashboardReport.P95InspectionTimeMs:F0} ms; readiness={_managementDashboardReport.AcceptanceReadinessStatus}; MES={_managementDashboardReport.MesSyncStatus}";
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            ManagementDashboardSummaryText.Text = $"Management dashboard unavailable: {ex.Message}";
+        }
+    }
+
+    private ManagementDashboardFilter BuildManagementDashboardFilter()
+        => new()
+        {
+            FromDate = FromDatePicker.SelectedDate,
+            ToDate = ToDatePicker.SelectedDate,
+            BoardModel = BoardFilterText.Text.Trim(),
+            LotId = ManagementLotFilterText.Text.Trim(),
+            ModelVersion = ManagementModelFilterText.Text.Trim(),
+        };
 
     private LogFilter BuildFilter()
     {
@@ -2470,6 +2560,26 @@ public partial class ReportsView : UserControl
                 Status = category.Status,
                 Evidence = category.Evidence,
                 NextAction = category.NextAction,
+            };
+    }
+
+    public sealed class CompletionMatrixRow
+    {
+        public string Stage { get; init; } = string.Empty;
+        public double PercentComplete { get; init; }
+        public string PercentDisplay => PercentComplete.ToString("F1", CultureInfo.InvariantCulture) + "%";
+        public string EvidenceSummary { get; init; } = string.Empty;
+        public string MissingEvidenceDisplay { get; init; } = string.Empty;
+
+        public static CompletionMatrixRow FromCategory(CompletionAssessmentCategory category)
+            => new()
+            {
+                Stage = category.Stage,
+                PercentComplete = category.PercentComplete,
+                EvidenceSummary = category.EvidenceSummary,
+                MissingEvidenceDisplay = category.MissingEvidence.Count == 0
+                    ? "None"
+                    : string.Join(" | ", category.MissingEvidence),
             };
     }
 

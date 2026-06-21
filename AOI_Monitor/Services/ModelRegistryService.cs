@@ -21,6 +21,7 @@ public static class ModelRegistryService
 
     public static string RegistryRoot => Path.Combine(AoiDatabase.StorageRoot, "model_registry");
     public static string ModelsRoot => Path.Combine(RegistryRoot, "models");
+    public static void NotifyRegistryChanged() => RegistryChanged?.Invoke();
 
     public static ModelRegistryEntry Register(ModelRegistrationRequest request)
     {
@@ -90,6 +91,7 @@ public static class ModelRegistryService
             ValidationStatus = ModelConfigurationTestStatus.NotTested,
             ValidationMessage = "Not validated.",
             Notes = request.Notes.Trim(),
+            LifecycleState = ModelLifecycleState.Registered,
         };
 
         WriteMetadata(entry);
@@ -100,7 +102,7 @@ public static class ModelRegistryService
             relatedEntityType: "ModelRegistry",
             relatedEntityId: entry.ModelId,
             relatedPath: entry.MetadataPath);
-        RegistryChanged?.Invoke();
+        NotifyRegistryChanged();
         return entry;
     }
 
@@ -127,6 +129,8 @@ public static class ModelRegistryService
         var model = GetModel(modelId);
         if (model is null)
             return false;
+        if (model.LifecycleState == ModelLifecycleState.Retired)
+            throw new InvalidOperationException("Retired models cannot be set active.");
 
         AoiDatabase.SetActiveModelRegistryRecord(model.ModelId);
         model.IsActive = true;
@@ -138,7 +142,7 @@ public static class ModelRegistryService
             relatedEntityType: "ModelRegistry",
             relatedEntityId: model.ModelId,
             relatedPath: model.MetadataPath);
-        RegistryChanged?.Invoke();
+        NotifyRegistryChanged();
         InspectionModelConfigurationService.NotifyExternalConfigurationChanged();
         return true;
     }
@@ -163,7 +167,7 @@ public static class ModelRegistryService
         if (model.IsActive)
             SaveConfigurationFromModel(model);
 
-        RegistryChanged?.Invoke();
+        NotifyRegistryChanged();
         InspectionModelConfigurationService.NotifyExternalConfigurationChanged();
         return result;
     }
@@ -241,7 +245,15 @@ public static class ModelRegistryService
             entry.ValidationMessage,
             entry.Notes,
             entry.IsActive,
-            null);
+            null,
+            entry.LifecycleState,
+            entry.LatestAcceptanceStatus,
+            entry.LatestReleasePackagePath,
+            entry.DeploymentWaiverReason,
+            entry.DeploymentWaivedBy,
+            entry.DeploymentWaivedAtUtc,
+            entry.RetiredReason,
+            entry.RetiredAtUtc);
 
     private static ModelRegistryEntry FromRecord(ModelRegistryRecord record)
         => new()
@@ -267,6 +279,14 @@ public static class ModelRegistryService
             ValidationMessage = record.ValidationMessage,
             Notes = record.Notes,
             IsActive = record.IsActive,
+            LifecycleState = record.LifecycleState,
+            LatestAcceptanceStatus = record.LatestAcceptanceStatus,
+            LatestReleasePackagePath = record.LatestReleasePackagePath,
+            DeploymentWaiverReason = record.DeploymentWaiverReason,
+            DeploymentWaivedBy = record.DeploymentWaivedBy,
+            DeploymentWaivedAtUtc = record.DeploymentWaivedAtUtc,
+            RetiredReason = record.RetiredReason,
+            RetiredAtUtc = record.RetiredAtUtc,
         };
 
     private static void SaveConfigurationFromModel(ModelRegistryEntry model)

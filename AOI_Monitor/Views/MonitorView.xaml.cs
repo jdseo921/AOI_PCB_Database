@@ -42,6 +42,7 @@ public partial class MonitorView : UserControl
     private BitmapSource? _currentBitmap;
     private ImportedImage? _currentImportedImage;
     private AnalysisResult? _currentAnalysis;
+    private InspectionLatencyTraceBuilder? _currentLatencyTrace;
     private CalibrationProfileRecord? _selectedCalibrationProfile;
 
     public MonitorView()
@@ -169,8 +170,14 @@ public partial class MonitorView : UserControl
 
         try
         {
+            _currentLatencyTrace?.StartSpan("resultPersist");
             WorkflowState.Instance.SetAnalysis(_currentAnalysis, persist: true);
+            _currentLatencyTrace?.StopSpan("resultPersist");
+            if (_currentLatencyTrace is not null)
+                InspectionLatencyService.Persist(_currentLatencyTrace, saved: true);
+            _currentLatencyTrace = null;
             _currentResultSaved = true;
+            UpdateTimingDisplay(_currentAnalysis.Timing);
             LogEvent("SAVE", $"Inspection result saved to SQLite: {_currentAnalysis.Verdict}.");
         }
         catch (Exception ex)
@@ -524,7 +531,10 @@ public partial class MonitorView : UserControl
         var engine = InspectionEngineFactory.Create();
         RefreshHeader();
 
+        var frameCapturedAtUtc = DateTime.UtcNow;
+        var analysisStartUtc = DateTime.UtcNow;
         var analysis = engine.Analyze(imagePath, state.GoldenImagePath, state.DetectionPriority);
+        var analysisEndUtc = DateTime.UtcNow;
         analysis.BoardProgram = BoardModelText.Text;
         analysis.BoardId = CurrentBoardId();
         analysis.LotId = LotText.Text;
@@ -544,9 +554,19 @@ public partial class MonitorView : UserControl
         }
 
         _currentAnalysis = analysis;
+        _currentLatencyTrace = InspectionLatencyService.StartTrace(
+            _currentSourceKind,
+            engine.Name,
+            InspectionModelConfigurationService.Load().ActiveModelId,
+            _currentBitmap?.PixelWidth ?? 0,
+            _currentBitmap?.PixelHeight ?? 0,
+            frameCapturedAtUtc);
+        PopulateAnalysisSpans(_currentLatencyTrace, analysis.Timing, analysisStartUtc, analysisEndUtc);
         var autoSave = AutoSaveCheck.IsChecked == true;
         RefreshDefectRows();
+        _currentLatencyTrace.StartSpan("overlay");
         var overlayMs = RenderOverlay();
+        _currentLatencyTrace.StopSpan("overlay");
         analysis.Timing.OverlayRenderingMilliseconds = overlayMs;
         analysis.Timing.RecalculateTotal();
         UpdateTimingDisplay(analysis.Timing);
@@ -554,7 +574,16 @@ public partial class MonitorView : UserControl
         if (analysis.Timing.IsOverOneSecond)
             LogEvent("PERFORMANCE WARNING", $"Visualization target exceeded: {analysis.Timing.TotalInspectionMilliseconds:F0} ms (limit 1000 ms).");
 
+        if (autoSave)
+            _currentLatencyTrace.StartSpan("resultPersist");
         state.SetAnalysis(analysis, persist: autoSave);
+        if (autoSave)
+        {
+            _currentLatencyTrace.StopSpan("resultPersist");
+            InspectionLatencyService.Persist(_currentLatencyTrace, saved: true);
+            _currentLatencyTrace = null;
+            UpdateTimingDisplay(analysis.Timing);
+        }
         _currentResultSaved = autoSave;
 
         LogEvent("INSPECTION COMPLETE", $"{analysis.Verdict}: {analysis.SuggestedDefect}, score {analysis.DifferenceScore:F1}%, confidence {analysis.Confidence:P0}, total {analysis.Timing.TotalInspectionMilliseconds:F0} ms.");
@@ -727,10 +756,34 @@ public partial class MonitorView : UserControl
 
     private void UpdateTimingDisplay(InspectionTiming timing)
     {
-        TimingText.Text = $"Total {timing.TotalInspectionMilliseconds:F0} ms | load {timing.ImageLoadMilliseconds:F0}, prep {timing.PreprocessingMilliseconds:F0}, inspect {timing.InferenceMilliseconds:F0}, overlay {timing.OverlayRenderingMilliseconds:F0}";
+        var session = InspectionLatencyService.GetCurrentSessionSummary();
+        var saveMs = _currentLatencyTrace?.Trace.ResultPersistStartUtc is { } saveStart && _currentLatencyTrace.Trace.ResultPersistEndUtc is { } saveEnd
+            ? Math.Max(0, (saveEnd - saveStart).TotalMilliseconds)
+            : session.P95SaveMs;
+        var frameToResult = _currentLatencyTrace?.Trace.TotalFrameToOverlayMs > 0
+            ? _currentLatencyTrace.Trace.TotalFrameToOverlayMs
+            : timing.TotalInspectionMilliseconds;
+        TimingText.Text = $"Frame-result {frameToResult:F0} ms | infer {timing.InferenceMilliseconds:F0} | overlay {timing.OverlayRenderingMilliseconds:F0} | save {saveMs:F0} | session p95 {session.P95FrameToOverlayMs:F0}";
         TimingText.Foreground = timing.IsOverOneSecond
             ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"))
             : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE5EB"));
+    }
+
+    private static void PopulateAnalysisSpans(InspectionLatencyTraceBuilder trace, InspectionTiming timing, DateTime analysisStartUtc, DateTime analysisEndUtc)
+    {
+        var cursor = analysisStartUtc;
+        var loadMs = Math.Max(0, timing.ImageLoadMilliseconds);
+        cursor = cursor.AddMilliseconds(loadMs);
+        trace.StartSpan("preprocessing", cursor);
+        cursor = cursor.AddMilliseconds(Math.Max(0, timing.PreprocessingMilliseconds));
+        trace.StopSpan("preprocessing", cursor);
+        trace.StartSpan("inference", cursor);
+        cursor = cursor.AddMilliseconds(Math.Max(0, timing.InferenceMilliseconds));
+        if (cursor > analysisEndUtc)
+            cursor = analysisEndUtc;
+        trace.StopSpan("inference", cursor);
+        trace.StartSpan("postprocess", cursor);
+        trace.StopSpan("postprocess", analysisEndUtc);
     }
 
     private void SetResultStatus(string verdict)

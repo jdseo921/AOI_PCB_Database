@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Diagnostics;
 using AOI_Monitor.Data;
+using AOI_Monitor.Models;
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
 using AOI_Monitor.Views;
@@ -49,6 +50,7 @@ public partial class MainWindow : Window
             CameraSourceSettingsService.ApplyActiveSource();
             LightingSettingsService.ApplyIntegrationBoundary();
             MesIntegrationSettingsService.ApplyIntegrationBoundary();
+            WorkflowState.Instance.SetAuthenticationMode(AuthenticationSettingsService.CurrentMode);
             WorkflowState.Instance.AddEvent("STORAGE", $"SQLite ready: {AoiDatabase.DatabasePath}");
             UpdateReadinessPanel(databaseConnected: File.Exists(AoiDatabase.DatabasePath), vaultAvailable: Directory.Exists(AoiDatabase.ImageVaultPath));
             UpdateFooterStatus();
@@ -68,6 +70,7 @@ public partial class MainWindow : Window
             UserRole.Engineer => 1,
             _ => 0,
         };
+        AuthModeCombo.SelectedIndex = AuthenticationModeToCombo(WorkflowState.Instance.AuthenticationMode);
         _vm.RefreshRolePermissions(WorkflowState.Instance.CurrentRole);
         RefreshRoleUi();
         _vm.PropertyChanged += (_, args) =>
@@ -81,11 +84,13 @@ public partial class MainWindow : Window
         CameraSourceFactory.ActiveSourceChanged += OnCameraSourceChanged;
         LightingSettingsService.SettingsChanged += OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
+        AuthenticationSettingsService.AuthenticationChanged += OnAuthenticationChanged;
         Closed += (_, _) => WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         Closed += (_, _) => InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
         Closed += (_, _) => CameraSourceFactory.ActiveSourceChanged -= OnCameraSourceChanged;
         Closed += (_, _) => LightingSettingsService.SettingsChanged -= OnLightingSettingsChanged;
         Closed += (_, _) => MesIntegrationSettingsService.SettingsChanged -= OnMesIntegrationSettingsChanged;
+        Closed += (_, _) => AuthenticationSettingsService.AuthenticationChanged -= OnAuthenticationChanged;
 
         SwitchPage("monitor");
         UpdateWorkflowPanel();
@@ -280,6 +285,8 @@ public partial class MainWindow : Window
     {
         if (!IsLoaded)
             return;
+        if (WorkflowState.Instance.AuthenticationMode != AuthenticationMode.DemoLocalRoleSelector)
+            return;
 
         var role = RoleCombo.SelectedIndex switch
         {
@@ -291,11 +298,65 @@ public partial class MainWindow : Window
         WorkflowState.Instance.SetCurrentUser(UserIdText.Text, role);
         _vm.RefreshRolePermissions(role);
         RefreshRoleUi();
-        MessageBox.Show($"Local user set to {WorkflowState.Instance.OperatorWithRole}.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show($"Demo local role selector set to {WorkflowState.Instance.OperatorWithRole}. This is not production authentication.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void OnAuthModeSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+
+        if (!EnsurePermission(RoleAuthorization.CanManageSettings, "Changing authentication mode"))
+        {
+            AuthModeCombo.SelectedIndex = AuthenticationModeToCombo(WorkflowState.Instance.AuthenticationMode);
+            return;
+        }
+
+        var mode = ComboToAuthenticationMode(AuthModeCombo.SelectedIndex);
+        AuthenticationSettingsService.Save(new AuthenticationSettings { Mode = mode }, WorkflowState.Instance.OperatorWithRole);
+        WorkflowState.Instance.SetAuthenticationMode(mode);
+        RefreshRoleUi();
+        MessageBox.Show($"Authentication mode set to {mode}.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void OnLocalLoginClick(object sender, RoutedEventArgs e)
     {
+        var mode = WorkflowState.Instance.AuthenticationMode;
+        if (mode == AuthenticationMode.LocalUsers)
+        {
+            if (!AuthenticationSettingsService.TryAuthenticate(UserIdText.Text, LoginPasswordBox.Password, out var user))
+            {
+                WorkflowState.Instance.AddEvent("ACCESS_DENIED", $"LocalUsers login failed for {UserIdText.Text.Trim()}.");
+                MessageBox.Show("Local user login failed.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            WorkflowState.Instance.SetCurrentUser(user.UserId, user.Role, AuthenticationMode.LocalUsers);
+            RoleCombo.SelectedIndex = user.Role switch
+            {
+                UserRole.Admin => 2,
+                UserRole.Engineer => 1,
+                _ => 0,
+            };
+            _vm.RefreshRolePermissions(user.Role);
+            RefreshRoleUi();
+            MessageBox.Show($"Local user authenticated as {WorkflowState.Instance.OperatorWithRole}.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (mode == AuthenticationMode.MesAuthenticationBoundary)
+        {
+            WorkflowState.Instance.SetCurrentUser(UserIdText.Text, UserRole.Operator, AuthenticationMode.MesAuthenticationBoundary);
+            _vm.RefreshRolePermissions(UserRole.Operator);
+            RefreshRoleUi();
+            MessageBox.Show(
+                "MES authentication boundary is documented for Stage 4 integration. No production MES identity provider is active in this PoC, so the session is limited to Operator.",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
         var role = RoleCombo.SelectedIndex switch
         {
             2 => UserRole.Admin,
@@ -303,14 +364,40 @@ public partial class MainWindow : Window
             _ => UserRole.Operator,
         };
 
-        WorkflowState.Instance.SetCurrentUser(UserIdText.Text, role);
+        WorkflowState.Instance.SetCurrentUser(UserIdText.Text, role, AuthenticationMode.DemoLocalRoleSelector);
         _vm.RefreshRolePermissions(role);
         RefreshRoleUi();
         MessageBox.Show(
-            $"Local user set to {WorkflowState.Instance.OperatorWithRole}.\nMES authentication is Stage 4 planned.",
+            $"Demo local role selector set to {WorkflowState.Instance.OperatorWithRole}.\nThis is not production authentication.",
             "AOI Monitor",
             MessageBoxButton.OK,
-            MessageBoxImage.Information);
+            MessageBoxImage.Warning);
+    }
+
+    private void OnCreateLocalUserClick(object sender, RoutedEventArgs e)
+    {
+        if (!EnsurePermission(RoleAuthorization.CanManageSettings, "Creating local users"))
+            return;
+
+        var password = PromptForPassword("Create Local User", $"Password for {UserIdText.Text.Trim()}");
+        if (string.IsNullOrWhiteSpace(password))
+            return;
+
+        try
+        {
+            var role = RoleCombo.SelectedIndex switch
+            {
+                2 => UserRole.Admin,
+                1 => UserRole.Engineer,
+                _ => UserRole.Operator,
+            };
+            var user = AuthenticationSettingsService.CreateUser(UserIdText.Text, role, password, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
+            MessageBox.Show($"Local user created: {user.UserId} [{user.Role}]. Password was stored as a salted hash.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or UnauthorizedAccessException or IOException)
+        {
+            MessageBox.Show($"Local user could not be created:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void RefreshRoleUi()
@@ -319,6 +406,9 @@ public partial class MainWindow : Window
         FileMenuBtn.IsEnabled = isAdmin;
         LockRecipeBtn.IsEnabled = isAdmin;
         ExportBtn.IsEnabled = isAdmin;
+        CreateUserBtn.IsEnabled = isAdmin;
+        LoginPasswordBox.IsEnabled = WorkflowState.Instance.AuthenticationMode == AuthenticationMode.LocalUsers;
+        RoleCombo.IsEnabled = WorkflowState.Instance.AuthenticationMode == AuthenticationMode.DemoLocalRoleSelector || isAdmin;
     }
 
     private bool EnsurePageAccess(string key)
@@ -358,6 +448,16 @@ public partial class MainWindow : Window
     private void OnMesIntegrationSettingsChanged()
     {
         Dispatcher.Invoke(UpdateIntegrationBoundaryStatus);
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            WorkflowState.Instance.SetAuthenticationMode(AuthenticationSettingsService.CurrentMode);
+            AuthModeCombo.SelectedIndex = AuthenticationModeToCombo(WorkflowState.Instance.AuthenticationMode);
+            RefreshRoleUi();
+        });
     }
 
     private void OnLightingSettingsChanged()
@@ -563,4 +663,53 @@ public partial class MainWindow : Window
         IntegrationConnectionStatus.Error => "Error",
         _ => "Not Connected",
     };
+
+    private static AuthenticationMode ComboToAuthenticationMode(int selectedIndex) => selectedIndex switch
+    {
+        1 => AuthenticationMode.LocalUsers,
+        2 => AuthenticationMode.MesAuthenticationBoundary,
+        _ => AuthenticationMode.DemoLocalRoleSelector,
+    };
+
+    private static int AuthenticationModeToCombo(AuthenticationMode mode) => mode switch
+    {
+        AuthenticationMode.LocalUsers => 1,
+        AuthenticationMode.MesAuthenticationBoundary => 2,
+        _ => 0,
+    };
+
+    private static string PromptForPassword(string title, string label)
+    {
+        var password = new PasswordBox { MinWidth = 300, MinHeight = 26, Margin = new Thickness(0, 6, 0, 10) };
+        var ok = new Button { Content = "OK", Width = 78, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+        var cancel = new Button { Content = "Cancel", Width = 78, IsCancel = true };
+        var dialog = new Window
+        {
+            Title = title,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Children =
+                {
+                    new TextBlock { Text = label, FontWeight = FontWeights.SemiBold },
+                    password,
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Children = { ok, cancel },
+                    },
+                },
+            },
+        };
+        ok.Click += (_, _) =>
+        {
+            dialog.DialogResult = true;
+            dialog.Close();
+        };
+        return dialog.ShowDialog() == true ? password.Password : string.Empty;
+    }
 }

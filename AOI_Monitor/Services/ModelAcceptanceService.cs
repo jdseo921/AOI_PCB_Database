@@ -46,6 +46,18 @@ public static class ModelAcceptanceService
 
         try
         {
+            var preflight = CustomerDatasetPreflightService.Validate(validationDatasetFolder, groundTruthCsvPath);
+            if (preflight.Status == "FAIL")
+            {
+                return PersistFailure(
+                    criteria,
+                    validationDatasetFolder,
+                    groundTruthCsvPath,
+                    operatorId,
+                    $"Customer dataset preflight failed: {string.Join(" ", preflight.BlockingFailures.Take(8))}",
+                    activeModel);
+            }
+
             var manifest = BatchValidationService.LoadValidationManifest(groundTruthCsvPath, validationDatasetFolder);
             var imageFiles = Directory.EnumerateFiles(validationDatasetFolder)
                 .Where(path => ImageExtensions.Contains(Path.GetExtension(path)))
@@ -87,8 +99,11 @@ public static class ModelAcceptanceService
             run.FalseCallRecommendation = falseCallSummary;
             run.BreakdownSummary = breakdown;
             run.Messages = messages;
+            run.Messages.Add($"Dataset preflight {preflight.Status}: rows={preflight.ManifestRows}; OK={preflight.OkCount}; NG={preflight.NgCount}; defectClasses={preflight.DefectClassCount}; warnings={preflight.Warnings.Count}.");
+            run.Messages.AddRange(preflight.Warnings.Take(8).Select(warning => $"CONDITIONAL: {warning}"));
             run.Limitations = DefaultLimitations();
             run.Id = AoiDatabase.RecordModelAcceptanceRun(run);
+            ModelLifecycleService.RecordAcceptanceResult(run, run.OperatorId);
             return run;
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
@@ -150,23 +165,13 @@ public static class ModelAcceptanceService
 
         var record = new ModelReleasePackageRecord(0, DateTime.UtcNow, run.Id, run.ModelId, run.ModelVersion, run.ModelSha256, folder, manifestPath, reportPath, run.Status, approvedBy, null);
         var id = AoiDatabase.RecordModelReleasePackage(record);
-        return record with { Id = id };
+        var saved = record with { Id = id };
+        ModelLifecycleService.RecordReleasePackage(saved, approvedBy);
+        return saved;
     }
 
     public static void PromoteToProductionCandidate(long acceptanceRunId, UserRole role, string approvedBy)
-    {
-        if (!RoleAuthorization.CanChangeThresholds(role))
-            throw new UnauthorizedAccessException(RoleAuthorization.DeniedMessage(role, "promoting production candidate models"));
-
-        var run = AoiDatabase.GetLatestModelAcceptanceRun();
-        if (run is null || run.Id != acceptanceRunId)
-            throw new InvalidOperationException("Model acceptance run was not found.");
-        if (!string.Equals(run.Status, "PASS", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Only PASS model acceptance runs can be promoted to production candidate.");
-
-        AoiDatabase.PromoteModelAcceptanceRun(run.Id, approvedBy);
-        AoiDatabase.RecordAuditEvent("MODEL_PRODUCTION_CANDIDATE", $"Promoted model acceptance run {run.Id} for model {run.ModelId} to production candidate. Validation is scoped to the acceptance dataset.", operatorWithRole: approvedBy, relatedEntityType: "ModelAcceptanceRun", relatedEntityId: run.Id.ToString(CultureInfo.InvariantCulture));
-    }
+        => ModelLifecycleService.PromoteProductionCandidate(acceptanceRunId, role, approvedBy);
 
     private static IEnumerable<string> Evaluate(ModelAcceptanceCriteria criteria, BatchMetrics metrics, BatchPerformanceSummary performance, DatasetQualitySummary dataset, FalseCallRecommendationSummary falseCall, ValidationManifest manifest, IReadOnlyCollection<BatchTestRow> rows)
     {
@@ -208,6 +213,7 @@ public static class ModelAcceptanceService
         run.Messages.Add($"FAIL: {message}");
         run.Limitations = DefaultLimitations();
         run.Id = AoiDatabase.RecordModelAcceptanceRun(run);
+        ModelLifecycleService.RecordAcceptanceResult(run, run.OperatorId);
         return run;
     }
 

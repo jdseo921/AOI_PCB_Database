@@ -25,6 +25,7 @@ public partial class ProfileView : UserControl
     private string _currentCsvPath = string.Empty;
     private (int X, int Y, double Height)? _selectedPoint;
     private Profile3DAcceptanceRun? _lastAcceptanceRun;
+    private CancellationTokenSource? _acceptanceCancellation;
 
     public ProfileView()
     {
@@ -102,14 +103,35 @@ public partial class ProfileView : UserControl
         };
     }
 
-    private void OnRunAcceptanceClick(object sender, RoutedEventArgs e)
+    private async void OnRunAcceptanceClick(object sender, RoutedEventArgs e)
     {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanTestModelConfiguration, "Running 3D profile acceptance", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (_acceptanceCancellation is not null)
+            return;
+
+        _acceptanceCancellation = new CancellationTokenSource();
+        RunAcceptanceButton.IsEnabled = false;
+        CancelAcceptanceButton.IsEnabled = true;
+        AcceptanceProgressBar.Value = 10;
+        StatusText.Text = "3D acceptance running...";
+
         try
         {
             var source = CreateSelectedProfileSource();
-            var run = Profile3DAcceptanceTestService.Run(source);
+            var token = _acceptanceCancellation.Token;
+            var run = await Task.Run(() =>
+            {
+                token.ThrowIfCancellationRequested();
+                return Profile3DAcceptanceTestService.Run(source, cancellationToken: token);
+            }, token);
+            AcceptanceProgressBar.Value = 100;
             _lastAcceptanceRun = run;
-            AoiDatabase.RecordProfile3DAcceptanceRun(run);
+            AoiDatabase.RecordProfile3DAcceptanceRun(run, WorkflowState.Instance.OperatorWithRole);
             var issueText = string.Join(" ", run.Failures.Concat(run.Warnings).Take(3));
             StatusText.Text = $"3D acceptance {run.Status}; readiness={run.FactoryReadinessStatus}; source={run.SourceName}; simulated={run.IsSimulated}. {issueText}";
             WorkflowState.Instance.AddEvent("PROFILE_3D_ACCEPTANCE", StatusText.Text);
@@ -119,16 +141,40 @@ public partial class ProfileView : UserControl
                 MessageBoxButton.OK,
                 run.Status == "FAIL" ? MessageBoxImage.Warning : MessageBoxImage.Information);
         }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "3D acceptance canceled.";
+            WorkflowState.Instance.AddEvent("PROFILE_3D_ACCEPTANCE", "3D profile acceptance canceled by user.");
+        }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
         {
             StatusText.Text = $"3D acceptance failed: {ex.Message}";
             WorkflowState.Instance.AddEvent("PROFILE_3D_ERROR", StatusText.Text);
             MessageBox.Show(StatusText.Text, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        finally
+        {
+            _acceptanceCancellation?.Dispose();
+            _acceptanceCancellation = null;
+            RunAcceptanceButton.IsEnabled = true;
+            CancelAcceptanceButton.IsEnabled = false;
+            AcceptanceProgressBar.Value = 0;
+        }
+    }
+
+    private void OnCancelAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        _acceptanceCancellation?.Cancel();
     }
 
     private void OnExportAcceptanceClick(object sender, RoutedEventArgs e)
     {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting 3D profile acceptance report", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         var run = _lastAcceptanceRun ?? AoiDatabase.GetLatestProfile3DAcceptanceRun();
         if (run is null)
         {

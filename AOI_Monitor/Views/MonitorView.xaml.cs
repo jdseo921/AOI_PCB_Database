@@ -376,6 +376,9 @@ public partial class MonitorView : UserControl
 
     private void OnViewSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (BoardModelText is null)
+            return;
+
         _cameraSource.SelectedView = SelectedCameraView();
         CameraSourceFactory.ActiveSource.SelectedView = SelectedCameraView();
         RefreshHeader();
@@ -385,6 +388,9 @@ public partial class MonitorView : UserControl
 
     private void OnOverlayChanged(object sender, RoutedEventArgs e)
     {
+        if (DefectOverlayCanvas is null || OverlayCheck is null)
+            return;
+
         DefectOverlayCanvas.Visibility = OverlayCheck.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -621,6 +627,20 @@ public partial class MonitorView : UserControl
 
     private void RefreshHeader()
     {
+        if (StationText is null ||
+            BoardModelText is null ||
+            LotText is null ||
+            OperatorText is null ||
+            EngineText is null ||
+            ModelVersionText is null ||
+            CameraSourceText is null ||
+            CameraFrameMetadataText is null ||
+            LightingSyncText is null ||
+            TimingText is null)
+        {
+            return;
+        }
+
         var state = WorkflowState.Instance;
         var engine = InspectionEngineFactory.Create();
         _cameraSource = CameraSourceFactory.ActiveSource;

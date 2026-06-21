@@ -123,7 +123,7 @@
                         <ColumnDefinition Width="*"/>
                       </Grid.ColumnDefinitions>
                       <TextBlock Text="Demo Role" Foreground="#E1A334" FontSize="11.5" VerticalAlignment="Center" ToolTip="DemoLocalRoleSelector mode only. LocalUsers mode authenticates against local hashed users."/>
-                      <ComboBox Grid.Column="1" x:Name="RoleCombo" SelectedIndex="0" MinHeight="24" Margin="4,0,0,0" SelectionChanged="OnRoleSelectionChanged">
+                      <ComboBox Grid.Column="1" x:Name="RoleCombo" SelectedIndex="2" MinHeight="24" Margin="4,0,0,0" SelectionChanged="OnRoleSelectionChanged">
                         <ComboBoxItem Content="Operator"/>
                         <ComboBoxItem Content="Engineer"/>
                         <ComboBoxItem Content="Admin"/>

@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="AOI Monitor Setup Wizard"
-        Width="960" Height="620" MinWidth="860" MinHeight="560"
+        Width="1080" Height="720" MinWidth="900" MinHeight="640"
         WindowStartupLocation="CenterOwner"
         Background="#0B0E10">
   <Window.Resources>
@@ -37,7 +37,7 @@
           <TextBlock x:Name="StepCounterText" DockPanel.Dock="Right" Text="Step 1 / 6" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
           <StackPanel>
             <TextBlock x:Name="StepTitleText" Text="Storage Root" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="15"/>
-            <TextBlock x:Name="StepSubtitleText" Text="Confirm where local SQLite, image vault, exports, and settings are stored." Foreground="#8B969E" FontSize="11" Margin="0,3,0,0"/>
+            <TextBlock x:Name="StepSubtitleText" Text="Confirm where local SQLite, image vault, exports, and settings are stored." Foreground="#8B969E" FontSize="11" Margin="0,3,0,0" TextWrapping="Wrap"/>
           </StackPanel>
         </DockPanel>
       </Border>
@@ -59,7 +59,8 @@
           </ListBox>
         </Border>
 
-        <Grid Grid.Column="1" Margin="16">
+        <ScrollViewer Grid.Column="1" Margin="16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid>
           <Grid x:Name="StepStorage">
             <StackPanel>
               <TextBlock Text="Storage root" Foreground="#DCE5EB" FontWeight="Bold" FontSize="13"/>
@@ -162,11 +163,12 @@
             </StackPanel>
           </Grid>
         </Grid>
+        </ScrollViewer>
       </Grid>
 
       <Border Grid.Row="2" Background="#0F1316" BorderBrush="#343D44" BorderThickness="0,1,0,0" Padding="10">
         <DockPanel>
-          <TextBlock x:Name="WizardStatusText" Text="Prototype setup wizard. Real hardware is not required." Foreground="#9AA6AF" VerticalAlignment="Center"/>
+          <TextBlock x:Name="WizardStatusText" Text="Prototype setup wizard. Real hardware is not required." Foreground="#9AA6AF" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"/>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="SkipButton" Style="{StaticResource WizardButton}" Content="Skip" Click="OnSkipClick"/>
             <Button x:Name="BackButton" Style="{StaticResource WizardButton}" Content="Back" Click="OnBackClick"/>

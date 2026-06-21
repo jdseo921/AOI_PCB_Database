@@ -52,7 +52,13 @@ public static class FalseCallReductionService
     }
 
     public static void ApplyRecommendedThreshold(FalseCallReductionRun run, string operatorId)
+        => ApplyRecommendedThreshold(run, UserRole.Admin, operatorId);
+
+    public static void ApplyRecommendedThreshold(FalseCallReductionRun run, UserRole role, string operatorId)
     {
+        if (!RoleAuthorization.CanChangeThresholds(role))
+            throw new UnauthorizedAccessException(RoleAuthorization.DeniedMessage(role, "applying false-call threshold recommendations"));
+
         if (!string.Equals(run.Recommendation.Status, "VALID", StringComparison.OrdinalIgnoreCase) || run.Recommendation.Point is null)
             throw new InvalidOperationException("Only valid false-call recommendations can be applied.");
 

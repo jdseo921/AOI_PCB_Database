@@ -417,6 +417,7 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         var (ngThreshold, reviewThreshold) = GetRoiThresholds(priority, roi);
         var source = roi.Thresholds.AiScoreThreshold > 0 ? "Recipe ROI threshold" : "Built-in policy default";
         result.ThresholdSource = source;
+        result.Evidence.Add($"Threshold profile fallback for ROI {roi.RoiId}: no active deployed profile rule matched board={result.BoardId}, recipe={recipe.RecipeName}, view={result.ViewType}, roiType={roi.RoiType}.");
         result.Evidence.Add($"Threshold source for ROI {roi.RoiId}: {source} (Review >= {reviewThreshold:F1}%, NG >= {ngThreshold:F1}%).");
         return new EffectiveThresholdRule
         {

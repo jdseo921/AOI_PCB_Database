@@ -158,6 +158,7 @@
                 <ComboBoxItem Content="Maximize Defect Recall"/>
               </ComboBox>
               <Button Style="{StaticResource ActionBtnBlue}" Content="Analyze False Calls" Margin="0,0,6,0" Click="OnAnalyzeFalseCallsClick"/>
+              <Button x:Name="CreateThresholdProfileDraftButton" Style="{StaticResource ActionBtn}" Content="Create Threshold Profile Draft" IsEnabled="False" Margin="0,0,6,0" Click="OnCreateThresholdProfileDraftClick"/>
               <Button x:Name="ApplyRecommendedThresholdButton" Style="{StaticResource ActionBtnAmber}" Content="Apply Recommended Threshold" IsEnabled="False" Click="OnApplyRecommendedThresholdClick"/>
             </StackPanel>
             <StackPanel>
@@ -168,6 +169,8 @@
           <DataGrid Grid.Row="1" x:Name="FalseCallGrid" Margin="0,6,0,0" AutoGenerateColumns="False" HeadersVisibility="Column" CanUserAddRows="False" IsReadOnly="True">
             <DataGrid.Columns>
               <DataGridTextColumn Header="Threshold" Binding="{Binding ConfidenceThreshold, StringFormat=F3}" Width="82"/>
+              <DataGridTextColumn Header="Precision" Binding="{Binding Precision, StringFormat=P1}" Width="78"/>
+              <DataGridTextColumn Header="Recall" Binding="{Binding Recall, StringFormat=P1}" Width="72"/>
               <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="52"/>
               <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="52"/>
               <DataGridTextColumn Header="False Call" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="86"/>

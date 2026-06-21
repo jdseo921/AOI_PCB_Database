@@ -34,6 +34,7 @@ public sealed class CustomerValidationReportContext
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> PrototypeLimitations { get; init; } = DefaultPrototypeLimitations;
     public FalseCallRecommendationSummary? FalseCallRecommendation { get; init; }
+    public ThresholdProfileEvidenceSummary ThresholdProfileEvidence { get; init; } = new();
     public ValidationBreakdownSummary BreakdownSummary { get; init; } = new();
     public DatasetQualitySummary DatasetQualitySummary { get; init; } = new();
     public CameraAcceptanceSummary CameraAcceptanceSummary { get; init; } = new();
@@ -160,6 +161,7 @@ public static class CustomerValidationReportService
         AppendRobotAcceptanceSection(sb, context.RobotAcceptanceSummary);
         AppendMesReadinessSection(sb, context.MesReadinessSummary);
         AppendFalseCallLaborImpact(sb, context.FalseCallRecommendation);
+        AppendThresholdProfileEvidence(sb, context.ThresholdProfileEvidence);
         AppendBreakdownSection(sb, context.BreakdownSummary);
 
         sb.AppendLine("  <h2>Confusion Matrix</h2>");
@@ -285,6 +287,7 @@ public static class CustomerValidationReportService
         AppendMarkdownRobotAcceptanceSection(sb, context.RobotAcceptanceSummary);
         AppendMarkdownMesReadinessSection(sb, context.MesReadinessSummary);
         AppendMarkdownFalseCallLaborImpact(sb, context.FalseCallRecommendation);
+        AppendMarkdownThresholdProfileEvidence(sb, context.ThresholdProfileEvidence);
         AppendMarkdownBreakdownSection(sb, context.BreakdownSummary);
         sb.AppendLine();
         sb.AppendLine("## Confusion Matrix");
@@ -469,6 +472,36 @@ public static class CustomerValidationReportService
         sb.AppendLine($"- Review burden estimate: {summary.EstimatedManualReviewMinutes:F1} minutes ({FormatPercent(summary.ReviewRate)} review rate)");
         foreach (var limitation in summary.Limitations)
             sb.AppendLine($"- {EscapeMarkdown(limitation)}");
+    }
+
+    private static void AppendThresholdProfileEvidence(StringBuilder sb, ThresholdProfileEvidenceSummary summary)
+    {
+        sb.AppendLine("  <h2>Deployed Threshold Profile Evidence</h2>");
+        sb.AppendLine("  <table class=\"details\">");
+        AppendDetailRow(sb, "Status", summary.Status);
+        AppendDetailRow(sb, "Profile ID / revision", string.IsNullOrWhiteSpace(summary.ProfileId) ? "Not deployed" : $"{summary.ProfileId} / {summary.Revision}");
+        AppendDetailRow(sb, "Board / recipe scope", $"{summary.BoardModel} / {summary.BoardProgram} / {summary.RecipeName} / {summary.RecipeRevision}");
+        AppendDetailRow(sb, "Source validation run", summary.SourceValidationRunId?.ToString(CultureInfo.InvariantCulture) ?? "Not available");
+        AppendDetailRow(sb, "Source false-call run", summary.SourceFalseCallReductionRunId?.ToString(CultureInfo.InvariantCulture) ?? "Not available");
+        AppendDetailRow(sb, "Approved by", string.IsNullOrWhiteSpace(summary.ApprovedBy) ? "Not approved" : summary.ApprovedBy);
+        AppendDetailRow(sb, "Rules", summary.RuleCount.ToString(CultureInfo.InvariantCulture));
+        sb.AppendLine("  </table>");
+        sb.AppendLine($"  <div class=\"notice\">{Html(summary.EvidenceBoundary)}</div>");
+    }
+
+    private static void AppendMarkdownThresholdProfileEvidence(StringBuilder sb, ThresholdProfileEvidenceSummary summary)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## Deployed Threshold Profile Evidence");
+        sb.AppendLine();
+        sb.AppendLine($"- Status: {EscapeMarkdown(summary.Status)}");
+        sb.AppendLine($"- Profile ID / revision: {EscapeMarkdown(string.IsNullOrWhiteSpace(summary.ProfileId) ? "Not deployed" : $"{summary.ProfileId} / {summary.Revision}")}");
+        sb.AppendLine($"- Board / recipe scope: {EscapeMarkdown($"{summary.BoardModel} / {summary.BoardProgram} / {summary.RecipeName} / {summary.RecipeRevision}")}");
+        sb.AppendLine($"- Source validation run: {summary.SourceValidationRunId?.ToString(CultureInfo.InvariantCulture) ?? "Not available"}");
+        sb.AppendLine($"- Source false-call run: {summary.SourceFalseCallReductionRunId?.ToString(CultureInfo.InvariantCulture) ?? "Not available"}");
+        sb.AppendLine($"- Approved by: {EscapeMarkdown(string.IsNullOrWhiteSpace(summary.ApprovedBy) ? "Not approved" : summary.ApprovedBy)}");
+        sb.AppendLine($"- Rules: {summary.RuleCount}");
+        sb.AppendLine($"- Limitation: {EscapeMarkdown(summary.EvidenceBoundary)}");
     }
 
     private static void AppendDatasetQualitySection(StringBuilder sb, DatasetQualitySummary summary)

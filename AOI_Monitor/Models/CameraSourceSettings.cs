@@ -11,6 +11,7 @@ public sealed class CameraSourceSettings
     public string TopDeviceId { get; set; } = string.Empty;
     public string SideDeviceId { get; set; } = string.Empty;
     public string BottomDeviceId { get; set; } = string.Empty;
+    public string AdapterFolder { get; set; } = string.Empty;
     public CameraAcquisitionMode AcquisitionMode { get; set; } = CameraAcquisitionMode.Continuous;
     public double ExposureMs { get; set; } = 5.0;
     public double Gain { get; set; } = 1.0;

@@ -121,6 +121,51 @@ public sealed class MesRestIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void NullOpcUaMesClientDocumentsBoundary()
+    {
+        var client = new NullOpcUaMesClient();
+
+        Assert.Equal(IntegrationConnectionStatus.NotConnected, client.Status);
+        Assert.Contains("OPC UA", client.StatusMessage);
+    }
+
+    [Fact]
+    public async Task TraceabilitySignoffPersistsPassingReport()
+    {
+        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" });
+        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
+
+        var report = await TraceabilitySignoffService.RunAsync(operatorId: "Engineer01 [Engineer]");
+        var latest = AoiDatabase.GetLatestTraceabilityTestReport();
+
+        Assert.Equal("PASS", report.Status);
+        Assert.NotNull(latest);
+        Assert.Equal("PASS", latest.Status);
+        Assert.True(File.Exists(report.ReportJsonPath));
+        Assert.True(File.Exists(report.ReportHtmlPath));
+    }
+
+    [Fact]
+    public async Task TraceabilitySignoffReportRedactsSecrets()
+    {
+        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" });
+        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        var settings = RestSettings(maxRetryCount: 0);
+        settings.AuthMode = MesRestAuthMode.Bearer;
+        settings.BearerToken = "bearer-secret-for-test";
+        settings.BaseUrl = "http://mes.test?token=bearer-secret-for-test";
+        MesIntegrationSettingsService.Save(settings);
+
+        var report = await TraceabilitySignoffService.RunAsync(operatorId: "Engineer01 [Engineer]");
+        var json = File.ReadAllText(report.ReportJsonPath);
+        var audits = AoiDatabase.GetAuditEvents(new LogFilter());
+
+        Assert.DoesNotContain("bearer-secret-for-test", json);
+        Assert.DoesNotContain(audits, audit => audit.ActionDetail.Contains("bearer-secret-for-test", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task SpoolRetryMarksSuccessfulItemSent()
     {
         var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" });
@@ -194,6 +239,20 @@ public sealed class MesRestIntegrationTests : IDisposable
 
         Assert.Equal("MES Mock Only", mock.Status);
         Assert.Contains(mock.Messages, message => message.Contains("Mock MES", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void MesReadinessRequiresPassingTraceabilityTestWhenConfigured()
+    {
+        MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
+
+        var readiness = MesSpoolService.EvaluateReadiness(new MesReadinessCriteria
+        {
+            RequirePassingTraceabilityTest = true,
+        });
+
+        Assert.Equal("MES REST Error", readiness.Status);
+        Assert.Equal("NOT RUN", readiness.LatestTraceabilityTestStatus);
     }
 
     private static MesIntegrationSettings RestSettings(int maxRetryCount = 0, int retryBackoffMs = 0)

@@ -118,9 +118,67 @@ public interface ITraceabilityUploader : IIntegrationEndpoint
         CancellationToken cancellationToken = default);
 }
 
+public interface IOpcUaMesClient : IIntegrationEndpoint
+{
+    Task<IntegrationCommandResult> WriteTraceabilityNodeAsync(
+        TraceabilityPayload payload,
+        CancellationToken cancellationToken = default);
+}
+
+public interface ICentralProductionDatabaseClient : IIntegrationEndpoint
+{
+    Task<IntegrationCommandResult> UploadCentralSyncPayloadAsync(
+        CentralSyncPayload payload,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IEmergencyStopMonitor : IIntegrationEndpoint
 {
     bool IsEmergencyStopActive { get; }
+}
+
+public sealed class SafetyStatus
+{
+    public bool IsGuardDoorClosed { get; set; } = true;
+    public bool IsEmergencyStopActive { get; set; }
+    public bool IsAirPressureOk { get; set; } = true;
+    public bool IsRobotServoReady { get; set; } = true;
+    public bool IsBoardClampReady { get; set; } = true;
+    public string Message { get; set; } = "Safety interlocks OK.";
+
+    public bool IsOk =>
+        IsGuardDoorClosed &&
+        !IsEmergencyStopActive &&
+        IsAirPressureOk &&
+        IsRobotServoReady &&
+        IsBoardClampReady;
+
+    public string BlockingReason()
+    {
+        var reasons = new List<string>();
+        if (!IsGuardDoorClosed)
+            reasons.Add("guard door open");
+        if (IsEmergencyStopActive)
+            reasons.Add("emergency stop active");
+        if (!IsAirPressureOk)
+            reasons.Add("air pressure not OK");
+        if (!IsRobotServoReady)
+            reasons.Add("robot servo not ready");
+        if (!IsBoardClampReady)
+            reasons.Add("board clamp not ready");
+        return reasons.Count == 0 ? Message : string.Join(", ", reasons);
+    }
+}
+
+public interface IPlcSafetyController : IIntegrationEndpoint
+{
+    bool IsGuardDoorClosed { get; }
+    bool IsEmergencyStopActive { get; }
+    bool IsAirPressureOk { get; }
+    bool IsRobotServoReady { get; }
+    bool IsBoardClampReady { get; }
+    Task<IntegrationCommandResult> ResetSafetyFaultAsync(CancellationToken cancellationToken = default);
+    SafetyStatus GetDiagnostics();
 }
 
 public sealed class NullLightingController : ILightingController
@@ -160,6 +218,122 @@ public sealed class NullRobotController : IRobotController
     public Task<IntegrationCommandResult> ResetAsync(
         CancellationToken cancellationToken = default)
         => Task.FromResult(IntegrationCommandResult.NotConnected(StatusMessage));
+}
+
+public sealed class NullPlcSafetyController : IPlcSafetyController
+{
+    public string Name => "Null PLC Safety Controller";
+    public IntegrationConnectionStatus Status => IntegrationConnectionStatus.NotConnected;
+    public string StatusMessage => "Stage 3 PLC/safety interlock boundary only. No real guard door, clamp, air, servo, or e-stop circuit is monitored.";
+    public bool IsGuardDoorClosed => false;
+    public bool IsEmergencyStopActive => false;
+    public bool IsAirPressureOk => false;
+    public bool IsRobotServoReady => false;
+    public bool IsBoardClampReady => false;
+
+    public Task<IntegrationCommandResult> ResetSafetyFaultAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(IntegrationCommandResult.NotConnected(StatusMessage));
+
+    public SafetyStatus GetDiagnostics()
+        => new()
+        {
+            IsGuardDoorClosed = false,
+            IsEmergencyStopActive = false,
+            IsAirPressureOk = false,
+            IsRobotServoReady = false,
+            IsBoardClampReady = false,
+            Message = StatusMessage,
+        };
+}
+
+public sealed class NullCentralProductionDatabaseClient : ICentralProductionDatabaseClient
+{
+    public string Name => "Null Central Production Database Client";
+    public IntegrationConnectionStatus Status => IntegrationConnectionStatus.NotConnected;
+    public string StatusMessage => "Central PostgreSQL integration boundary only. Local SQLite remains the offline source of truth and no Npgsql client is bundled.";
+
+    public Task<IntegrationCommandResult> UploadCentralSyncPayloadAsync(
+        CentralSyncPayload payload,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(IntegrationCommandResult.NotConnected(
+            "Central production database upload is not configured. Expected future mapping: local InspectionResults, Defects, ReviewEvents, ValidationPackages, acceptance reports, and ExportVerification records to central reporting tables."));
+}
+
+public sealed class SimulatedPlcSafetyController : IPlcSafetyController
+{
+    public string Name => "Simulated PLC Safety Controller";
+    public IntegrationConnectionStatus Status => IsEmergencyStopActive ? IntegrationConnectionStatus.Error : IntegrationConnectionStatus.Simulated;
+    public string StatusMessage => IsEmergencyStopActive
+        ? "Simulated PLC safety fault active. No safety-certified hardware is monitored."
+        : "PLC/safety simulation only. No real interlock circuit is monitored.";
+    public bool IsGuardDoorClosed { get; private set; } = true;
+    public bool IsEmergencyStopActive { get; private set; }
+    public bool IsAirPressureOk { get; private set; } = true;
+    public bool IsRobotServoReady { get; private set; } = true;
+    public bool IsBoardClampReady { get; private set; } = true;
+
+    public void SetGuardDoorClosed(bool value) => IsGuardDoorClosed = value;
+    public void SetEmergencyStopActive(bool value) => IsEmergencyStopActive = value;
+    public void SetAirPressureOk(bool value) => IsAirPressureOk = value;
+    public void SetRobotServoReady(bool value) => IsRobotServoReady = value;
+    public void SetBoardClampReady(bool value) => IsBoardClampReady = value;
+
+    public Task<IntegrationCommandResult> ResetSafetyFaultAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        IsGuardDoorClosed = true;
+        IsEmergencyStopActive = false;
+        IsAirPressureOk = true;
+        IsRobotServoReady = true;
+        IsBoardClampReady = true;
+        return Task.FromResult(new IntegrationCommandResult(true, IntegrationConnectionStatus.Simulated, "Simulated PLC safety fault reset. No real safety circuit was reset."));
+    }
+
+    public SafetyStatus GetDiagnostics()
+        => new()
+        {
+            IsGuardDoorClosed = IsGuardDoorClosed,
+            IsEmergencyStopActive = IsEmergencyStopActive,
+            IsAirPressureOk = IsAirPressureOk,
+            IsRobotServoReady = IsRobotServoReady,
+            IsBoardClampReady = IsBoardClampReady,
+            Message = StatusMessage,
+        };
+}
+
+public sealed class TcpTextPlcSafetyController : IPlcSafetyController
+{
+    private readonly string _endpointSummary;
+
+    public TcpTextPlcSafetyController(string endpointSummary = "")
+    {
+        _endpointSummary = endpointSummary;
+    }
+
+    public string Name => "TCP Text PLC Safety Boundary";
+    public IntegrationConnectionStatus Status => string.IsNullOrWhiteSpace(_endpointSummary) ? IntegrationConnectionStatus.NotConnected : IntegrationConnectionStatus.Ready;
+    public string StatusMessage => Status == IntegrationConnectionStatus.Ready
+        ? $"TCP text PLC boundary configured for {_endpointSummary}. Commands are sent only by explicit PLC integration code."
+        : "TCP text PLC boundary is not configured; no network safety command will be sent.";
+    public bool IsGuardDoorClosed => false;
+    public bool IsEmergencyStopActive => false;
+    public bool IsAirPressureOk => false;
+    public bool IsRobotServoReady => false;
+    public bool IsBoardClampReady => false;
+
+    public Task<IntegrationCommandResult> ResetSafetyFaultAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(IntegrationCommandResult.NotConnected("TCP text PLC reset is a boundary only in this build. No vendor PLC or safety-certified reset command was sent."));
+
+    public SafetyStatus GetDiagnostics()
+        => new()
+        {
+            IsGuardDoorClosed = false,
+            IsEmergencyStopActive = false,
+            IsAirPressureOk = false,
+            IsRobotServoReady = false,
+            IsBoardClampReady = false,
+            Message = StatusMessage,
+        };
 }
 
 public sealed class SimulatedRobotController : IRobotController
@@ -312,6 +486,21 @@ public sealed class SimulatedEmergencyStopMonitor : IEmergencyStopMonitor
     public bool IsEmergencyStopActive => _robotController.IsEmergencyStopActive;
 }
 
+public sealed class PlcEmergencyStopMonitor : IEmergencyStopMonitor
+{
+    private readonly IPlcSafetyController _plc;
+
+    public PlcEmergencyStopMonitor(IPlcSafetyController plc)
+    {
+        _plc = plc;
+    }
+
+    public string Name => $"{_plc.Name} E-Stop";
+    public IntegrationConnectionStatus Status => _plc.Status;
+    public string StatusMessage => _plc.StatusMessage;
+    public bool IsEmergencyStopActive => _plc.IsEmergencyStopActive;
+}
+
 public sealed class NullMesClient : IMesClient
 {
     public string Name => "Null MES Client";
@@ -356,6 +545,18 @@ public sealed class NullTraceabilityUploader : ITraceabilityUploader
         => Task.FromResult(IntegrationCommandResult.NotConnected(StatusMessage));
 }
 
+public sealed class NullOpcUaMesClient : IOpcUaMesClient
+{
+    public string Name => "Null OPC UA MES Client";
+    public IntegrationConnectionStatus Status => IntegrationConnectionStatus.NotConnected;
+    public string StatusMessage => "OPC UA MES adapter boundary only. No OPC UA package or production implementation is bundled.";
+
+    public Task<IntegrationCommandResult> WriteTraceabilityNodeAsync(
+        TraceabilityPayload payload,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(IntegrationCommandResult.NotConnected("OPC UA MES traceability requires a reviewed adapter with endpoint, namespace, node mapping, certificate, and security-mode configuration. No production OPC UA write was attempted."));
+}
+
 public sealed class NullEmergencyStopMonitor : IEmergencyStopMonitor
 {
     public string Name => "Null Emergency Stop Monitor";
@@ -368,7 +569,10 @@ public static class IntegrationBoundaryRegistry
 {
     public static ILightingController LightingController { get; set; } = new NullLightingController();
     public static IRobotController RobotController { get; set; } = new NullRobotController();
+    public static IPlcSafetyController PlcSafetyController { get; set; } = new NullPlcSafetyController();
     public static IMesClient MesClient { get; set; } = new NullMesClient();
     public static ITraceabilityUploader TraceabilityUploader { get; set; } = new NullTraceabilityUploader();
+    public static IOpcUaMesClient OpcUaMesClient { get; set; } = new NullOpcUaMesClient();
+    public static ICentralProductionDatabaseClient CentralProductionDatabaseClient { get; set; } = new NullCentralProductionDatabaseClient();
     public static IEmergencyStopMonitor EmergencyStopMonitor { get; set; } = new NullEmergencyStopMonitor();
 }

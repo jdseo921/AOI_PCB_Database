@@ -154,10 +154,10 @@ public static class CameraAcceptanceTestService
         sb.AppendLine(CultureInfo.InvariantCulture, $"<tr><td>{run.TotalRequestedFrames}</td><td>{run.TotalReceivedFrames}</td><td>{run.DroppedFrameCount}</td><td>{run.TriggerFailureCount}</td><td>{run.TimeoutCount}</td><td>{run.MaxConnectMs:F1}</td><td>{run.MaxFirstFrameMs:F1}</td><td>{run.AverageFrameIntervalMs:F1}</td></tr></table></div>");
         AppendMessages(sb, "Blocking Failures", run.Failures, "fail");
         AppendMessages(sb, "Warnings / Limitations", run.Warnings, "warn");
-        sb.AppendLine("<div class=\"card\"><h2>Per View</h2><table><tr><th>View</th><th>Status</th><th>Received</th><th>Dropped</th><th>Trigger Failures</th><th>Timeouts</th><th>Connect ms</th><th>First ms</th><th>Avg interval ms</th></tr>");
+        sb.AppendLine("<div class=\"card\"><h2>Per View / Trigger Synchronization Evidence</h2><table><tr><th>View</th><th>Status</th><th>Received</th><th>Dropped</th><th>Trigger Failures</th><th>Timeouts</th><th>Connect ms</th><th>First ms</th><th>Avg interval ms</th><th>Trigger mode</th><th>Trigger-to-frame ms</th><th>Lighting program</th><th>Lighting command ms</th><th>Sync status</th></tr>");
         foreach (var view in run.ViewMetrics)
         {
-            sb.AppendLine(CultureInfo.InvariantCulture, $"<tr><td>{Escape(view.ViewType)}</td><td>{Escape(view.Status)}</td><td>{view.ReceivedFrames}/{view.RequestedFrames}</td><td>{view.DroppedFrameCount}</td><td>{view.TriggerFailureCount}</td><td>{view.TimeoutCount}</td><td>{view.ConnectMs:F1}</td><td>{view.FirstFrameMs:F1}</td><td>{view.AverageFrameIntervalMs:F1}</td></tr>");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"<tr><td>{Escape(view.ViewType)}</td><td>{Escape(view.Status)}</td><td>{view.ReceivedFrames}/{view.RequestedFrames}</td><td>{view.DroppedFrameCount}</td><td>{view.TriggerFailureCount}</td><td>{view.TimeoutCount}</td><td>{view.ConnectMs:F1}</td><td>{view.FirstFrameMs:F1}</td><td>{view.AverageFrameIntervalMs:F1}</td><td>{Escape(view.TriggerMode)}</td><td>{view.TriggerToFrameLatencyMs:F1}</td><td>{Escape(view.LightingProgramSelected)}</td><td>{view.LightingCommandLatencyMs:F1}</td><td>{Escape(view.SyncStatus)}</td></tr>");
         }
 
         sb.AppendLine("</table></div>");
@@ -179,6 +179,9 @@ public static class CameraAcceptanceTestService
         {
             ViewType = view.ToString(),
             RequestedFrames = criteria.FramesPerView,
+            TriggerMode = settings.AcquisitionMode.ToString(),
+            LightingProgramSelected = "Not controlled by camera acceptance",
+            SyncStatus = settings.AcquisitionMode == CameraAcquisitionMode.Continuous ? "FRAME TIMING ONLY" : "TRIGGER TIMING RECORDED",
         };
         source.SelectedView = view;
 
@@ -270,6 +273,8 @@ public static class CameraAcceptanceTestService
         metrics.AverageFrameIntervalMs = viewFrames.Count(frame => frame.IntervalMs > 0) == 0
             ? 0
             : viewFrames.Where(frame => frame.IntervalMs > 0).Average(frame => frame.IntervalMs);
+        metrics.TriggerToFrameLatencyMs = viewFrames.Length == 0 ? 0 : viewFrames.Average(frame => frame.LatencyMs);
+        metrics.LightingCommandLatencyMs = 0;
         metrics.DroppedFrameRate = metrics.RequestedFrames == 0 ? 0 : metrics.DroppedFrameCount / (double)metrics.RequestedFrames;
         metrics.TriggerFailureRate = metrics.RequestedFrames == 0 ? 0 : metrics.TriggerFailureCount / (double)metrics.RequestedFrames;
 

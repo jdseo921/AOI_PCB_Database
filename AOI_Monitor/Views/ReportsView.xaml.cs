@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -28,7 +29,9 @@ public partial class ReportsView : UserControl
     private readonly ObservableCollection<ExportHistoryRow> _exportRows = new();
     private readonly ObservableCollection<AuditLogRow> _auditRows = new();
     private readonly ObservableCollection<MesSpoolQueueRow> _mesSpoolRows = new();
+    private readonly ObservableCollection<CentralSyncQueueRow> _centralSyncRows = new();
     private readonly ObservableCollection<FactoryReadinessRow> _factoryReadinessRows = new();
+    private readonly ObservableCollection<FactoryAcceptanceChecklistItem> _factoryAcceptanceRows = new();
     private CancellationTokenSource? _workCts;
 
     public ReportsView()
@@ -39,7 +42,10 @@ public partial class ReportsView : UserControl
         ExportGrid.ItemsSource = _exportRows;
         AuditGrid.ItemsSource = _auditRows;
         MesSpoolGrid.ItemsSource = _mesSpoolRows;
+        CentralSyncGrid.ItemsSource = _centralSyncRows;
         FactoryReadinessGrid.ItemsSource = _factoryReadinessRows;
+        FactoryAcceptanceGrid.ItemsSource = _factoryAcceptanceRows;
+        PopulateFactoryAcceptanceProfiles();
         FromDatePicker.SelectedDate = DateTime.Today.AddDays(-30);
         ToDatePicker.SelectedDate = DateTime.Today;
         LoadLogs();
@@ -48,6 +54,33 @@ public partial class ReportsView : UserControl
     public void RefreshFromState() => LoadLogs();
 
     private void OnApplyFiltersClick(object sender, RoutedEventArgs e) => LoadLogs();
+
+    private void PopulateFactoryAcceptanceProfiles()
+    {
+        FactoryAcceptanceProfileCombo.Items.Clear();
+        foreach (DeploymentProfile profile in Enum.GetValues<DeploymentProfile>())
+        {
+            FactoryAcceptanceProfileCombo.Items.Add(new ComboBoxItem
+            {
+                Content = FactoryReadinessService.DisplayName(profile),
+                Tag = profile,
+            });
+        }
+
+        FactoryAcceptanceProfileCombo.SelectedIndex = Math.Max(0, (int)DeploymentProfileSettingsService.Load());
+    }
+
+    private DeploymentProfile SelectedFactoryAcceptanceProfile()
+        => (FactoryAcceptanceProfileCombo.SelectedItem as ComboBoxItem)?.Tag is DeploymentProfile profile
+            ? profile
+            : DeploymentProfile.Stage1ImageValidation;
+
+    private void OnGenerateFactoryAcceptanceChecklistClick(object sender, RoutedEventArgs e)
+    {
+        var checklist = FactoryAcceptanceChecklistService.Generate(SelectedFactoryAcceptanceProfile());
+        ReplaceRows(_factoryAcceptanceRows, checklist.Items);
+        StatusText.Text = $"Generated factory acceptance checklist for {checklist.ProfileDisplayName}.";
+    }
 
     private void OnClearFiltersClick(object sender, RoutedEventArgs e)
     {
@@ -71,17 +104,23 @@ public partial class ReportsView : UserControl
             .ToArray();
         var audits = AoiDatabase.GetAuditEvents(filter).Select(AuditLogRow.FromRecord).ToArray();
         var mesSpool = AoiDatabase.GetMesSpoolQueue().Select(MesSpoolQueueRow.FromRecord).ToArray();
+        var centralSync = AoiDatabase.GetCentralSyncQueue().Select(CentralSyncQueueRow.FromRecord).ToArray();
         var readinessReport = FactoryReadinessService.Evaluate();
         var readiness = readinessReport.Categories.Select(FactoryReadinessRow.FromCategory).ToArray();
+        var buildEvidence = BuildTestEvidenceService.GetSummary();
 
         ReplaceRows(_inspectionRows, inspections);
         ReplaceRows(_reviewRows, reviews);
         ReplaceRows(_exportRows, exports);
         ReplaceRows(_auditRows, audits);
         ReplaceRows(_mesSpoolRows, mesSpool);
+        ReplaceRows(_centralSyncRows, centralSync);
         ReplaceRows(_factoryReadinessRows, readiness);
+        if (_factoryAcceptanceRows.Count == 0)
+            ReplaceRows(_factoryAcceptanceRows, FactoryAcceptanceChecklistService.Generate(SelectedFactoryAcceptanceProfile()).Items);
 
-        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows / {mesSpool.Length} MES spool / readiness {readinessReport.OverallStatus}";
+        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows / {mesSpool.Length} MES spool / {centralSync.Length} central sync / readiness {readinessReport.OverallStatus}";
+        BuildEvidenceSummaryText.Text = BuildEvidenceSummaryTextFor(buildEvidence);
         StatusText.Text = "Loaded real SQLite log records.";
     }
 
@@ -410,6 +449,82 @@ public partial class ReportsView : UserControl
         }
     }
 
+    private void OnExportFactoryAcceptanceChecklistClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting factory acceptance checklist", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!ConfirmExport("Export a client-facing Factory Acceptance Checklist package?"))
+            return;
+
+        try
+        {
+            var profile = SelectedFactoryAcceptanceProfile();
+            var result = FactoryAcceptanceChecklistService.Export(profile, EnsureExportsDir());
+            var checklist = FactoryAcceptanceChecklistService.Generate(profile);
+            ReplaceRows(_factoryAcceptanceRows, checklist.Items);
+            WorkflowState.Instance.AddEvent("FACTORY_ACCEPTANCE_EXPORT", $"Factory acceptance checklist exported: {Path.GetFileName(result.Folder)}.");
+            RefreshAfterExport($"Factory acceptance checklist exported. HTML: {result.HtmlPath}. JSON: {result.JsonPath}. CSV: {result.CsvPath}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Factory acceptance checklist export failed", ex, "FACTORY_ACCEPTANCE_EXPORT_ERROR");
+        }
+    }
+
+    private void OnImportBuildTestEvidenceClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Importing build/test evidence", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select build/test evidence JSON",
+            Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var evidence = BuildTestEvidenceService.ImportEvidence(dialog.FileName, WorkflowState.Instance.OperatorWithRole);
+            WorkflowState.Instance.AddEvent("BUILD_TEST_EVIDENCE", $"Build/test evidence imported: {Path.GetFileName(evidence.EvidencePath)}.");
+            LoadLogs();
+            StatusText.Text = $"Build/test evidence imported: {evidence.EvidencePath}.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException)
+        {
+            HandleWorkError("Build/test evidence import failed", ex, "BUILD_TEST_EVIDENCE_ERROR");
+        }
+    }
+
+    private void OnOpenBuildEvidenceFolderClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(BuildTestEvidenceService.EvidenceFolder);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = BuildTestEvidenceService.EvidenceFolder,
+                UseShellExecute = true,
+            });
+            StatusText.Text = $"Opened build/test evidence folder: {BuildTestEvidenceService.EvidenceFolder}.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Open build/test evidence folder failed", ex, "BUILD_TEST_EVIDENCE_ERROR");
+        }
+    }
+
     private void OnVerifyImagePathsClick(object sender, RoutedEventArgs e)
     {
         if (!ConfirmExport("Run image path verification and record the utility report?"))
@@ -602,7 +717,13 @@ public partial class ReportsView : UserControl
         };
 
         var cts = BeginWork("Running soak test...");
-        var progress = new Progress<SoakTestProgress>(p => UpdateProgress(new WorkProgress(p.ElapsedSeconds, p.TotalSeconds, p.Message)));
+        var progress = new Progress<SoakTestProgress>(p =>
+        {
+            var suffix = $" Max={p.MaxInspectionMilliseconds:F0} ms; memory peak={p.PeakWorkingSetMegabytes:F1} MB";
+            if (!string.IsNullOrWhiteSpace(p.CancellationReason))
+                suffix += $"; cancel={p.CancellationReason}";
+            UpdateProgress(new WorkProgress(p.ElapsedSeconds, p.TotalSeconds, p.Message + suffix));
+        });
 
         try
         {
@@ -610,16 +731,18 @@ public partial class ReportsView : UserControl
             SoakTestService.Persist(result, state.OperatorWithRole);
             var reportPath = SoakTestService.WriteHtmlReport(result, options.OutputFolder);
             var jsonReportPath = SoakTestService.WriteJsonReport(result, options.OutputFolder);
+            var csvReportPath = SoakTestService.WriteIterationsCsv(result, options.OutputFolder);
             var status = result.WasCanceled
                 ? "CANCELED"
                 : result.Errors.Count == 0 ? "OK" : "WARN";
 
             var verified = ExportVerificationService.RecordVerifiedExport("SoakTestReport", reportPath, status);
             ExportVerificationService.RecordVerifiedExport("SoakTestJsonReport", jsonReportPath, status);
+            ExportVerificationService.RecordVerifiedExport("SoakTestIterationsCsv", csvReportPath, status);
             WorkflowState.Instance.AddEvent("SOAK_TEST", $"Soak test {status}: cycles={result.TotalCycles}, success={result.SuccessfulCycles}, failed={result.FailedCycles}, p95={result.P95InspectionMilliseconds:F0} ms, source={result.SourceKind}, report={Path.GetFileName(reportPath)}.");
             LogErrors("SOAK_TEST_ERROR", result.Errors);
             SoakReportPathText.Text = $"Latest soak-test report: {reportPath}";
-            RefreshAfterExport($"Soak test {status}. Cycles={result.TotalCycles}, failed={result.FailedCycles}, p95={result.P95InspectionMilliseconds:F0} ms, source={result.SourceKind}. HTML: {reportPath}. JSON: {jsonReportPath}. Verification: {verified.Verification.Status}.");
+            RefreshAfterExport($"Soak test {status}. Cycles={result.TotalCycles}, failed={result.FailedCycles}, p95={result.P95InspectionMilliseconds:F0} ms, cycle p95={result.P95TotalCycleMilliseconds:F0} ms, source={result.SourceKind}. HTML: {reportPath}. JSON: {jsonReportPath}. CSV: {csvReportPath}. Verification: {verified.Verification.Status}.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -628,6 +751,39 @@ public partial class ReportsView : UserControl
         finally
         {
             EndWork();
+        }
+    }
+
+    private void OnExportLatestSoakEvidenceClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting latest soak-test evidence", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var latest = AoiDatabase.GetLatestSoakTestRun();
+        if (latest is null)
+        {
+            MessageBox.Show("No persisted soak-test run is available to export.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var output = string.IsNullOrWhiteSpace(latest.OutputFolder) ? EnsureExportsDir() : latest.OutputFolder;
+            var htmlPath = SoakTestService.WriteHtmlReport(latest, output);
+            var jsonPath = SoakTestService.WriteJsonReport(latest, output);
+            var csvPath = SoakTestService.WriteIterationsCsv(latest, output);
+            ExportVerificationService.RecordVerifiedExport("SoakTestReport", htmlPath, latest.WasCanceled ? "CANCELED" : "OK");
+            ExportVerificationService.RecordVerifiedExport("SoakTestJsonReport", jsonPath, latest.WasCanceled ? "CANCELED" : "OK");
+            ExportVerificationService.RecordVerifiedExport("SoakTestIterationsCsv", csvPath, latest.WasCanceled ? "CANCELED" : "OK");
+            WorkflowState.Instance.AddEvent("SOAK_TEST_EXPORT", $"Latest soak evidence exported: {Path.GetFileName(htmlPath)}.");
+            RefreshAfterExport($"Latest soak evidence exported. HTML: {htmlPath}. JSON: {jsonPath}. CSV: {csvPath}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Latest soak evidence export failed", ex, "SOAK_TEST_EXPORT_ERROR");
         }
     }
 
@@ -727,6 +883,127 @@ public partial class ReportsView : UserControl
         }
     }
 
+    private async void OnRunTraceabilityTestClick(object sender, RoutedEventArgs e)
+    {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Running MES traceability signoff", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var settings = MesIntegrationSettingsService.Load();
+        string? imagePath = null;
+        var chooseImage = MessageBox.Show("Select a test image payload for this traceability signoff? Choose No to send result payload only.", "Traceability Signoff", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        var productionConfirmed = false;
+        if (chooseImage == MessageBoxResult.Yes)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "Select MES traceability test image",
+                Filter = "Image files|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff|All files|*.*",
+            };
+            if (dialog.ShowDialog() == true)
+                imagePath = dialog.FileName;
+
+            if (!string.IsNullOrWhiteSpace(imagePath) && settings.Mode == MesIntegrationMode.Rest)
+            {
+                productionConfirmed = MessageBox.Show(
+                    "Production REST mode is selected. Send the selected image file to the configured MES image endpoint?",
+                    "Confirm Production Image Upload",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning) == MessageBoxResult.Yes;
+            }
+        }
+
+        var cts = BeginWork("Running MES traceability signoff...");
+        try
+        {
+            var report = await TraceabilitySignoffService.RunAsync(imagePath, productionConfirmed, WorkflowState.Instance.OperatorWithRole, cts.Token);
+            WorkflowState.Instance.AddEvent(report.Status == "PASS" ? "MES_TRACEABILITY_TEST" : "MES_TRACEABILITY_TEST_ERROR", $"Traceability signoff {report.Status}; result={report.ResultStatus}; image={report.ImageStatus}; report={Path.GetFileName(report.ReportHtmlPath)}.");
+            RefreshAfterExport($"Traceability signoff {report.Status}. HTML: {report.ReportHtmlPath}. JSON: {report.ReportJsonPath}.");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Traceability signoff canceled.";
+            WorkflowState.Instance.AddEvent("MES_TRACEABILITY_TEST", "Traceability signoff canceled by user.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Traceability signoff failed", ex, "MES_TRACEABILITY_TEST_ERROR");
+        }
+        finally
+        {
+            EndWork();
+        }
+    }
+
+    private void OnQueueCentralSyncClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Queueing central sync payloads", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            var count = CentralSyncService.QueueLocalChangesForSync();
+            WorkflowState.Instance.AddEvent("CENTRAL_SYNC_QUEUE", $"Queued {count} central sync payload(s).");
+            RefreshAfterExport($"Queued {count} central sync payload(s).");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Central sync queueing failed", ex, "CENTRAL_SYNC_QUEUE_ERROR");
+        }
+    }
+
+    private async void OnRetryCentralSyncClick(object sender, RoutedEventArgs e)
+    {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Retrying central sync queue", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var pending = AoiDatabase.GetPendingCentralSyncItems();
+        if (pending.Count == 0)
+        {
+            MessageBox.Show("No pending central sync items are ready for retry.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            LoadLogs();
+            return;
+        }
+
+        var cts = BeginWork("Retrying central sync queue...");
+        try
+        {
+            var summary = await CentralSyncService.RetryEligibleAsync(100, cts.Token);
+            var message = $"Central sync retry complete: attempted={summary.Attempted}, sent={summary.Sent}, failed={summary.Failed}, skipped={summary.Skipped}.";
+            WorkflowState.Instance.AddEvent("CENTRAL_SYNC_RETRY", message);
+            RefreshAfterExport(message);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Central sync retry canceled.";
+            WorkflowState.Instance.AddEvent("CENTRAL_SYNC_RETRY", "Central sync retry canceled by user.");
+        }
+        finally
+        {
+            EndWork();
+        }
+    }
+
     private async void OnRetrySelectedMesSpoolClick(object sender, RoutedEventArgs e)
     {
         if (_workCts is not null)
@@ -777,6 +1054,56 @@ public partial class ReportsView : UserControl
         }
     }
 
+    private async void OnRetrySelectedCentralSyncClick(object sender, RoutedEventArgs e)
+    {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Retrying selected central sync items", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var selected = CentralSyncGrid.SelectedItems.OfType<CentralSyncQueueRow>().ToArray();
+        if (selected.Length == 0)
+        {
+            MessageBox.Show("Select one or more central sync queue items to retry.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var retryable = selected
+            .Where(row => row.Status == "Pending")
+            .Select(row => row.Id)
+            .ToArray();
+        if (retryable.Length == 0)
+        {
+            MessageBox.Show("Selected central sync queue items are not retryable. Only Pending items can be retried.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var cts = BeginWork("Retrying selected central sync items...");
+        try
+        {
+            var summary = await CentralSyncService.RetryItemsAsync(retryable, cts.Token);
+            var message = $"Selected central sync retry complete: attempted={summary.Attempted}, sent={summary.Sent}, failed={summary.Failed}, skipped={summary.Skipped}.";
+            WorkflowState.Instance.AddEvent("CENTRAL_SYNC_RETRY", message);
+            RefreshAfterExport(message);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Selected central sync retry canceled.";
+            WorkflowState.Instance.AddEvent("CENTRAL_SYNC_RETRY", "Selected central sync retry canceled by user.");
+        }
+        finally
+        {
+            EndWork();
+        }
+    }
+
     private void OnExportMesQueueReportClick(object sender, RoutedEventArgs e)
     {
         if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting MES queue report", out var permissionMessage))
@@ -794,6 +1121,26 @@ public partial class ReportsView : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             HandleWorkError("MES queue report export failed", ex, "MES_SPOOL_EXPORT_ERROR");
+        }
+    }
+
+    private void OnExportCentralSyncReportClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting central sync queue report", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            var report = CentralSyncService.ExportQueueReport();
+            WorkflowState.Instance.AddEvent("CENTRAL_SYNC_EXPORT", $"Central sync queue report exported: {Path.GetFileName(report.HtmlPath)}.");
+            RefreshAfterExport($"Central sync report exported. HTML: {report.HtmlPath}. JSON: {report.JsonPath}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Central sync report export failed", ex, "CENTRAL_SYNC_EXPORT_ERROR");
         }
     }
 
@@ -1525,6 +1872,16 @@ public partial class ReportsView : UserControl
     private static string ShortHash(string hash)
         => string.IsNullOrWhiteSpace(hash) || hash.Length <= 12 ? hash : hash[..12];
 
+    private static string BuildEvidenceSummaryTextFor(BuildTestEvidenceSummary summary)
+    {
+        if (summary.Latest is null)
+            return "Build/test evidence: not imported";
+
+        var latest = summary.Latest;
+        var commit = string.IsNullOrWhiteSpace(latest.GitCommit) ? "unknown" : ShortHash(latest.GitCommit);
+        return $"Build/test evidence: {summary.Status} | {latest.Configuration} | commit {commit} | hygiene {latest.HygieneStatus}, restore {latest.RestoreStatus}, build {latest.BuildStatus}, test {latest.TestStatus}, publish {latest.PublishValidationStatus}";
+    }
+
     private static string FormatPercent(double value)
         => value.ToString("P1", CultureInfo.InvariantCulture);
 
@@ -2046,14 +2403,50 @@ public partial class ReportsView : UserControl
                 Id = record.Id,
                 CreatedAtUtc = record.CreatedAtUtc,
                 PayloadType = record.PayloadType,
-                EndpointUrl = record.EndpointUrl,
+                EndpointUrl = MesIntegrationSettingsService.RedactSecrets(record.EndpointUrl),
                 RetryCount = record.RetryCount,
                 MaxRetryCount = record.MaxRetryCount,
                 Status = record.Status,
-                LastError = record.LastError,
+                LastError = MesIntegrationSettingsService.RedactSecrets(record.LastError),
                 LotId = record.LotId,
                 BoardModel = record.BoardModel,
                 Result = record.Result,
+            };
+        }
+    }
+
+    public sealed class CentralSyncQueueRow
+    {
+        public long Id { get; init; }
+        public DateTime CreatedAtUtc { get; init; }
+        public string CreatedLocal => CreatedAtUtc == DateTime.MinValue ? "--" : CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm");
+        public string ItemType { get; init; } = string.Empty;
+        public string ItemId { get; init; } = string.Empty;
+        public string StationId { get; init; } = string.Empty;
+        public string EndpointOrFolder { get; init; } = string.Empty;
+        public int RetryCount { get; init; }
+        public int MaxRetryCount { get; init; }
+        public string RetryDisplay => $"{RetryCount}/{MaxRetryCount}";
+        public string Status { get; init; } = string.Empty;
+        public string LastError { get; init; } = string.Empty;
+
+        public static CentralSyncQueueRow FromRecord(CentralSyncQueueRecord record)
+        {
+            var settings = CentralSyncSettingsService.Load();
+            return new CentralSyncQueueRow
+            {
+                Id = record.Id,
+                CreatedAtUtc = record.CreatedAtUtc,
+                ItemType = record.ItemType,
+                ItemId = record.ItemId,
+                StationId = record.StationId,
+                EndpointOrFolder = settings.RedactEndpointInExports && !string.IsNullOrWhiteSpace(record.EndpointOrFolder)
+                    ? "***"
+                    : CentralSyncSettingsService.RedactSecrets(record.EndpointOrFolder, settings),
+                RetryCount = record.RetryCount,
+                MaxRetryCount = record.MaxRetryCount,
+                Status = record.Status,
+                LastError = CentralSyncSettingsService.RedactSecrets(record.LastError, settings),
             };
         }
     }

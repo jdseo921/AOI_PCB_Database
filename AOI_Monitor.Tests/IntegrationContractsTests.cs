@@ -215,6 +215,74 @@ public sealed class IntegrationContractsTests
     }
 
     [Fact]
+    public async Task RobotCycleServiceSafetyFaultBlocksLoad()
+    {
+        var robot = new SimulatedRobotController();
+        var plc = new SimulatedPlcSafetyController();
+        plc.SetGuardDoorClosed(false);
+        await WithRobotBoundariesAsync(robot, new PlcEmergencyStopMonitor(plc), plc, async () =>
+        {
+            var service = new RobotCycleService((_, _) => { }, new RobotCycleOptions { PermitSafetyBypassForSimulation = false });
+
+            var result = await service.LoadAsync(new LoadCommand("B1", "TBOX", "LOT-1", "AOI-LIB-01"));
+
+            Assert.False(result.Accepted);
+            Assert.Equal(RobotCycleState.Faulted, service.CurrentState);
+            Assert.Contains("PLC safety interlock", result.Message);
+            Assert.Contains("guard door open", result.Message);
+        });
+    }
+
+    [Fact]
+    public async Task SimulatedPlcSafetyResetClearsFault()
+    {
+        var plc = new SimulatedPlcSafetyController();
+        plc.SetBoardClampReady(false);
+        plc.SetEmergencyStopActive(true);
+
+        var reset = await plc.ResetSafetyFaultAsync();
+
+        Assert.True(reset.Accepted);
+        Assert.True(plc.GetDiagnostics().IsOk);
+        Assert.False(plc.IsEmergencyStopActive);
+    }
+
+    [Fact]
+    public async Task RobotCellAcceptanceEmergencyStopCausesNoGoEvidenceWhenNotBlocked()
+    {
+        await WithRobotBoundariesAsync(new NullRobotController(), new NullEmergencyStopMonitor(), new NullPlcSafetyController(), async () =>
+        {
+            var run = await RobotCellAcceptanceTestService.RunAsync(new RobotAcceptanceCriteria
+            {
+                RequireEmergencyStopTest = true,
+                RequireInvalidTransitionTest = true,
+            });
+
+            Assert.Equal("FAIL", run.Status);
+            Assert.False(run.EmergencyStopBlocked);
+            Assert.Contains(run.Failures, failure => failure.Contains("Load failed", StringComparison.OrdinalIgnoreCase) || failure.Contains("Robot cycle ended", StringComparison.OrdinalIgnoreCase));
+        });
+    }
+
+    [Fact]
+    public async Task RobotCellAcceptanceReportDistinguishesSimulatedSafetySource()
+    {
+        var robot = new SimulatedRobotController();
+        var plc = new SimulatedPlcSafetyController();
+        await WithRobotBoundariesAsync(robot, new PlcEmergencyStopMonitor(plc), plc, async () =>
+        {
+            var run = await RobotCellAcceptanceTestService.RunAsync();
+            var html = RobotCellAcceptanceTestService.BuildHtml(run);
+
+            Assert.Equal("PASS", run.Status);
+            Assert.Equal("Simulated", run.SafetySourceKind);
+            Assert.True(run.SafetyFaultBlocked);
+            Assert.Contains("Simulated PLC Safety Controller", html);
+            Assert.Contains("not safety certification", html, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    [Fact]
     public async Task SimulatedLightingControllerRecordsProgramPerView()
     {
         var settings = new LightingSettings
@@ -309,12 +377,14 @@ public sealed class IntegrationContractsTests
     {
         var previousRobot = IntegrationBoundaryRegistry.RobotController;
         var previousEmergencyStop = IntegrationBoundaryRegistry.EmergencyStopMonitor;
+        var previousPlc = IntegrationBoundaryRegistry.PlcSafetyController;
         var robot = new SimulatedRobotController();
 
         try
         {
             IntegrationBoundaryRegistry.RobotController = robot;
             IntegrationBoundaryRegistry.EmergencyStopMonitor = new SimulatedEmergencyStopMonitor(robot);
+            IntegrationBoundaryRegistry.PlcSafetyController = new NullPlcSafetyController();
             var service = new RobotCycleService((_, _) => { });
             await action(service);
         }
@@ -322,6 +392,7 @@ public sealed class IntegrationContractsTests
         {
             IntegrationBoundaryRegistry.RobotController = previousRobot;
             IntegrationBoundaryRegistry.EmergencyStopMonitor = previousEmergencyStop;
+            IntegrationBoundaryRegistry.PlcSafetyController = previousPlc;
         }
     }
 
@@ -335,20 +406,30 @@ public sealed class IntegrationContractsTests
         IRobotController robot,
         IEmergencyStopMonitor emergencyStop,
         Func<Task> action)
+        => await WithRobotBoundariesAsync(robot, emergencyStop, new NullPlcSafetyController(), action);
+
+    private static async Task WithRobotBoundariesAsync(
+        IRobotController robot,
+        IEmergencyStopMonitor emergencyStop,
+        IPlcSafetyController plc,
+        Func<Task> action)
     {
         var previousRobot = IntegrationBoundaryRegistry.RobotController;
         var previousEmergencyStop = IntegrationBoundaryRegistry.EmergencyStopMonitor;
+        var previousPlc = IntegrationBoundaryRegistry.PlcSafetyController;
 
         try
         {
             IntegrationBoundaryRegistry.RobotController = robot;
             IntegrationBoundaryRegistry.EmergencyStopMonitor = emergencyStop;
+            IntegrationBoundaryRegistry.PlcSafetyController = plc;
             await action();
         }
         finally
         {
             IntegrationBoundaryRegistry.RobotController = previousRobot;
             IntegrationBoundaryRegistry.EmergencyStopMonitor = previousEmergencyStop;
+            IntegrationBoundaryRegistry.PlcSafetyController = previousPlc;
         }
     }
 }

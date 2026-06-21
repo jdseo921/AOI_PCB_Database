@@ -34,13 +34,16 @@ public static class FactoryReadinessService
         var latestFalseCall = AoiDatabase.GetLatestFalseCallReductionRun();
         var latestVerifications = AoiDatabase.GetExportVerifications(100);
         var camera = AoiDatabase.GetLatestCameraAcceptanceRun(realHardwareOnly: false);
+        var profile3D = AoiDatabase.GetLatestProfile3DAcceptanceRun();
         var lighting = AoiDatabase.GetLatestLightingAcceptanceRun();
         var robot = AoiDatabase.GetLatestRobotAcceptanceRun();
         var mes = MesSpoolService.EvaluateReadiness(new MesReadinessCriteria
         {
             FailOnPendingQueue = criteria.RequireNoPendingMesQueueForProductionMode && !criteria.Stage1Only,
             FailOnFailedQueue = true,
+            RequirePassingTraceabilityTest = criteria.RequirePassingTraceabilityTest && !criteria.Stage1Only,
         });
+        var centralSync = CentralSyncService.EvaluateReadiness();
 
         AddBuildTest(report);
         AddDiagnosticCategory(report, "Database health", diagnostics, "Database");
@@ -52,9 +55,11 @@ public static class FactoryReadinessService
         AddExportVerification(report, criteria, latestVerifications);
         AddSoakTest(report, criteria);
         AddCamera(report, criteria, camera);
+        AddProfile3D(report, criteria, profile3D);
         AddLighting(report, criteria, lighting);
         AddRobot(report, criteria, robot);
         AddMes(report, criteria, mes);
+        AddCentralSync(report, criteria, centralSync);
         AddSecurityAudit(report);
         AddKnownLimitations(report, criteria);
 
@@ -97,6 +102,7 @@ public static class FactoryReadinessService
                 RequireSuccessfulLatestValidationPackage = true,
                 RequireProductionModel = false,
                 RequireCameraAcceptance = true,
+                RequireProfile3DAcceptance = true,
                 RequireLightingAcceptance = true,
                 RequireNoExportVerificationErrors = true,
             },
@@ -107,6 +113,7 @@ public static class FactoryReadinessService
                 RequireSuccessfulLatestValidationPackage = true,
                 RequireProductionModel = false,
                 RequireCameraAcceptance = true,
+                RequireProfile3DAcceptance = true,
                 RequireLightingAcceptance = true,
                 RequireRobotAcceptance = true,
                 RequireNoExportVerificationErrors = true,
@@ -118,10 +125,12 @@ public static class FactoryReadinessService
                 RequireSuccessfulLatestValidationPackage = true,
                 RequireProductionModel = false,
                 RequireCameraAcceptance = true,
+                RequireProfile3DAcceptance = true,
                 RequireLightingAcceptance = true,
                 RequireRobotAcceptance = true,
                 RequireNoPendingMesQueueForProductionMode = true,
                 RequireNoExportVerificationErrors = true,
+                RequirePassingTraceabilityTest = true,
             },
             DeploymentProfile.FullFactoryAutomation => new FactoryReadinessCriteria
             {
@@ -131,12 +140,15 @@ public static class FactoryReadinessService
                 RequireProductionModel = true,
                 RequireFalseCallEvidence = true,
                 RequireCameraAcceptance = true,
+                RequireProfile3DAcceptance = true,
                 RequireLightingAcceptance = true,
                 RequireRobotAcceptance = true,
                 RequireRealHardwareAcceptance = true,
                 RequireNoPendingMesQueueForProductionMode = true,
                 RequireSoakTestEvidenceForFactoryPilot = true,
                 RequireNoExportVerificationErrors = true,
+                RequirePassingTraceabilityTest = true,
+                WarnWhenCentralSyncDisabled = true,
             },
             _ => new FactoryReadinessCriteria { DeploymentProfile = DeploymentProfile.Stage1ImageValidation },
         };
@@ -172,7 +184,9 @@ public static class FactoryReadinessService
 
         CopyLatestValidationManifest(packageFolder);
         WriteLatestExportVerification(packageFolder);
+        CopyLatestBuildTestEvidence(packageFolder);
         WriteLatestAcceptanceReports(packageFolder);
+        FactoryAcceptanceChecklistService.ExportToFolder(criteria?.DeploymentProfile ?? DeploymentProfileSettingsService.Load(), packageFolder);
         WritePackageManifest(packageFolder, report);
 
         ExportVerificationService.RecordVerifiedExport("FactoryReadinessPackage", packageFolder, report.OverallStatus == "NoGo" ? "WARN" : "OK");
@@ -205,7 +219,24 @@ public static class FactoryReadinessService
     }
 
     private static void AddBuildTest(FactoryReadinessReport report)
-        => Add(report, "Build/Test status", "Conditional", "No in-app build/test artifact is recorded. The dashboard cannot independently prove the latest repository build from runtime data.", "Attach CI output or run dotnet test before management/customer review.");
+    {
+        var summary = BuildTestEvidenceService.GetSummary();
+        if (summary.Latest is null)
+        {
+            Add(report, "Build/Test status", "Conditional", "No local build/test evidence artifact is recorded. The dashboard cannot independently prove the latest repository build from runtime data.", "Run hygiene, restore, build, test, and publish validation, then import the generated build/test evidence JSON.");
+            return;
+        }
+
+        var latest = summary.Latest;
+        var commit = string.IsNullOrWhiteSpace(latest.GitCommit) ? "unknown" : latest.GitCommit;
+        var status = summary.IsPassing ? "Go" : "No-Go";
+        Add(
+            report,
+            "Build/Test status",
+            status,
+            $"Latest evidence generated {latest.GeneratedAtUtc:O} on {latest.MachineName}; commit={commit}; configuration={latest.Configuration}; hygiene={latest.HygieneStatus}; restore={latest.RestoreStatus}; build={latest.BuildStatus}; test={latest.TestStatus}; publishValidation={latest.PublishValidationStatus}; TRX={latest.TestResultPath}; evidence={latest.EvidencePath}.",
+            status == "Go" ? "No action required." : "Fix failing command(s), rerun the full validation chain, and import passing build/test evidence.");
+    }
 
     private static void AddDiagnosticCategory(FactoryReadinessReport report, string name, SystemDiagnosticReport diagnostics, string diagnosticCategory)
     {
@@ -249,7 +280,19 @@ public static class FactoryReadinessService
         }
 
         if (status == InspectionEngineStatus.MlModelReady)
-            Add(report, "Active model readiness", "Go", $"Active model is ready. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}.", "No action required.");
+        {
+            var acceptance = AoiDatabase.GetLatestPassingProductionModelAcceptance(configuration.ActiveModelId);
+            if (criteria.RequireProductionModel && acceptance is null)
+            {
+                Add(report, "Active model readiness", "No-Go", $"Active ONNX model is runtime-ready but has no passing promoted model acceptance run. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}.", "Run model acceptance on customer validation data, create a release package, and promote the PASS run to production candidate.");
+                return;
+            }
+
+            Add(report, "Active model readiness", "Go", acceptance is null
+                ? $"Active model is runtime-ready for non-production profile. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}."
+                : $"Active model has passing production-candidate acceptance run {acceptance.Id}. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}; dataset={acceptance.DatasetName}.",
+                "No action required.");
+        }
         else
             Add(report, "Active model readiness", criteria.RequireProductionModel ? "No-Go" : "Conditional", $"Active model is not production-ready: {text}.", "Register and validate the production ONNX model or keep the review scoped to Stage 1 prototype evidence.");
     }
@@ -334,8 +377,8 @@ public static class FactoryReadinessService
             report,
             "Soak test status",
             status,
-            $"Latest soak run {latest.RunId}: profile={latest.ProfileName}; source={latest.SourceKind}; duration={latest.ActualDuration.TotalHours:F2} h / requested={latest.RequestedDuration.TotalHours:F2} h; iterations={latest.TotalCycles}; failures={latest.FailedCycles}; canceled={latest.WasCanceled}; avg={latest.AverageInspectionMilliseconds:F0} ms; p95={latest.P95InspectionMilliseconds:F0} ms; max={latest.MaxInspectionMilliseconds:F0} ms; over1s={latest.CountOverOneSecond}; factoryEvidenceAccepted={factoryAccepted}.",
-            status == "Go" ? "No action required." : "Run the Factory PoC 8-hour profile to completion with no critical errors.");
+            $"Latest soak run {latest.RunId}: profile={latest.ProfileName}; source={latest.SourceKind}; realCamera={latest.IsRealCameraSource}; duration={latest.ActualDuration.TotalHours:F2} h / requested={latest.RequestedDuration.TotalHours:F2} h; iterations={latest.TotalCycles}; failures={latest.FailedCycles}; canceled={latest.WasCanceled}; cancelReason={latest.CancellationReason}; avg={latest.AverageInspectionMilliseconds:F0} ms; p95={latest.P95InspectionMilliseconds:F0} ms; max={latest.MaxInspectionMilliseconds:F0} ms; cycleP95={latest.P95TotalCycleMilliseconds:F0} ms; workingSetPeak={latest.PeakWorkingSetMegabytes:F1} MB; memoryWarnings={latest.MemoryWarnings.Count}; firstCriticalError={latest.FirstCriticalError}; over1s={latest.CountOverOneSecond}; factoryEvidenceAccepted={factoryAccepted}. Shorter or simulated profiles are pilot stability evidence only.",
+            status == "Go" ? "No action required." : "Run the Factory PoC 8-hour profile to completion with real camera source evidence and no critical errors.");
     }
 
     private static void AddCamera(FactoryReadinessReport report, FactoryReadinessCriteria criteria, CameraAcceptanceRun? run)
@@ -346,6 +389,24 @@ public static class FactoryReadinessService
         var ok = summary.AcceptanceStatus is "PASS" or "WARN" && (!realRequired || summary.IsRealHardware);
         var status = ok ? "Go" : required ? "No-Go" : "Conditional";
         Add(report, "Camera acceptance status", status, $"Status={summary.Status}; acceptance={summary.AcceptanceStatus}; realHardware={summary.IsRealHardware}; adapter={summary.AdapterName}; received={summary.TotalReceivedFrames}/{summary.TotalRequestedFrames}. {string.Join(" ", summary.Messages)}", ok ? "No action required." : "Run camera acceptance with the required production camera profile.");
+    }
+
+    private static void AddProfile3D(FactoryReadinessReport report, FactoryReadinessCriteria criteria, Profile3DAcceptanceRun? run)
+    {
+        if (run is null)
+        {
+            Add(report, "3D profile acceptance status", criteria.RequireProfile3DAcceptance ? "No-Go" : "Conditional", "No 3D profile acceptance run has been recorded.", "Run 3D profile acceptance when height/coplanarity inspection is part of the deployment profile.");
+            return;
+        }
+
+        var realOk = !criteria.RequireRealHardwareAcceptance || !run.IsSimulated;
+        var ok = run.Status is "PASS" or "WARN" && realOk;
+        Add(
+            report,
+            "3D profile acceptance status",
+            ok ? "Go" : criteria.RequireProfile3DAcceptance ? "No-Go" : "Conditional",
+            $"Status={run.Status}; readiness={run.FactoryReadinessStatus}; source={run.SourceName}; simulated={run.IsSimulated}; frame={run.FrameId}; dimensions={run.Width}x{run.Height}; invalidHeights={run.NaNHeightCount + run.MissingHeightCount}. {string.Join(" ", run.Warnings.Concat(run.Failures))}",
+            ok ? "No action required." : "Run 3D profile acceptance with the required source, and do not treat sample CSV evidence as real 3D camera validation.");
     }
 
     private static void AddLighting(FactoryReadinessReport report, FactoryReadinessCriteria criteria, LightingAcceptanceRun? run)
@@ -366,8 +427,9 @@ public static class FactoryReadinessService
         var summary = RobotAcceptanceTestService.ToSummary(run);
         var realOk = !criteria.RequireRealHardwareAcceptance || summary.SourceKind == "Real";
         var eStopOk = !criteria.RequireRobotAcceptance || summary.EmergencyStopBlocked;
-        var ok = summary.Status == "PASS" && realOk && eStopOk;
-        Add(report, "Robot acceptance status", ok ? "Go" : criteria.RequireRobotAcceptance ? "No-Go" : "Conditional", $"Status={summary.Status}; source={summary.SourceKind}; controller={summary.ControllerName}; fullCycleMs={summary.FullCycleMs:F1}; emergencyStopBlocked={summary.EmergencyStopBlocked}. {string.Join(" ", summary.Messages)}", ok ? "No action required." : "Run robot acceptance on the required controller, including emergency-stop blocking evidence, without equating simulation to real machine validation.");
+        var safetyOk = !criteria.RequireRobotAcceptance || summary.SafetyFaultBlocked || summary.SafetySourceKind == "Real";
+        var ok = summary.Status == "PASS" && realOk && eStopOk && safetyOk;
+        Add(report, "Robot acceptance status", ok ? "Go" : criteria.RequireRobotAcceptance ? "No-Go" : "Conditional", $"Status={summary.Status}; source={summary.SourceKind}; controller={summary.ControllerName}; safety={summary.SafetyControllerName}/{summary.SafetySourceKind}; fullCycleMs={summary.FullCycleMs:F1}; emergencyStopBlocked={summary.EmergencyStopBlocked}; safetyFaultBlocked={summary.SafetyFaultBlocked}. {string.Join(" ", summary.Messages)}", ok ? "No action required." : "Run robot cell acceptance with PLC/safety interlock evidence, including emergency-stop and guard/clamp blocking, without equating simulation to real machine validation.");
     }
 
     private static void AddMes(FactoryReadinessReport report, FactoryReadinessCriteria criteria, MesReadinessSummary mes)
@@ -381,7 +443,27 @@ public static class FactoryReadinessService
             "MES Mock Only" or "MES Not Configured" => productionMes ? "No-Go" : "Conditional",
             _ => "Conditional",
         };
-        Add(report, "MES/spool status", status, $"{mes.Status}; mode={mes.Mode}; pending={mes.PendingCount}; failed={mes.FailedCount}; sent={mes.SentCount}; abandoned={mes.AbandonedCount}. {string.Join(" ", mes.Messages)}", status == "Go" ? "No action required." : "Resolve pending/failed MES queue items and configure production REST only when explicitly required.");
+        Add(report, "MES/spool status", status, $"{mes.Status}; mode={mes.Mode}; pending={mes.PendingCount}; oldPending={mes.OldPendingCount}; failed={mes.FailedCount}; sent={mes.SentCount}; abandoned={mes.AbandonedCount}; latestTraceabilityTest={mes.LatestTraceabilityTestStatus}. {string.Join(" ", mes.Messages)}", status == "Go" ? "No action required." : "Resolve pending/failed MES queue items, configure production REST or accepted adapter, and run a passing traceability signoff.");
+    }
+
+    private static void AddCentralSync(FactoryReadinessReport report, FactoryReadinessCriteria criteria, CentralSyncReadinessSummary summary)
+    {
+        var status = summary.Status switch
+        {
+            "Central Sync Ready" => "Go",
+            "Central Sync Error" => "Conditional",
+            "Central Sync Pending" => "Conditional",
+            "Central Sync Disabled" when criteria.WarnWhenCentralSyncDisabled => "Conditional",
+            "Central Sync Disabled" => "Go",
+            _ => "Conditional",
+        };
+
+        Add(
+            report,
+            "Central sync status",
+            status,
+            $"Mode={summary.Mode}; pending={summary.PendingCount}; failed={summary.FailedCount}; sent={summary.SentCount}; skipped={summary.SkippedCount}. {string.Join(" ", summary.Messages)}",
+            status == "Go" ? "No action required." : "Configure central sync or clear pending/failed queue items before claiming multi-station management aggregation.");
     }
 
     private static void AddSecurityAudit(FactoryReadinessReport report)
@@ -445,6 +527,22 @@ public static class FactoryReadinessService
         File.WriteAllText(path, JsonSerializer.Serialize(records, JsonOptions), Encoding.UTF8);
     }
 
+    private static void CopyLatestBuildTestEvidence(string packageFolder)
+    {
+        var latest = AoiDatabase.GetLatestBuildTestEvidence();
+        if (latest is null)
+            return;
+
+        var evidenceFolder = Path.Combine(packageFolder, "build_test_evidence");
+        Directory.CreateDirectory(evidenceFolder);
+        File.WriteAllText(
+            Path.Combine(evidenceFolder, "latest_build_test_evidence_summary.json"),
+            JsonSerializer.Serialize(latest, JsonOptions),
+            Encoding.UTF8);
+        if (!string.IsNullOrWhiteSpace(latest.EvidencePath) && File.Exists(latest.EvidencePath))
+            File.Copy(latest.EvidencePath, Path.Combine(evidenceFolder, "latest_build_test_evidence.json"), overwrite: true);
+    }
+
     private static void WriteLatestAcceptanceReports(string packageFolder)
     {
         var evidence = Path.Combine(packageFolder, "latest_acceptance_reports");
@@ -454,6 +552,8 @@ public static class FactoryReadinessService
             File.WriteAllText(Path.Combine(evidence, "latest_camera_acceptance.json"), JsonSerializer.Serialize(camera, JsonOptions), Encoding.UTF8);
         if (AoiDatabase.GetLatestLightingAcceptanceRun() is { } lighting)
             File.WriteAllText(Path.Combine(evidence, "latest_lighting_acceptance.json"), JsonSerializer.Serialize(lighting, JsonOptions), Encoding.UTF8);
+        if (AoiDatabase.GetLatestProfile3DAcceptanceRun() is { } profile3D)
+            File.WriteAllText(Path.Combine(evidence, "latest_3d_profile_acceptance.json"), JsonSerializer.Serialize(profile3D, JsonOptions), Encoding.UTF8);
         if (AoiDatabase.GetLatestRobotAcceptanceRun() is { } robot)
             File.WriteAllText(Path.Combine(evidence, "latest_robot_acceptance.json"), JsonSerializer.Serialize(robot, JsonOptions), Encoding.UTF8);
         if (AoiDatabase.GetLatestSoakTestRun() is { } soak)
@@ -500,6 +600,8 @@ public static class FactoryReadinessService
             return "Latest validation manifest";
         if (fileName.Contains("export_verification", StringComparison.OrdinalIgnoreCase))
             return "Latest export verification";
+        if (fileName.Contains("build_test_evidence", StringComparison.OrdinalIgnoreCase))
+            return "Latest build/test evidence";
         if (fileName.Contains("acceptance", StringComparison.OrdinalIgnoreCase) || fileName.Contains("mes_readiness", StringComparison.OrdinalIgnoreCase))
             return "Latest acceptance/readiness evidence";
         if (fileName.Equals("README.txt", StringComparison.OrdinalIgnoreCase))
@@ -521,6 +623,7 @@ public static class FactoryReadinessService
         - factory_readiness_summary.json: machine-readable category evidence.
         - latest_validation_manifest.json: copied when a Stage 1 validation package exists.
         - latest_export_verification_report.json: copied when export verification records exist.
+        - build_test_evidence/: latest imported hygiene/build/test/publish validation evidence when available.
         - latest_acceptance_reports/: latest camera, lighting, robot, and MES readiness summaries when available.
 
         Evidence boundary:

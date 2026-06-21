@@ -92,6 +92,8 @@ public static class MesSpoolService
         var settings = MesIntegrationSettingsService.Load();
         MesIntegrationSettingsService.ApplyIntegrationBoundary();
         var queue = AoiDatabase.GetMesSpoolQueue(1000);
+        var latestTraceabilityTest = AoiDatabase.GetLatestTraceabilityTestReport();
+        var oldPendingCutoff = DateTime.UtcNow.AddMinutes(-Math.Max(1, criteria.MaximumPendingAgeMinutes));
         var summary = new MesReadinessSummary
         {
             Mode = TraceabilityUploadService.ToDisplay(settings.Mode),
@@ -99,6 +101,8 @@ public static class MesSpoolService
             FailedCount = queue.Count(item => item.Status == "Failed"),
             SentCount = queue.Count(item => item.Status == "Sent"),
             AbandonedCount = queue.Count(item => item.Status == "Abandoned"),
+            OldPendingCount = queue.Count(item => item.Status == "Pending" && item.CreatedAtUtc < oldPendingCutoff),
+            LatestTraceabilityTestStatus = latestTraceabilityTest?.Status ?? "NOT RUN",
         };
 
         var validation = MesIntegrationSettingsService.Validate(settings);
@@ -106,12 +110,22 @@ public static class MesSpoolService
             summary.Messages.Add($"{summary.PendingCount} MES spool item(s) are pending retry.");
         if (summary.FailedCount > 0)
             summary.Messages.Add($"{summary.FailedCount} MES spool item(s) failed all configured retries.");
+        if (summary.OldPendingCount > 0)
+            summary.Messages.Add($"{summary.OldPendingCount} MES spool item(s) are older than {criteria.MaximumPendingAgeMinutes} minute(s).");
         if (summary.AbandonedCount > 0)
             summary.Messages.Add($"{summary.AbandonedCount} MES spool item(s) were abandoned by Admin action.");
+        if (criteria.RequirePassingTraceabilityTest && summary.LatestTraceabilityTestStatus != "PASS")
+            summary.Messages.Add($"Latest MES traceability signoff is {summary.LatestTraceabilityTestStatus}.");
+
+        if (criteria.RequirePassingTraceabilityTest && summary.LatestTraceabilityTestStatus != "PASS")
+        {
+            summary.Status = "MES REST Error";
+            return summary;
+        }
 
         if (summary.PendingCount > 0)
         {
-            summary.Status = criteria.FailOnPendingQueue ? "MES Queue Pending FAIL" : "MES Queue Pending";
+            summary.Status = criteria.FailOnPendingQueue || summary.OldPendingCount > 0 ? "MES Queue Pending FAIL" : "MES Queue Pending";
             return summary;
         }
 
@@ -183,15 +197,16 @@ public static class MesSpoolService
 
     private static string BuildHtml(IReadOnlyList<MesSpoolQueueRecord> rows, MesReadinessSummary readiness)
     {
+        var settings = MesIntegrationSettingsService.Load();
         var sb = new StringBuilder();
         sb.AppendLine("<!doctype html><html><head><meta charset=\"utf-8\"><title>MES Queue Report</title>");
         sb.AppendLine("<style>body{font-family:Segoe UI,Arial,sans-serif;margin:24px;color:#17212b}table{border-collapse:collapse;width:100%}td,th{border:1px solid #cfd8df;padding:6px;text-align:left}.notice{background:#fff8e8;border-left:5px solid #d9951b;padding:12px;margin:12px 0}</style></head><body>");
         sb.AppendLine("<h1>MES Queue Report</h1>");
         sb.AppendLine($"<div class=\"notice\"><strong>Readiness:</strong> {Escape(readiness.Status)}. Secrets are redacted and payload JSON is not shown in this report.</div>");
-        sb.AppendLine("<table><tr><th>Created</th><th>Type</th><th>Lot</th><th>Board</th><th>Result</th><th>Retries</th><th>Status</th><th>Last Error</th></tr>");
+        sb.AppendLine("<table><tr><th>Created</th><th>Type</th><th>Lot</th><th>Board</th><th>Result</th><th>Endpoint</th><th>Retries</th><th>Status</th><th>Last Error</th></tr>");
         foreach (var row in rows)
         {
-            sb.AppendLine($"<tr><td>{row.CreatedAtUtc:u}</td><td>{Escape(row.PayloadType)}</td><td>{Escape(row.LotId)}</td><td>{Escape(row.BoardModel)}</td><td>{Escape(row.Result)}</td><td>{row.RetryCount}/{row.MaxRetryCount}</td><td>{Escape(row.Status)}</td><td>{Escape(row.LastError)}</td></tr>");
+            sb.AppendLine($"<tr><td>{row.CreatedAtUtc:u}</td><td>{Escape(row.PayloadType)}</td><td>{Escape(row.LotId)}</td><td>{Escape(row.BoardModel)}</td><td>{Escape(row.Result)}</td><td>{Escape(MesIntegrationSettingsService.RedactSecrets(row.EndpointUrl, settings))}</td><td>{row.RetryCount}/{row.MaxRetryCount}</td><td>{Escape(row.Status)}</td><td>{Escape(MesIntegrationSettingsService.RedactSecrets(row.LastError, settings))}</td></tr>");
         }
 
         sb.AppendLine("</table></body></html>");
@@ -208,11 +223,11 @@ public static class MesSpoolService
             row.LastAttemptAtUtc,
             row.NextAttemptAtUtc,
             row.PayloadType,
-            row.EndpointUrl,
+            MesIntegrationSettingsService.RedactSecrets(row.EndpointUrl),
             row.RetryCount,
             row.MaxRetryCount,
             row.Status,
-            row.LastError,
+            MesIntegrationSettingsService.RedactSecrets(row.LastError),
             row.LotId,
             row.BoardModel,
             row.Result);

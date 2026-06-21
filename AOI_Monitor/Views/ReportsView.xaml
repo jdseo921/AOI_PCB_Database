@@ -155,6 +155,21 @@
                 <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100"/>
                 <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
                 <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="70"/>
+                <DataGridTextColumn Header="Endpoint" Binding="{Binding EndpointUrl}" Width="150"/>
+                <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="75"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
+                <DataGridTextColumn Header="Last Error" Binding="{Binding LastError}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </TabItem>
+          <TabItem Header="Central Sync Queue">
+            <DataGrid x:Name="CentralSyncGrid" CanUserSortColumns="True" SelectionMode="Extended">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
+                <DataGridTextColumn Header="Item Type" Binding="{Binding ItemType}" Width="145"/>
+                <DataGridTextColumn Header="Item ID" Binding="{Binding ItemId}" Width="85"/>
+                <DataGridTextColumn Header="Station" Binding="{Binding StationId}" Width="115"/>
+                <DataGridTextColumn Header="Endpoint/Folder" Binding="{Binding EndpointOrFolder}" Width="150"/>
                 <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="75"/>
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
                 <DataGridTextColumn Header="Last Error" Binding="{Binding LastError}" Width="*"/>
@@ -170,6 +185,33 @@
                 <DataGridTextColumn Header="Next Action" Binding="{Binding NextAction}" Width="240"/>
               </DataGrid.Columns>
             </DataGrid>
+          </TabItem>
+          <TabItem Header="Factory Acceptance">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <StackPanel Orientation="Horizontal" Margin="8">
+                <TextBlock Text="Deployment Profile" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox x:Name="FactoryAcceptanceProfileCombo" Width="230" SelectedIndex="0" Style="{StaticResource FilterCombo}"/>
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Generate Checklist" Margin="8,0,0,0" Click="OnGenerateFactoryAcceptanceChecklistClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Export FAT Package" Margin="8,0,0,0" Click="OnExportFactoryAcceptanceChecklistClick"/>
+              </StackPanel>
+              <DataGrid x:Name="FactoryAcceptanceGrid" Grid.Row="1" CanUserSortColumns="True">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="ID" Binding="{Binding RequirementId}" Width="95"/>
+                  <DataGridTextColumn Header="Requirement" Binding="{Binding Requirement}" Width="220"/>
+                  <DataGridTextColumn Header="Expected Evidence" Binding="{Binding ExpectedEvidence}" Width="240"/>
+                  <DataGridTextColumn Header="Evidence Path" Binding="{Binding CurrentEvidencePath}" Width="190"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="105"/>
+                  <DataGridTextColumn Header="Operator" Binding="{Binding OperatorSignoff}" Width="90"/>
+                  <DataGridTextColumn Header="Engineer" Binding="{Binding EngineerSignoff}" Width="90"/>
+                  <DataGridTextColumn Header="Admin" Binding="{Binding AdminSignoff}" Width="90"/>
+                  <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
           </TabItem>
         </TabControl>
       </Grid>
@@ -189,6 +231,7 @@
           <TextBlock x:Name="StatusText" Text="Ready." Foreground="#9AA6AF" FontSize="11" Margin="0,6,0,0"/>
           <TextBlock x:Name="PackagePathText" Text="Latest customer package: --" Foreground="#DCE5EB" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
           <TextBlock x:Name="SoakReportPathText" Text="Latest soak-test report: --" Foreground="#DCE5EB" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+          <TextBlock x:Name="BuildEvidenceSummaryText" Text="Build/test evidence: --" Foreground="#DCE5EB" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
           <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
             <ProgressBar x:Name="WorkProgressBar" Width="190" Height="12" Minimum="0" Maximum="100" Value="0" Margin="0,0,8,0" VerticalAlignment="Center"/>
             <Button x:Name="CancelWorkButton" Style="{StaticResource MiniBtn}" Content="Cancel" IsEnabled="False" Click="OnCancelWorkClick"/>
@@ -201,17 +244,26 @@
           <Button Style="{StaticResource ActionBtnBlue}" Content="Annotated Overlays" Margin="0,0,6,6" Click="OnExportAnnotatedOverlaysClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Create Stage 1 Customer Package" Margin="0,0,6,6" Click="OnExportCustomerPackageClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Export Go/No-Go Package" Margin="0,0,6,6" Click="OnExportFactoryReadinessPackageClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Export FAT Checklist" Margin="0,0,6,6" Click="OnExportFactoryAcceptanceChecklistClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Import Build/Test Evidence" Margin="0,0,6,6" Click="OnImportBuildTestEvidenceClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Open Build Evidence Folder" Margin="0,0,6,6" Click="OnOpenBuildEvidenceFolderClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="DB Integrity" Margin="0,0,6,0" Click="OnRunDbIntegrityCheckClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Database Health" Margin="0,0,6,0" Click="OnOpenDatabaseHealthClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Verify Paths" Margin="0,0,6,0" Click="OnVerifyImagePathsClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Verify Selected Export" Margin="0,0,6,0" Click="OnVerifySelectedExportClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Rebuild Image Index" Margin="0,0,6,0" Click="OnRebuildImageIndexClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Upload Result to MES" Margin="0,0,6,0" Click="OnUploadMesMockClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Run Traceability Test" Margin="0,0,6,0" Click="OnRunTraceabilityTestClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Retry Selected MES" Margin="0,0,6,0" Click="OnRetrySelectedMesSpoolClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Retry All Pending MES" Margin="0,0,6,0" Click="OnRetryMesSpoolClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Export Queue Report" Margin="0,0,6,0" Click="OnExportMesQueueReportClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Mark MES Abandoned" Margin="0,0,6,0" Click="OnAbandonMesSpoolClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Central Sync" Margin="0,0,6,0" Click="OnQueueCentralSyncClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Retry Selected Central" Margin="0,0,6,0" Click="OnRetrySelectedCentralSyncClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Retry All Central" Margin="0,0,6,0" Click="OnRetryCentralSyncClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Export Central Sync Report" Margin="0,0,6,0" Click="OnExportCentralSyncReportClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Soak Test" Margin="0,0,6,0" Click="OnRunSoakTestClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Export Latest Soak Evidence" Margin="0,0,6,0" Click="OnExportLatestSoakEvidenceClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Recipe" Click="OnLockActiveRecipeClick"/>
         </WrapPanel>
       </Grid>

@@ -20,7 +20,13 @@ public static class CameraSourceFactory
         => new(folders);
 
     public static GenericVisionCameraSource CreateGeneric(CameraSourceSettings settings, IVisionCameraAdapter? adapter = null)
-        => new(settings, adapter ?? new NullVisionCameraAdapter());
+    {
+        if (adapter is not null)
+            return new GenericVisionCameraSource(settings, adapter);
+
+        var loaded = VisionCameraPluginLoader.CreateAdapterOrNull(settings, out _);
+        return new GenericVisionCameraSource(settings, loaded);
+    }
 
     public static ICameraSource Create(CameraSourceSettings settings)
         => Create(settings, null);

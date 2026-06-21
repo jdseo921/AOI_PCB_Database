@@ -191,6 +191,47 @@ public static class ThresholdProfileService
         };
     }
 
+    public static ThresholdProfileEvidenceSummary ToEvidenceSummary(ThresholdProfile? profile)
+    {
+        if (profile is null)
+            return new ThresholdProfileEvidenceSummary();
+
+        var deployed = string.Equals(profile.Status, "Deployed", StringComparison.OrdinalIgnoreCase);
+        return new ThresholdProfileEvidenceSummary
+        {
+            Status = profile.Status,
+            ProfileId = profile.ProfileId,
+            Revision = profile.Revision,
+            BoardModel = profile.BoardModel,
+            BoardProgram = profile.BoardProgram,
+            RecipeName = profile.RecipeName,
+            RecipeRevision = profile.RecipeRevision,
+            SourceValidationRunId = profile.SourceValidationRunId,
+            SourceFalseCallReductionRunId = profile.SourceFalseCallReductionRunId,
+            CreatedBy = profile.CreatedBy,
+            ApprovedBy = profile.ApprovedBy,
+            ApprovedAtUtc = profile.ApprovedAtUtc,
+            RuleCount = profile.Rules.Count,
+            IsDeployed = deployed,
+            EvidenceBoundary = deployed
+                ? "Deployed threshold profile evidence is scoped to the customer-labeled validation and approval records that created it; it is not universal production proof."
+                : "Threshold profile exists but is not deployed for production use.",
+        };
+    }
+
+    public static ThresholdProfileEvidenceSummary GetActiveEvidenceSummary(
+        string boardModel,
+        string boardProgram,
+        string recipeName)
+    {
+        var profile = AoiDatabase.GetActiveThresholdProfile(boardModel, boardProgram, recipeName)
+            ?? AoiDatabase.GetActiveThresholdProfile(boardModel, boardProgram, "ANY")
+            ?? AoiDatabase.GetActiveThresholdProfile("ANY", boardProgram, recipeName)
+            ?? AoiDatabase.GetActiveThresholdProfile("ANY", boardProgram, "ANY")
+            ?? AoiDatabase.GetActiveThresholdProfile("ANY", "ANY", "ANY");
+        return ToEvidenceSummary(profile);
+    }
+
     private static ThresholdProfile NewDraft(
         string boardModel,
         string boardProgram,

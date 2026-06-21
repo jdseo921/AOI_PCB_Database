@@ -5,6 +5,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AOI_Monitor.Data;
+using AOI_Monitor.Models;
 using AOI_Monitor.Services;
 using Microsoft.Win32;
 
@@ -22,6 +24,7 @@ public partial class ProfileView : UserControl
     private double _meanHeight;
     private string _currentCsvPath = string.Empty;
     private (int X, int Y, double Height)? _selectedPoint;
+    private Profile3DAcceptanceRun? _lastAcceptanceRun;
 
     public ProfileView()
     {
@@ -83,6 +86,73 @@ public partial class ProfileView : UserControl
         DrawProfileLine();
         StatusText.Text = "Sample height-map loaded. Sample Data Mode only; 3D Camera Not Connected.";
     }
+
+    private void OnProfileSourceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+
+        StatusText.Text = GetSelectedSourceMode() switch
+        {
+            "Sample CSV" => string.IsNullOrWhiteSpace(_currentCsvPath)
+                ? "Sample CSV source selected. Load a height-map CSV before running 3D acceptance."
+                : "Sample CSV source selected. This is simulation/sample evidence only.",
+            "Generic 3D Adapter" => "Generic 3D Adapter selected. No vendor SDK is configured; this does not validate real 3D hardware.",
+            _ => "No 3D profile source selected.",
+        };
+    }
+
+    private void OnRunAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var source = CreateSelectedProfileSource();
+            var run = Profile3DAcceptanceTestService.Run(source);
+            _lastAcceptanceRun = run;
+            AoiDatabase.RecordProfile3DAcceptanceRun(run);
+            var issueText = string.Join(" ", run.Failures.Concat(run.Warnings).Take(3));
+            StatusText.Text = $"3D acceptance {run.Status}; readiness={run.FactoryReadinessStatus}; source={run.SourceName}; simulated={run.IsSimulated}. {issueText}";
+            WorkflowState.Instance.AddEvent("PROFILE_3D_ACCEPTANCE", StatusText.Text);
+            MessageBox.Show(
+                $"3D acceptance completed: {run.Status}\nFactory readiness: {run.FactoryReadinessStatus}\n\n{issueText}",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                run.Status == "FAIL" ? MessageBoxImage.Warning : MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            StatusText.Text = $"3D acceptance failed: {ex.Message}";
+            WorkflowState.Instance.AddEvent("PROFILE_3D_ERROR", StatusText.Text);
+            MessageBox.Show(StatusText.Text, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnExportAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        var run = _lastAcceptanceRun ?? AoiDatabase.GetLatestProfile3DAcceptanceRun();
+        if (run is null)
+        {
+            MessageBox.Show("Run a 3D acceptance test before exporting a report.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var output = Path.Combine(AoiDatabase.StorageRoot, "exports", "profile_3d_acceptance");
+        var htmlPath = Profile3DAcceptanceTestService.ExportReport(run, output);
+        StatusText.Text = $"3D acceptance report exported: {htmlPath}";
+        WorkflowState.Instance.AddEvent("PROFILE_3D_EXPORT", StatusText.Text);
+        MessageBox.Show($"3D acceptance report exported:\n{htmlPath}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private IProfile3DSource CreateSelectedProfileSource()
+        => GetSelectedSourceMode() switch
+        {
+            "Sample CSV" => new CsvProfile3DSource(_currentCsvPath),
+            "Generic 3D Adapter" => new GenericProfile3DAdapter(),
+            _ => new NullProfile3DSource(),
+        };
+
+    private string GetSelectedSourceMode()
+        => (ProfileSourceCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Sample CSV";
 
     public static List<(int X, int Y, double Height)> ParseHeightMap(string path)
     {

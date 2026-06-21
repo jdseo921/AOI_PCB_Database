@@ -609,6 +609,26 @@ public static class AoiDatabase
         return records;
     }
 
+    public static BuildTestEvidenceRecord? GetLatestBuildTestEvidence()
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, GeneratedAtUtc, CommitSha, Configuration, HygieneStatus, RestoreStatus,
+                   BuildStatus, TestStatus, PublishValidationStatus, EvidencePath, OperatorId,
+                   CreatedAtUtc, TestResultPath, MachineName
+            FROM BuildTestEvidence
+            ORDER BY datetime(GeneratedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadBuildTestEvidence(reader) : null;
+    }
+
     public static IReadOnlyList<ValidationPackageRecord> GetValidationPackages(int limit = 100)
     {
         EnsureInitialized();
@@ -1236,6 +1256,77 @@ public static class AoiDatabase
         return run;
     }
 
+    public static long RecordProfile3DAcceptanceRun(Profile3DAcceptanceRun run, string? operatorId = null)
+    {
+        EnsureInitialized();
+
+        var effectiveOperator = string.IsNullOrWhiteSpace(operatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : operatorId;
+        var auditEventId = RecordAuditEvent(
+            "PROFILE_3D_ACCEPTANCE_TEST",
+            $"3D profile acceptance completed: status={run.Status}; readiness={run.FactoryReadinessStatus}; source={run.SourceName}; simulated={run.IsSimulated}.",
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "Profile3DAcceptanceRun");
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO Profile3DAcceptanceRuns
+                (CreatedAtUtc, SourceName, SourceKind, IsSimulated, Status, FactoryReadinessStatus,
+                 AcquisitionMs, Width, Height, Unit, XPitchMicrons, YPitchMicrons, MissingHeightCount,
+                 NaNHeightCount, FrameId, CriteriaJson, DiagnosticsJson, WarningsJson, FailuresJson,
+                 OperatorId, AuditEventId)
+            VALUES
+                ($createdAtUtc, $sourceName, $sourceKind, $isSimulated, $status, $factoryReadinessStatus,
+                 $acquisitionMs, $width, $height, $unit, $xPitchMicrons, $yPitchMicrons, $missingHeightCount,
+                 $nanHeightCount, $frameId, $criteriaJson, $diagnosticsJson, $warningsJson, $failuresJson,
+                 $operatorId, $auditEventId);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$createdAtUtc", run.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$sourceName", run.SourceName);
+        command.Parameters.AddWithValue("$sourceKind", run.SourceKind);
+        command.Parameters.AddWithValue("$isSimulated", run.IsSimulated ? 1 : 0);
+        command.Parameters.AddWithValue("$status", run.Status);
+        command.Parameters.AddWithValue("$factoryReadinessStatus", run.FactoryReadinessStatus);
+        command.Parameters.AddWithValue("$acquisitionMs", run.AcquisitionMs);
+        command.Parameters.AddWithValue("$width", run.Width);
+        command.Parameters.AddWithValue("$height", run.Height);
+        command.Parameters.AddWithValue("$unit", run.Unit);
+        command.Parameters.AddWithValue("$xPitchMicrons", run.XPitchMicrons);
+        command.Parameters.AddWithValue("$yPitchMicrons", run.YPitchMicrons);
+        command.Parameters.AddWithValue("$missingHeightCount", run.MissingHeightCount);
+        command.Parameters.AddWithValue("$nanHeightCount", run.NaNHeightCount);
+        command.Parameters.AddWithValue("$frameId", run.FrameId);
+        command.Parameters.AddWithValue("$criteriaJson", JsonSerializer.Serialize(run.Criteria));
+        command.Parameters.AddWithValue("$diagnosticsJson", JsonSerializer.Serialize(run.Diagnostics));
+        command.Parameters.AddWithValue("$warningsJson", JsonSerializer.Serialize(run.Warnings));
+        command.Parameters.AddWithValue("$failuresJson", JsonSerializer.Serialize(run.Failures));
+        command.Parameters.AddWithValue("$operatorId", effectiveOperator);
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
+        return (long)(command.ExecuteScalar() ?? 0L);
+    }
+
+    public static Profile3DAcceptanceRun? GetLatestProfile3DAcceptanceRun()
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, SourceName, SourceKind, IsSimulated, Status,
+                   FactoryReadinessStatus, AcquisitionMs, Width, Height, Unit,
+                   XPitchMicrons, YPitchMicrons, MissingHeightCount, NaNHeightCount,
+                   FrameId, CriteriaJson, DiagnosticsJson, WarningsJson, FailuresJson
+            FROM Profile3DAcceptanceRuns
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadProfile3DAcceptanceRun(reader) : null;
+    }
+
     public static long RecordRobotAcceptanceRun(RobotAcceptanceRun run, string? operatorId = null)
     {
         EnsureInitialized();
@@ -1254,20 +1345,22 @@ public static class AoiDatabase
         command.CommandText =
             """
             INSERT INTO RobotAcceptanceRuns
-                (CreatedAtUtc, ControllerName, EmergencyStopName, SourceKind, CriteriaJson,
+                (CreatedAtUtc, ControllerName, EmergencyStopName, SafetyControllerName, SafetySourceKind, SourceKind, CriteriaJson,
                  Status, FinalState, LoadMs, MoveToInspectMs, InspectionMs, UnloadMs,
-                 FullCycleMs, InvalidTransitionRejected, EmergencyStopBlocked, ResetReturnedIdle,
+                 FullCycleMs, InvalidTransitionRejected, EmergencyStopBlocked, SafetyFaultBlocked, ResetReturnedIdle,
                  AuditEventCount, WarningsJson, FailuresJson, OperatorId, AuditEventId)
             VALUES
-                ($createdAtUtc, $controllerName, $emergencyStopName, $sourceKind, $criteriaJson,
+                ($createdAtUtc, $controllerName, $emergencyStopName, $safetyControllerName, $safetySourceKind, $sourceKind, $criteriaJson,
                  $status, $finalState, $loadMs, $moveToInspectMs, $inspectionMs, $unloadMs,
-                 $fullCycleMs, $invalidTransitionRejected, $emergencyStopBlocked, $resetReturnedIdle,
+                 $fullCycleMs, $invalidTransitionRejected, $emergencyStopBlocked, $safetyFaultBlocked, $resetReturnedIdle,
                  $auditEventCount, $warningsJson, $failuresJson, $operatorId, $auditEventId);
             SELECT last_insert_rowid();
             """;
         command.Parameters.AddWithValue("$createdAtUtc", run.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$controllerName", run.ControllerName);
         command.Parameters.AddWithValue("$emergencyStopName", run.EmergencyStopName);
+        command.Parameters.AddWithValue("$safetyControllerName", run.SafetyControllerName);
+        command.Parameters.AddWithValue("$safetySourceKind", run.SafetySourceKind);
         command.Parameters.AddWithValue("$sourceKind", run.SourceKind);
         command.Parameters.AddWithValue("$criteriaJson", JsonSerializer.Serialize(run.Criteria));
         command.Parameters.AddWithValue("$status", run.Status);
@@ -1279,6 +1372,7 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$fullCycleMs", run.FullCycleMs);
         command.Parameters.AddWithValue("$invalidTransitionRejected", run.InvalidTransitionRejected ? 1 : 0);
         command.Parameters.AddWithValue("$emergencyStopBlocked", run.EmergencyStopBlocked ? 1 : 0);
+        command.Parameters.AddWithValue("$safetyFaultBlocked", run.SafetyFaultBlocked ? 1 : 0);
         command.Parameters.AddWithValue("$resetReturnedIdle", run.ResetReturnedIdle ? 1 : 0);
         command.Parameters.AddWithValue("$auditEventCount", run.AuditEventCount);
         command.Parameters.AddWithValue("$warningsJson", JsonSerializer.Serialize(run.Warnings));
@@ -1321,9 +1415,9 @@ public static class AoiDatabase
         using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT Id, CreatedAtUtc, ControllerName, EmergencyStopName, SourceKind, CriteriaJson,
+            SELECT Id, CreatedAtUtc, ControllerName, EmergencyStopName, SafetyControllerName, SafetySourceKind, SourceKind, CriteriaJson,
                    Status, FinalState, LoadMs, MoveToInspectMs, InspectionMs, UnloadMs,
-                   FullCycleMs, InvalidTransitionRejected, EmergencyStopBlocked, ResetReturnedIdle,
+                   FullCycleMs, InvalidTransitionRejected, EmergencyStopBlocked, SafetyFaultBlocked, ResetReturnedIdle,
                    AuditEventCount, WarningsJson, FailuresJson
             FROM RobotAcceptanceRuns
             ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
@@ -1363,7 +1457,9 @@ public static class AoiDatabase
                  WasCanceled, TotalCycles, SuccessfulCycles, FailedCycles, AverageInspectionMs,
                  MinInspectionMs, MaxInspectionMs, P95InspectionMs, CountOverOneSecond,
                  StartManagedMemoryMb, EndManagedMemoryMb, StartWorkingSetMb, EndWorkingSetMb,
-                 PeakWorkingSetMb, IsCompletedFactoryEvidence, ErrorsJson, AuditEventId)
+                 PeakWorkingSetMb, IsCompletedFactoryEvidence, ErrorsJson, AuditEventId,
+                 AverageTotalCycleMs, MaxTotalCycleMs, P95TotalCycleMs, CancellationReason,
+                 FirstCriticalError, MemoryWarningsJson)
             VALUES
                 ($runId, $startedAtUtc, $endedAtUtc, $imageFolder, $outputFolder, $engineKey, $engineName,
                  $engineVersion, $sourceKind, $isRealCameraSource, $profileName, $requestedDurationSeconds,
@@ -1371,7 +1467,9 @@ public static class AoiDatabase
                  $wasCanceled, $totalCycles, $successfulCycles, $failedCycles, $averageInspectionMs,
                  $minInspectionMs, $maxInspectionMs, $p95InspectionMs, $countOverOneSecond,
                  $startManagedMemoryMb, $endManagedMemoryMb, $startWorkingSetMb, $endWorkingSetMb,
-                 $peakWorkingSetMb, $isCompletedFactoryEvidence, $errorsJson, $auditEventId);
+                 $peakWorkingSetMb, $isCompletedFactoryEvidence, $errorsJson, $auditEventId,
+                 $averageTotalCycleMs, $maxTotalCycleMs, $p95TotalCycleMs, $cancellationReason,
+                 $firstCriticalError, $memoryWarningsJson);
             SELECT last_insert_rowid();
             """;
         command.Parameters.AddWithValue("$runId", run.RunId);
@@ -1408,6 +1506,12 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$isCompletedFactoryEvidence", run.IsCompletedFactoryEvidence ? 1 : 0);
         command.Parameters.AddWithValue("$errorsJson", JsonSerializer.Serialize(run.Errors));
         command.Parameters.AddWithValue("$auditEventId", auditEventId);
+        command.Parameters.AddWithValue("$averageTotalCycleMs", run.AverageTotalCycleMilliseconds);
+        command.Parameters.AddWithValue("$maxTotalCycleMs", run.MaxTotalCycleMilliseconds);
+        command.Parameters.AddWithValue("$p95TotalCycleMs", run.P95TotalCycleMilliseconds);
+        command.Parameters.AddWithValue("$cancellationReason", run.CancellationReason);
+        command.Parameters.AddWithValue("$firstCriticalError", run.FirstCriticalError);
+        command.Parameters.AddWithValue("$memoryWarningsJson", JsonSerializer.Serialize(run.MemoryWarnings));
 
         var runRowId = (long)(command.ExecuteScalar() ?? 0L);
         run.Id = runRowId;
@@ -1418,10 +1522,10 @@ public static class AoiDatabase
             """
             INSERT INTO SoakTestIterations
                 (RunId, CycleNumber, TimestampUtc, FrameId, ImagePath, EngineName, Verdict,
-                 TotalInspectionMs, WorkingSetMb, Success, Message, Error)
+                 TotalInspectionMs, WorkingSetMb, Success, Message, Error, TotalCycleMs, ExceptionCategory)
             VALUES
                 ($runId, $cycleNumber, $timestampUtc, $frameId, $imagePath, $engineName, $verdict,
-                 $totalInspectionMs, $workingSetMb, $success, $message, $error);
+                 $totalInspectionMs, $workingSetMb, $success, $message, $error, $totalCycleMs, $exceptionCategory);
             """;
         foreach (var cycle in run.Cycles)
         {
@@ -1438,6 +1542,8 @@ public static class AoiDatabase
             iterationCommand.Parameters.AddWithValue("$success", cycle.Success ? 1 : 0);
             iterationCommand.Parameters.AddWithValue("$message", cycle.Message);
             iterationCommand.Parameters.AddWithValue("$error", cycle.Error);
+            iterationCommand.Parameters.AddWithValue("$totalCycleMs", cycle.TotalCycleMilliseconds);
+            iterationCommand.Parameters.AddWithValue("$exceptionCategory", cycle.ExceptionCategory);
             iterationCommand.ExecuteNonQuery();
         }
 
@@ -1459,7 +1565,9 @@ public static class AoiDatabase
                    WasCanceled, TotalCycles, SuccessfulCycles, FailedCycles, AverageInspectionMs,
                    MinInspectionMs, MaxInspectionMs, P95InspectionMs, CountOverOneSecond,
                    StartManagedMemoryMb, EndManagedMemoryMb, StartWorkingSetMb, EndWorkingSetMb,
-                   PeakWorkingSetMb, IsCompletedFactoryEvidence, ErrorsJson
+                   PeakWorkingSetMb, IsCompletedFactoryEvidence, ErrorsJson, AverageTotalCycleMs,
+                   MaxTotalCycleMs, P95TotalCycleMs, CancellationReason, FirstCriticalError,
+                   MemoryWarningsJson
             FROM SoakTestRuns
             ORDER BY datetime(StartedAtUtc) DESC, Id DESC
             LIMIT 1;
@@ -1518,6 +1626,62 @@ public static class AoiDatabase
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadModelRegistryRecord(reader) : null;
+    }
+
+    public static ModelAcceptanceRun? GetLatestModelAcceptanceRun(string? modelId = null)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        var filter = string.IsNullOrWhiteSpace(modelId) ? string.Empty : "WHERE ModelId = $modelId";
+        command.CommandText =
+            $"""
+            SELECT Id, CreatedAtUtc, ModelId, ModelVersion, ModelSha256, ModelPath, LabelMapPath,
+                   InputTensorName, OutputTensorName, OutputShape, DatasetFolder, DatasetName,
+                   GroundTruthCsvPath, IsFormalManifest, Status, OperatorId, ApprovedBy, ApprovedAtUtc,
+                   IsProductionCandidate, CriteriaJson, MetricsJson, DatasetQualityJson,
+                   FalseCallRecommendationJson, BreakdownJson, PerformanceJson, P95InferenceMs,
+                   MessagesJson, LimitationsJson
+            FROM ModelAcceptanceRuns
+            {filter}
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+        if (!string.IsNullOrWhiteSpace(modelId))
+            command.Parameters.AddWithValue("$modelId", modelId);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadModelAcceptanceRun(reader) : null;
+    }
+
+    public static ModelAcceptanceRun? GetLatestPassingProductionModelAcceptance(string? modelId = null)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        var filter = string.IsNullOrWhiteSpace(modelId) ? string.Empty : "AND ModelId = $modelId";
+        command.CommandText =
+            $"""
+            SELECT Id, CreatedAtUtc, ModelId, ModelVersion, ModelSha256, ModelPath, LabelMapPath,
+                   InputTensorName, OutputTensorName, OutputShape, DatasetFolder, DatasetName,
+                   GroundTruthCsvPath, IsFormalManifest, Status, OperatorId, ApprovedBy, ApprovedAtUtc,
+                   IsProductionCandidate, CriteriaJson, MetricsJson, DatasetQualityJson,
+                   FalseCallRecommendationJson, BreakdownJson, PerformanceJson, P95InferenceMs,
+                   MessagesJson, LimitationsJson
+            FROM ModelAcceptanceRuns
+            WHERE Status = 'PASS'
+              AND IsProductionCandidate = 1
+              {filter}
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+        if (!string.IsNullOrWhiteSpace(modelId))
+            command.Parameters.AddWithValue("$modelId", modelId);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadModelAcceptanceRun(reader) : null;
     }
 
     public static IReadOnlyList<AuditEventRecord> GetAuditEvents(LogFilter filter, int limit = 500)
@@ -1989,6 +2153,102 @@ public static class AoiDatabase
         command.ExecuteNonQuery();
     }
 
+    public static long RecordModelAcceptanceRun(ModelAcceptanceRun run)
+    {
+        EnsureInitialized();
+
+        var effectiveOperator = string.IsNullOrWhiteSpace(run.OperatorId) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : run.OperatorId;
+        var auditEventId = RecordAuditEvent(
+            "MODEL_ACCEPTANCE",
+            $"Model acceptance run recorded: model={run.ModelId}; version={run.ModelVersion}; status={run.Status}; dataset={run.DatasetName}.",
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "ModelAcceptanceRun",
+            relatedEntityId: run.ModelId,
+            relatedPath: run.DatasetFolder);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO ModelAcceptanceRuns
+                (CreatedAtUtc, ModelId, ModelVersion, ModelSha256, ModelPath, LabelMapPath,
+                 InputTensorName, OutputTensorName, OutputShape, DatasetFolder, DatasetName,
+                 GroundTruthCsvPath, IsFormalManifest, Status, OperatorId, ApprovedBy, ApprovedAtUtc,
+                 IsProductionCandidate, CriteriaJson, MetricsJson, DatasetQualityJson,
+                 FalseCallRecommendationJson, BreakdownJson, PerformanceJson, P95InferenceMs,
+                 MessagesJson, LimitationsJson, AuditEventId)
+            VALUES
+                ($createdAtUtc, $modelId, $modelVersion, $modelSha256, $modelPath, $labelMapPath,
+                 $inputTensorName, $outputTensorName, $outputShape, $datasetFolder, $datasetName,
+                 $groundTruthCsvPath, $isFormalManifest, $status, $operatorId, $approvedBy, $approvedAtUtc,
+                 $isProductionCandidate, $criteriaJson, $metricsJson, $datasetQualityJson,
+                 $falseCallRecommendationJson, $breakdownJson, $performanceJson, $p95InferenceMs,
+                 $messagesJson, $limitationsJson, $auditEventId);
+            SELECT last_insert_rowid();
+            """;
+        BindModelAcceptanceRun(command, run, effectiveOperator, auditEventId);
+        return (long)(command.ExecuteScalar() ?? 0L);
+    }
+
+    public static void PromoteModelAcceptanceRun(long id, string approvedBy)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE ModelAcceptanceRuns
+            SET IsProductionCandidate = 1,
+                ApprovedBy = $approvedBy,
+                ApprovedAtUtc = $approvedAtUtc
+            WHERE Id = $id
+              AND Status = 'PASS';
+            """;
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$approvedBy", string.IsNullOrWhiteSpace(approvedBy) ? "UNKNOWN" : approvedBy);
+        command.Parameters.AddWithValue("$approvedAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.ExecuteNonQuery();
+    }
+
+    public static long RecordModelReleasePackage(ModelReleasePackageRecord record)
+    {
+        EnsureInitialized();
+
+        var auditEventId = RecordAuditEvent(
+            "MODEL_RELEASE_PACKAGE",
+            $"Model release package recorded: model={record.ModelId}; version={record.ModelVersion}; status={record.Status}.",
+            operatorWithRole: record.ApprovedBy,
+            relatedEntityType: "ModelReleasePackage",
+            relatedEntityId: record.ModelId,
+            relatedPath: record.PackagePath);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO ModelReleasePackages
+                (CreatedAtUtc, AcceptanceRunId, ModelId, ModelVersion, ModelSha256,
+                 PackagePath, ManifestPath, ReportPath, Status, ApprovedBy, AuditEventId)
+            VALUES
+                ($createdAtUtc, $acceptanceRunId, $modelId, $modelVersion, $modelSha256,
+                 $packagePath, $manifestPath, $reportPath, $status, $approvedBy, $auditEventId);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$createdAtUtc", record.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$acceptanceRunId", record.AcceptanceRunId);
+        command.Parameters.AddWithValue("$modelId", record.ModelId);
+        command.Parameters.AddWithValue("$modelVersion", record.ModelVersion);
+        command.Parameters.AddWithValue("$modelSha256", record.ModelSha256);
+        command.Parameters.AddWithValue("$packagePath", record.PackagePath);
+        command.Parameters.AddWithValue("$manifestPath", record.ManifestPath);
+        command.Parameters.AddWithValue("$reportPath", record.ReportPath);
+        command.Parameters.AddWithValue("$status", record.Status);
+        command.Parameters.AddWithValue("$approvedBy", record.ApprovedBy);
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
+        return (long)(command.ExecuteScalar() ?? 0L);
+    }
+
     public static long RecordExport(string exportType, string filePath, string status = "OK", string? operatorId = null)
     {
         EnsureInitialized();
@@ -2041,6 +2301,51 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$sizeBytes", result.SizeBytes);
         command.Parameters.AddWithValue("$messagesJson", JsonSerializer.Serialize(result.Messages));
         command.Parameters.AddWithValue("$artifactChecksumsJson", JsonSerializer.Serialize(result.ArtifactChecksums));
+        return (long)(command.ExecuteScalar() ?? 0L);
+    }
+
+    public static long RecordBuildTestEvidence(BuildTestEvidenceRecord evidence)
+    {
+        EnsureInitialized();
+
+        var effectiveOperator = string.IsNullOrWhiteSpace(evidence.OperatorId)
+            ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN"
+            : evidence.OperatorId.Trim();
+        var auditEventId = RecordAuditEvent(
+            "BUILD_TEST_EVIDENCE",
+            $"Build/test evidence recorded: configuration={evidence.Configuration}; hygiene={evidence.HygieneStatus}; build={evidence.BuildStatus}; test={evidence.TestStatus}; publishValidation={evidence.PublishValidationStatus}.",
+            operatorWithRole: effectiveOperator,
+            relatedEntityType: "BuildTestEvidence",
+            relatedPath: evidence.EvidencePath);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO BuildTestEvidence
+                (GeneratedAtUtc, CommitSha, Configuration, HygieneStatus, RestoreStatus,
+                 BuildStatus, TestStatus, PublishValidationStatus, EvidencePath, OperatorId,
+                 CreatedAtUtc, TestResultPath, MachineName, AuditEventId)
+            VALUES
+                ($generatedAtUtc, $commitSha, $configuration, $hygieneStatus, $restoreStatus,
+                 $buildStatus, $testStatus, $publishValidationStatus, $evidencePath, $operatorId,
+                 $createdAtUtc, $testResultPath, $machineName, $auditEventId);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$generatedAtUtc", evidence.GeneratedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$commitSha", evidence.GitCommit ?? string.Empty);
+        command.Parameters.AddWithValue("$configuration", evidence.Configuration ?? "Release");
+        command.Parameters.AddWithValue("$hygieneStatus", evidence.HygieneStatus ?? "UNKNOWN");
+        command.Parameters.AddWithValue("$restoreStatus", evidence.RestoreStatus ?? "UNKNOWN");
+        command.Parameters.AddWithValue("$buildStatus", evidence.BuildStatus ?? "UNKNOWN");
+        command.Parameters.AddWithValue("$testStatus", evidence.TestStatus ?? "UNKNOWN");
+        command.Parameters.AddWithValue("$publishValidationStatus", evidence.PublishValidationStatus ?? "UNKNOWN");
+        command.Parameters.AddWithValue("$evidencePath", evidence.EvidencePath ?? string.Empty);
+        command.Parameters.AddWithValue("$operatorId", effectiveOperator);
+        command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$testResultPath", evidence.TestResultPath ?? string.Empty);
+        command.Parameters.AddWithValue("$machineName", evidence.MachineName ?? string.Empty);
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
         return (long)(command.ExecuteScalar() ?? 0L);
     }
 
@@ -2298,6 +2603,276 @@ public static class AoiDatabase
             operatorWithRole: operatorId,
             relatedEntityType: "MesSpoolQueue",
             relatedEntityId: id.ToString(CultureInfo.InvariantCulture));
+    }
+
+    public static long EnqueueCentralSyncItem(
+        string itemType,
+        string itemId,
+        string payloadJson,
+        string payloadPath,
+        string endpointOrFolder,
+        string stationId,
+        int maxRetryCount,
+        string status = "Pending",
+        string lastError = "")
+    {
+        EnsureInitialized();
+
+        var now = DateTime.UtcNow;
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO CentralSyncQueue
+                (CreatedAtUtc, LastAttemptAtUtc, NextAttemptAtUtc, ItemType, ItemId, PayloadJson, PayloadPath,
+                 EndpointOrFolder, StationId, RetryCount, MaxRetryCount, Status, LastError)
+            VALUES
+                ($createdAtUtc, NULL, $nextAttemptAtUtc, $itemType, $itemId, $payloadJson, $payloadPath,
+                 $endpointOrFolder, $stationId, 0, $maxRetryCount, $status, $lastError);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$createdAtUtc", now.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$nextAttemptAtUtc", now.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$itemType", itemType);
+        command.Parameters.AddWithValue("$itemId", itemId);
+        command.Parameters.AddWithValue("$payloadJson", payloadJson);
+        command.Parameters.AddWithValue("$payloadPath", payloadPath);
+        command.Parameters.AddWithValue("$endpointOrFolder", endpointOrFolder);
+        command.Parameters.AddWithValue("$stationId", string.IsNullOrWhiteSpace(stationId) ? Environment.MachineName : stationId);
+        command.Parameters.AddWithValue("$maxRetryCount", Math.Max(0, maxRetryCount));
+        command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$lastError", lastError);
+
+        var id = Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        RecordAuditEvent(
+            "CENTRAL_SYNC_QUEUE",
+            $"Central sync payload queued: id={id}; type={itemType}; item={itemId}; status={status}.",
+            relatedEntityType: "CentralSyncQueue",
+            relatedEntityId: id.ToString(CultureInfo.InvariantCulture),
+            relatedPath: payloadPath);
+        return id;
+    }
+
+    public static bool CentralSyncQueueContains(string itemType, string itemId)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT 1
+            FROM CentralSyncQueue
+            WHERE ItemType = $itemType AND ItemId = $itemId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$itemType", itemType);
+        command.Parameters.AddWithValue("$itemId", itemId);
+        return command.ExecuteScalar() is not null;
+    }
+
+    public static IReadOnlyList<CentralSyncQueueRecord> GetPendingCentralSyncItems(int limit = 100)
+    {
+        EnsureInitialized();
+
+        var records = new List<CentralSyncQueueRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, LastAttemptAtUtc, NextAttemptAtUtc, ItemType, ItemId, PayloadJson,
+                   PayloadPath, EndpointOrFolder, StationId, RetryCount, MaxRetryCount, Status, LastError
+            FROM CentralSyncQueue
+            WHERE Status = 'Pending' AND (NextAttemptAtUtc IS NULL OR datetime(NextAttemptAtUtc) <= datetime($now))
+            ORDER BY datetime(CreatedAtUtc), Id
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            records.Add(ReadCentralSyncQueueRecord(reader));
+
+        return records;
+    }
+
+    public static IReadOnlyList<CentralSyncQueueRecord> GetCentralSyncQueue(int limit = 500)
+    {
+        EnsureInitialized();
+
+        var records = new List<CentralSyncQueueRecord>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, LastAttemptAtUtc, NextAttemptAtUtc, ItemType, ItemId, PayloadJson,
+                   PayloadPath, EndpointOrFolder, StationId, RetryCount, MaxRetryCount, Status, LastError
+            FROM CentralSyncQueue
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            records.Add(ReadCentralSyncQueueRecord(reader));
+
+        return records;
+    }
+
+    public static void MarkCentralSyncItemSent(long id, string payloadPath, string message)
+        => UpdateCentralSyncItem(id, "Sent", payloadPath, message, retryBackoffMs: 0, incrementRetry: false);
+
+    public static void MarkCentralSyncItemSkipped(long id, string message)
+        => UpdateCentralSyncItem(id, "Skipped", payloadPath: string.Empty, message, retryBackoffMs: 0, incrementRetry: false);
+
+    public static void RecordCentralSyncRetryFailure(long id, string message, int retryBackoffMs)
+        => UpdateCentralSyncItem(id, "Pending", payloadPath: string.Empty, message, retryBackoffMs, incrementRetry: true);
+
+    public static void RecordCentralSyncAttempt(
+        long queueId,
+        string mode,
+        string endpointOrFolder,
+        string status,
+        string message)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO CentralSyncAttempts
+                (QueueId, AttemptedAtUtc, Mode, EndpointOrFolder, Status, Message)
+            VALUES
+                ($queueId, $attemptedAtUtc, $mode, $endpointOrFolder, $status, $message);
+            """;
+        command.Parameters.AddWithValue("$queueId", queueId);
+        command.Parameters.AddWithValue("$attemptedAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$mode", mode);
+        command.Parameters.AddWithValue("$endpointOrFolder", endpointOrFolder);
+        command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$message", message);
+        command.ExecuteNonQuery();
+    }
+
+    private static void UpdateCentralSyncItem(
+        long id,
+        string status,
+        string payloadPath,
+        string message,
+        int retryBackoffMs,
+        bool incrementRetry)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            $"""
+            UPDATE CentralSyncQueue
+            SET Status = $status,
+                LastAttemptAtUtc = $lastAttemptAtUtc,
+                NextAttemptAtUtc = {(status == "Pending" ? "$nextAttemptAtUtc" : "NULL")},
+                RetryCount = RetryCount + {(incrementRetry ? "1" : "0")},
+                PayloadPath = CASE WHEN $payloadPath <> '' THEN $payloadPath ELSE PayloadPath END,
+                LastError = $message
+            WHERE Id = $id;
+            """;
+        var now = DateTime.UtcNow;
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$status", status);
+        command.Parameters.AddWithValue("$lastAttemptAtUtc", now.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$nextAttemptAtUtc", now.AddMilliseconds(Math.Max(0, retryBackoffMs)).ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$payloadPath", payloadPath);
+        command.Parameters.AddWithValue("$message", message);
+        command.ExecuteNonQuery();
+
+        RecordAuditEvent(
+            "CENTRAL_SYNC_QUEUE",
+            $"Central sync item {id} status={status}. {message}",
+            relatedEntityType: "CentralSyncQueue",
+            relatedEntityId: id.ToString(CultureInfo.InvariantCulture),
+            relatedPath: payloadPath);
+    }
+
+    public static long RecordTraceabilityTestReport(TraceabilityTestReport report)
+    {
+        EnsureInitialized();
+
+        var auditEventId = RecordAuditEvent(
+            "MES_TRACEABILITY_TEST",
+            $"Traceability test {report.Status}; mode={report.Mode}; result={report.ResultStatus}; image={report.ImageStatus}; endpoint={MesIntegrationSettingsService.RedactSecrets(report.EndpointUrl)}.",
+            operatorWithRole: report.OperatorId,
+            relatedEntityType: "TraceabilityTestReport");
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO TraceabilityTestReports
+                (CreatedAtUtc, Status, Mode, EndpointUrl, ResultStatus, ImageStatus,
+                 PayloadPath, ReportJsonPath, ReportHtmlPath, Message, ProductionModeConfirmed,
+                 OperatorId, AuditEventId)
+            VALUES
+                ($createdAtUtc, $status, $mode, $endpointUrl, $resultStatus, $imageStatus,
+                 $payloadPath, $reportJsonPath, $reportHtmlPath, $message, $productionModeConfirmed,
+                 $operatorId, $auditEventId);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$createdAtUtc", report.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$status", report.Status);
+        command.Parameters.AddWithValue("$mode", report.Mode);
+        command.Parameters.AddWithValue("$endpointUrl", MesIntegrationSettingsService.RedactSecrets(report.EndpointUrl));
+        command.Parameters.AddWithValue("$resultStatus", report.ResultStatus);
+        command.Parameters.AddWithValue("$imageStatus", report.ImageStatus);
+        command.Parameters.AddWithValue("$payloadPath", report.PayloadPath);
+        command.Parameters.AddWithValue("$reportJsonPath", report.ReportJsonPath);
+        command.Parameters.AddWithValue("$reportHtmlPath", report.ReportHtmlPath);
+        command.Parameters.AddWithValue("$message", MesIntegrationSettingsService.RedactSecrets(report.Message));
+        command.Parameters.AddWithValue("$productionModeConfirmed", report.ProductionModeConfirmed ? 1 : 0);
+        command.Parameters.AddWithValue("$operatorId", report.OperatorId);
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
+        var id = (long)(command.ExecuteScalar() ?? 0L);
+        report.Id = id;
+        return id;
+    }
+
+    public static TraceabilityTestReport? GetLatestTraceabilityTestReport()
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CreatedAtUtc, Status, Mode, EndpointUrl, ResultStatus, ImageStatus,
+                   PayloadPath, ReportJsonPath, ReportHtmlPath, Message, ProductionModeConfirmed,
+                   OperatorId
+            FROM TraceabilityTestReports
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT 1;
+            """;
+        using var reader = command.ExecuteReader();
+        return reader.Read()
+            ? new TraceabilityTestReport
+            {
+                Id = reader.GetInt64(0),
+                CreatedAtUtc = ParseDateTime(reader.GetString(1)),
+                Status = reader.GetString(2),
+                Mode = reader.GetString(3),
+                EndpointUrl = reader.GetString(4),
+                ResultStatus = reader.GetString(5),
+                ImageStatus = reader.GetString(6),
+                PayloadPath = reader.GetString(7),
+                ReportJsonPath = reader.GetString(8),
+                ReportHtmlPath = reader.GetString(9),
+                Message = reader.GetString(10),
+                ProductionModeConfirmed = reader.GetInt32(11) != 0,
+                OperatorId = reader.GetString(12),
+            }
+            : null;
     }
 
     public static string RunIntegrityCheck()
@@ -2659,6 +3234,27 @@ public static class AoiDatabase
             reader.IsDBNull(9) ? "{}" : reader.GetString(9));
     }
 
+    private static BuildTestEvidenceRecord ReadBuildTestEvidence(SqliteDataReader reader)
+    {
+        return new BuildTestEvidenceRecord
+        {
+            Id = reader.GetInt64(0),
+            GeneratedAtUtc = ParseDateTime(reader.GetString(1)),
+            GitCommit = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+            Configuration = reader.IsDBNull(3) ? "Release" : reader.GetString(3),
+            HygieneStatus = reader.IsDBNull(4) ? "UNKNOWN" : reader.GetString(4),
+            RestoreStatus = reader.IsDBNull(5) ? "UNKNOWN" : reader.GetString(5),
+            BuildStatus = reader.IsDBNull(6) ? "UNKNOWN" : reader.GetString(6),
+            TestStatus = reader.IsDBNull(7) ? "UNKNOWN" : reader.GetString(7),
+            PublishValidationStatus = reader.IsDBNull(8) ? "UNKNOWN" : reader.GetString(8),
+            EvidencePath = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+            OperatorId = reader.IsDBNull(10) ? "UNKNOWN" : reader.GetString(10),
+            CreatedAtUtc = ParseDateTime(reader.GetString(11)),
+            TestResultPath = reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
+            MachineName = reader.IsDBNull(13) ? string.Empty : reader.GetString(13),
+        };
+    }
+
     private static ValidationPackageRecord ReadValidationPackage(SqliteDataReader reader)
     {
         return new ValidationPackageRecord(
@@ -2784,6 +3380,31 @@ public static class AoiDatabase
             Failures = DeserializeOrDefault(reader.IsDBNull(14) ? "[]" : reader.GetString(14), new List<string>()),
         };
 
+    private static Profile3DAcceptanceRun ReadProfile3DAcceptanceRun(SqliteDataReader reader)
+        => new()
+        {
+            Id = reader.GetInt64(0),
+            CreatedAtUtc = ParseDateTime(reader.GetString(1)),
+            SourceName = reader.GetString(2),
+            SourceKind = reader.GetString(3),
+            IsSimulated = reader.GetInt32(4) != 0,
+            Status = reader.GetString(5),
+            FactoryReadinessStatus = reader.GetString(6),
+            AcquisitionMs = reader.GetDouble(7),
+            Width = reader.GetInt32(8),
+            Height = reader.GetInt32(9),
+            Unit = reader.GetString(10),
+            XPitchMicrons = reader.GetDouble(11),
+            YPitchMicrons = reader.GetDouble(12),
+            MissingHeightCount = reader.GetInt32(13),
+            NaNHeightCount = reader.GetInt32(14),
+            FrameId = reader.GetString(15),
+            Criteria = DeserializeOrDefault(reader.IsDBNull(16) ? "{}" : reader.GetString(16), new Profile3DAcceptanceCriteria()),
+            Diagnostics = DeserializeOrDefault(reader.IsDBNull(17) ? "{}" : reader.GetString(17), new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+            Warnings = DeserializeOrDefault(reader.IsDBNull(18) ? "[]" : reader.GetString(18), new List<string>()),
+            Failures = DeserializeOrDefault(reader.IsDBNull(19) ? "[]" : reader.GetString(19), new List<string>()),
+        };
+
     private static IReadOnlyList<LightingAcceptanceStep> GetLightingAcceptanceSteps(long runId)
     {
         var steps = new List<LightingAcceptanceStep>();
@@ -2829,21 +3450,24 @@ public static class AoiDatabase
             CreatedAtUtc = ParseDateTime(reader.GetString(1)),
             ControllerName = reader.GetString(2),
             EmergencyStopName = reader.GetString(3),
-            SourceKind = reader.GetString(4),
-            Criteria = DeserializeOrDefault(reader.IsDBNull(5) ? "{}" : reader.GetString(5), new RobotAcceptanceCriteria()),
-            Status = reader.GetString(6),
-            FinalState = reader.GetString(7),
-            LoadMs = reader.GetDouble(8),
-            MoveToInspectMs = reader.GetDouble(9),
-            InspectionMs = reader.GetDouble(10),
-            UnloadMs = reader.GetDouble(11),
-            FullCycleMs = reader.GetDouble(12),
-            InvalidTransitionRejected = reader.GetInt32(13) != 0,
-            EmergencyStopBlocked = reader.GetInt32(14) != 0,
-            ResetReturnedIdle = reader.GetInt32(15) != 0,
-            AuditEventCount = reader.GetInt32(16),
-            Warnings = DeserializeOrDefault(reader.IsDBNull(17) ? "[]" : reader.GetString(17), new List<string>()),
-            Failures = DeserializeOrDefault(reader.IsDBNull(18) ? "[]" : reader.GetString(18), new List<string>()),
+            SafetyControllerName = reader.GetString(4),
+            SafetySourceKind = reader.GetString(5),
+            SourceKind = reader.GetString(6),
+            Criteria = DeserializeOrDefault(reader.IsDBNull(7) ? "{}" : reader.GetString(7), new RobotAcceptanceCriteria()),
+            Status = reader.GetString(8),
+            FinalState = reader.GetString(9),
+            LoadMs = reader.GetDouble(10),
+            MoveToInspectMs = reader.GetDouble(11),
+            InspectionMs = reader.GetDouble(12),
+            UnloadMs = reader.GetDouble(13),
+            FullCycleMs = reader.GetDouble(14),
+            InvalidTransitionRejected = reader.GetInt32(15) != 0,
+            EmergencyStopBlocked = reader.GetInt32(16) != 0,
+            SafetyFaultBlocked = reader.GetInt32(17) != 0,
+            ResetReturnedIdle = reader.GetInt32(18) != 0,
+            AuditEventCount = reader.GetInt32(19),
+            Warnings = DeserializeOrDefault(reader.IsDBNull(20) ? "[]" : reader.GetString(20), new List<string>()),
+            Failures = DeserializeOrDefault(reader.IsDBNull(21) ? "[]" : reader.GetString(21), new List<string>()),
         };
 
     private static IReadOnlyList<RobotAcceptanceStep> GetRobotAcceptanceSteps(long runId)
@@ -2913,8 +3537,14 @@ public static class AoiDatabase
             StartWorkingSetMegabytes = reader.GetDouble(29),
             EndWorkingSetMegabytes = reader.GetDouble(30),
             PeakWorkingSetMegabytes = reader.GetDouble(31),
+            AverageTotalCycleMilliseconds = reader.IsDBNull(34) ? 0 : reader.GetDouble(34),
+            MaxTotalCycleMilliseconds = reader.IsDBNull(35) ? 0 : reader.GetDouble(35),
+            P95TotalCycleMilliseconds = reader.IsDBNull(36) ? 0 : reader.GetDouble(36),
+            CancellationReason = reader.IsDBNull(37) ? string.Empty : reader.GetString(37),
+            FirstCriticalError = reader.IsDBNull(38) ? string.Empty : reader.GetString(38),
         };
         run.Errors.AddRange(DeserializeOrDefault(reader.IsDBNull(33) ? "[]" : reader.GetString(33), new List<string>()));
+        run.MemoryWarnings.AddRange(DeserializeOrDefault(reader.IsDBNull(39) ? "[]" : reader.GetString(39), new List<string>()));
         return run;
     }
 
@@ -2926,7 +3556,7 @@ public static class AoiDatabase
         command.CommandText =
             """
             SELECT CycleNumber, TimestampUtc, FrameId, ImagePath, EngineName, Verdict,
-                   TotalInspectionMs, WorkingSetMb, Success, Message, Error
+                   TotalInspectionMs, WorkingSetMb, Success, Message, Error, TotalCycleMs, ExceptionCategory
             FROM SoakTestIterations
             WHERE RunId = $runId
             ORDER BY CycleNumber ASC, Id ASC;
@@ -2947,7 +3577,9 @@ public static class AoiDatabase
                 ParseDateTime(reader.GetString(1)),
                 reader.GetString(4),
                 reader.GetDouble(7),
-                reader.GetString(10)));
+                reader.GetString(10),
+                reader.IsDBNull(11) ? 0 : reader.GetDouble(11),
+                reader.IsDBNull(12) ? string.Empty : reader.GetString(12)));
         }
 
         return cycles;
@@ -3089,6 +3721,41 @@ public static class AoiDatabase
             reader.IsDBNull(22) ? null : reader.GetInt64(22));
     }
 
+    private static ModelAcceptanceRun ReadModelAcceptanceRun(SqliteDataReader reader)
+    {
+        return new ModelAcceptanceRun
+        {
+            Id = reader.GetInt64(0),
+            CreatedAtUtc = ParseDateTime(reader.GetString(1)),
+            ModelId = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+            ModelVersion = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+            ModelSha256 = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+            ModelPath = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+            LabelMapPath = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            InputTensorName = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            OutputTensorName = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+            OutputShape = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+            DatasetFolder = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+            DatasetName = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+            GroundTruthCsvPath = reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
+            IsFormalManifest = !reader.IsDBNull(13) && reader.GetInt32(13) != 0,
+            Status = reader.IsDBNull(14) ? "FAIL" : reader.GetString(14),
+            OperatorId = reader.IsDBNull(15) ? "UNKNOWN" : reader.GetString(15),
+            ApprovedBy = reader.IsDBNull(16) ? string.Empty : reader.GetString(16),
+            ApprovedAtUtc = reader.IsDBNull(17) ? null : ParseDateTime(reader.GetString(17)),
+            IsProductionCandidate = !reader.IsDBNull(18) && reader.GetInt32(18) != 0,
+            Criteria = DeserializeOrDefault(reader.IsDBNull(19) ? "{}" : reader.GetString(19), new ModelAcceptanceCriteria()),
+            Metrics = DeserializeOrDefault(reader.IsDBNull(20) ? "{}" : reader.GetString(20), new BatchMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
+            DatasetQualitySummary = DeserializeOrDefault(reader.IsDBNull(21) ? "{}" : reader.GetString(21), new DatasetQualitySummary()),
+            FalseCallRecommendation = DeserializeOrDefault(reader.IsDBNull(22) ? "{}" : reader.GetString(22), new FalseCallRecommendationSummary()),
+            BreakdownSummary = DeserializeOrDefault(reader.IsDBNull(23) ? "{}" : reader.GetString(23), new ValidationBreakdownSummary()),
+            PerformanceSummary = DeserializeOrDefault(reader.IsDBNull(24) ? "{}" : reader.GetString(24), new BatchPerformanceSummary(0, 0, 0, 0, 0)),
+            P95InferenceMs = reader.IsDBNull(25) ? 0 : reader.GetDouble(25),
+            Messages = DeserializeStringList(reader.IsDBNull(26) ? "[]" : reader.GetString(26)).ToList(),
+            Limitations = DeserializeStringList(reader.IsDBNull(27) ? "[]" : reader.GetString(27)).ToList(),
+        };
+    }
+
     private static AuditEventRecord ReadAuditEvent(SqliteDataReader reader)
     {
         return new AuditEventRecord(
@@ -3140,6 +3807,25 @@ public static class AoiDatabase
             reader.IsDBNull(13) ? string.Empty : reader.GetString(13),
             reader.IsDBNull(14) ? string.Empty : reader.GetString(14),
             reader.IsDBNull(15) ? string.Empty : reader.GetString(15));
+    }
+
+    private static CentralSyncQueueRecord ReadCentralSyncQueueRecord(SqliteDataReader reader)
+    {
+        return new CentralSyncQueueRecord(
+            reader.GetInt64(0),
+            ParseDateTime(reader.GetString(1)),
+            reader.IsDBNull(2) ? null : ParseDateTime(reader.GetString(2)),
+            reader.IsDBNull(3) ? null : ParseDateTime(reader.GetString(3)),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetString(6),
+            reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+            reader.IsDBNull(9) ? Environment.MachineName : reader.GetString(9),
+            reader.GetInt32(10),
+            reader.GetInt32(11),
+            reader.GetString(12),
+            reader.IsDBNull(13) ? string.Empty : reader.GetString(13));
     }
 
     private static RecipeRevisionRecord ReadRecipeRevision(SqliteDataReader reader)
@@ -3201,6 +3887,38 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$notes", record.Notes);
         command.Parameters.AddWithValue("$isActive", record.IsActive ? 1 : 0);
         command.Parameters.AddWithValue("$auditEventId", record.AuditEventId is { } id ? (object)id : DBNull.Value);
+    }
+
+    private static void BindModelAcceptanceRun(SqliteCommand command, ModelAcceptanceRun run, string operatorId, long auditEventId)
+    {
+        command.Parameters.AddWithValue("$createdAtUtc", run.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$modelId", run.ModelId ?? string.Empty);
+        command.Parameters.AddWithValue("$modelVersion", run.ModelVersion ?? string.Empty);
+        command.Parameters.AddWithValue("$modelSha256", run.ModelSha256 ?? string.Empty);
+        command.Parameters.AddWithValue("$modelPath", run.ModelPath ?? string.Empty);
+        command.Parameters.AddWithValue("$labelMapPath", run.LabelMapPath ?? string.Empty);
+        command.Parameters.AddWithValue("$inputTensorName", run.InputTensorName ?? string.Empty);
+        command.Parameters.AddWithValue("$outputTensorName", run.OutputTensorName ?? string.Empty);
+        command.Parameters.AddWithValue("$outputShape", run.OutputShape ?? string.Empty);
+        command.Parameters.AddWithValue("$datasetFolder", run.DatasetFolder ?? string.Empty);
+        command.Parameters.AddWithValue("$datasetName", run.DatasetName ?? string.Empty);
+        command.Parameters.AddWithValue("$groundTruthCsvPath", run.GroundTruthCsvPath ?? string.Empty);
+        command.Parameters.AddWithValue("$isFormalManifest", run.IsFormalManifest ? 1 : 0);
+        command.Parameters.AddWithValue("$status", run.Status ?? "FAIL");
+        command.Parameters.AddWithValue("$operatorId", operatorId);
+        command.Parameters.AddWithValue("$approvedBy", run.ApprovedBy ?? string.Empty);
+        command.Parameters.AddWithValue("$approvedAtUtc", run.ApprovedAtUtc is { } approvedAt ? (object)approvedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
+        command.Parameters.AddWithValue("$isProductionCandidate", run.IsProductionCandidate ? 1 : 0);
+        command.Parameters.AddWithValue("$criteriaJson", JsonSerializer.Serialize(run.Criteria));
+        command.Parameters.AddWithValue("$metricsJson", JsonSerializer.Serialize(run.Metrics));
+        command.Parameters.AddWithValue("$datasetQualityJson", JsonSerializer.Serialize(run.DatasetQualitySummary));
+        command.Parameters.AddWithValue("$falseCallRecommendationJson", JsonSerializer.Serialize(run.FalseCallRecommendation));
+        command.Parameters.AddWithValue("$breakdownJson", JsonSerializer.Serialize(run.BreakdownSummary));
+        command.Parameters.AddWithValue("$performanceJson", JsonSerializer.Serialize(run.PerformanceSummary));
+        command.Parameters.AddWithValue("$p95InferenceMs", run.P95InferenceMs);
+        command.Parameters.AddWithValue("$messagesJson", JsonSerializer.Serialize(run.Messages));
+        command.Parameters.AddWithValue("$limitationsJson", JsonSerializer.Serialize(run.Limitations));
+        command.Parameters.AddWithValue("$auditEventId", auditEventId);
     }
 
     private static void BindFalseCallReductionPoint(SqliteCommand command, ThresholdSweepPoint point)
@@ -3486,6 +4204,49 @@ public static class AoiDatabase
         command.ExecuteNonQuery();
     }
 
+    internal static void EnsureCentralSyncTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS CentralSyncQueue
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CreatedAtUtc TEXT NOT NULL,
+                LastAttemptAtUtc TEXT NULL,
+                NextAttemptAtUtc TEXT NULL,
+                ItemType TEXT NOT NULL,
+                ItemId TEXT NOT NULL,
+                PayloadJson TEXT NOT NULL,
+                PayloadPath TEXT NOT NULL DEFAULT '',
+                EndpointOrFolder TEXT NOT NULL DEFAULT '',
+                StationId TEXT NOT NULL DEFAULT '',
+                RetryCount INTEGER NOT NULL DEFAULT 0,
+                MaxRetryCount INTEGER NOT NULL DEFAULT 5,
+                Status TEXT NOT NULL DEFAULT 'Pending',
+                LastError TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS CentralSyncAttempts
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                QueueId INTEGER NOT NULL,
+                AttemptedAtUtc TEXT NOT NULL,
+                Mode TEXT NOT NULL,
+                EndpointOrFolder TEXT NOT NULL DEFAULT '',
+                Status TEXT NOT NULL,
+                Message TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (QueueId) REFERENCES CentralSyncQueue(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_CentralSyncQueue_Status_NextAttempt ON CentralSyncQueue(Status, NextAttemptAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_CentralSyncQueue_Item ON CentralSyncQueue(ItemType, ItemId);
+            CREATE INDEX IF NOT EXISTS IX_CentralSyncAttempts_QueueId ON CentralSyncAttempts(QueueId);
+            """;
+        command.ExecuteNonQuery();
+    }
+
     internal static void EnsureValidationPackagesTable(SqliteConnection connection, SqliteTransaction? transaction = null)
     {
         using var command = connection.CreateCommand();
@@ -3509,6 +4270,102 @@ public static class AoiDatabase
 
             CREATE INDEX IF NOT EXISTS IX_ValidationPackages_CreatedAtUtc ON ValidationPackages(CreatedAtUtc);
             CREATE INDEX IF NOT EXISTS IX_ValidationPackages_PackageId ON ValidationPackages(PackageId);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureTraceabilityTestReportsTable(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS TraceabilityTestReports
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CreatedAtUtc TEXT NOT NULL,
+                Status TEXT NOT NULL DEFAULT 'FAIL',
+                Mode TEXT NOT NULL DEFAULT 'Not Connected',
+                EndpointUrl TEXT NOT NULL DEFAULT '',
+                ResultStatus TEXT NOT NULL DEFAULT 'FAIL',
+                ImageStatus TEXT NOT NULL DEFAULT 'NOT SENT',
+                PayloadPath TEXT NOT NULL DEFAULT '',
+                ReportJsonPath TEXT NOT NULL DEFAULT '',
+                ReportHtmlPath TEXT NOT NULL DEFAULT '',
+                Message TEXT NOT NULL DEFAULT '',
+                ProductionModeConfirmed INTEGER NOT NULL DEFAULT 0,
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                AuditEventId INTEGER NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_TraceabilityTestReports_CreatedAtUtc ON TraceabilityTestReports(CreatedAtUtc);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureBuildTestEvidenceTable(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS BuildTestEvidence
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                GeneratedAtUtc TEXT NOT NULL,
+                CommitSha TEXT NOT NULL DEFAULT '',
+                Configuration TEXT NOT NULL DEFAULT 'Release',
+                HygieneStatus TEXT NOT NULL DEFAULT 'UNKNOWN',
+                RestoreStatus TEXT NOT NULL DEFAULT 'UNKNOWN',
+                BuildStatus TEXT NOT NULL DEFAULT 'UNKNOWN',
+                TestStatus TEXT NOT NULL DEFAULT 'UNKNOWN',
+                PublishValidationStatus TEXT NOT NULL DEFAULT 'UNKNOWN',
+                EvidencePath TEXT NOT NULL DEFAULT '',
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                CreatedAtUtc TEXT NOT NULL,
+                TestResultPath TEXT NOT NULL DEFAULT '',
+                MachineName TEXT NOT NULL DEFAULT '',
+                AuditEventId INTEGER NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_BuildTestEvidence_GeneratedAtUtc ON BuildTestEvidence(GeneratedAtUtc);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureProfile3DAcceptanceTable(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS Profile3DAcceptanceRuns
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CreatedAtUtc TEXT NOT NULL,
+                SourceName TEXT NOT NULL,
+                SourceKind TEXT NOT NULL DEFAULT 'None',
+                IsSimulated INTEGER NOT NULL DEFAULT 1,
+                Status TEXT NOT NULL DEFAULT 'FAIL',
+                FactoryReadinessStatus TEXT NOT NULL DEFAULT 'NOT VALIDATED',
+                AcquisitionMs REAL NOT NULL DEFAULT 0,
+                Width INTEGER NOT NULL DEFAULT 0,
+                Height INTEGER NOT NULL DEFAULT 0,
+                Unit TEXT NOT NULL DEFAULT '',
+                XPitchMicrons REAL NOT NULL DEFAULT 0,
+                YPitchMicrons REAL NOT NULL DEFAULT 0,
+                MissingHeightCount INTEGER NOT NULL DEFAULT 0,
+                NaNHeightCount INTEGER NOT NULL DEFAULT 0,
+                FrameId TEXT NOT NULL DEFAULT '',
+                CriteriaJson TEXT NOT NULL DEFAULT '{}',
+                DiagnosticsJson TEXT NOT NULL DEFAULT '{}',
+                WarningsJson TEXT NOT NULL DEFAULT '[]',
+                FailuresJson TEXT NOT NULL DEFAULT '[]',
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                AuditEventId INTEGER NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_Profile3DAcceptanceRuns_CreatedAtUtc ON Profile3DAcceptanceRuns(CreatedAtUtc);
             """;
         command.ExecuteNonQuery();
     }
@@ -3792,6 +4649,8 @@ public static class AoiDatabase
                 CreatedAtUtc TEXT NOT NULL,
                 ControllerName TEXT NOT NULL,
                 EmergencyStopName TEXT NOT NULL,
+                SafetyControllerName TEXT NOT NULL DEFAULT '',
+                SafetySourceKind TEXT NOT NULL DEFAULT 'NotConnected',
                 SourceKind TEXT NOT NULL,
                 CriteriaJson TEXT NOT NULL,
                 Status TEXT NOT NULL,
@@ -3803,6 +4662,7 @@ public static class AoiDatabase
                 FullCycleMs REAL NOT NULL DEFAULT 0,
                 InvalidTransitionRejected INTEGER NOT NULL DEFAULT 0,
                 EmergencyStopBlocked INTEGER NOT NULL DEFAULT 0,
+                SafetyFaultBlocked INTEGER NOT NULL DEFAULT 0,
                 ResetReturnedIdle INTEGER NOT NULL DEFAULT 0,
                 AuditEventCount INTEGER NOT NULL DEFAULT 0,
                 WarningsJson TEXT NOT NULL DEFAULT '[]',
@@ -3873,6 +4733,12 @@ public static class AoiDatabase
                 PeakWorkingSetMb REAL NOT NULL DEFAULT 0,
                 IsCompletedFactoryEvidence INTEGER NOT NULL DEFAULT 0,
                 ErrorsJson TEXT NOT NULL DEFAULT '[]',
+                AverageTotalCycleMs REAL NOT NULL DEFAULT 0,
+                MaxTotalCycleMs REAL NOT NULL DEFAULT 0,
+                P95TotalCycleMs REAL NOT NULL DEFAULT 0,
+                CancellationReason TEXT NOT NULL DEFAULT '',
+                FirstCriticalError TEXT NOT NULL DEFAULT '',
+                MemoryWarningsJson TEXT NOT NULL DEFAULT '[]',
                 AuditEventId INTEGER NULL
             );
 
@@ -3891,6 +4757,8 @@ public static class AoiDatabase
                 Success INTEGER NOT NULL DEFAULT 0,
                 Message TEXT NOT NULL DEFAULT '',
                 Error TEXT NOT NULL DEFAULT '',
+                TotalCycleMs REAL NOT NULL DEFAULT 0,
+                ExceptionCategory TEXT NOT NULL DEFAULT '',
                 FOREIGN KEY (RunId) REFERENCES SoakTestRuns(Id)
             );
 
@@ -3937,6 +4805,69 @@ public static class AoiDatabase
             CREATE INDEX IF NOT EXISTS IX_ModelRegistry_ModelId ON ModelRegistry(ModelId);
             CREATE INDEX IF NOT EXISTS IX_ModelRegistry_IsActive ON ModelRegistry(IsActive);
             CREATE INDEX IF NOT EXISTS IX_ModelRegistry_RegisteredAtUtc ON ModelRegistry(RegisteredAtUtc);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureModelAcceptanceTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS ModelAcceptanceRuns
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CreatedAtUtc TEXT NOT NULL,
+                ModelId TEXT NOT NULL DEFAULT '',
+                ModelVersion TEXT NOT NULL DEFAULT '',
+                ModelSha256 TEXT NOT NULL DEFAULT '',
+                ModelPath TEXT NOT NULL DEFAULT '',
+                LabelMapPath TEXT NOT NULL DEFAULT '',
+                InputTensorName TEXT NOT NULL DEFAULT '',
+                OutputTensorName TEXT NOT NULL DEFAULT '',
+                OutputShape TEXT NOT NULL DEFAULT '',
+                DatasetFolder TEXT NOT NULL DEFAULT '',
+                DatasetName TEXT NOT NULL DEFAULT '',
+                GroundTruthCsvPath TEXT NOT NULL DEFAULT '',
+                IsFormalManifest INTEGER NOT NULL DEFAULT 0,
+                Status TEXT NOT NULL DEFAULT 'FAIL',
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                ApprovedBy TEXT NOT NULL DEFAULT '',
+                ApprovedAtUtc TEXT NULL,
+                IsProductionCandidate INTEGER NOT NULL DEFAULT 0,
+                CriteriaJson TEXT NOT NULL DEFAULT '{}',
+                MetricsJson TEXT NOT NULL DEFAULT '{}',
+                DatasetQualityJson TEXT NOT NULL DEFAULT '{}',
+                FalseCallRecommendationJson TEXT NOT NULL DEFAULT '{}',
+                BreakdownJson TEXT NOT NULL DEFAULT '{}',
+                PerformanceJson TEXT NOT NULL DEFAULT '{}',
+                P95InferenceMs REAL NOT NULL DEFAULT 0,
+                MessagesJson TEXT NOT NULL DEFAULT '[]',
+                LimitationsJson TEXT NOT NULL DEFAULT '[]',
+                AuditEventId INTEGER NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS ModelReleasePackages
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CreatedAtUtc TEXT NOT NULL,
+                AcceptanceRunId INTEGER NOT NULL,
+                ModelId TEXT NOT NULL,
+                ModelVersion TEXT NOT NULL,
+                ModelSha256 TEXT NOT NULL,
+                PackagePath TEXT NOT NULL,
+                ManifestPath TEXT NOT NULL,
+                ReportPath TEXT NOT NULL,
+                Status TEXT NOT NULL,
+                ApprovedBy TEXT NOT NULL DEFAULT '',
+                AuditEventId INTEGER NULL,
+                FOREIGN KEY (AcceptanceRunId) REFERENCES ModelAcceptanceRuns(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_ModelAcceptanceRuns_Model_Status ON ModelAcceptanceRuns(ModelId, Status, IsProductionCandidate);
+            CREATE INDEX IF NOT EXISTS IX_ModelAcceptanceRuns_CreatedAtUtc ON ModelAcceptanceRuns(CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_ModelReleasePackages_Model ON ModelReleasePackages(ModelId, CreatedAtUtc);
             """;
         command.ExecuteNonQuery();
     }
@@ -4439,6 +5370,25 @@ public static class AoiDatabase
             FOREIGN KEY (ExportHistoryId) REFERENCES ExportHistory(Id)
         );
 
+        CREATE TABLE IF NOT EXISTS BuildTestEvidence
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            GeneratedAtUtc TEXT NOT NULL,
+            CommitSha TEXT NOT NULL DEFAULT '',
+            Configuration TEXT NOT NULL DEFAULT 'Release',
+            HygieneStatus TEXT NOT NULL DEFAULT 'UNKNOWN',
+            RestoreStatus TEXT NOT NULL DEFAULT 'UNKNOWN',
+            BuildStatus TEXT NOT NULL DEFAULT 'UNKNOWN',
+            TestStatus TEXT NOT NULL DEFAULT 'UNKNOWN',
+            PublishValidationStatus TEXT NOT NULL DEFAULT 'UNKNOWN',
+            EvidencePath TEXT NOT NULL DEFAULT '',
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            CreatedAtUtc TEXT NOT NULL,
+            TestResultPath TEXT NOT NULL DEFAULT '',
+            MachineName TEXT NOT NULL DEFAULT '',
+            AuditEventId INTEGER NULL
+        );
+
         CREATE TABLE IF NOT EXISTS ValidationPackages
         (
             Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4588,12 +5538,40 @@ public static class AoiDatabase
             FOREIGN KEY (RunId) REFERENCES LightingAcceptanceRuns(Id)
         );
 
+        CREATE TABLE IF NOT EXISTS Profile3DAcceptanceRuns
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CreatedAtUtc TEXT NOT NULL,
+            SourceName TEXT NOT NULL,
+            SourceKind TEXT NOT NULL DEFAULT 'None',
+            IsSimulated INTEGER NOT NULL DEFAULT 1,
+            Status TEXT NOT NULL DEFAULT 'FAIL',
+            FactoryReadinessStatus TEXT NOT NULL DEFAULT 'NOT VALIDATED',
+            AcquisitionMs REAL NOT NULL DEFAULT 0,
+            Width INTEGER NOT NULL DEFAULT 0,
+            Height INTEGER NOT NULL DEFAULT 0,
+            Unit TEXT NOT NULL DEFAULT '',
+            XPitchMicrons REAL NOT NULL DEFAULT 0,
+            YPitchMicrons REAL NOT NULL DEFAULT 0,
+            MissingHeightCount INTEGER NOT NULL DEFAULT 0,
+            NaNHeightCount INTEGER NOT NULL DEFAULT 0,
+            FrameId TEXT NOT NULL DEFAULT '',
+            CriteriaJson TEXT NOT NULL DEFAULT '{}',
+            DiagnosticsJson TEXT NOT NULL DEFAULT '{}',
+            WarningsJson TEXT NOT NULL DEFAULT '[]',
+            FailuresJson TEXT NOT NULL DEFAULT '[]',
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            AuditEventId INTEGER NULL
+        );
+
         CREATE TABLE IF NOT EXISTS RobotAcceptanceRuns
         (
             Id INTEGER PRIMARY KEY AUTOINCREMENT,
             CreatedAtUtc TEXT NOT NULL,
             ControllerName TEXT NOT NULL,
             EmergencyStopName TEXT NOT NULL,
+            SafetyControllerName TEXT NOT NULL DEFAULT '',
+            SafetySourceKind TEXT NOT NULL DEFAULT 'NotConnected',
             SourceKind TEXT NOT NULL,
             CriteriaJson TEXT NOT NULL,
             Status TEXT NOT NULL,
@@ -4605,6 +5583,7 @@ public static class AoiDatabase
             FullCycleMs REAL NOT NULL DEFAULT 0,
             InvalidTransitionRejected INTEGER NOT NULL DEFAULT 0,
             EmergencyStopBlocked INTEGER NOT NULL DEFAULT 0,
+            SafetyFaultBlocked INTEGER NOT NULL DEFAULT 0,
             ResetReturnedIdle INTEGER NOT NULL DEFAULT 0,
             AuditEventCount INTEGER NOT NULL DEFAULT 0,
             WarningsJson TEXT NOT NULL DEFAULT '[]',
@@ -4663,6 +5642,12 @@ public static class AoiDatabase
             PeakWorkingSetMb REAL NOT NULL DEFAULT 0,
             IsCompletedFactoryEvidence INTEGER NOT NULL DEFAULT 0,
             ErrorsJson TEXT NOT NULL DEFAULT '[]',
+            AverageTotalCycleMs REAL NOT NULL DEFAULT 0,
+            MaxTotalCycleMs REAL NOT NULL DEFAULT 0,
+            P95TotalCycleMs REAL NOT NULL DEFAULT 0,
+            CancellationReason TEXT NOT NULL DEFAULT '',
+            FirstCriticalError TEXT NOT NULL DEFAULT '',
+            MemoryWarningsJson TEXT NOT NULL DEFAULT '[]',
             AuditEventId INTEGER NULL
         );
 
@@ -4681,6 +5666,8 @@ public static class AoiDatabase
             Success INTEGER NOT NULL DEFAULT 0,
             Message TEXT NOT NULL DEFAULT '',
             Error TEXT NOT NULL DEFAULT '',
+            TotalCycleMs REAL NOT NULL DEFAULT 0,
+            ExceptionCategory TEXT NOT NULL DEFAULT '',
             FOREIGN KEY (RunId) REFERENCES SoakTestRuns(Id)
         );
 
@@ -4717,6 +5704,54 @@ public static class AoiDatabase
             LotId TEXT NOT NULL DEFAULT '',
             BoardModel TEXT NOT NULL DEFAULT '',
             Result TEXT NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS CentralSyncQueue
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CreatedAtUtc TEXT NOT NULL,
+            LastAttemptAtUtc TEXT NULL,
+            NextAttemptAtUtc TEXT NULL,
+            ItemType TEXT NOT NULL,
+            ItemId TEXT NOT NULL,
+            PayloadJson TEXT NOT NULL,
+            PayloadPath TEXT NOT NULL DEFAULT '',
+            EndpointOrFolder TEXT NOT NULL DEFAULT '',
+            StationId TEXT NOT NULL DEFAULT '',
+            RetryCount INTEGER NOT NULL DEFAULT 0,
+            MaxRetryCount INTEGER NOT NULL DEFAULT 5,
+            Status TEXT NOT NULL DEFAULT 'Pending',
+            LastError TEXT NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS CentralSyncAttempts
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            QueueId INTEGER NOT NULL,
+            AttemptedAtUtc TEXT NOT NULL,
+            Mode TEXT NOT NULL,
+            EndpointOrFolder TEXT NOT NULL DEFAULT '',
+            Status TEXT NOT NULL,
+            Message TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY (QueueId) REFERENCES CentralSyncQueue(Id)
+        );
+
+        CREATE TABLE IF NOT EXISTS TraceabilityTestReports
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CreatedAtUtc TEXT NOT NULL,
+            Status TEXT NOT NULL DEFAULT 'FAIL',
+            Mode TEXT NOT NULL DEFAULT 'Not Connected',
+            EndpointUrl TEXT NOT NULL DEFAULT '',
+            ResultStatus TEXT NOT NULL DEFAULT 'FAIL',
+            ImageStatus TEXT NOT NULL DEFAULT 'NOT SENT',
+            PayloadPath TEXT NOT NULL DEFAULT '',
+            ReportJsonPath TEXT NOT NULL DEFAULT '',
+            ReportHtmlPath TEXT NOT NULL DEFAULT '',
+            Message TEXT NOT NULL DEFAULT '',
+            ProductionModeConfirmed INTEGER NOT NULL DEFAULT 0,
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            AuditEventId INTEGER NULL
         );
 
         CREATE TABLE IF NOT EXISTS LogArchive
@@ -4756,6 +5791,7 @@ public static class AoiDatabase
         CREATE INDEX IF NOT EXISTS IX_ExportVerification_ExportHistoryId ON ExportVerification(ExportHistoryId);
         CREATE INDEX IF NOT EXISTS IX_ExportVerification_CheckedAtUtc ON ExportVerification(CheckedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_ExportVerification_Status ON ExportVerification(Status);
+        CREATE INDEX IF NOT EXISTS IX_BuildTestEvidence_GeneratedAtUtc ON BuildTestEvidence(GeneratedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_ValidationPackages_CreatedAtUtc ON ValidationPackages(CreatedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_ValidationPackages_PackageId ON ValidationPackages(PackageId);
         CREATE INDEX IF NOT EXISTS IX_FalseCallReductionRuns_CreatedAtUtc ON FalseCallReductionRuns(CreatedAtUtc);
@@ -4766,6 +5802,7 @@ public static class AoiDatabase
         CREATE INDEX IF NOT EXISTS IX_CameraAcceptanceFrames_RunId ON CameraAcceptanceFrames(RunId);
         CREATE INDEX IF NOT EXISTS IX_LightingAcceptanceRuns_CreatedAtUtc ON LightingAcceptanceRuns(CreatedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_LightingAcceptanceSteps_RunId ON LightingAcceptanceSteps(RunId);
+        CREATE INDEX IF NOT EXISTS IX_Profile3DAcceptanceRuns_CreatedAtUtc ON Profile3DAcceptanceRuns(CreatedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_RobotAcceptanceRuns_CreatedAtUtc ON RobotAcceptanceRuns(CreatedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_RobotAcceptanceSteps_RunId ON RobotAcceptanceSteps(RunId);
         CREATE INDEX IF NOT EXISTS IX_SoakTestRuns_StartedAtUtc ON SoakTestRuns(StartedAtUtc);
@@ -4774,5 +5811,9 @@ public static class AoiDatabase
         CREATE INDEX IF NOT EXISTS IX_MesUploadAttempts_CreatedAtUtc ON MesUploadAttempts(CreatedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_MesSpoolQueue_Status_NextAttempt ON MesSpoolQueue(Status, NextAttemptAtUtc);
         CREATE INDEX IF NOT EXISTS IX_MesSpoolQueue_CreatedAtUtc ON MesSpoolQueue(CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_CentralSyncQueue_Status_NextAttempt ON CentralSyncQueue(Status, NextAttemptAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_CentralSyncQueue_Item ON CentralSyncQueue(ItemType, ItemId);
+        CREATE INDEX IF NOT EXISTS IX_CentralSyncAttempts_QueueId ON CentralSyncAttempts(QueueId);
+        CREATE INDEX IF NOT EXISTS IX_TraceabilityTestReports_CreatedAtUtc ON TraceabilityTestReports(CreatedAtUtc);
         """;
 }

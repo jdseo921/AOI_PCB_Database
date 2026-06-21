@@ -243,10 +243,11 @@ public partial class AIModelTestView : UserControl
             _currentRunUsedFormalManifest = batch.IsFormalManifest;
             _lastAnnotatedImageFolder = string.Empty;
             _lastReportPath = string.Empty;
-            _currentFalseCallRun = null;
-            _falseCallPoints.Clear();
-            FalseCallRecommendationText.Text = "Batch complete. Analyze false calls to generate threshold candidates.";
-            ApplyRecommendedThresholdButton.IsEnabled = false;
+        _currentFalseCallRun = null;
+        _falseCallPoints.Clear();
+        FalseCallRecommendationText.Text = "Batch complete. Analyze false calls to generate threshold candidates.";
+        CreateThresholdProfileDraftButton.IsEnabled = false;
+        ApplyRecommendedThresholdButton.IsEnabled = false;
 
             _rows.Clear();
             foreach (var row in batch.Rows)
@@ -483,7 +484,7 @@ public partial class AIModelTestView : UserControl
             WorkflowState.Instance.OperatorWithRole);
 
         _falseCallPoints.Clear();
-        foreach (var point in _currentFalseCallRun.Points.OrderBy(point => point.FalsePositive).ThenBy(point => point.FalseNegative).Take(8))
+        foreach (var point in _currentFalseCallRun.Points.OrderBy(point => point.ConfidenceThreshold))
             _falseCallPoints.Add(point);
 
         var selected = _currentFalseCallRun.Recommendation.Point;
@@ -491,10 +492,57 @@ public partial class AIModelTestView : UserControl
             ? $"{_currentFalseCallRun.Recommendation.Status}: {string.Join(" ", _currentFalseCallRun.Recommendation.Messages.Take(2))}"
             : string.Create(
                 CultureInfo.InvariantCulture,
-                $"{_currentFalseCallRun.Recommendation.Status}: threshold {selected.ConfidenceThreshold:F3}, false call {selected.FalseCallRate:P1}, possible escapes {selected.FalseNegative}, review burden {selected.EstimatedManualReviewMinutes:F1} min.");
+                $"{_currentFalseCallRun.Recommendation.Status}: mode {_currentFalseCallRun.Recommendation.Mode}, threshold {selected.ConfidenceThreshold:F3}, false call {selected.FalseCallRate:P1}, possible escapes {selected.FalseNegative}, review burden {selected.EstimatedManualReviewMinutes:F1} min.");
         ApplyRecommendedThresholdButton.IsEnabled = string.Equals(_currentFalseCallRun.Recommendation.Status, "VALID", StringComparison.OrdinalIgnoreCase) &&
             RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole);
+        CreateThresholdProfileDraftButton.IsEnabled = _currentFalseCallRun.Recommendation.Point is not null &&
+            !string.Equals(_currentFalseCallRun.Recommendation.Status, "INVALID", StringComparison.OrdinalIgnoreCase) &&
+            RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole);
         StatusText.Text = $"False-call analysis generated for run {_currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "unsaved"}: {_currentFalseCallRun.Recommendation.Status}.";
+    }
+
+    private void OnCreateThresholdProfileDraftClick(object sender, RoutedEventArgs e)
+    {
+        if (_currentFalseCallRun?.Recommendation.Point is null)
+        {
+            MessageBox.Show("Analyze false calls before creating a threshold profile draft.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanChangeThresholds, "Creating threshold profile drafts", out var message))
+        {
+            MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            var state = WorkflowState.Instance;
+            var boardModel = CustomerValidationReportService.SummarizeDistinct(_rows.Select(row => row.BoardModel));
+            if (string.Equals(boardModel, "Not provided", StringComparison.OrdinalIgnoreCase))
+                boardModel = state.BoardProgram;
+            var recipe = RecipeService.LoadLatestRecipe(state.BoardProgram).Recipe;
+            var profile = ThresholdProfileService.CreateDraftFromFalseCallReductionRecommendation(
+                _currentFalseCallRun,
+                boardModel,
+                state.BoardProgram,
+                recipe?.RecipeName ?? "ANY",
+                recipe?.Revision ?? "ANY",
+                state.OperatorWithRole);
+
+            StatusText.Text = $"Threshold profile draft created: {profile.ProfileId}/{profile.Revision}. Approve and deploy it from Settings.";
+            FalseCallRecommendationText.Text += $" Draft profile {profile.ProfileId}/{profile.Revision} created.";
+            WorkflowState.Instance.AddEvent("THRESHOLD_PROFILE_DRAFT", $"Draft profile created from false-call run {_currentFalseCallRun.Id}: {profile.ProfileId}/{profile.Revision}.");
+            MessageBox.Show(
+                $"Threshold profile draft created:\n{profile.ProfileId} / {profile.Revision}\n\nApprove and deploy it from Settings > Threshold Profiles.",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(ex.Message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OnApplyRecommendedThresholdClick(object sender, RoutedEventArgs e)
@@ -525,7 +573,7 @@ public partial class AIModelTestView : UserControl
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        FalseCallReductionService.ApplyRecommendedThreshold(_currentFalseCallRun, WorkflowState.Instance.OperatorWithRole);
+        FalseCallReductionService.ApplyRecommendedThreshold(_currentFalseCallRun, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
         RefreshEngineText();
         StatusText.Text = $"Applied recommended threshold {point.ConfidenceThreshold:F3}.";
         FalseCallRecommendationText.Text += " Applied to current model configuration.";
@@ -658,6 +706,7 @@ public partial class AIModelTestView : UserControl
             SampleAnnotatedImages = sampleImages,
             Warnings = warnings,
             FalseCallRecommendation = FalseCallReductionService.ToSummary(_currentFalseCallRun ?? AoiDatabase.GetLatestFalseCallReductionRun(_currentRunId)),
+            ThresholdProfileEvidence = ThresholdProfileService.GetActiveEvidenceSummary(boardModel, state.BoardProgram, "ANY"),
             BreakdownSummary = ClassMetricsService.Calculate(_rows),
             DatasetQualitySummary = datasetQuality,
             CameraAcceptanceSummary = CameraAcceptanceTestService.ToSummary(AoiDatabase.GetLatestCameraAcceptanceRun(realHardwareOnly: true)),
@@ -698,14 +747,23 @@ public partial class AIModelTestView : UserControl
         _falseCallPoints.Clear();
         if (_currentFalseCallRun is not null)
         {
-            foreach (var candidate in _currentFalseCallRun.Points.OrderBy(point => point.FalsePositive).ThenBy(point => point.FalseNegative).Take(8))
+            foreach (var candidate in _currentFalseCallRun.Points.OrderBy(point => point.ConfidenceThreshold))
                 _falseCallPoints.Add(candidate);
 
             FalseCallRecommendationText.Text = _currentFalseCallRun.Recommendation.Point is { } selectedPoint
-                ? $"{_currentFalseCallRun.Recommendation.Status}: threshold {selectedPoint.ConfidenceThreshold:F3}, false call {selectedPoint.FalseCallRate:P1}, possible escapes {selectedPoint.FalseNegative}."
+                ? $"{_currentFalseCallRun.Recommendation.Status}: mode {_currentFalseCallRun.Recommendation.Mode}, threshold {selectedPoint.ConfidenceThreshold:F3}, false call {selectedPoint.FalseCallRate:P1}, possible escapes {selectedPoint.FalseNegative}."
                 : $"{_currentFalseCallRun.Recommendation.Status}: no applied candidate.";
             ApplyRecommendedThresholdButton.IsEnabled = string.Equals(_currentFalseCallRun.Recommendation.Status, "VALID", StringComparison.OrdinalIgnoreCase) &&
                 RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole);
+            CreateThresholdProfileDraftButton.IsEnabled = _currentFalseCallRun.Recommendation.Point is not null &&
+                !string.Equals(_currentFalseCallRun.Recommendation.Status, "INVALID", StringComparison.OrdinalIgnoreCase) &&
+                RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole);
+        }
+        else
+        {
+            FalseCallRecommendationText.Text = "Batch loaded. Analyze false calls to generate threshold candidates.";
+            CreateThresholdProfileDraftButton.IsEnabled = false;
+            ApplyRecommendedThresholdButton.IsEnabled = false;
         }
     }
 

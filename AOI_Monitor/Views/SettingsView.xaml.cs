@@ -45,6 +45,7 @@ public partial class SettingsView : UserControl
         CameraSourceSettingsService.SettingsChanged += OnCameraSourceSettingsChanged;
         LightingSettingsService.SettingsChanged += OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
+        CentralSyncSettingsService.SettingsChanged += OnCentralSyncSettingsChanged;
         RefreshWorkflowUi();
         RefreshThresholdProfilesUi();
         ApplyLanguageVisuals();
@@ -59,6 +60,7 @@ public partial class SettingsView : UserControl
         CameraSourceSettingsService.SettingsChanged -= OnCameraSourceSettingsChanged;
         LightingSettingsService.SettingsChanged -= OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged -= OnMesIntegrationSettingsChanged;
+        CentralSyncSettingsService.SettingsChanged -= OnCentralSyncSettingsChanged;
     }
 
     private void OnWorkflowStateChanged() => Dispatcher.Invoke(RefreshWorkflowUi);
@@ -67,6 +69,7 @@ public partial class SettingsView : UserControl
     private void OnCameraSourceSettingsChanged() => Dispatcher.Invoke(RefreshCameraSourceUi);
     private void OnLightingSettingsChanged() => Dispatcher.Invoke(RefreshLightingUi);
     private void OnMesIntegrationSettingsChanged() => Dispatcher.Invoke(RefreshMesIntegrationUi);
+    private void OnCentralSyncSettingsChanged() => Dispatcher.Invoke(RefreshCentralSyncUi);
 
     private void OnApply(object sender, RoutedEventArgs e)
     {
@@ -79,6 +82,8 @@ public partial class SettingsView : UserControl
         var newLighting = BuildLightingSettingsFromUi();
         var existingMes = MesIntegrationSettingsService.Load();
         var newMes = BuildMesIntegrationSettingsFromUi();
+        var existingCentralSync = CentralSyncSettingsService.Load();
+        var newCentralSync = BuildCentralSyncSettingsFromUi();
         var existingDeploymentProfile = DeploymentProfileSettingsService.Load();
         var newDeploymentProfile = ComboToDeploymentProfile(DeploymentProfileCombo.SelectedIndex);
         var newStorageRoot = string.IsNullOrWhiteSpace(StorageRootText.Text)
@@ -105,6 +110,7 @@ public partial class SettingsView : UserControl
             !string.Equals(existingCamera.TopDeviceId, newCamera.TopDeviceId, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingCamera.SideDeviceId, newCamera.SideDeviceId, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingCamera.BottomDeviceId, newCamera.BottomDeviceId, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingCamera.AdapterFolder, newCamera.AdapterFolder, StringComparison.OrdinalIgnoreCase) ||
             existingCamera.AcquisitionMode != newCamera.AcquisitionMode ||
             Math.Abs(existingCamera.ExposureMs - newCamera.ExposureMs) > 0.0001 ||
             Math.Abs(existingCamera.Gain - newCamera.Gain) > 0.0001 ||
@@ -128,6 +134,17 @@ public partial class SettingsView : UserControl
             !string.Equals(existingMes.Password, newMes.Password, StringComparison.Ordinal) ||
             existingMes.MaxRetryCount != newMes.MaxRetryCount ||
             existingMes.RetryBackoffMs != newMes.RetryBackoffMs;
+        var centralSyncConfigChanged =
+            existingCentralSync.Mode != newCentralSync.Mode ||
+            !string.Equals(existingCentralSync.EndpointOrFolder, newCentralSync.EndpointOrFolder, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingCentralSync.StationId, newCentralSync.StationId, StringComparison.OrdinalIgnoreCase) ||
+            existingCentralSync.SyncIntervalSeconds != newCentralSync.SyncIntervalSeconds ||
+            existingCentralSync.IncludeImages != newCentralSync.IncludeImages ||
+            existingCentralSync.RedactOperatorId != newCentralSync.RedactOperatorId ||
+            existingCentralSync.RedactImagePaths != newCentralSync.RedactImagePaths ||
+            existingCentralSync.RedactEndpointInExports != newCentralSync.RedactEndpointInExports ||
+            existingCentralSync.MaxRetryCount != newCentralSync.MaxRetryCount ||
+            !string.Equals(existingCentralSync.SharedSecret, newCentralSync.SharedSecret, StringComparison.Ordinal);
         var lightingConfigChanged =
             !string.Equals(existingLighting.Mode, newLighting.Mode, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(existingLighting.TcpHost, newLighting.TcpHost, StringComparison.OrdinalIgnoreCase) ||
@@ -144,7 +161,7 @@ public partial class SettingsView : UserControl
             ComboToPriority(DetectionPriorityCombo.SelectedIndex) != state.DetectionPriority ||
             Math.Abs(existingConfig.ConfidenceThreshold - newConfig.ConfidenceThreshold) > 0.0001;
 
-        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || lightingConfigChanged || mesConfigChanged || deploymentProfileChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, deployment target, camera source, lighting sync, or MES integration settings"))
+        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || lightingConfigChanged || mesConfigChanged || centralSyncConfigChanged || deploymentProfileChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, deployment target, camera source, lighting sync, MES integration, or central sync settings"))
             return;
 
         if (thresholdChanged && !Authorize(RoleAuthorization.CanChangeThresholds, "Changing inspection thresholds or detection priority"))
@@ -159,6 +176,7 @@ public partial class SettingsView : UserControl
         SaveCameraSourceSettings(newCamera);
         SaveLightingSettings(newLighting);
         SaveMesIntegrationSettings(newMes);
+        SaveCentralSyncSettings(newCentralSync);
         if (deploymentProfileChanged)
             DeploymentProfileSettingsService.Save(newDeploymentProfile);
 
@@ -202,6 +220,7 @@ public partial class SettingsView : UserControl
         CameraTopDeviceIdText.Text = string.Empty;
         CameraSideDeviceIdText.Text = string.Empty;
         CameraBottomDeviceIdText.Text = string.Empty;
+        CameraAdapterFolderText.Text = string.Empty;
         CameraAcquisitionModeCombo.SelectedIndex = 0;
         CameraExposureMsText.Text = "5.0";
         CameraGainText.Text = "1.0";
@@ -234,6 +253,17 @@ public partial class SettingsView : UserControl
         MesRetryBackoffText.Text = "500";
         MesAutoUploadCheck.IsChecked = false;
         MesIntegrationSettingsService.Save(new MesIntegrationSettings());
+        CentralSyncModeCombo.SelectedIndex = 0;
+        CentralSyncEndpointText.Text = string.Empty;
+        CentralSyncStationIdText.Text = Environment.MachineName;
+        CentralSyncIntervalText.Text = "300";
+        CentralSyncMaxRetryText.Text = "5";
+        CentralSyncSecretBox.Password = string.Empty;
+        CentralSyncIncludeImagesCheck.IsChecked = false;
+        CentralSyncRedactOperatorCheck.IsChecked = true;
+        CentralSyncRedactImagePathsCheck.IsChecked = true;
+        CentralSyncRedactEndpointCheck.IsChecked = true;
+        CentralSyncSettingsService.Save(new CentralSyncSettings());
         DeploymentProfileSettingsService.Save(DeploymentProfile.Stage1ImageValidation);
 
         ApplyLanguageVisuals();
@@ -469,6 +499,95 @@ public partial class SettingsView : UserControl
             MessageBoxImage.Information);
     }
 
+    private void OnRunModelAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanTestModelConfiguration, "Running model acceptance"))
+            return;
+
+        var datasetDialog = new OpenFolderDialog { Title = "Select model acceptance validation dataset folder", Multiselect = false };
+        if (datasetDialog.ShowDialog() != true || string.IsNullOrWhiteSpace(datasetDialog.FolderName))
+            return;
+
+        var csvDialog = new OpenFileDialog
+        {
+            Title = "Select formal ground-truth CSV",
+            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+        };
+        if (csvDialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var run = ModelAcceptanceService.RunAcceptance(datasetDialog.FolderName, csvDialog.FileName, operatorId: WorkflowState.Instance.OperatorWithRole);
+            WorkflowState.Instance.AddEvent("MODEL_ACCEPTANCE", $"Model acceptance {run.Status}: model={run.ModelId}; run={run.Id}; dataset={run.DatasetName}.");
+            MessageBox.Show($"Model acceptance {run.Status}.\n\nRun ID: {run.Id}\n{string.Join(Environment.NewLine, run.Messages.Take(5))}", "Model Acceptance", MessageBoxButton.OK, run.Status == "PASS" ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or InvalidDataException)
+        {
+            MessageBox.Show($"Model acceptance failed:\n{ex.Message}", "Model Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnCreateModelReleasePackageClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanChangeThresholds, "Creating model release packages"))
+            return;
+
+        var latest = AoiDatabase.GetLatestModelAcceptanceRun();
+        if (latest is null)
+        {
+            MessageBox.Show("Run model acceptance before creating a release package.", "Model Release", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var outputDialog = new OpenFolderDialog { Title = "Select model release package output folder", Multiselect = false };
+        if (outputDialog.ShowDialog() != true || string.IsNullOrWhiteSpace(outputDialog.FolderName))
+            return;
+
+        try
+        {
+            var package = ModelAcceptanceService.CreateReleasePackage(latest.Id, outputDialog.FolderName, WorkflowState.Instance.OperatorWithRole);
+            WorkflowState.Instance.AddEvent("MODEL_RELEASE_PACKAGE", $"Model release package created: model={package.ModelId}; status={package.Status}.");
+            MessageBox.Show($"Model release package created:\n{package.PackagePath}", "Model Release", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            MessageBox.Show($"Model release package failed:\n{ex.Message}", "Model Release", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnPromoteProductionCandidateClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanChangeThresholds, "Promoting production candidate models"))
+            return;
+
+        var latest = AoiDatabase.GetLatestModelAcceptanceRun();
+        if (latest is null)
+        {
+            MessageBox.Show("Run model acceptance before promoting a production candidate.", "Model Acceptance", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"Promote model acceptance run {latest.Id} for {latest.ModelId} to production candidate?\n\nThis remains limited to the validation dataset and does not prove universal production accuracy.",
+            "Confirm Production Candidate",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            ModelAcceptanceService.PromoteToProductionCandidate(latest.Id, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
+            WorkflowState.Instance.AddEvent("MODEL_PRODUCTION_CANDIDATE", $"Promoted model acceptance run {latest.Id} for {latest.ModelId}.");
+            MessageBox.Show("Model acceptance run promoted to production candidate.", "Model Acceptance", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(ex.Message, "Model Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void OnBrowseCameraTopClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Top);
     private void OnBrowseCameraSideClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Side);
     private void OnBrowseCameraBottomClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Bottom);
@@ -538,6 +657,103 @@ public partial class SettingsView : UserControl
             "Camera Source Test",
             MessageBoxButton.OK,
             source.ConnectionStatus is CameraSourceStatus.Ready or CameraSourceStatus.Simulated ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
+    private void OnBrowseCameraAdapterClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select external camera adapter plugin folder",
+            Multiselect = false,
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            CameraAdapterFolderText.Text = dialog.FolderName;
+            CameraSourceCombo.SelectedIndex = 2;
+            RefreshCameraSourceUi(BuildCameraSourceSettingsFromUi());
+        }
+    }
+
+    private void OnDiscoverCamerasClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Discovering cameras"))
+            return;
+
+        var settings = BuildCameraSourceSettingsFromUi();
+        var discovery = VisionCameraPluginLoader.CreateDiscovery(settings, out var loadMessage);
+        IReadOnlyList<VisionDeviceInfo> devices;
+        try
+        {
+            devices = discovery.DiscoverDevices();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            CameraDiagnosticsText.Text = $"Camera discovery failed safely: {ex.Message}";
+            MessageBox.Show(CameraDiagnosticsText.Text, "Camera Discovery", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        AssignDiscoveredDevices(devices);
+        var summary = devices.Count == 0
+            ? "No cameras discovered."
+            : string.Join(Environment.NewLine, devices.Select(device => $"{device.ViewAssignment}: {device.DeviceId} {device.Vendor} {device.Model} {device.InterfaceType} {device.Status}"));
+        CameraDiagnosticsText.Text = $"{loadMessage} Discovered {devices.Count} device(s). {summary}";
+        MessageBox.Show(CameraDiagnosticsText.Text, "Camera Discovery", MessageBoxButton.OK, devices.Any(d => !string.IsNullOrWhiteSpace(d.DeviceId)) ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
+    private void OnExportHardwareAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Exporting hardware acceptance package"))
+            return;
+
+        try
+        {
+            var root = Path.Combine(AoiDatabase.StorageRoot, "exports", "hardware_acceptance", DateTime.UtcNow.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture));
+            Directory.CreateDirectory(root);
+            var camera = _lastCameraAcceptanceRun ?? AoiDatabase.GetLatestCameraAcceptanceRun();
+            var lighting = _lastLightingAcceptanceRun ?? AoiDatabase.GetLatestLightingAcceptanceRun();
+            var manifest = new
+            {
+                schemaVersion = "hardware-acceptance-package/v1",
+                generatedAtUtc = DateTime.UtcNow,
+                cameraIncluded = camera is not null,
+                lightingIncluded = lighting is not null,
+                limitation = "Fake, null, folder, or simulated evidence does not validate real GigE/USB3 cameras or real lighting controllers.",
+            };
+
+            File.WriteAllText(Path.Combine(root, "hardware_acceptance_manifest.json"), JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }));
+            if (camera is not null)
+                File.WriteAllText(Path.Combine(root, "latest_camera_acceptance.json"), JsonSerializer.Serialize(camera, new JsonSerializerOptions { WriteIndented = true }));
+            if (lighting is not null)
+                File.WriteAllText(Path.Combine(root, "latest_lighting_acceptance.json"), JsonSerializer.Serialize(lighting, new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText(Path.Combine(root, "README.txt"), "Hardware acceptance evidence is scoped to the recorded adapters/controllers. Simulation-only evidence must not be presented as real production hardware validation.");
+
+            MessageBox.Show($"Hardware acceptance package exported:\n{root}", "Hardware Acceptance", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            MessageBox.Show($"Hardware acceptance export failed:\n{ex.Message}", "Hardware Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void AssignDiscoveredDevices(IReadOnlyList<VisionDeviceInfo> devices)
+    {
+        foreach (var device in devices.Where(device => !string.IsNullOrWhiteSpace(device.DeviceId)))
+        {
+            switch (device.ViewAssignment.Trim().ToLowerInvariant())
+            {
+                case "side":
+                    CameraSideDeviceIdText.Text = device.DeviceId;
+                    break;
+                case "bottom":
+                    CameraBottomDeviceIdText.Text = device.DeviceId;
+                    break;
+                case "top":
+                    CameraTopDeviceIdText.Text = device.DeviceId;
+                    break;
+            }
+        }
     }
 
     private async void OnRunCameraAcceptanceClick(object sender, RoutedEventArgs e)
@@ -685,6 +901,7 @@ public partial class SettingsView : UserControl
         RefreshCameraSourceUi();
         RefreshLightingUi();
         RefreshMesIntegrationUi();
+        RefreshCentralSyncUi();
     }
 
     private void RefreshRoleControls()
@@ -703,6 +920,8 @@ public partial class SettingsView : UserControl
         CameraTopDeviceIdText.IsEnabled = canManageSettings;
         CameraSideDeviceIdText.IsEnabled = canManageSettings;
         CameraBottomDeviceIdText.IsEnabled = canManageSettings;
+        CameraAdapterFolderText.IsEnabled = canManageSettings;
+        BrowseCameraAdapterBtn.IsEnabled = canManageSettings;
         CameraAcquisitionModeCombo.IsEnabled = canManageSettings;
         CameraExposureMsText.IsEnabled = canManageSettings;
         CameraGainText.IsEnabled = canManageSettings;
@@ -741,13 +960,25 @@ public partial class SettingsView : UserControl
         MesRetryBackoffText.IsEnabled = canManageSettings;
         MesAutoUploadCheck.IsEnabled = canManageSettings;
         TestMesRestBtn.IsEnabled = canManageSettings;
+        CentralSyncModeCombo.IsEnabled = canManageSettings;
+        CentralSyncEndpointText.IsEnabled = canManageSettings;
+        CentralSyncStationIdText.IsEnabled = canManageSettings;
+        CentralSyncIntervalText.IsEnabled = canManageSettings;
+        CentralSyncMaxRetryText.IsEnabled = canManageSettings;
+        CentralSyncSecretBox.IsEnabled = canManageSettings;
+        CentralSyncIncludeImagesCheck.IsEnabled = canManageSettings;
+        CentralSyncRedactOperatorCheck.IsEnabled = canManageSettings;
+        CentralSyncRedactImagePathsCheck.IsEnabled = canManageSettings;
+        CentralSyncRedactEndpointCheck.IsEnabled = canManageSettings;
         BrowseCameraTopBtn.IsEnabled = canManageSettings;
         BrowseCameraSideBtn.IsEnabled = canManageSettings;
         BrowseCameraBottomBtn.IsEnabled = canManageSettings;
         TestCameraSourceBtn.IsEnabled = canManageSettings;
+        DiscoverCamerasBtn.IsEnabled = canManageSettings;
         RunCameraAcceptanceBtn.IsEnabled = canManageSettings && _cameraAcceptanceCancellation is null;
         CancelCameraAcceptanceBtn.IsEnabled = _cameraAcceptanceCancellation is not null;
         ExportCameraAcceptanceBtn.IsEnabled = canManageSettings;
+        ExportHardwareAcceptanceBtn.IsEnabled = canManageSettings;
         TestLightingBtn.IsEnabled = canManageSettings;
         ModelPathText.IsEnabled = canManageSettings;
         ModelVersionText.IsEnabled = canManageSettings;
@@ -765,6 +996,9 @@ public partial class SettingsView : UserControl
         ConfidenceThresholdText.IsEnabled = canChangeThresholds;
         TestModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
         ValidateRegisteredModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
+        RunModelAcceptanceBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
+        CreateModelReleasePackageBtn.IsEnabled = canChangeThresholds;
+        PromoteProductionCandidateBtn.IsEnabled = canChangeThresholds;
         ApproveThresholdProfileBtn.IsEnabled = canChangeThresholds;
         DeployThresholdProfileBtn.IsEnabled = canChangeThresholds;
     }
@@ -823,6 +1057,14 @@ public partial class SettingsView : UserControl
 
         try
         {
+            var confirm = MessageBox.Show(
+                $"Deploy threshold profile {row.ProfileId}/{row.Revision}?\n\nFuture inspections matching its board/recipe scope will use this active profile. This is customer-dataset calibration evidence, not universal production proof.",
+                "Confirm Threshold Profile Deployment",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
             ThresholdProfileService.DeployProfile(row.ProfileId, row.Revision, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
             RefreshThresholdProfilesUi();
             MessageBox.Show("Threshold profile deployed.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1025,6 +1267,7 @@ public partial class SettingsView : UserControl
         CameraTopDeviceIdText.Text = settings.TopDeviceId;
         CameraSideDeviceIdText.Text = settings.SideDeviceId;
         CameraBottomDeviceIdText.Text = settings.BottomDeviceId;
+        CameraAdapterFolderText.Text = settings.AdapterFolder;
         CameraAcquisitionModeCombo.SelectedIndex = settings.AcquisitionMode switch
         {
             CameraAcquisitionMode.SoftwareTrigger => 1,
@@ -1072,6 +1315,7 @@ public partial class SettingsView : UserControl
             TopDeviceId = CameraTopDeviceIdText.Text.Trim(),
             SideDeviceId = CameraSideDeviceIdText.Text.Trim(),
             BottomDeviceId = CameraBottomDeviceIdText.Text.Trim(),
+            AdapterFolder = CameraAdapterFolderText.Text.Trim(),
             AcquisitionMode = CameraAcquisitionModeCombo.SelectedIndex switch
             {
                 1 => CameraAcquisitionMode.SoftwareTrigger,
@@ -1386,6 +1630,47 @@ public partial class SettingsView : UserControl
         MesDiagnosticsText.Text = MesIntegrationSettingsService.RedactedSummary(settings);
     }
 
+    private void SaveCentralSyncSettings(CentralSyncSettings? preparedSettings = null)
+    {
+        var settings = preparedSettings ?? BuildCentralSyncSettingsFromUi();
+        var validation = CentralSyncSettingsService.Validate(settings);
+        if (validation.Count > 0)
+        {
+            CentralSyncStatusText.Text = string.Join(" ", validation);
+            WorkflowState.Instance.AddEvent("CENTRAL_SYNC_CONFIG_WARNING", CentralSyncStatusText.Text);
+            return;
+        }
+
+        CentralSyncSettingsService.Save(settings);
+        WorkflowState.Instance.AddEvent(
+            "CENTRAL_SYNC_CONFIG",
+            $"Central sync settings updated: {CentralSyncSettingsService.RedactedSummary(settings)}");
+    }
+
+    private void RefreshCentralSyncUi()
+        => RefreshCentralSyncUi(CentralSyncSettingsService.Load());
+
+    private void RefreshCentralSyncUi(CentralSyncSettings settings)
+    {
+        CentralSyncModeCombo.SelectedIndex = settings.Mode switch
+        {
+            CentralSyncMode.FileDrop => 1,
+            CentralSyncMode.RestApi => 2,
+            CentralSyncMode.PostgreSqlBoundary => 3,
+            _ => 0,
+        };
+        CentralSyncEndpointText.Text = settings.EndpointOrFolder;
+        CentralSyncStationIdText.Text = settings.StationId;
+        CentralSyncIntervalText.Text = settings.SyncIntervalSeconds.ToString(CultureInfo.InvariantCulture);
+        CentralSyncMaxRetryText.Text = settings.MaxRetryCount.ToString(CultureInfo.InvariantCulture);
+        CentralSyncSecretBox.Password = settings.SharedSecret;
+        CentralSyncIncludeImagesCheck.IsChecked = settings.IncludeImages;
+        CentralSyncRedactOperatorCheck.IsChecked = settings.RedactOperatorId;
+        CentralSyncRedactImagePathsCheck.IsChecked = settings.RedactImagePaths;
+        CentralSyncRedactEndpointCheck.IsChecked = settings.RedactEndpointInExports;
+        CentralSyncStatusText.Text = CentralSyncSettingsService.RedactedSummary(settings);
+    }
+
     private async void OnTestMesRestClick(object sender, RoutedEventArgs e)
     {
         if (!Authorize(RoleAuthorization.CanManageSettings, "Testing MES integration"))
@@ -1486,6 +1771,39 @@ public partial class SettingsView : UserControl
                 out var backoff)
                 ? backoff
                 : 500,
+        };
+
+    private CentralSyncSettings BuildCentralSyncSettingsFromUi()
+        => new()
+        {
+            Mode = CentralSyncModeCombo.SelectedIndex switch
+            {
+                1 => CentralSyncMode.FileDrop,
+                2 => CentralSyncMode.RestApi,
+                3 => CentralSyncMode.PostgreSqlBoundary,
+                _ => CentralSyncMode.Disabled,
+            },
+            EndpointOrFolder = CentralSyncEndpointText.Text.Trim(),
+            StationId = CentralSyncStationIdText.Text.Trim(),
+            SyncIntervalSeconds = int.TryParse(
+                CentralSyncIntervalText.Text,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var interval)
+                ? interval
+                : 300,
+            MaxRetryCount = int.TryParse(
+                CentralSyncMaxRetryText.Text,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var maxRetry)
+                ? maxRetry
+                : 5,
+            IncludeImages = CentralSyncIncludeImagesCheck.IsChecked == true,
+            RedactOperatorId = CentralSyncRedactOperatorCheck.IsChecked == true,
+            RedactImagePaths = CentralSyncRedactImagePathsCheck.IsChecked == true,
+            RedactEndpointInExports = CentralSyncRedactEndpointCheck.IsChecked == true,
+            SharedSecret = CentralSyncSecretBox.Password,
         };
 
     private InspectionModelConfiguration BuildConfigurationFromUi()
@@ -1837,17 +2155,29 @@ public partial class SettingsView : UserControl
         {
             ProfileId = profile.ProfileId;
             Revision = profile.Revision;
+            BoardModel = profile.BoardModel;
             BoardProgram = profile.BoardProgram;
             RecipeName = profile.RecipeName;
             Status = profile.Status;
             RuleCount = profile.Rules.Count;
+            CreatedBy = profile.CreatedBy;
+            ApprovedBy = string.IsNullOrWhiteSpace(profile.ApprovedBy) ? "--" : profile.ApprovedBy;
+            Deployed = string.Equals(profile.Status, "Deployed", StringComparison.OrdinalIgnoreCase) ? "Yes" : "No";
+            SourceFalseCallReductionRunDisplay = profile.SourceFalseCallReductionRunId?.ToString(CultureInfo.InvariantCulture) ?? "--";
+            SourceValidationRunDisplay = profile.SourceValidationRunId?.ToString(CultureInfo.InvariantCulture) ?? "--";
         }
 
         public string ProfileId { get; }
         public string Revision { get; }
+        public string BoardModel { get; }
         public string BoardProgram { get; }
         public string RecipeName { get; }
         public string Status { get; }
         public int RuleCount { get; }
+        public string CreatedBy { get; }
+        public string ApprovedBy { get; }
+        public string Deployed { get; }
+        public string SourceFalseCallReductionRunDisplay { get; }
+        public string SourceValidationRunDisplay { get; }
     }
 }

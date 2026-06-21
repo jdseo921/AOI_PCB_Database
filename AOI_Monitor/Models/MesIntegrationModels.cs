@@ -105,6 +105,8 @@ public sealed class MesReadinessCriteria
 {
     public bool FailOnPendingQueue { get; set; }
     public bool FailOnFailedQueue { get; set; } = true;
+    public int MaximumPendingAgeMinutes { get; set; } = 60;
+    public bool RequirePassingTraceabilityTest { get; set; }
 }
 
 public sealed class MesReadinessSummary
@@ -115,5 +117,24 @@ public sealed class MesReadinessSummary
     public int FailedCount { get; set; }
     public int SentCount { get; set; }
     public int AbandonedCount { get; set; }
+    public int OldPendingCount { get; set; }
+    public string LatestTraceabilityTestStatus { get; set; } = "NOT RUN";
     public List<string> Messages { get; set; } = new();
+}
+
+public sealed class TraceabilityTestReport
+{
+    public long Id { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public string Status { get; set; } = "FAIL";
+    public string Mode { get; set; } = "Not Connected";
+    public string EndpointUrl { get; set; } = string.Empty;
+    public string ResultStatus { get; set; } = "FAIL";
+    public string ImageStatus { get; set; } = "NOT SENT";
+    public string PayloadPath { get; set; } = string.Empty;
+    public string ReportJsonPath { get; set; } = string.Empty;
+    public string ReportHtmlPath { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public bool ProductionModeConfirmed { get; set; }
+    public string OperatorId { get; set; } = "UNKNOWN";
 }

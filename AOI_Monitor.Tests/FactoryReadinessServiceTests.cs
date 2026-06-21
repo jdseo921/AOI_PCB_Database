@@ -37,6 +37,84 @@ public sealed class FactoryReadinessServiceTests : IDisposable
     }
 
     [Fact]
+    public void NoBuildTestEvidenceLeavesBuildCategoryConditional()
+    {
+        var report = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
+        {
+            DeploymentProfile = DeploymentProfile.Stage1ImageValidation,
+            Stage1Only = true,
+            RequireSuccessfulLatestValidationPackage = false,
+            RequireDatasetQualityEvidence = false,
+            RequireNoExportVerificationErrors = false,
+        });
+
+        Assert.Contains(report.Categories, category =>
+            category.Name == "Build/Test status" &&
+            category.Status == "Conditional" &&
+            category.Evidence.Contains("No local build/test evidence", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void PassingBuildTestEvidenceMakesBuildCategoryGo()
+    {
+        BuildTestEvidenceService.CreateLocalEvidence(operatorId: "TestAdmin [Admin]");
+
+        var report = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
+        {
+            DeploymentProfile = DeploymentProfile.Stage1ImageValidation,
+            Stage1Only = true,
+            RequireSuccessfulLatestValidationPackage = false,
+            RequireDatasetQualityEvidence = false,
+            RequireNoExportVerificationErrors = false,
+        });
+
+        Assert.Contains(report.Categories, category =>
+            category.Name == "Build/Test status" &&
+            category.Status == "Go" &&
+            category.Evidence.Contains("hygiene=PASS", StringComparison.OrdinalIgnoreCase) &&
+            category.Evidence.Contains("publishValidation=PASS", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void FailedTestEvidenceMakesBuildCategoryNoGo()
+    {
+        BuildTestEvidenceService.CreateLocalEvidence(testStatus: "FAIL", operatorId: "TestAdmin [Admin]");
+
+        var report = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
+        {
+            DeploymentProfile = DeploymentProfile.Stage1ImageValidation,
+            Stage1Only = true,
+            RequireSuccessfulLatestValidationPackage = false,
+            RequireDatasetQualityEvidence = false,
+            RequireNoExportVerificationErrors = false,
+        });
+
+        Assert.Equal("NoGo", report.OverallStatus);
+        Assert.Contains(report.Categories, category =>
+            category.Name == "Build/Test status" &&
+            category.Status == "No-Go" &&
+            category.Evidence.Contains("test=FAIL", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ExportedFactoryReadinessPackageIncludesBuildEvidenceJson()
+    {
+        BuildTestEvidenceService.CreateLocalEvidence(testResultPath: Path.Combine(_root, "TestResults", "test-results.trx"), operatorId: "TestAdmin [Admin]");
+
+        var result = FactoryReadinessService.ExportGoNoGoPackage(new FactoryReadinessCriteria
+        {
+            DeploymentProfile = DeploymentProfile.Stage1ImageValidation,
+            Stage1Only = true,
+            RequireSuccessfulLatestValidationPackage = false,
+            RequireDatasetQualityEvidence = false,
+            RequireNoExportVerificationErrors = false,
+        }, _root);
+
+        Assert.True(File.Exists(Path.Combine(result.PackageFolder, "build_test_evidence", "latest_build_test_evidence.json")));
+        Assert.True(File.Exists(Path.Combine(result.PackageFolder, "build_test_evidence", "latest_build_test_evidence_summary.json")));
+    }
+
+    [Fact]
     public void MissingProductionModelCausesNoGoWhenRequired()
     {
         var report = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
@@ -171,12 +249,72 @@ public sealed class FactoryReadinessServiceTests : IDisposable
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         Assert.True(File.Exists(Path.Combine(result.PackageFolder, "package_manifest.json")));
-        Assert.Equal(15, categories.Length);
+        Assert.Equal(17, categories.Length);
         Assert.Contains("Build/Test status", names);
+        Assert.Contains("3D profile acceptance status", names);
         Assert.Contains("MES/spool status", names);
+        Assert.Contains("Central sync status", names);
         Assert.Contains("Known limitations", names);
         Assert.Equal("Stage1ImageValidation", document.RootElement.GetProperty("deploymentProfile").GetString());
         Assert.True(document.RootElement.TryGetProperty("unmetCriteria", out _));
+    }
+
+    [Fact]
+    public void FullFactoryAutomationWithoutEightHourSoakRunHasNoGoSoakCategory()
+    {
+        var report = FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(DeploymentProfile.FullFactoryAutomation));
+
+        Assert.Contains(report.Categories, category =>
+            category.Name == "Soak test status" &&
+            category.Status == "No-Go" &&
+            category.Evidence.Contains("No soak-test", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Stage1FactoryAcceptanceChecklistDoesNotRequireRobotOrMes()
+    {
+        var checklist = FactoryAcceptanceChecklistService.Generate(DeploymentProfile.Stage1ImageValidation);
+
+        Assert.Contains(checklist.Items, item => item.RequirementId == "S3-ROBOT-001" && item.Status == "Not Required");
+        Assert.Contains(checklist.Items, item => item.RequirementId == "S4-MES-001" && item.Status == "Not Required");
+        Assert.DoesNotContain(checklist.Items, item =>
+            (item.RequirementId == "S3-ROBOT-001" || item.RequirementId == "S4-MES-001") &&
+            item.Status.Contains("No-Go", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void FullFactoryAutomationChecklistRequiresAllStages()
+    {
+        var checklist = FactoryAcceptanceChecklistService.Generate(DeploymentProfile.FullFactoryAutomation);
+        var requiredIds = new[] { "S1-001", "S2-CAM-001", "S2-LIGHT-001", "S3-ROBOT-001", "S4-MES-001", "TR-009" };
+
+        foreach (var id in requiredIds)
+            Assert.Contains(checklist.Items, item => item.RequirementId == id && item.Status != "Not Required");
+    }
+
+    [Fact]
+    public void MissingFactoryAcceptanceEvidenceItemsBecomeOpenNoGo()
+    {
+        var checklist = FactoryAcceptanceChecklistService.Generate(DeploymentProfile.FullFactoryAutomation);
+
+        Assert.Contains(checklist.Items, item => item.RequirementId == "S2-CAM-001" && item.Status == "Open/No-Go");
+        Assert.Contains(checklist.Items, item => item.RequirementId == "TR-009" && item.Status == "No-Go");
+    }
+
+    [Fact]
+    public void ExportedFactoryAcceptanceChecklistContainsRequirementIds()
+    {
+        var export = FactoryAcceptanceChecklistService.Export(DeploymentProfile.FullFactoryAutomation, _root);
+        var json = File.ReadAllText(export.JsonPath);
+        var csv = File.ReadAllText(export.CsvPath);
+        var html = File.ReadAllText(export.HtmlPath);
+
+        foreach (var id in new[] { "GUI-001", "PERF-001", "BT-001", "S1-001", "S2-CAM-001", "S3-ROBOT-001", "S4-MES-001", "TR-009", "FA-001" })
+        {
+            Assert.Contains(id, json);
+            Assert.Contains(id, csv);
+            Assert.Contains(id, html);
+        }
     }
 
     [Fact]

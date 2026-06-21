@@ -24,17 +24,22 @@ public static class RobotAcceptanceTestService
         criteria ??= new RobotAcceptanceCriteria();
         var robot = IntegrationBoundaryRegistry.RobotController;
         var emergencyStop = IntegrationBoundaryRegistry.EmergencyStopMonitor;
+        var safety = IntegrationBoundaryRegistry.PlcSafetyController;
         var auditEvents = new List<string>();
         var run = new RobotAcceptanceRun
         {
             CreatedAtUtc = DateTime.UtcNow,
             ControllerName = robot.Name,
             EmergencyStopName = emergencyStop.Name,
+            SafetyControllerName = safety.Name,
+            SafetySourceKind = DetermineSafetySourceKind(safety),
             SourceKind = DetermineSourceKind(robot),
             Criteria = criteria,
         };
         if (run.SourceKind == "Simulated")
             run.Warnings.Add("Simulation evidence only; no production robot movement was validated.");
+        if (run.SafetySourceKind == "Simulated")
+            run.Warnings.Add("PLC/safety interlock evidence is simulated only and is not safety-certified validation.");
 
         var service = new RobotCycleService((category, message) => auditEvents.Add($"{category}: {message}"));
         var fullCycleWatch = Stopwatch.StartNew();
@@ -157,8 +162,11 @@ public static class RobotAcceptanceTestService
             SourceKind = run.SourceKind,
             CreatedAtUtc = run.CreatedAtUtc,
             ControllerName = run.ControllerName,
+            SafetyControllerName = run.SafetyControllerName,
+            SafetySourceKind = run.SafetySourceKind,
             FullCycleMs = run.FullCycleMs,
             EmergencyStopBlocked = run.EmergencyStopBlocked,
+            SafetyFaultBlocked = run.SafetyFaultBlocked,
             InvalidTransitionRejected = run.InvalidTransitionRejected,
             ResetReturnedIdle = run.ResetReturnedIdle,
         };
@@ -190,7 +198,7 @@ public static class RobotAcceptanceTestService
         sb.AppendLine("<!doctype html><html><head><meta charset=\"utf-8\"><title>Robot Cell Acceptance</title>");
         sb.AppendLine("<style>body{font-family:Segoe UI,Arial,sans-serif;background:#f7f9fb;color:#17212b;margin:24px}.card{background:white;border:1px solid #d8e0e7;padding:16px;margin:0 0 16px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #d8e0e7;padding:6px;text-align:left}.warn{color:#8a5a00}.fail{color:#a12626}.ok{color:#176b3a}</style></head><body>");
         sb.AppendLine("<h1>Robot Cell Acceptance Report</h1>");
-        sb.AppendLine($"<div class=\"card\"><strong>Status:</strong> {Escape(run.Status)}<br><strong>Source:</strong> {Escape(run.SourceKind)}<br><strong>Controller:</strong> {Escape(run.ControllerName)}<br><strong>Full cycle:</strong> {run.FullCycleMs:F1} ms</div>");
+        sb.AppendLine($"<div class=\"card\"><strong>Status:</strong> {Escape(run.Status)}<br><strong>Source:</strong> {Escape(run.SourceKind)}<br><strong>Controller:</strong> {Escape(run.ControllerName)}<br><strong>Safety:</strong> {Escape(run.SafetyControllerName)} ({Escape(run.SafetySourceKind)})<br><strong>Full cycle:</strong> {run.FullCycleMs:F1} ms</div>");
         if (run.SourceKind == "Simulated")
             sb.AppendLine("<div class=\"card warn\"><strong>Simulation evidence only; no production robot movement was validated.</strong></div>");
         AppendMessages(sb, "Failures", run.Failures, "fail");
@@ -234,6 +242,21 @@ public static class RobotAcceptanceTestService
 
     private static async Task RunEmergencyStopCheckAsync(RobotAcceptanceRun run, CancellationToken cancellationToken)
     {
+        if (IntegrationBoundaryRegistry.PlcSafetyController is SimulatedPlcSafetyController simulatedPlc)
+        {
+            simulatedPlc.SetEmergencyStopActive(true);
+            var plcService = new RobotCycleService((_, _) => { });
+            var plcWatch = Stopwatch.StartNew();
+            var plcResult = await plcService.LoadAsync(LoadCommand("E-STOP-TEST"), cancellationToken).ConfigureAwait(false);
+            plcWatch.Stop();
+            run.EmergencyStopBlocked = !plcResult.Accepted && plcService.CurrentState == RobotCycleState.EmergencyStopped;
+            AddStep(run, "EmergencyStopBlock", RobotCycleState.Idle.ToString(), plcService.CurrentState.ToString(), plcWatch.Elapsed.TotalMilliseconds, run.EmergencyStopBlocked, plcResult.Message, null);
+            if (!run.EmergencyStopBlocked)
+                run.Failures.Add("PLC emergency stop did not block the robot cycle.");
+            await simulatedPlc.ResetSafetyFaultAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         if (IntegrationBoundaryRegistry.RobotController is not SimulatedRobotController simulated)
         {
             run.Warnings.Add("Emergency stop acceptance check could not actuate the active controller. No safety-certified e-stop validation is claimed.");
@@ -287,6 +310,12 @@ public static class RobotAcceptanceTestService
     }
 
     private static string DetermineSourceKind(IRobotController controller)
+        => controller.Status == IntegrationConnectionStatus.Simulated ||
+           controller.Name.Contains("simulated", StringComparison.OrdinalIgnoreCase)
+            ? "Simulated"
+            : controller.Status == IntegrationConnectionStatus.Ready ? "Real" : "NotConnected";
+
+    private static string DetermineSafetySourceKind(IPlcSafetyController controller)
         => controller.Status == IntegrationConnectionStatus.Simulated ||
            controller.Name.Contains("simulated", StringComparison.OrdinalIgnoreCase)
             ? "Simulated"

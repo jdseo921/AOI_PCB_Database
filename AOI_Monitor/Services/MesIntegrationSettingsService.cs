@@ -120,6 +120,21 @@ public static class MesIntegrationSettingsService
         };
     }
 
+    public static string RedactSecrets(string text, MesIntegrationSettings? settings = null)
+    {
+        var redacted = text ?? string.Empty;
+        var source = settings ?? _cached ?? new MesIntegrationSettings();
+        foreach (var secret in new[] { source.ApiKey, source.BearerToken, source.Password })
+        {
+            if (!string.IsNullOrWhiteSpace(secret))
+                redacted = redacted.Replace(secret, "***", StringComparison.Ordinal);
+        }
+
+        if (!string.IsNullOrWhiteSpace(source.Username) && source.AuthMode == MesRestAuthMode.Basic)
+            redacted = redacted.Replace(source.Username, "***", StringComparison.Ordinal);
+        return redacted;
+    }
+
     private static void Save(MesIntegrationSettings settings, bool notify)
     {
         Normalize(settings);

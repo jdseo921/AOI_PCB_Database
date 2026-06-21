@@ -17,6 +17,14 @@ public static class LightingControllerFactory
         => IntegrationBoundaryRegistry.LightingController = Create(LightingSettingsService.Load());
 }
 
+public interface ILightingControllerFactory
+{
+    string DriverId { get; }
+    string DisplayName { get; }
+    string Version { get; }
+    ILightingController Create(LightingSettings settings);
+}
+
 public static class LightingSynchronizationService
 {
     public static async Task<IntegrationCommandResult> SynchronizeAsync(

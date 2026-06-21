@@ -187,6 +187,7 @@ public static class CustomerValidationPackageService
         var cameraAcceptance = CameraAcceptanceTestService.ToSummary(AoiDatabase.GetLatestCameraAcceptanceRun(realHardwareOnly: true));
         var robotAcceptance = RobotAcceptanceTestService.ToSummary(AoiDatabase.GetLatestRobotAcceptanceRun());
         var mesReadiness = MesSpoolService.EvaluateReadiness();
+        var thresholdProfileEvidence = ThresholdProfileService.GetActiveEvidenceSummary(request.BoardModel, request.BoardModel, "ANY");
         File.WriteAllText(breakdownCsvPath, ClassMetricsService.BuildCsv(breakdownSummary), Encoding.UTF8);
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -242,13 +243,14 @@ public static class CustomerValidationPackageService
             CameraAcceptanceSummary = cameraAcceptance,
             RobotAcceptanceSummary = robotAcceptance,
             MesReadinessSummary = mesReadiness,
+            ThresholdProfileEvidence = thresholdProfileEvidence,
         };
 
         File.WriteAllText(reportPath, CustomerValidationReportService.BuildHtml(reportContext), Encoding.UTF8);
         File.WriteAllText(instructionsPath, CustomerValidationReportService.BuildPrintToPdfInstructions(reportPath), Encoding.UTF8);
         File.WriteAllText(readmePath, BuildReadme(packageId, acceptance, warnings), Encoding.UTF8);
 
-        var manifest = BuildManifest(request, criteria, acceptance, warnings, generatedAtUtc, packageId, breakdownSummary, datasetQuality, cameraAcceptance, robotAcceptance, mesReadiness);
+        var manifest = BuildManifest(request, criteria, acceptance, warnings, generatedAtUtc, packageId, breakdownSummary, datasetQuality, cameraAcceptance, robotAcceptance, mesReadiness, thresholdProfileEvidence);
         manifest.IncludedFiles = EnumerateIncludedFiles(packageFolder).ToList();
         WriteManifest(manifestPath, manifest);
         manifest.IncludedFiles = EnumerateIncludedFiles(packageFolder).ToList();
@@ -288,7 +290,8 @@ public static class CustomerValidationPackageService
         DatasetQualitySummary datasetQuality,
         CameraAcceptanceSummary cameraAcceptance,
         RobotAcceptanceSummary robotAcceptance,
-        MesReadinessSummary mesReadiness)
+        MesReadinessSummary mesReadiness,
+        ThresholdProfileEvidenceSummary thresholdProfileEvidence)
     {
         return new ValidationPackageManifest
         {
@@ -346,6 +349,7 @@ public static class CustomerValidationPackageService
             AcceptanceStatus = acceptance.Status,
             Criteria = criteria,
             FalseCallRecommendation = FalseCallReductionService.ToSummary(request.FalseCallReductionRun),
+            ThresholdProfileEvidence = thresholdProfileEvidence,
             Warnings = warnings.Concat(acceptance.Messages).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             Limitations = CustomerValidationReportContext.DefaultPrototypeLimitations.ToList(),
         };

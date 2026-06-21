@@ -23,7 +23,15 @@
                      Foreground="#E1A334" FontSize="11" FontWeight="Bold" Margin="0,3,0,0"/>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+          <TextBlock Text="Source" Foreground="#9AA6AF" VerticalAlignment="Center" Margin="0,0,6,0"/>
+          <ComboBox x:Name="ProfileSourceCombo" Width="150" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="OnProfileSourceChanged">
+            <ComboBoxItem Content="Sample CSV"/>
+            <ComboBoxItem Content="Generic 3D Adapter"/>
+            <ComboBoxItem Content="None"/>
+          </ComboBox>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Load Height CSV" Margin="0,0,8,0" Click="OnLoadCsvClick"/>
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Run 3D Acceptance Test" Margin="0,0,8,0" Click="OnRunAcceptanceClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Export 3D Report" Margin="0,0,8,0" Click="OnExportAcceptanceClick"/>
           <Border Style="{StaticResource ChipAmber}" VerticalAlignment="Center">
             <TextBlock Text="Sample Data Mode" FontWeight="Bold" FontSize="10.5"/>
           </Border>

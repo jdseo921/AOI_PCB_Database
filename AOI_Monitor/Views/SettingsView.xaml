@@ -219,7 +219,10 @@
               <WrapPanel Margin="0,6,0,0">
                 <Button x:Name="RegisterModelBtn" Style="{StaticResource MiniBtnGreen}" Content="Register Model" Margin="0,0,6,6" Click="OnRegisterModelClick"/>
                 <Button x:Name="ValidateRegisteredModelBtn" Style="{StaticResource MiniBtn}" Content="Validate" Margin="0,0,6,6" Click="OnValidateRegisteredModelClick"/>
-                <Button x:Name="SetActiveModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Set Active" Margin="0,0,0,6" Click="OnSetActiveModelClick"/>
+                <Button x:Name="SetActiveModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Set Active" Margin="0,0,6,6" Click="OnSetActiveModelClick"/>
+                <Button x:Name="RunModelAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Run Model Acceptance" Margin="0,0,6,6" Click="OnRunModelAcceptanceClick"/>
+                <Button x:Name="CreateModelReleasePackageBtn" Style="{StaticResource MiniBtnGreen}" Content="Create Model Release Package" Margin="0,0,6,6" Click="OnCreateModelReleasePackageClick"/>
+                <Button x:Name="PromoteProductionCandidateBtn" Style="{StaticResource MiniBtnAmber}" Content="Promote to Production Candidate" Margin="0,0,0,6" Click="OnPromoteProductionCandidateClick"/>
               </WrapPanel>
             </StackPanel>
           </Border>
@@ -263,9 +266,15 @@
                 <DataGrid.Columns>
                   <DataGridTextColumn Header="Profile" Binding="{Binding ProfileId}" Width="*"/>
                   <DataGridTextColumn Header="Rev" Binding="{Binding Revision}" Width="62"/>
-                  <DataGridTextColumn Header="Board" Binding="{Binding BoardProgram}" Width="86"/>
+                  <DataGridTextColumn Header="Board Model" Binding="{Binding BoardModel}" Width="100"/>
+                  <DataGridTextColumn Header="Board Program" Binding="{Binding BoardProgram}" Width="105"/>
                   <DataGridTextColumn Header="Recipe" Binding="{Binding RecipeName}" Width="96"/>
                   <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="78"/>
+                  <DataGridTextColumn Header="Created By" Binding="{Binding CreatedBy}" Width="120"/>
+                  <DataGridTextColumn Header="Approved By" Binding="{Binding ApprovedBy}" Width="120"/>
+                  <DataGridTextColumn Header="Deployed" Binding="{Binding Deployed}" Width="72"/>
+                  <DataGridTextColumn Header="FC Run" Binding="{Binding SourceFalseCallReductionRunDisplay}" Width="70"/>
+                  <DataGridTextColumn Header="Validation Run" Binding="{Binding SourceValidationRunDisplay}" Width="88"/>
                   <DataGridTextColumn Header="Rules" Binding="{Binding RuleCount}" Width="52"/>
                 </DataGrid.Columns>
               </DataGrid>
@@ -317,6 +326,12 @@
                 <TextBox x:Name="CameraBottomDeviceIdText" Grid.Column="1" MinHeight="28"/>
               </Grid>
               <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Adapter Folder" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="CameraAdapterFolderText" Grid.Column="1" MinHeight="28" ToolTip="External folder containing a camera_adapter_manifest.json or *.camera-adapter.json manifest."/>
+                <Button x:Name="BrowseCameraAdapterBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseCameraAdapterClick"/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <TextBlock Text="Acquisition" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
                 <ComboBox x:Name="CameraAcquisitionModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
@@ -355,9 +370,11 @@
               </UniformGrid>
               <WrapPanel Margin="0,6,0,0">
                 <Button x:Name="TestCameraSourceBtn" Style="{StaticResource MiniBtn}" Content="Test Camera Source" Margin="0,0,6,6" Click="OnTestCameraSourceClick"/>
+                <Button x:Name="DiscoverCamerasBtn" Style="{StaticResource MiniBtn}" Content="Discover Cameras" Margin="0,0,6,6" Click="OnDiscoverCamerasClick"/>
                 <Button x:Name="RunCameraAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Camera Acceptance Test" Margin="0,0,6,6" Click="OnRunCameraAcceptanceClick"/>
                 <Button x:Name="CancelCameraAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,6,6" Click="OnCancelCameraAcceptanceClick" IsEnabled="False"/>
                 <Button x:Name="ExportCameraAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" Margin="0,0,0,6" Click="OnExportCameraAcceptanceClick"/>
+                <Button x:Name="ExportHardwareAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Hardware Acceptance Package" Margin="6,0,0,6" Click="OnExportHardwareAcceptanceClick"/>
               </WrapPanel>
               <TextBlock x:Name="CameraDiagnosticsText" Text="Generic adapter configured is not the same as camera connected." Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
             </StackPanel>
@@ -490,6 +507,43 @@
                 <TextBlock x:Name="MesMockStatusText" Text="MES: Not Connected" FontWeight="Bold" FontSize="11.5" Foreground="#F27777" HorizontalAlignment="Right"/>
               </UniformGrid>
               <TextBlock x:Name="MesDiagnosticsText" Text="Default mode is Not Connected. Mock local writes JSON evidence only." Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
+            <StackPanel>
+              <TextBlock Text="Central Sync (Optional Management Aggregation)" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Mode" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <ComboBox x:Name="CentralSyncModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Disabled"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="File Drop"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="REST API Boundary"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="PostgreSQL Boundary"/>
+                </ComboBox>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Endpoint/Folder" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="CentralSyncEndpointText" Grid.Column="1" MinHeight="28" ToolTip="FileDrop folder, REST endpoint, or future central database endpoint summary."/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Station / Interval" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="CentralSyncStationIdText" Grid.Column="1" MinHeight="28"/>
+                <TextBox x:Name="CentralSyncIntervalText" Grid.Column="3" MinHeight="28" Text="300"/>
+              </Grid>
+              <Grid Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Retry / Secret" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+                <TextBox x:Name="CentralSyncMaxRetryText" Grid.Column="1" MinHeight="28" Text="5"/>
+                <PasswordBox x:Name="CentralSyncSecretBox" Grid.Column="3" MinHeight="28"/>
+              </Grid>
+              <CheckBox x:Name="CentralSyncIncludeImagesCheck" Content="Include image file references only when explicitly enabled" Foreground="#DCE5EB" FontSize="11" Margin="0,0,0,4"/>
+              <CheckBox x:Name="CentralSyncRedactOperatorCheck" Content="Redact operator identifiers from payloads" Foreground="#DCE5EB" FontSize="11" Margin="0,0,0,4"/>
+              <CheckBox x:Name="CentralSyncRedactImagePathsCheck" Content="Redact image and package paths from payloads" Foreground="#DCE5EB" FontSize="11" Margin="0,0,0,4"/>
+              <CheckBox x:Name="CentralSyncRedactEndpointCheck" Content="Redact endpoints/folders from exported reports" Foreground="#DCE5EB" FontSize="11" Margin="0,0,0,6"/>
+              <TextBlock x:Name="CentralSyncStatusText" Text="Central sync disabled. Local SQLite remains the offline source of truth." Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap"/>
             </StackPanel>
           </Border>
           <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">

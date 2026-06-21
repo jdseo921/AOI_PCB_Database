@@ -1,3 +1,5 @@
+using AOI_Monitor.Services;
+
 namespace AOI_Monitor.Models;
 
 public record StatusCell(string Label, string Value, string Color);
@@ -303,6 +305,99 @@ public record ExportVerificationRecord(
     string MessagesJson,
     string ArtifactChecksumsJson);
 
+public sealed class BuildTestEvidenceRecord
+{
+    public long Id { get; set; }
+    public DateTime GeneratedAtUtc { get; set; } = DateTime.UtcNow;
+    public string GitCommit { get; set; } = string.Empty;
+    public string CommitSha
+    {
+        get => GitCommit;
+        set => GitCommit = value;
+    }
+    public string Configuration { get; set; } = "Release";
+    public string HygieneStatus { get; set; } = "UNKNOWN";
+    public string RestoreStatus { get; set; } = "UNKNOWN";
+    public string BuildStatus { get; set; } = "UNKNOWN";
+    public string TestStatus { get; set; } = "UNKNOWN";
+    public string PublishValidationStatus { get; set; } = "UNKNOWN";
+    public string TestResultPath { get; set; } = string.Empty;
+    public string EvidencePath { get; set; } = string.Empty;
+    public string OperatorId { get; set; } = "UNKNOWN";
+    public string MachineName { get; set; } = string.Empty;
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class BuildTestEvidenceSummary
+{
+    public string Status { get; set; } = "NoEvidence";
+    public BuildTestEvidenceRecord? Latest { get; set; }
+    public bool IsPassing { get; set; }
+    public bool HasFailure { get; set; }
+    public List<string> Messages { get; set; } = new();
+}
+
+public sealed class ModelAcceptanceCriteria
+{
+    public double MinimumAccuracy { get; set; } = 0.90;
+    public double MinimumPrecision { get; set; } = 0.90;
+    public double MinimumRecall { get; set; } = 0.90;
+    public double MaximumFalseCallRate { get; set; } = 0.05;
+    public double MaximumPossibleEscapeRate { get; set; } = 0.02;
+    public double MaximumReviewRate { get; set; } = 0.10;
+    public double MaximumAverageInferenceMs { get; set; } = 1000;
+    public double MaximumP95InferenceMs { get; set; } = 1000;
+    public string MinimumDatasetQualityStatus { get; set; } = "PASS";
+    public bool RequireFormalManifest { get; set; } = true;
+    public bool RequireDefectClassCoverage { get; set; } = true;
+}
+
+public sealed class ModelAcceptanceRun
+{
+    public long Id { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public string ModelId { get; set; } = string.Empty;
+    public string ModelVersion { get; set; } = string.Empty;
+    public string ModelSha256 { get; set; } = string.Empty;
+    public string ModelPath { get; set; } = string.Empty;
+    public string LabelMapPath { get; set; } = string.Empty;
+    public string InputTensorName { get; set; } = string.Empty;
+    public string OutputTensorName { get; set; } = string.Empty;
+    public string OutputShape { get; set; } = string.Empty;
+    public string DatasetFolder { get; set; } = string.Empty;
+    public string DatasetName { get; set; } = string.Empty;
+    public string GroundTruthCsvPath { get; set; } = string.Empty;
+    public bool IsFormalManifest { get; set; }
+    public string Status { get; set; } = "FAIL";
+    public string OperatorId { get; set; } = "UNKNOWN";
+    public string ApprovedBy { get; set; } = string.Empty;
+    public DateTime? ApprovedAtUtc { get; set; }
+    public bool IsProductionCandidate { get; set; }
+    public ModelAcceptanceCriteria Criteria { get; set; } = new();
+    public BatchMetrics Metrics { get; set; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    public DatasetQualitySummary DatasetQualitySummary { get; set; } = new();
+    public FalseCallRecommendationSummary FalseCallRecommendation { get; set; } = new();
+    public ValidationBreakdownSummary BreakdownSummary { get; set; } = new();
+    public BatchPerformanceSummary PerformanceSummary { get; set; } = new(0, 0, 0, 0, 0);
+    public double P95InferenceMs { get; set; }
+    public List<string> Messages { get; set; } = new();
+    public List<string> Limitations { get; set; } = new();
+}
+
+public sealed record ModelReleasePackageRecord(
+    long Id,
+    DateTime CreatedAtUtc,
+    long AcceptanceRunId,
+    string ModelId,
+    string ModelVersion,
+    string ModelSha256,
+    string PackagePath,
+    string ManifestPath,
+    string ReportPath,
+    string Status,
+    string ApprovedBy,
+    long? AuditEventId);
+
 public record ValidationPackageRecord(
     long Id,
     DateTime CreatedAtUtc,
@@ -412,6 +507,11 @@ public sealed class CameraAcceptanceViewMetrics
     public int TimeoutCount { get; set; }
     public double DroppedFrameRate { get; set; }
     public double TriggerFailureRate { get; set; }
+    public string LightingProgramSelected { get; set; } = string.Empty;
+    public string TriggerMode { get; set; } = string.Empty;
+    public double TriggerToFrameLatencyMs { get; set; }
+    public double LightingCommandLatencyMs { get; set; }
+    public string SyncStatus { get; set; } = "NOT TESTED";
     public string Status { get; set; } = "FAIL";
     public List<string> Warnings { get; set; } = new();
     public List<string> Failures { get; set; } = new();
@@ -501,6 +601,56 @@ public sealed class LightingAcceptanceRun
     public List<LightingAcceptanceStep> Steps { get; set; } = new();
 }
 
+public sealed class Profile3DFrame
+{
+    public string FrameId { get; set; } = string.Empty;
+    public string SourceKind { get; set; } = "None";
+    public bool IsSimulated { get; set; }
+    public DateTime CapturedAtUtc { get; set; } = DateTime.UtcNow;
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public string Unit { get; set; } = "microns";
+    public double XPitchMicrons { get; set; }
+    public double YPitchMicrons { get; set; }
+    public double[] HeightValues { get; set; } = Array.Empty<double>();
+    public string ViewType { get; set; } = "Top";
+    public string BoardModel { get; set; } = string.Empty;
+    public string LotId { get; set; } = string.Empty;
+}
+
+public sealed class Profile3DAcceptanceCriteria
+{
+    public int MinimumWidth { get; set; } = 2;
+    public int MinimumHeight { get; set; } = 2;
+    public double MaxAcquisitionMs { get; set; } = 1000;
+    public List<string> AcceptedUnits { get; set; } = new() { "microns", "um", "micrometer", "micrometers" };
+    public bool RequirePositivePitch { get; set; } = true;
+}
+
+public sealed class Profile3DAcceptanceRun
+{
+    public long Id { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public string SourceName { get; set; } = string.Empty;
+    public string SourceKind { get; set; } = "None";
+    public bool IsSimulated { get; set; }
+    public string Status { get; set; } = "FAIL";
+    public string FactoryReadinessStatus { get; set; } = "NOT VALIDATED";
+    public double AcquisitionMs { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public string Unit { get; set; } = string.Empty;
+    public double XPitchMicrons { get; set; }
+    public double YPitchMicrons { get; set; }
+    public int MissingHeightCount { get; set; }
+    public int NaNHeightCount { get; set; }
+    public string FrameId { get; set; } = string.Empty;
+    public Profile3DAcceptanceCriteria Criteria { get; set; } = new();
+    public Dictionary<string, string> Diagnostics { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<string> Warnings { get; set; } = new();
+    public List<string> Failures { get; set; } = new();
+}
+
 public sealed class RobotAcceptanceCriteria
 {
     public double MaxLoadMs { get; set; } = 1000;
@@ -530,6 +680,8 @@ public sealed class RobotAcceptanceRun
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public string ControllerName { get; set; } = string.Empty;
     public string EmergencyStopName { get; set; } = string.Empty;
+    public string SafetyControllerName { get; set; } = string.Empty;
+    public string SafetySourceKind { get; set; } = "NotConnected";
     public string SourceKind { get; set; } = "Simulated";
     public RobotAcceptanceCriteria Criteria { get; set; } = new();
     public string Status { get; set; } = "FAIL";
@@ -541,6 +693,7 @@ public sealed class RobotAcceptanceRun
     public double FullCycleMs { get; set; }
     public bool InvalidTransitionRejected { get; set; }
     public bool EmergencyStopBlocked { get; set; }
+    public bool SafetyFaultBlocked { get; set; }
     public bool ResetReturnedIdle { get; set; }
     public int AuditEventCount { get; set; }
     public List<string> Warnings { get; set; } = new();
@@ -554,8 +707,11 @@ public sealed class RobotAcceptanceSummary
     public string SourceKind { get; set; } = "NotValidated";
     public DateTime? CreatedAtUtc { get; set; }
     public string ControllerName { get; set; } = string.Empty;
+    public string SafetyControllerName { get; set; } = string.Empty;
+    public string SafetySourceKind { get; set; } = "NotValidated";
     public double FullCycleMs { get; set; }
     public bool EmergencyStopBlocked { get; set; }
+    public bool SafetyFaultBlocked { get; set; }
     public bool InvalidTransitionRejected { get; set; }
     public bool ResetReturnedIdle { get; set; }
     public List<string> Messages { get; set; } = new();
@@ -591,6 +747,7 @@ public sealed class ValidationPackageManifest
     public string AcceptanceStatus { get; set; } = "CONDITIONAL";
     public ValidationAcceptanceCriteria Criteria { get; set; } = new();
     public FalseCallRecommendationSummary? FalseCallRecommendation { get; set; }
+    public ThresholdProfileEvidenceSummary ThresholdProfileEvidence { get; set; } = new();
     public List<ValidationIncludedFile> IncludedFiles { get; set; } = new();
     public List<string> Warnings { get; set; } = new();
     public List<string> Limitations { get; set; } = new();
@@ -682,6 +839,25 @@ public sealed class FalseCallRecommendationSummary
     public List<string> Limitations { get; set; } = new();
 }
 
+public sealed class ThresholdProfileEvidenceSummary
+{
+    public string Status { get; set; } = "Not deployed";
+    public string ProfileId { get; set; } = string.Empty;
+    public string Revision { get; set; } = string.Empty;
+    public string BoardModel { get; set; } = string.Empty;
+    public string BoardProgram { get; set; } = string.Empty;
+    public string RecipeName { get; set; } = string.Empty;
+    public string RecipeRevision { get; set; } = string.Empty;
+    public long? SourceValidationRunId { get; set; }
+    public long? SourceFalseCallReductionRunId { get; set; }
+    public string CreatedBy { get; set; } = string.Empty;
+    public string ApprovedBy { get; set; } = string.Empty;
+    public DateTime? ApprovedAtUtc { get; set; }
+    public int RuleCount { get; set; }
+    public bool IsDeployed { get; set; }
+    public string EvidenceBoundary { get; set; } = "No deployed threshold profile was included.";
+}
+
 public sealed class ValidationMetricSummary
 {
     public int TotalImages { get; set; }
@@ -747,10 +923,13 @@ public sealed class FactoryReadinessCriteria
     public bool RequireNoExportVerificationErrors { get; set; } = true;
     public bool RequireNoPendingMesQueueForProductionMode { get; set; } = true;
     public bool RequireCameraAcceptance { get; set; }
+    public bool RequireProfile3DAcceptance { get; set; }
     public bool RequireLightingAcceptance { get; set; }
     public bool RequireRobotAcceptance { get; set; }
     public bool RequireRealHardwareAcceptance { get; set; }
     public bool RequireSoakTestEvidenceForFactoryPilot { get; set; }
+    public bool RequirePassingTraceabilityTest { get; set; }
+    public bool WarnWhenCentralSyncDisabled { get; set; }
 }
 
 public sealed class FactoryReadinessReport

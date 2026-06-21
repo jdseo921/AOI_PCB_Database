@@ -32,15 +32,22 @@ public sealed record RobotCycleRunResult(
     string Message,
     TimeSpan Elapsed);
 
+public sealed class RobotCycleOptions
+{
+    public bool PermitSafetyBypassForSimulation { get; set; } = true;
+}
+
 public sealed class RobotCycleService
 {
     private readonly Action<string, string> _auditSink;
+    private readonly RobotCycleOptions _options;
     private readonly Stopwatch _elapsed = new();
     private readonly List<RobotCycleTransition> _transitions = new();
 
-    public RobotCycleService(Action<string, string>? auditSink = null)
+    public RobotCycleService(Action<string, string>? auditSink = null, RobotCycleOptions? options = null)
     {
         _auditSink = auditSink ?? ((category, message) => WorkflowState.Instance.AddEvent(category, message));
+        _options = options ?? new RobotCycleOptions();
     }
 
     public RobotCycleState CurrentState { get; private set; } = RobotCycleState.Idle;
@@ -177,7 +184,11 @@ public sealed class RobotCycleService
             if (!result.Accepted)
                 return FaultFromResult(result);
 
-            if (IntegrationBoundaryRegistry.EmergencyStopMonitor.IsEmergencyStopActive)
+            if (IntegrationBoundaryRegistry.PlcSafetyController.Status != IntegrationConnectionStatus.NotConnected)
+                await IntegrationBoundaryRegistry.PlcSafetyController.ResetSafetyFaultAsync(cancellationToken).ConfigureAwait(false);
+
+            if (IntegrationBoundaryRegistry.EmergencyStopMonitor.IsEmergencyStopActive ||
+                IntegrationBoundaryRegistry.PlcSafetyController.IsEmergencyStopActive)
                 return MarkEmergencyStopped("Reset completed, but emergency stop remains active.");
 
             LastError = string.Empty;
@@ -240,6 +251,10 @@ public sealed class RobotCycleService
         Func<CancellationToken, Task<IntegrationCommandResult>> command,
         CancellationToken cancellationToken)
     {
+        var safety = BlockIfSafetyNotOk(action);
+        if (safety is not null)
+            return safety;
+
         var emergency = BlockIfEmergencyStopped(action);
         if (emergency is not null)
             return emergency;
@@ -264,10 +279,34 @@ public sealed class RobotCycleService
 
     private IntegrationCommandResult? BlockIfEmergencyStopped(string action)
     {
-        if (!IntegrationBoundaryRegistry.EmergencyStopMonitor.IsEmergencyStopActive)
+        if (!IntegrationBoundaryRegistry.EmergencyStopMonitor.IsEmergencyStopActive &&
+            !IntegrationBoundaryRegistry.PlcSafetyController.IsEmergencyStopActive)
             return null;
 
         return MarkEmergencyStopped($"{action} blocked because emergency stop is active.");
+    }
+
+    private IntegrationCommandResult? BlockIfSafetyNotOk(string action)
+    {
+        var plc = IntegrationBoundaryRegistry.PlcSafetyController;
+        var status = plc.GetDiagnostics();
+        if (status.IsOk)
+            return null;
+
+        var simulationBypass =
+            _options.PermitSafetyBypassForSimulation &&
+            plc.Status == IntegrationConnectionStatus.NotConnected &&
+            IntegrationBoundaryRegistry.RobotController.Status != IntegrationConnectionStatus.Ready;
+        if (simulationBypass)
+        {
+            _auditSink("ROBOT_SAFETY_BYPASS", $"{action} permitted because robot simulation is active and no PLC safety controller is configured. No production movement is validated.");
+            return null;
+        }
+
+        if (status.IsEmergencyStopActive)
+            return MarkEmergencyStopped($"{action} blocked by PLC safety interlock: {status.BlockingReason()}.");
+
+        return Fault($"{action} blocked by PLC safety interlock: {status.BlockingReason()}.", IntegrationConnectionStatus.Error);
     }
 
     private IntegrationCommandResult MarkEmergencyStopped(string message)

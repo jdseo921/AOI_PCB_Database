@@ -88,6 +88,15 @@ Avoid spaces, customer secrets, operator names, and timestamps that can identify
 5. Resolve all blocking failures before running acceptance.
 
 Preflight checks folder structure, manifest columns, image existence, golden-image existence, duplicate image rows, OK/NG balance, and defect-class coverage.
+It also checks duplicate image file hashes, side/view metadata, ROI/refdes completeness when any ROI metadata is supplied, and image names that are hard to audit.
+
+The AI Model Test screen shows a preflight result card:
+
+- `PASS`: no blocking failures or warnings.
+- `CONDITIONAL`: no blocking failures, but warnings require management/customer review.
+- `FAIL`: blocking failures must be fixed before acceptance evidence can be considered repeatable.
+
+Use `Open Manifest Template` on the AI Model Test screen to open `SampleData/customer_validation_manifest_template.csv`.
 
 ## Run AI Model Test
 
@@ -134,6 +143,13 @@ From `AI Model Test`, click the validation package export action after a success
 
 The package is intended for management review and customer evidence. It keeps prototype/hardware limitations explicit.
 
+Management review should check:
+
+- `dataset_preflight_summary.json` for preflight status, blocking failures, warnings, duplicate hashes, and metadata coverage.
+- `validation_manifest.json` for package ID, run ID, dataset preflight status, acceptance status, criteria, included files, and limitations.
+- `customer_validation_report.html` or PDF for the human-readable preflight, dataset quality, false-call, and acceptance summaries.
+- `validation_results.csv` and `validation_breakdown.csv` for row-level and class/side/ROI evidence.
+
 ## Interpreting Status
 
 `PASS` means the selected data, manifest, metrics, dataset quality, and configured gates passed for the Stage 1 claim. It does not imply full factory automation readiness.
@@ -141,3 +157,5 @@ The package is intended for management review and customer evidence. It keeps pr
 `CONDITIONAL` means no blocking gate failed, but one or more warnings require review, waiver, or follow-up. Examples include minor missing optional metadata or documented limitations.
 
 `FAIL` means at least one blocking requirement failed. Examples include missing image files, missing required manifest columns, all-OK/all-NG data, insufficient OK/NG balance, insufficient defect-class coverage, excessive unknown labels, or missing golden images under Pixel Difference criteria.
+
+Factory readiness remains separate from Stage 1 customer validation. A Stage 1 package can support customer review, but it does not claim real camera, lighting, robot, PLC, production MES, ERP, or full factory readiness unless those later-stage acceptance paths are explicitly completed with real hardware evidence.

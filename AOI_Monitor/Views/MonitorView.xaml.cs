@@ -43,6 +43,7 @@ public partial class MonitorView : UserControl
     private ImportedImage? _currentImportedImage;
     private AnalysisResult? _currentAnalysis;
     private InspectionLatencyTraceBuilder? _currentLatencyTrace;
+    private InspectionLatencyTrace? _lastLatencyTrace;
     private CalibrationProfileRecord? _selectedCalibrationProfile;
 
     public MonitorView()
@@ -174,7 +175,7 @@ public partial class MonitorView : UserControl
             WorkflowState.Instance.SetAnalysis(_currentAnalysis, persist: true);
             _currentLatencyTrace?.StopSpan("resultPersist");
             if (_currentLatencyTrace is not null)
-                InspectionLatencyService.Persist(_currentLatencyTrace, saved: true);
+                _lastLatencyTrace = InspectionLatencyService.Persist(_currentLatencyTrace, saved: true);
             _currentLatencyTrace = null;
             _currentResultSaved = true;
             UpdateTimingDisplay(_currentAnalysis.Timing);
@@ -567,6 +568,8 @@ public partial class MonitorView : UserControl
         _currentLatencyTrace.StartSpan("overlay");
         var overlayMs = RenderOverlay();
         _currentLatencyTrace.StopSpan("overlay");
+        _currentLatencyTrace.Trace.Verdict = analysis.Verdict;
+        InspectionLatencyService.CompleteTrace(_currentLatencyTrace, saved: false);
         analysis.Timing.OverlayRenderingMilliseconds = overlayMs;
         analysis.Timing.RecalculateTotal();
         UpdateTimingDisplay(analysis.Timing);
@@ -580,7 +583,7 @@ public partial class MonitorView : UserControl
         if (autoSave)
         {
             _currentLatencyTrace.StopSpan("resultPersist");
-            InspectionLatencyService.Persist(_currentLatencyTrace, saved: true);
+            _lastLatencyTrace = InspectionLatencyService.Persist(_currentLatencyTrace, saved: true);
             _currentLatencyTrace = null;
             UpdateTimingDisplay(analysis.Timing);
         }
@@ -757,14 +760,23 @@ public partial class MonitorView : UserControl
     private void UpdateTimingDisplay(InspectionTiming timing)
     {
         var session = InspectionLatencyService.GetCurrentSessionSummary();
+        var activeTrace = _currentLatencyTrace?.Trace ?? _lastLatencyTrace;
         var saveMs = _currentLatencyTrace?.Trace.ResultPersistStartUtc is { } saveStart && _currentLatencyTrace.Trace.ResultPersistEndUtc is { } saveEnd
             ? Math.Max(0, (saveEnd - saveStart).TotalMilliseconds)
-            : session.P95SaveMs;
-        var frameToResult = _currentLatencyTrace?.Trace.TotalFrameToOverlayMs > 0
-            ? _currentLatencyTrace.Trace.TotalFrameToOverlayMs
+            : activeTrace?.TotalFrameToSavedResultMs > 0 && activeTrace.ResultPersistStartUtc is not null
+                ? activeTrace.TotalFrameToSavedResultMs
+                : session.P95SaveMs;
+        var frameToOverlay = activeTrace?.TotalFrameToOverlayMs > 0
+            ? activeTrace.TotalFrameToOverlayMs
             : timing.TotalInspectionMilliseconds;
-        TimingText.Text = $"Frame-result {frameToResult:F0} ms | infer {timing.InferenceMilliseconds:F0} | overlay {timing.OverlayRenderingMilliseconds:F0} | save {saveMs:F0} | session p95 {session.P95FrameToOverlayMs:F0}";
-        TimingText.Foreground = timing.IsOverOneSecond
+        var frameToSaved = activeTrace?.TotalFrameToSavedResultMs > 0
+            ? activeTrace.TotalFrameToSavedResultMs
+            : saveMs;
+        var warningSuffix = session.OverOneSecondCount > 0
+            ? $" | over1s {session.OverOneSecondCount}"
+            : string.Empty;
+        TimingText.Text = $"Frame-overlay {frameToOverlay:F0} ms | frame-saved {frameToSaved:F0} | infer {timing.InferenceMilliseconds:F0} | overlay {timing.OverlayRenderingMilliseconds:F0} | save {saveMs:F0} | session p95 {session.P95FrameToOverlayMs:F0}{warningSuffix}";
+        TimingText.Foreground = timing.IsOverOneSecond || session.OverOneSecondCount > 0
             ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"))
             : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DCE5EB"));
     }

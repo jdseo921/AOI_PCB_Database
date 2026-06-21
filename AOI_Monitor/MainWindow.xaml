@@ -141,18 +141,24 @@
                       </ComboBox>
                     </Grid>
                   </Border>
-                  <Border Width="250" Padding="10,0">
+                  <Border Width="406" Padding="10,0">
                     <Grid VerticalAlignment="Center">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="62"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="58"/>
                         <ColumnDefinition Width="48"/>
+                        <ColumnDefinition Width="62"/>
+                        <ColumnDefinition Width="56"/>
+                        <ColumnDefinition Width="52"/>
                       </Grid.ColumnDefinitions>
                       <TextBlock Text="Password" Foreground="#AAB4BB" FontSize="11.5" VerticalAlignment="Center"/>
                       <PasswordBox Grid.Column="1" x:Name="LoginPasswordBox" MinHeight="24" Margin="4,0,0,0"/>
                       <Button Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Login" Margin="6,4,0,4" Click="OnLocalLoginClick"/>
                       <Button Grid.Column="3" x:Name="CreateUserBtn" Style="{StaticResource MiniBtn}" Content="Add" Margin="6,4,0,4" Click="OnCreateLocalUserClick" ToolTip="Admin only: create local user with selected role."/>
+                      <Button Grid.Column="4" x:Name="ChangePasswordBtn" Style="{StaticResource MiniBtn}" Content="Set PW" Margin="6,4,0,4" Click="OnChangeLocalPasswordClick" ToolTip="Admin only: set password for the local user in Operator field."/>
+                      <Button Grid.Column="5" x:Name="DisableUserBtn" Style="{StaticResource MiniBtn}" Content="Disable" Margin="6,4,0,4" Click="OnDisableLocalUserClick" ToolTip="Admin only: disable the local user in Operator field."/>
+                      <Button Grid.Column="6" x:Name="DeleteUserBtn" Style="{StaticResource MiniBtn}" Content="Delete" Margin="6,4,0,4" Click="OnDeleteLocalUserClick" ToolTip="Admin only: delete the local user in Operator field."/>
                     </Grid>
                   </Border>
                 </StackPanel>

@@ -148,19 +148,31 @@
             </DataGrid>
           </TabItem>
           <TabItem Header="MES Queue">
-            <DataGrid x:Name="MesSpoolGrid" CanUserSortColumns="True" SelectionMode="Extended">
-              <DataGrid.Columns>
-                <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
-                <DataGridTextColumn Header="Type" Binding="{Binding PayloadType}" Width="135"/>
-                <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100"/>
-                <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
-                <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="70"/>
-                <DataGridTextColumn Header="Endpoint" Binding="{Binding EndpointUrl}" Width="150"/>
-                <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="75"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
-                <DataGridTextColumn Header="Last Error" Binding="{Binding LastError}" Width="*"/>
-              </DataGrid.Columns>
-            </DataGrid>
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Status" Foreground="#8B969E" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox x:Name="MesQueueStatusFilter" Width="150" SelectionChanged="OnMesQueueStatusFilterChanged" SelectedIndex="0">
+                  <ComboBoxItem Content="All"/>
+                  <ComboBoxItem Content="Pending"/>
+                  <ComboBoxItem Content="Failed"/>
+                  <ComboBoxItem Content="Sent"/>
+                  <ComboBoxItem Content="Abandoned"/>
+                </ComboBox>
+              </StackPanel>
+              <DataGrid x:Name="MesSpoolGrid" CanUserSortColumns="True" SelectionMode="Extended">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
+                  <DataGridTextColumn Header="Type" Binding="{Binding PayloadType}" Width="135"/>
+                  <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100"/>
+                  <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
+                  <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="70"/>
+                  <DataGridTextColumn Header="Endpoint" Binding="{Binding EndpointUrl}" Width="150"/>
+                  <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="75"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
+                  <DataGridTextColumn Header="Last Error" Binding="{Binding LastError}" Width="*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </DockPanel>
           </TabItem>
           <TabItem Header="Central Sync Queue">
             <DataGrid x:Name="CentralSyncGrid" CanUserSortColumns="True" SelectionMode="Extended">
@@ -189,7 +201,9 @@
                   <ColumnDefinition Width="8"/>
                   <ColumnDefinition Width="130"/>
                   <ColumnDefinition Width="8"/>
-                  <ColumnDefinition Width="150"/>
+                  <ColumnDefinition Width="165"/>
+                  <ColumnDefinition Width="8"/>
+                  <ColumnDefinition Width="190"/>
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
@@ -202,10 +216,14 @@
                   <TextBox x:Name="ManagementModelFilterText"/>
                 </StackPanel>
                 <StackPanel Grid.Column="4">
-                  <TextBlock Text="Board Model" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
-                  <TextBlock Text="Uses top Board filter" Foreground="#DCE5EB" FontSize="11.5" VerticalAlignment="Center" Margin="0,5,0,0"/>
+                  <TextBlock Text="Board / Operator" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+                  <TextBlock Text="Uses top filters" Foreground="#DCE5EB" FontSize="11.5" VerticalAlignment="Center" Margin="0,5,0,0"/>
                 </StackPanel>
-                <WrapPanel Grid.Column="6" VerticalAlignment="Bottom">
+                <StackPanel Grid.Column="6">
+                  <TextBlock Text="Deployment Profile" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+                  <ComboBox x:Name="ManagementDeploymentProfileCombo" SelectedIndex="0" Style="{StaticResource FilterCombo}"/>
+                </StackPanel>
+                <WrapPanel Grid.Column="8" VerticalAlignment="Bottom">
                   <Button Style="{StaticResource ActionBtnGreen}" Content="Refresh Dashboard" Margin="0,0,6,0" Click="OnRefreshManagementDashboardClick"/>
                   <Button Style="{StaticResource ActionBtnAmber}" Content="Export Dashboard HTML/CSV/PDF" Click="OnExportManagementDashboardClick"/>
                 </WrapPanel>
@@ -364,6 +382,7 @@
           <Button Style="{StaticResource ActionBtnAmber}" Content="Retry Selected MES" Margin="0,0,6,0" Click="OnRetrySelectedMesSpoolClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Retry All Pending MES" Margin="0,0,6,0" Click="OnRetryMesSpoolClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Export Queue Report" Margin="0,0,6,0" Click="OnExportMesQueueReportClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Export MES Contract" Margin="0,0,6,0" Click="OnExportMesContractClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Mark MES Abandoned" Margin="0,0,6,0" Click="OnAbandonMesSpoolClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Central Sync" Margin="0,0,6,0" Click="OnQueueCentralSyncClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Retry Selected Central" Margin="0,0,6,0" Click="OnRetrySelectedCentralSyncClick"/>

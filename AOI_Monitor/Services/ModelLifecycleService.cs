@@ -35,7 +35,8 @@ public static class ModelLifecycleService
             state,
             operatorId,
             $"Model acceptance run {run.Id} status={run.Status}.",
-            latestAcceptanceStatus: run.Status);
+            latestAcceptanceStatus: run.Status,
+            latestAcceptanceRunId: run.Id);
     }
 
     public static void RecordReleasePackage(ModelReleasePackageRecord package, string operatorId)
@@ -53,6 +54,7 @@ public static class ModelLifecycleService
             operatorId,
             $"Model release package {package.Id} recorded at {package.PackagePath}.",
             latestAcceptanceStatus: package.Status,
+            latestReleasePackageId: package.Id,
             latestReleasePackagePath: package.PackagePath);
     }
 
@@ -75,10 +77,14 @@ public static class ModelLifecycleService
             ModelLifecycleState.ProductionCandidate,
             approvedBy,
             $"Promoted model acceptance run {run.Id} to production candidate.",
-            latestAcceptanceStatus: run.Status);
+            latestAcceptanceStatus: run.Status,
+            latestAcceptanceRunId: run.Id);
     }
 
-    public static void DeployModel(string modelId, UserRole role, string approvedBy, string? waiverReason = null)
+    public static void DeployModel(string modelId, UserRole role, string approvedBy)
+        => DeployModel(modelId, role, approvedBy, waiverReason: null, waiverExpiresAtUtc: null);
+
+    public static void DeployModel(string modelId, UserRole role, string approvedBy, string? waiverReason, DateTime? waiverExpiresAtUtc)
     {
         if (!RoleAuthorization.CanManageSettings(role))
             throw new UnauthorizedAccessException(RoleAuthorization.DeniedMessage(role, "deploying model lifecycle state"));
@@ -91,6 +97,11 @@ public static class ModelLifecycleService
         var hasPassingAcceptance = latestAcceptance is not null &&
             string.Equals(latestAcceptance.Status, "PASS", StringComparison.OrdinalIgnoreCase);
         var hasWaiver = !string.IsNullOrWhiteSpace(waiverReason);
+        if (hasWaiver && waiverExpiresAtUtc is null)
+            throw new ArgumentException("Admin deployment waiver expiry date is required.", nameof(waiverExpiresAtUtc));
+        var normalizedWaiverExpiresAtUtc = waiverExpiresAtUtc?.ToUniversalTime();
+        if (hasWaiver && normalizedWaiverExpiresAtUtc <= DateTime.UtcNow)
+            throw new ArgumentException("Admin deployment waiver expiry date must be in the future.", nameof(waiverExpiresAtUtc));
         if (!hasPassingAcceptance && !hasWaiver)
             throw new InvalidOperationException("Model deployment requires PASS model acceptance or an Admin deployment waiver reason.");
 
@@ -100,16 +111,19 @@ public static class ModelLifecycleService
             model.ModelId,
             ModelLifecycleState.Deployed,
             latestAcceptanceStatus: latestAcceptance?.Status ?? model.LatestAcceptanceStatus,
+            latestAcceptanceRunId: latestAcceptance?.Id,
             deploymentWaiverReason: normalizedWaiver,
+            waiverExpiresAtUtc: hasWaiver ? normalizedWaiverExpiresAtUtc : null,
             deploymentWaivedBy: hasWaiver ? approvedBy : string.Empty,
             deploymentWaivedAtUtc: hasWaiver ? now : null,
+            deployedAtUtc: now,
             isActive: true,
             replaceDeploymentWaiver: true);
         ModelRegistryService.SetActiveModel(model.ModelId);
         AoiDatabase.RecordAuditEvent(
             hasWaiver ? "MODEL_DEPLOYMENT_WAIVER" : "MODEL_DEPLOYMENT",
             hasWaiver
-                ? $"Deployed model {model.ModelId} with Admin waiver. Reason={normalizedWaiver}"
+                ? $"Deployed model {model.ModelId} with Admin waiver. Reason={normalizedWaiver}; expires={normalizedWaiverExpiresAtUtc:O}"
                 : $"Deployed model {model.ModelId} with PASS acceptance run {latestAcceptance?.Id.ToString(CultureInfo.InvariantCulture) ?? "unknown"}.",
             operatorWithRole: approvedBy,
             relatedEntityType: "ModelRegistry",
@@ -152,12 +166,16 @@ public static class ModelLifecycleService
         string operatorId,
         string message,
         string latestAcceptanceStatus = "",
+        long? latestAcceptanceRunId = null,
+        long? latestReleasePackageId = null,
         string latestReleasePackagePath = "")
     {
         AoiDatabase.UpdateModelLifecycle(
             modelId,
             state,
             latestAcceptanceStatus: latestAcceptanceStatus,
+            latestAcceptanceRunId: latestAcceptanceRunId,
+            latestReleasePackageId: latestReleasePackageId,
             latestReleasePackagePath: latestReleasePackagePath);
         AoiDatabase.RecordAuditEvent(
             "MODEL_LIFECYCLE",

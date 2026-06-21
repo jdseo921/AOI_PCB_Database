@@ -19,9 +19,19 @@ Customer packages are generated with `Scripts/publish.ps1`.
 - `app/` contains the published WPF application.
 - `Docs/` is included when documentation is packaged.
 - `Templates/` is included only when adapter templates are requested for developer handoff.
+- `SampleData/customer_validation_manifest_template.csv` is included only when `-IncludeSampleManifestTemplate` is requested.
 - `RUN_RELEASE.md` records package generation settings.
 
 Runtime data is intentionally excluded from release packages: local SQLite databases, image vaults, training images, customer images, generated exports, overlays, and machine-interface JSON.
+
+Common package commands:
+
+```powershell
+pwsh Scripts/publish.ps1 -Configuration Release
+pwsh Scripts/publish.ps1 -Configuration Release -IncludeTemplates
+pwsh Scripts/publish.ps1 -Configuration Release -IncludeSampleManifestTemplate
+pwsh Scripts/publish.ps1 -Configuration Release -IncludeTemplates -IncludeSampleManifestTemplate
+```
 
 ## Install Path
 
@@ -69,6 +79,8 @@ After restore:
 - Confirm storage root, active model, threshold profile, camera source, lighting, MES, and central sync settings.
 - Run the relevant acceptance tests before using restored hardware or model settings for customer/factory evidence.
 
+Restore preview checks schema compatibility, target storage path, settings changes, existing model/threshold conflicts, missing model files, and missing plugin folders. Do not apply a restore until blocking issues are cleared and warnings are understood.
+
 ## Firewall And Network Notes
 
 Allow outbound network traffic only for explicitly configured integrations:
@@ -114,3 +126,18 @@ To roll back:
 5. Re-run model, camera, lighting, robot, traceability, and factory readiness checks that apply to the deployment profile.
 
 Rollback is complete only when the restored app produces the expected audit events, active model/threshold settings, and acceptance evidence for the target deployment stage.
+
+## Run Readiness Package After Install
+
+After installing or restoring configuration on a customer/factory PC:
+
+1. Start AOI Monitor as an Admin user.
+2. Open `Settings` and confirm the deployment target, storage path, model registry, threshold profile, camera/plugin folders, MES, and central sync settings.
+3. Run the applicable validation actions for the deployment profile:
+   - Stage 1: Dataset Preflight, AI Model Test, false-call reduction, model acceptance when using ONNX.
+   - Stage 2: Camera, lighting, 3D profile, and latency trace evidence.
+   - Stage 3: Robot cell and PLC/safety acceptance evidence.
+   - Stage 4: MES traceability signoff and MES queue review.
+4. Open `Log & Export`.
+5. Export the Factory Readiness Go/No-Go package.
+6. Review the HTML/JSON summary and confirm simulated, mock, CSV sample, fake adapter, and not-connected evidence is not treated as real production readiness.

@@ -57,6 +57,7 @@ public partial class ReportsView : UserControl
         ManagementModelTrendGrid.ItemsSource = _managementTrendRows;
         ManagementLotModelGrid.ItemsSource = _managementBreakdownRows;
         PopulateFactoryAcceptanceProfiles();
+        PopulateManagementProfiles();
         FromDatePicker.SelectedDate = DateTime.Today.AddDays(-30);
         ToDatePicker.SelectedDate = DateTime.Today;
         LoadLogs();
@@ -65,6 +66,14 @@ public partial class ReportsView : UserControl
     public void RefreshFromState() => LoadLogs();
 
     private void OnApplyFiltersClick(object sender, RoutedEventArgs e) => LoadLogs();
+
+    private IEnumerable<MesSpoolQueueRow> ApplyMesQueueFilter(IEnumerable<MesSpoolQueueRow> rows)
+    {
+        var selected = (MesQueueStatusFilter?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All";
+        return string.Equals(selected, "All", StringComparison.OrdinalIgnoreCase)
+            ? rows
+            : rows.Where(row => row.Status.Equals(selected, StringComparison.OrdinalIgnoreCase));
+    }
 
     private void PopulateFactoryAcceptanceProfiles()
     {
@@ -85,6 +94,27 @@ public partial class ReportsView : UserControl
         => (FactoryAcceptanceProfileCombo.SelectedItem as ComboBoxItem)?.Tag is DeploymentProfile profile
             ? profile
             : DeploymentProfile.Stage1ImageValidation;
+
+    private void PopulateManagementProfiles()
+    {
+        ManagementDeploymentProfileCombo.Items.Clear();
+        ManagementDeploymentProfileCombo.Items.Add(new ComboBoxItem { Content = "Active deployment profile", Tag = null });
+        foreach (DeploymentProfile profile in Enum.GetValues<DeploymentProfile>())
+        {
+            ManagementDeploymentProfileCombo.Items.Add(new ComboBoxItem
+            {
+                Content = FactoryReadinessService.DisplayName(profile),
+                Tag = profile,
+            });
+        }
+
+        ManagementDeploymentProfileCombo.SelectedIndex = 0;
+    }
+
+    private DeploymentProfile? SelectedManagementProfile()
+        => (ManagementDeploymentProfileCombo.SelectedItem as ComboBoxItem)?.Tag is DeploymentProfile profile
+            ? profile
+            : null;
 
     private void OnGenerateFactoryAcceptanceChecklistClick(object sender, RoutedEventArgs e)
     {
@@ -114,7 +144,7 @@ public partial class ReportsView : UserControl
             .Select(record => ExportHistoryRow.FromRecord(record, AoiDatabase.GetLatestExportVerification(record.Id)))
             .ToArray();
         var audits = AoiDatabase.GetAuditEvents(filter).Select(AuditLogRow.FromRecord).ToArray();
-        var mesSpool = AoiDatabase.GetMesSpoolQueue().Select(MesSpoolQueueRow.FromRecord).ToArray();
+        var mesSpool = ApplyMesQueueFilter(AoiDatabase.GetMesSpoolQueue().Select(MesSpoolQueueRow.FromRecord)).ToArray();
         var centralSync = AoiDatabase.GetCentralSyncQueue().Select(CentralSyncQueueRow.FromRecord).ToArray();
         var readinessReport = FactoryReadinessService.Evaluate();
         var readiness = readinessReport.Categories.Select(FactoryReadinessRow.FromCategory).ToArray();
@@ -196,7 +226,8 @@ public partial class ReportsView : UserControl
             ManagementDashboardSummaryText.Text =
                 $"Boards={_managementDashboardReport.TotalBoardsInspected:N0}; OK/NG/REVIEW={_managementDashboardReport.OkCount:N0}/{_managementDashboardReport.NgCount:N0}/{_managementDashboardReport.ReviewCount:N0}; " +
                 $"false-call={_managementDashboardReport.FalseCallRate:P1}; escapes={_managementDashboardReport.PossibleEscapeCount:N0}; review burden={_managementDashboardReport.ManualReviewBurdenMinutes:F1} min; " +
-                $"avg/p95={_managementDashboardReport.AverageInspectionTimeMs:F0}/{_managementDashboardReport.P95InspectionTimeMs:F0} ms; readiness={_managementDashboardReport.AcceptanceReadinessStatus}; MES={_managementDashboardReport.MesSyncStatus}";
+                $"avg/p95={_managementDashboardReport.AverageInspectionTimeMs:F0}/{_managementDashboardReport.P95InspectionTimeMs:F0} ms; readiness={_managementDashboardReport.AcceptanceReadinessStatus}; " +
+                $"MES={_managementDashboardReport.MesSyncStatus}; central={_managementDashboardReport.CentralSyncStatus}";
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
         {
@@ -211,7 +242,9 @@ public partial class ReportsView : UserControl
             ToDate = ToDatePicker.SelectedDate,
             BoardModel = BoardFilterText.Text.Trim(),
             LotId = ManagementLotFilterText.Text.Trim(),
+            OperatorId = OperatorFilterText.Text.Trim(),
             ModelVersion = ManagementModelFilterText.Text.Trim(),
+            DeploymentProfile = SelectedManagementProfile(),
         };
 
     private LogFilter BuildFilter()
@@ -975,6 +1008,14 @@ public partial class ReportsView : UserControl
         }
     }
 
+    private void OnMesQueueStatusFilterChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+
+        LoadLogs();
+    }
+
     private async void OnRunTraceabilityTestClick(object sender, RoutedEventArgs e)
     {
         if (_workCts is not null)
@@ -1213,6 +1254,26 @@ public partial class ReportsView : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             HandleWorkError("MES queue report export failed", ex, "MES_SPOOL_EXPORT_ERROR");
+        }
+    }
+
+    private void OnExportMesContractClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting MES endpoint contract", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            var export = TraceabilityAcceptanceTestService.ExportEndpointContracts();
+            WorkflowState.Instance.AddEvent("MES_CONTRACT_EXPORT", $"MES endpoint contract exported: {Path.GetFileName(export.PayloadContractPath)}.");
+            RefreshAfterExport($"MES endpoint contract exported. Payload: {export.PayloadContractPath}. Response: {export.ResponseContractPath}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("MES contract export failed", ex, "MES_CONTRACT_EXPORT_ERROR");
         }
     }
 

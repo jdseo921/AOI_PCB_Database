@@ -21,6 +21,7 @@ public sealed class LocalUserRecord
     public int Iterations { get; set; } = 120_000;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public string CreatedBy { get; set; } = "UNKNOWN";
+    public DateTime? UpdatedAtUtc { get; set; }
     public bool IsDisabled { get; set; }
 }
 
@@ -91,15 +92,13 @@ public static class AuthenticationSettingsService
         if (store.Users.Any(user => string.Equals(user.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("Local user already exists.");
 
-        var salt = RandomNumberGenerator.GetBytes(16);
-        var iterations = 120_000;
-        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, 32);
+        var (hash, salt, iterations) = CreatePasswordHash(password);
         var record = new LocalUserRecord
         {
             UserId = normalizedUserId,
             Role = role,
-            PasswordHash = Convert.ToBase64String(hash),
-            PasswordSalt = Convert.ToBase64String(salt),
+            PasswordHash = hash,
+            PasswordSalt = salt,
             Iterations = iterations,
             CreatedAtUtc = DateTime.UtcNow,
             CreatedBy = createdBy,
@@ -107,6 +106,7 @@ public static class AuthenticationSettingsService
 
         store.Users.Add(record);
         SaveUsersInternal(store);
+        AoiDatabase.UpsertLocalUserMetadata(record.UserId, record.Role.ToString(), record.IsDisabled, record.CreatedAtUtc, record.CreatedBy, record.UpdatedAtUtc);
         AoiDatabase.RecordAuditEvent(
             "LOCAL_USER_CREATE",
             $"Local user created: {normalizedUserId}; role={role}.",
@@ -120,10 +120,25 @@ public static class AuthenticationSettingsService
     {
         var store = LoadUsersInternal();
         var candidate = store.Users.FirstOrDefault(item =>
-            !item.IsDisabled &&
             string.Equals(item.UserId, userId?.Trim(), StringComparison.OrdinalIgnoreCase));
-        if (candidate is null || string.IsNullOrWhiteSpace(candidate.PasswordHash) || string.IsNullOrWhiteSpace(candidate.PasswordSalt))
+        var normalizedUserId = userId?.Trim() ?? string.Empty;
+        if (candidate is null)
         {
+            AoiDatabase.RecordLocalUserSession(normalizedUserId, "UNKNOWN", AuthenticationMode.LocalUsers.ToString(), success: false, "Local user not found.");
+            user = new LocalUserRecord();
+            return false;
+        }
+
+        if (candidate.IsDisabled)
+        {
+            AoiDatabase.RecordLocalUserSession(candidate.UserId, candidate.Role.ToString(), AuthenticationMode.LocalUsers.ToString(), success: false, "Local user disabled.");
+            user = new LocalUserRecord();
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(candidate.PasswordHash) || string.IsNullOrWhiteSpace(candidate.PasswordSalt))
+        {
+            AoiDatabase.RecordLocalUserSession(candidate.UserId, candidate.Role.ToString(), AuthenticationMode.LocalUsers.ToString(), success: false, "Local user password metadata incomplete.");
             user = new LocalUserRecord();
             return false;
         }
@@ -133,16 +148,75 @@ public static class AuthenticationSettingsService
         var actual = Rfc2898DeriveBytes.Pbkdf2(password ?? string.Empty, salt, candidate.Iterations, HashAlgorithmName.SHA256, expected.Length);
         if (!CryptographicOperations.FixedTimeEquals(actual, expected))
         {
+            AoiDatabase.RecordLocalUserSession(candidate.UserId, candidate.Role.ToString(), AuthenticationMode.LocalUsers.ToString(), success: false, "Local user password mismatch.");
             user = new LocalUserRecord();
             return false;
         }
 
         user = Clone(candidate);
+        AoiDatabase.RecordLocalUserSession(candidate.UserId, candidate.Role.ToString(), AuthenticationMode.LocalUsers.ToString(), success: true, "Local user authenticated.");
         return true;
     }
 
     public static IReadOnlyList<LocalUserRecord> GetUsers()
         => LoadUsersInternal().Users.Select(Clone).ToArray();
+
+    public static LocalUserRecord DisableUser(string userId, UserRole actingRole, string operatorWithRole, string reason = "")
+    {
+        if (!RoleAuthorization.CanManageSettings(actingRole))
+            throw new UnauthorizedAccessException(RoleAuthorization.DeniedMessage(actingRole, "disabling local users"));
+
+        var store = LoadUsersInternal();
+        var record = FindUser(store, userId);
+        record.IsDisabled = true;
+        record.UpdatedAtUtc = DateTime.UtcNow;
+        SaveUsersInternal(store);
+        AoiDatabase.UpsertLocalUserMetadata(record.UserId, record.Role.ToString(), record.IsDisabled, record.CreatedAtUtc, record.CreatedBy, record.UpdatedAtUtc);
+        AoiDatabase.RecordAuditEvent(
+            "LOCAL_USER_DISABLE",
+            $"Local user disabled: {record.UserId}; reason={RedactReason(reason)}.",
+            operatorWithRole: operatorWithRole,
+            relatedEntityType: "LocalUser",
+            relatedEntityId: record.UserId);
+        return Clone(record);
+    }
+
+    public static void DeleteUser(string userId, UserRole actingRole, string operatorWithRole)
+    {
+        if (!RoleAuthorization.CanManageSettings(actingRole))
+            throw new UnauthorizedAccessException(RoleAuthorization.DeniedMessage(actingRole, "deleting local users"));
+
+        var store = LoadUsersInternal();
+        var record = FindUser(store, userId);
+        store.Users.Remove(record);
+        SaveUsersInternal(store);
+        AoiDatabase.MarkLocalUserDeleted(record.UserId, operatorWithRole);
+    }
+
+    public static LocalUserRecord ChangePassword(string userId, string newPassword, UserRole actingRole, string operatorWithRole)
+    {
+        if (!RoleAuthorization.CanManageSettings(actingRole))
+            throw new UnauthorizedAccessException(RoleAuthorization.DeniedMessage(actingRole, "changing local user passwords"));
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
+            throw new ArgumentException("Local user password must be at least 8 characters.", nameof(newPassword));
+
+        var store = LoadUsersInternal();
+        var record = FindUser(store, userId);
+        var (hash, salt, iterations) = CreatePasswordHash(newPassword);
+        record.PasswordHash = hash;
+        record.PasswordSalt = salt;
+        record.Iterations = iterations;
+        record.UpdatedAtUtc = DateTime.UtcNow;
+        SaveUsersInternal(store);
+        AoiDatabase.UpsertLocalUserMetadata(record.UserId, record.Role.ToString(), record.IsDisabled, record.CreatedAtUtc, record.CreatedBy, record.UpdatedAtUtc);
+        AoiDatabase.RecordAuditEvent(
+            "LOCAL_USER_PASSWORD_CHANGE",
+            $"Local user password changed: {record.UserId}.",
+            operatorWithRole: operatorWithRole,
+            relatedEntityType: "LocalUser",
+            relatedEntityId: record.UserId);
+        return Clone(record);
+    }
 
     public static void ResetForTests()
     {
@@ -204,6 +278,24 @@ public static class AuthenticationSettingsService
             settings.Mode = AuthenticationMode.DemoLocalRoleSelector;
     }
 
+    private static LocalUserRecord FindUser(LocalUserStore store, string userId)
+    {
+        var normalizedUserId = userId?.Trim() ?? string.Empty;
+        return store.Users.FirstOrDefault(user => string.Equals(user.UserId, normalizedUserId, StringComparison.OrdinalIgnoreCase))
+               ?? throw new InvalidOperationException("Local user does not exist.");
+    }
+
+    private static (string Hash, string Salt, int Iterations) CreatePasswordHash(string password)
+    {
+        var salt = RandomNumberGenerator.GetBytes(16);
+        var iterations = 120_000;
+        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, 32);
+        return (Convert.ToBase64String(hash), Convert.ToBase64String(salt), iterations);
+    }
+
+    private static string RedactReason(string reason)
+        => string.IsNullOrWhiteSpace(reason) ? "not specified" : SecretProtectionService.RedactKnownSecrets(reason.Trim());
+
     private static AuthenticationSettings Clone(AuthenticationSettings source)
         => new() { Mode = source.Mode };
 
@@ -220,6 +312,7 @@ public static class AuthenticationSettingsService
             Iterations = source.Iterations,
             CreatedAtUtc = source.CreatedAtUtc,
             CreatedBy = source.CreatedBy,
+            UpdatedAtUtc = source.UpdatedAtUtc,
             IsDisabled = source.IsDisabled,
         };
 }

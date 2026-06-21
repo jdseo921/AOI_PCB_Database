@@ -249,6 +249,7 @@ public static class CustomerValidationPackageService
             FalseCallRecommendation = FalseCallReductionService.ToSummary(request.FalseCallReductionRun),
             BreakdownSummary = breakdownSummary,
             DatasetQualitySummary = datasetQuality,
+            DatasetPreflightResult = preflight,
             CameraAcceptanceSummary = cameraAcceptance,
             RobotAcceptanceSummary = robotAcceptance,
             MesReadinessSummary = mesReadiness,

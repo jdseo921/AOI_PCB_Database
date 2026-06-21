@@ -21,12 +21,14 @@ public partial class SettingsView : UserControl
     private readonly ObservableCollection<ModelRegistryRow> _modelRegistryRows = new();
     private readonly ObservableCollection<ThresholdProfileRow> _thresholdProfileRows = new();
     private readonly ObservableCollection<ModelAcceptanceRunRow> _modelAcceptanceRows = new();
+    private CancellationTokenSource? _modelAcceptanceCancellation;
     private CancellationTokenSource? _cameraAcceptanceCancellation;
     private CameraAcceptanceRun? _lastCameraAcceptanceRun;
     private CancellationTokenSource? _lightingAcceptanceCancellation;
     private LightingAcceptanceRun? _lastLightingAcceptanceRun;
     private CancellationTokenSource? _robotAcceptanceCancellation;
     private RobotAcceptanceRun? _lastRobotAcceptanceRun;
+    private string? _pendingRestoreBackupPath;
     private bool _isKorean;
 
     public SettingsView(MainViewModel vm)
@@ -366,28 +368,64 @@ public partial class SettingsView : UserControl
         {
             var preview = ConfigurationBackupService.Preview(dialog.FileName);
             var details = BuildRestorePreviewMessage(preview);
+            _pendingRestoreBackupPath = preview.IsCompatible ? dialog.FileName : null;
+            ApplyRestoreBtn.IsEnabled = preview.IsCompatible && RoleAuthorization.CanManageSettings(WorkflowState.Instance.CurrentRole);
             if (!preview.IsCompatible)
             {
                 MessageBox.Show(details, "AOI Monitor Restore Preview", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            var apply = MessageBox.Show(
-                $"{details}\n\nApply this configuration backup now?",
+            MessageBox.Show(
+                $"{details}\n\nUse Apply Restore to apply this backup.",
                 "AOI Monitor Restore Preview",
-                MessageBoxButton.YesNo,
-                preview.Warnings.Count == 0 ? MessageBoxImage.Question : MessageBoxImage.Warning);
-            if (apply != MessageBoxResult.Yes)
-                return;
+                MessageBoxButton.OK,
+                preview.Warnings.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        {
+            _pendingRestoreBackupPath = null;
+            ApplyRestoreBtn.IsEnabled = false;
+            MessageBox.Show($"Configuration restore preview failed:\n{ex.Message}", "AOI Monitor Restore Preview", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 
-            ConfigurationBackupService.Import(dialog.FileName, WorkflowState.Instance.OperatorWithRole);
+    private void OnApplyRestoreClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Applying workstation configuration restore"))
+            return;
+        if (string.IsNullOrWhiteSpace(_pendingRestoreBackupPath) || !File.Exists(_pendingRestoreBackupPath))
+        {
+            MessageBox.Show("Run Restore Configuration Preview and select a compatible backup before applying restore.", "AOI Monitor Restore", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"Apply configuration restore from:\n{_pendingRestoreBackupPath}\n\nThis will update settings, model registry metadata, threshold profiles, recipe revisions, and deployment profile. Restart the app before production use.",
+            "Apply Configuration Restore",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            var preview = ConfigurationBackupService.Import(_pendingRestoreBackupPath, WorkflowState.Instance.OperatorWithRole);
+            if (!preview.IsCompatible)
+            {
+                MessageBox.Show(BuildRestorePreviewMessage(preview), "AOI Monitor Restore", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            _pendingRestoreBackupPath = null;
+            ApplyRestoreBtn.IsEnabled = false;
             RefreshWorkflowUi();
             RefreshThresholdProfilesUi();
             MessageBox.Show("Configuration restored. Restart the app before production use so all integration boundaries reload cleanly.", "AOI Monitor Restore", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
-            MessageBox.Show($"Configuration restore preview failed:\n{ex.Message}", "AOI Monitor Restore Preview", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show($"Configuration restore failed:\n{ex.Message}", "AOI Monitor Restore", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -558,9 +596,17 @@ public partial class SettingsView : UserControl
             return;
         }
 
-        if (!ModelRegistryService.SetActiveModel(row.ModelId))
+        try
         {
-            MessageBox.Show("The selected model registry entry could not be found.", "Model Registry", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!ModelRegistryService.SetActiveModel(row.ModelId))
+            {
+                MessageBox.Show("The selected model registry entry could not be found.", "Model Registry", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            MessageBox.Show(ex.Message, "Model Registry", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -579,6 +625,9 @@ public partial class SettingsView : UserControl
         if (!Authorize(RoleAuthorization.CanTestModelConfiguration, "Running model acceptance"))
             return;
 
+        if (_modelAcceptanceCancellation is not null)
+            return;
+
         var datasetDialog = new OpenFolderDialog { Title = "Select model acceptance validation dataset folder", Multiselect = false };
         if (datasetDialog.ShowDialog() != true || string.IsNullOrWhiteSpace(datasetDialog.FolderName))
             return;
@@ -593,15 +642,33 @@ public partial class SettingsView : UserControl
 
         try
         {
-            RunModelAcceptanceBtn.IsEnabled = false;
+            _modelAcceptanceCancellation = new CancellationTokenSource();
+            RefreshRoleControls();
+            ModelAcceptanceProgressBar.IsIndeterminate = true;
+            ModelAcceptanceProgressText.Text = "Starting model acceptance...";
             ModelCheckMessageText.Text = "Model acceptance running...";
             var datasetFolder = datasetDialog.FolderName;
             var csvPath = csvDialog.FileName;
             var operatorId = WorkflowState.Instance.OperatorWithRole;
-            var run = await Task.Run(() => ModelAcceptanceService.RunAcceptance(datasetFolder, csvPath, operatorId: operatorId));
+            var progress = new Progress<string>(message =>
+            {
+                ModelAcceptanceProgressText.Text = message;
+                ModelCheckMessageText.Text = message;
+            });
+            var token = _modelAcceptanceCancellation.Token;
+            var run = await Task.Run(() => ModelAcceptanceService.RunAcceptance(datasetFolder, csvPath, operatorId: operatorId, progress: progress, cancellationToken: token), token);
             RefreshModelAcceptanceRunsUi();
             WorkflowState.Instance.AddEvent("MODEL_ACCEPTANCE", $"Model acceptance {run.Status}: model={run.ModelId}; run={run.Id}; dataset={run.DatasetName}.");
+            ModelAcceptanceProgressBar.IsIndeterminate = false;
+            ModelAcceptanceProgressBar.Value = 100;
+            ModelAcceptanceProgressText.Text = $"Model acceptance {run.Status}: run {run.Id}.";
             MessageBox.Show($"Model acceptance {run.Status}.\n\nRun ID: {run.Id}\n{string.Join(Environment.NewLine, run.Messages.Take(5))}", "Model Acceptance", MessageBoxButton.OK, run.Status == "PASS" ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (OperationCanceledException)
+        {
+            WorkflowState.Instance.AddEvent("MODEL_ACCEPTANCE", "Model acceptance canceled by user before acceptance evidence was recorded.");
+            ModelCheckMessageText.Text = "Model acceptance canceled.";
+            ModelAcceptanceProgressText.Text = "Model acceptance canceled.";
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or InvalidDataException)
         {
@@ -609,8 +676,18 @@ public partial class SettingsView : UserControl
         }
         finally
         {
+            _modelAcceptanceCancellation?.Dispose();
+            _modelAcceptanceCancellation = null;
+            ModelAcceptanceProgressBar.IsIndeterminate = false;
             RefreshRoleControls();
         }
+    }
+
+    private void OnCancelModelAcceptanceClick(object sender, RoutedEventArgs e)
+    {
+        _modelAcceptanceCancellation?.Cancel();
+        ModelAcceptanceProgressText.Text = "Cancel requested. Finishing current validation step...";
+        ModelCheckMessageText.Text = "Cancel requested. Finishing current validation step...";
     }
 
     private void OnCreateModelReleasePackageClick(object sender, RoutedEventArgs e)
@@ -719,16 +796,26 @@ public partial class SettingsView : UserControl
         var reason = PromptForText("Deployment Waiver", "Admin waiver reason");
         if (string.IsNullOrWhiteSpace(reason))
             return;
+        var expiryText = PromptForText("Deployment Waiver Expiry", "Expiry date/time UTC, for example 2026-07-21T00:00:00Z");
+        if (!DateTime.TryParse(
+                expiryText,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var waiverExpiresAtUtc))
+        {
+            MessageBox.Show("A valid future waiver expiry date is required.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
         try
         {
-            ModelLifecycleService.DeployModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole, reason);
+            ModelLifecycleService.DeployModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole, reason, waiverExpiresAtUtc);
             RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
             RefreshModelRegistryUi();
-            WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT_WAIVER", $"Deployed model {row.ModelId} with Admin waiver. Full automation remains blocked without real PASS evidence.");
+            WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT_WAIVER", $"Deployed model {row.ModelId} with Admin waiver expiring {waiverExpiresAtUtc:O}. Full automation remains blocked without real PASS evidence.");
             MessageBox.Show("Model deployed with waiver. Readiness packages will show this waiver and will not claim full production readiness.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or ArgumentException)
         {
             MessageBox.Show(ex.Message, "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
@@ -1198,10 +1285,12 @@ public partial class SettingsView : UserControl
         ExportDiagnosticsBtn.IsEnabled = canManageSettings;
         BackupConfigurationBtn.IsEnabled = canManageSettings;
         RestoreConfigurationPreviewBtn.IsEnabled = canManageSettings;
+        ApplyRestoreBtn.IsEnabled = canManageSettings && !string.IsNullOrWhiteSpace(_pendingRestoreBackupPath);
         ConfidenceThresholdText.IsEnabled = canChangeThresholds;
         TestModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
         ValidateRegisteredModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
-        RunModelAcceptanceBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
+        RunModelAcceptanceBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role) && _modelAcceptanceCancellation is null;
+        CancelModelAcceptanceBtn.IsEnabled = _modelAcceptanceCancellation is not null;
         ViewModelAcceptanceRunsBtn.IsEnabled = canManageSettings;
         CreateModelReleasePackageBtn.IsEnabled = canChangeThresholds;
         PromoteProductionCandidateBtn.IsEnabled = canChangeThresholds;
@@ -2509,8 +2598,14 @@ public partial class SettingsView : UserControl
             preview.Summary,
             $"Schema: {preview.SchemaVersion}",
             $"Database schema: {preview.DatabaseSchemaVersion}",
+            $"Target storage path: {preview.TargetStoragePath}",
             $"Settings: {string.Join(", ", preview.SettingsKeys.DefaultIfEmpty("--"))}",
         };
+
+        AddPreviewSection(lines, "Settings that will change:", preview.SettingsChanges);
+        AddPreviewSection(lines, "Conflicts:", preview.Conflicts);
+        AddPreviewSection(lines, "Missing model files:", preview.MissingModelFiles);
+        AddPreviewSection(lines, "Missing plugin folders:", preview.MissingPluginFolders);
 
         if (preview.Warnings.Count > 0)
         {
@@ -2529,6 +2624,16 @@ public partial class SettingsView : UserControl
         return string.Join(Environment.NewLine, lines);
     }
 
+    private static void AddPreviewSection(List<string> lines, string title, IReadOnlyCollection<string> items)
+    {
+        if (items.Count == 0)
+            return;
+
+        lines.Add(string.Empty);
+        lines.Add(title);
+        lines.AddRange(items.Select(item => $"- {item}"));
+    }
+
     private sealed class ModelRegistryRow
     {
         public ModelRegistryRow(ModelRegistryEntry entry)
@@ -2541,7 +2646,7 @@ public partial class SettingsView : UserControl
             LatestAcceptanceStatus = string.IsNullOrWhiteSpace(entry.LatestAcceptanceStatus) ? "--" : entry.LatestAcceptanceStatus;
             ReleasePackageDisplay = string.IsNullOrWhiteSpace(entry.LatestReleasePackagePath)
                 ? "--"
-                : Path.GetFileName(entry.LatestReleasePackagePath);
+                : $"{entry.LatestReleasePackagePath} (#{entry.LatestReleasePackageId?.ToString(CultureInfo.InvariantCulture) ?? "--"})";
             ThresholdDisplay = entry.ConfidenceThreshold.ToString("P0", CultureInfo.InvariantCulture);
             LastValidatedDisplay = entry.LastValidatedAtUtc is { } timestamp
                 ? timestamp.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture)

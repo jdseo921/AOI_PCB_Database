@@ -36,13 +36,16 @@ public sealed class UiServiceCoverageTests
     public void RequiredOperatorVisibleActionsExistInXaml()
     {
         var settings = ReadRepoFile("AOI_Monitor", "Views", "SettingsView.xaml");
+        var modelTest = ReadRepoFile("AOI_Monitor", "Views", "AIModelTestView.xaml");
         var profile = ReadRepoFile("AOI_Monitor", "Views", "ProfileView.xaml");
         var reports = ReadRepoFile("AOI_Monitor", "Views", "ReportsView.xaml");
-        var combined = settings + profile + reports;
+        var combined = settings + modelTest + profile + reports;
 
         foreach (var label in new[]
         {
             "Run Model Acceptance",
+            "Cancel Acceptance",
+            "Open Manifest Template",
             "Create Model Release Package",
             "Promote to Production Candidate",
             "Deploy",
@@ -124,6 +127,7 @@ public sealed class UiServiceCoverageTests
 
         Assert.Contains("Simulation is not production robot validation", combined);
         Assert.Contains("Simulated mode is not real hardware", combined);
+        Assert.Contains("Real Hardware", combined);
         Assert.Contains("Sample Data Mode", combined);
         Assert.Contains("3D Camera Not Connected", combined);
         Assert.Contains("real hardware readiness", combined, StringComparison.OrdinalIgnoreCase);

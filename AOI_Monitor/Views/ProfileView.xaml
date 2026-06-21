@@ -26,7 +26,7 @@
           <TextBlock Text="Source" Foreground="#9AA6AF" VerticalAlignment="Center" Margin="0,0,6,0"/>
           <ComboBox x:Name="ProfileSourceCombo" Width="150" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="OnProfileSourceChanged">
             <ComboBoxItem Content="Sample CSV"/>
-            <ComboBoxItem Content="Generic 3D Adapter"/>
+            <ComboBoxItem Content="Generic 3D Adapter (Real Hardware)"/>
             <ComboBoxItem Content="None"/>
           </ComboBox>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Load Height CSV" Margin="0,0,8,0" Click="OnLoadCsvClick"/>

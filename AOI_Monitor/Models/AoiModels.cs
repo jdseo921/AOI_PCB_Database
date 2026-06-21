@@ -100,6 +100,7 @@ public sealed class InspectionLatencyTrace
     public string ModelId { get; set; } = string.Empty;
     public int ImageWidth { get; set; }
     public int ImageHeight { get; set; }
+    public string Verdict { get; set; } = string.Empty;
     public List<string> Warnings { get; set; } = new();
 }
 
@@ -424,6 +425,7 @@ public sealed class ModelAcceptanceRun
     public bool IsProductionCandidate { get; set; }
     public ModelAcceptanceCriteria Criteria { get; set; } = new();
     public BatchMetrics Metrics { get; set; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    public CustomerDatasetPreflightResult DatasetPreflightResult { get; set; } = new();
     public DatasetQualitySummary DatasetQualitySummary { get; set; } = new();
     public FalseCallRecommendationSummary FalseCallRecommendation { get; set; } = new();
     public ValidationBreakdownSummary BreakdownSummary { get; set; } = new();

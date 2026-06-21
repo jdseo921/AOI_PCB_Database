@@ -81,6 +81,15 @@ public static class InspectionLatencyService
         DateTime? frameCapturedAtUtc = null)
         => new(sourceKind, engine, modelId, imageWidth, imageHeight, frameCapturedAtUtc);
 
+    public static void StartSpan(InspectionLatencyTraceBuilder builder, string name, DateTime? timestampUtc = null)
+        => builder.StartSpan(name, timestampUtc);
+
+    public static void EndSpan(InspectionLatencyTraceBuilder builder, string name, DateTime? timestampUtc = null)
+        => builder.StopSpan(name, timestampUtc);
+
+    public static InspectionLatencyTrace CompleteTrace(InspectionLatencyTraceBuilder builder, bool saved)
+        => builder.Complete(saved);
+
     public static InspectionLatencyTrace Persist(InspectionLatencyTraceBuilder builder, bool saved)
         => Persist(builder.Complete(saved));
 
@@ -137,6 +146,9 @@ public static class InspectionLatencyService
     public static InspectionLatencySummary GetRecentSummary(int limit = 500)
         => Summarize(AoiDatabase.GetInspectionLatencyTraces(limit));
 
+    public static InspectionLatencySummary GetSummary(DateTime fromUtc, DateTime toUtc, int limit = 10000)
+        => Summarize(AoiDatabase.GetInspectionLatencyTraces(fromUtc, toUtc, limit));
+
     public static InspectionLatencySummary SummarizeBatchRows(IEnumerable<BatchTestRow> rows)
     {
         var traces = rows.Select(row => new InspectionLatencyTrace
@@ -152,6 +164,7 @@ public static class InspectionLatencyService
             SourceKind = "BatchValidation",
             Engine = row.InspectionEngine,
             ModelId = row.ModelVersion,
+            Verdict = row.EngineResult,
             Warnings = { "Batch validation row timing does not include live UI result-persist span." },
         });
         return Summarize(traces);

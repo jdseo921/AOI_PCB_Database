@@ -4,12 +4,23 @@ Vendor/customer hardware adapters must live outside the main app. Do not add Bas
 
 ## Camera Adapter Requirements
 
-Implement `IVisionCameraAdapterFactory`, `IVisionCameraAdapter`, and `IVisionDeviceDiscovery`. The adapter manifest must name the assembly and factory type:
+Implement `IVisionCameraAdapterFactory`, `IVisionCameraAdapter`, and `IVisionDeviceDiscovery`.
+
+### Camera Manifest Schema
+
+The adapter manifest must be named `camera_adapter_manifest.json` or `*.camera-adapter.json` and include:
 
 - `camera_adapter_manifest.json`
+- `adapterId`
+- `displayName`
+- `version`
 - `assemblyFile`
 - `factoryTypeName`
-- supported interfaces, views, and pixel formats
+- `supportedInterfaces`
+- `supportedViews`
+- `supportedPixelFormats`
+
+### Camera Frame Metadata Requirements
 
 Every accepted frame must provide:
 
@@ -86,6 +97,15 @@ CustomerVendor.CameraAdapter/
   README.md
 ```
 
-Lighting uses `lighting_adapter_manifest.json`. Robot templates include `robot_controller_manifest.json` plus documented registration because robot motion plugins are not automatically loaded by the app.
+Lighting uses `lighting_adapter_manifest.json` or `*.lighting-adapter.json` with:
+
+- `driverId`
+- `displayName`
+- `version`
+- `assemblyFile`
+- `factoryTypeName`
+- `supportedModes`
+
+Robot templates include `robot_controller_manifest.json` plus documented registration because robot motion plugins are not automatically loaded by the app.
 
 Do not commit generated plugin binaries, vendor redistributables, secrets, customer images, or runtime logs to this repository.

@@ -25,10 +25,14 @@ public static class ModelAcceptanceService
         string validationDatasetFolder,
         string groundTruthCsvPath,
         ModelAcceptanceCriteria? criteria = null,
-        string? operatorId = null)
+        string? operatorId = null,
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         AoiDatabase.Initialize();
         criteria ??= new ModelAcceptanceCriteria();
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report("Loading active model configuration...");
         var configuration = InspectionModelConfigurationService.Load();
         var activeModel = ModelRegistryService.GetActiveModel();
 
@@ -46,6 +50,8 @@ public static class ModelAcceptanceService
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report("Running validation dataset preflight...");
             var preflight = CustomerDatasetPreflightService.Validate(validationDatasetFolder, groundTruthCsvPath);
             if (preflight.Status == "FAIL")
             {
@@ -55,9 +61,12 @@ public static class ModelAcceptanceService
                     groundTruthCsvPath,
                     operatorId,
                     $"Customer dataset preflight failed: {string.Join(" ", preflight.BlockingFailures.Take(8))}",
-                    activeModel);
+                    activeModel,
+                    preflight);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report("Loading formal validation manifest...");
             var manifest = BatchValidationService.LoadValidationManifest(groundTruthCsvPath, validationDatasetFolder);
             var imageFiles = Directory.EnumerateFiles(validationDatasetFolder)
                 .Where(path => ImageExtensions.Contains(Path.GetExtension(path)))
@@ -66,8 +75,11 @@ public static class ModelAcceptanceService
             var items = BatchValidationService.BuildRunItems(imageFiles, manifest);
             var engine = new OnnxInspectionEngine(ModelRegistryService.ToInspectionConfiguration(activeModel));
             var rows = new List<BatchTestRow>();
-            foreach (var item in items)
+            for (var i = 0; i < items.Count; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                var item = items[i];
+                progress?.Report($"Analyzing validation image {i + 1} of {items.Count}: {Path.GetFileName(item.ImagePath)}");
                 try
                 {
                     rows.Add(BatchValidationService.ToRow(item.ImagePath, item.Manifest, engine.Analyze(item.ImagePath, item.Manifest.GoldenPath, DetectionPriority.Balanced)));
@@ -78,6 +90,8 @@ public static class ModelAcceptanceService
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report("Calculating acceptance metrics and false-call evidence...");
             var metrics = BatchValidationService.CalculateMetrics(rows);
             var performance = BatchValidationService.CalculatePerformanceSummary(rows);
             var datasetQuality = DatasetQualityService.Analyze(rows, manifest);
@@ -95,6 +109,7 @@ public static class ModelAcceptanceService
             run.Metrics = metrics;
             run.PerformanceSummary = performance;
             run.P95InferenceMs = Percentile(rows.Select(row => row.InferenceMilliseconds).OrderBy(value => value).ToArray(), 0.95);
+            run.DatasetPreflightResult = preflight;
             run.DatasetQualitySummary = datasetQuality;
             run.FalseCallRecommendation = falseCallSummary;
             run.BreakdownSummary = breakdown;
@@ -102,8 +117,10 @@ public static class ModelAcceptanceService
             run.Messages.Add($"Dataset preflight {preflight.Status}: rows={preflight.ManifestRows}; OK={preflight.OkCount}; NG={preflight.NgCount}; defectClasses={preflight.DefectClassCount}; warnings={preflight.Warnings.Count}.");
             run.Messages.AddRange(preflight.Warnings.Take(8).Select(warning => $"CONDITIONAL: {warning}"));
             run.Limitations = DefaultLimitations();
+            progress?.Report("Persisting model acceptance evidence...");
             run.Id = AoiDatabase.RecordModelAcceptanceRun(run);
             ModelLifecycleService.RecordAcceptanceResult(run, run.OperatorId);
+            progress?.Report($"Model acceptance {run.Status}: run {run.Id}.");
             return run;
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
@@ -117,6 +134,14 @@ public static class ModelAcceptanceService
         var run = AoiDatabase.GetLatestModelAcceptanceRun();
         if (run is null || run.Id != acceptanceRunId)
             throw new InvalidOperationException("Model acceptance run was not found.");
+        if (string.IsNullOrWhiteSpace(run.DatasetPreflightResult.ManifestPath) &&
+            !string.IsNullOrWhiteSpace(run.DatasetFolder) &&
+            !string.IsNullOrWhiteSpace(run.GroundTruthCsvPath) &&
+            Directory.Exists(run.DatasetFolder) &&
+            File.Exists(run.GroundTruthCsvPath))
+        {
+            run.DatasetPreflightResult = CustomerDatasetPreflightService.Validate(run.DatasetFolder, run.GroundTruthCsvPath);
+        }
 
         var root = string.IsNullOrWhiteSpace(outputRoot)
             ? Path.Combine(AoiDatabase.StorageRoot, "exports", "model_releases")
@@ -155,6 +180,7 @@ public static class ModelAcceptanceService
             metricsCsv = Path.GetFileName(metricsPath),
             validationBreakdownCsv = Path.GetFileName(breakdownPath),
             datasetQuality = run.DatasetQualitySummary,
+            datasetPreflight = run.DatasetPreflightResult,
             falseCallRecommendation = run.FalseCallRecommendation,
             limitations = run.Limitations,
         };
@@ -207,9 +233,18 @@ public static class ModelAcceptanceService
         yield return "PASS: Acceptance evidence is scoped to this validation dataset only.";
     }
 
-    private static ModelAcceptanceRun PersistFailure(ModelAcceptanceCriteria criteria, string datasetFolder, string csvPath, string? operatorId, string message, ModelRegistryEntry? model = null)
+    private static ModelAcceptanceRun PersistFailure(
+        ModelAcceptanceCriteria criteria,
+        string datasetFolder,
+        string csvPath,
+        string? operatorId,
+        string message,
+        ModelRegistryEntry? model = null,
+        CustomerDatasetPreflightResult? preflight = null)
     {
         var run = BuildRun(model, criteria, datasetFolder, csvPath, false, "FAIL", operatorId);
+        if (preflight is not null)
+            run.DatasetPreflightResult = preflight;
         run.Messages.Add($"FAIL: {message}");
         run.Limitations = DefaultLimitations();
         run.Id = AoiDatabase.RecordModelAcceptanceRun(run);
@@ -267,6 +302,10 @@ public static class ModelAcceptanceService
         sb.AppendLine("<h1>Model Acceptance Report</h1>");
         sb.AppendLine($"<p><strong>Status:</strong> {Escape(run.Status)}<br><strong>Model:</strong> {Escape(run.ModelId)} / {Escape(run.ModelVersion)}<br><strong>SHA-256:</strong> {Escape(run.ModelSha256)}<br><strong>Approved by:</strong> {Escape(approvedBy)}</p>");
         sb.AppendLine($"<h2>Metrics</h2><table><tr><th>Accuracy</th><th>Precision</th><th>Recall</th><th>False Call</th><th>P95 Inference</th></tr><tr><td>{run.Metrics.Accuracy:P1}</td><td>{run.Metrics.Precision:P1}</td><td>{run.Metrics.Recall:P1}</td><td>{run.Metrics.FalseCallRate:P1}</td><td>{run.P95InferenceMs:F1} ms</td></tr></table>");
+        sb.AppendLine("<h2>Dataset Preflight</h2>");
+        sb.AppendLine($"<table><tr><th>Status</th><th>Rows</th><th>OK</th><th>NG</th><th>Defect classes</th><th>Missing images</th><th>Missing golden</th><th>Duplicate hashes</th></tr><tr><td>{Escape(run.DatasetPreflightResult.Status)}</td><td>{run.DatasetPreflightResult.ManifestRows}</td><td>{run.DatasetPreflightResult.OkCount}</td><td>{run.DatasetPreflightResult.NgCount}</td><td>{run.DatasetPreflightResult.DefectClassCount}</td><td>{run.DatasetPreflightResult.MissingImageCount}</td><td>{run.DatasetPreflightResult.MissingGoldenCount}</td><td>{run.DatasetPreflightResult.DuplicateFileHashCount}</td></tr></table>");
+        if (run.DatasetPreflightResult.BlockingFailures.Count > 0 || run.DatasetPreflightResult.Warnings.Count > 0)
+            sb.AppendLine($"<ul>{string.Join("", run.DatasetPreflightResult.BlockingFailures.Concat(run.DatasetPreflightResult.Warnings).Take(12).Select(item => $"<li>{Escape(item)}</li>"))}</ul>");
         sb.AppendLine($"<h2>Limitations</h2><ul>{string.Join("", run.Limitations.Select(item => $"<li>{Escape(item)}</li>"))}</ul>");
         sb.AppendLine("</body></html>");
         return sb.ToString();

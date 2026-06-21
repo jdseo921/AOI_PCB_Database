@@ -131,6 +131,8 @@ public static class ModelRegistryService
             return false;
         if (model.LifecycleState == ModelLifecycleState.Retired)
             throw new InvalidOperationException("Retired models cannot be set active.");
+        if (model.LifecycleState == ModelLifecycleState.AcceptanceFailed)
+            throw new InvalidOperationException("Models with failed acceptance cannot be set active. Re-run acceptance or register a corrected model.");
 
         AoiDatabase.SetActiveModelRegistryRecord(model.ModelId);
         model.IsActive = true;
@@ -248,10 +250,14 @@ public static class ModelRegistryService
             null,
             entry.LifecycleState,
             entry.LatestAcceptanceStatus,
+            entry.LatestAcceptanceRunId,
+            entry.LatestReleasePackageId,
             entry.LatestReleasePackagePath,
             entry.DeploymentWaiverReason,
+            entry.WaiverExpiresAtUtc,
             entry.DeploymentWaivedBy,
             entry.DeploymentWaivedAtUtc,
+            entry.DeployedAtUtc,
             entry.RetiredReason,
             entry.RetiredAtUtc);
 
@@ -281,10 +287,14 @@ public static class ModelRegistryService
             IsActive = record.IsActive,
             LifecycleState = record.LifecycleState,
             LatestAcceptanceStatus = record.LatestAcceptanceStatus,
+            LatestAcceptanceRunId = record.LatestAcceptanceRunId,
+            LatestReleasePackageId = record.LatestReleasePackageId,
             LatestReleasePackagePath = record.LatestReleasePackagePath,
             DeploymentWaiverReason = record.DeploymentWaiverReason,
+            WaiverExpiresAtUtc = record.WaiverExpiresAtUtc,
             DeploymentWaivedBy = record.DeploymentWaivedBy,
             DeploymentWaivedAtUtc = record.DeploymentWaivedAtUtc,
+            DeployedAtUtc = record.DeployedAtUtc,
             RetiredReason = record.RetiredReason,
             RetiredAtUtc = record.RetiredAtUtc,
         };

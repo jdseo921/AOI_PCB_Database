@@ -101,6 +101,15 @@ public sealed record MesSpoolRetrySummary(
     int Succeeded,
     int Failed);
 
+public sealed class MesUploadResponseContract
+{
+    public bool Accepted { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public string ExternalInspectionId { get; set; } = string.Empty;
+    public DateTime TimestampUtc { get; set; } = DateTime.UtcNow;
+    public string ResultCode { get; set; } = string.Empty;
+}
+
 public sealed class MesReadinessCriteria
 {
     public bool FailOnPendingQueue { get; set; }

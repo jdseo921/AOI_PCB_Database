@@ -106,10 +106,14 @@ public sealed class ModelRegistryEntry
     public bool IsActive { get; set; }
     public ModelLifecycleState LifecycleState { get; set; } = ModelLifecycleState.Registered;
     public string LatestAcceptanceStatus { get; set; } = string.Empty;
+    public long? LatestAcceptanceRunId { get; set; }
+    public long? LatestReleasePackageId { get; set; }
     public string LatestReleasePackagePath { get; set; } = string.Empty;
     public string DeploymentWaiverReason { get; set; } = string.Empty;
+    public DateTime? WaiverExpiresAtUtc { get; set; }
     public string DeploymentWaivedBy { get; set; } = string.Empty;
     public DateTime? DeploymentWaivedAtUtc { get; set; }
+    public DateTime? DeployedAtUtc { get; set; }
     public string RetiredReason { get; set; } = string.Empty;
     public DateTime? RetiredAtUtc { get; set; }
 }
@@ -152,9 +156,13 @@ public record ModelRegistryRecord(
     long? AuditEventId,
     ModelLifecycleState LifecycleState,
     string LatestAcceptanceStatus,
+    long? LatestAcceptanceRunId,
+    long? LatestReleasePackageId,
     string LatestReleasePackagePath,
     string DeploymentWaiverReason,
+    DateTime? WaiverExpiresAtUtc,
     string DeploymentWaivedBy,
     DateTime? DeploymentWaivedAtUtc,
+    DateTime? DeployedAtUtc,
     string RetiredReason,
     DateTime? RetiredAtUtc);

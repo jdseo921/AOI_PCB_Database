@@ -147,6 +147,44 @@ public sealed class MesRestIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task TraceabilitySignoffValidatesRestResponseSchema()
+    {
+        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            ReasonPhrase = "OK",
+            Content = new StringContent("{\"accepted\":true,\"message\":\"accepted\",\"externalInspectionId\":\"MES-123\",\"timestampUtc\":\"2026-06-21T10:15:30Z\",\"resultCode\":\"OK\"}", Encoding.UTF8, "application/json"),
+        });
+        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
+
+        var report = await TraceabilityAcceptanceTestService.RunResultOnlyAsync("Engineer01 [Engineer]");
+
+        Assert.Equal("PASS", report.Status);
+        Assert.Contains("Response schema valid", report.Message);
+        Assert.Contains("externalInspectionId=MES-123", report.Message);
+    }
+
+    [Fact]
+    public async Task InvalidRestResponseSchemaFailsAndEnqueuesSpoolItem()
+    {
+        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            ReasonPhrase = "OK",
+            Content = new StringContent("{\"message\":\"accepted without required fields\"}", Encoding.UTF8, "application/json"),
+        });
+        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
+
+        var report = await TraceabilityAcceptanceTestService.RunResultOnlyAsync("Engineer01 [Engineer]");
+        var spool = Assert.Single(AoiDatabase.GetMesSpoolQueue());
+
+        Assert.Equal("FAIL", report.Status);
+        Assert.Equal("Pending", spool.Status);
+        Assert.Contains("response schema validation failed", spool.LastError, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("accepted:boolean", spool.LastError);
+    }
+
+    [Fact]
     public async Task TraceabilitySignoffReportRedactsSecrets()
     {
         var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" });
@@ -190,6 +228,45 @@ public sealed class MesRestIntegrationTests : IDisposable
         Assert.DoesNotContain("secret-api-key", spool.LastError);
         Assert.DoesNotContain("secret-api-key", json);
         Assert.DoesNotContain(audits, audit => audit.ActionDetail.Contains("secret-api-key", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MesContractExportWritesAllFilesWithoutSecrets()
+    {
+        const string secret = "secret-contract-token";
+        var settings = RestSettings(maxRetryCount: 0);
+        settings.AuthMode = MesRestAuthMode.Bearer;
+        settings.BearerToken = secret;
+        MesIntegrationSettingsService.Save(settings);
+
+        var export = TraceabilityAcceptanceTestService.ExportEndpointContracts(Path.Combine(_root, "contracts"));
+        var files = new[]
+        {
+            export.PayloadContractPath,
+            export.ResponseContractPath,
+            export.ExampleResultPayloadPath,
+            export.ExampleImageUploadMetadataPath,
+        };
+
+        Assert.All(files, path => Assert.True(File.Exists(path), path));
+        foreach (var path in files)
+            Assert.DoesNotContain(secret, File.ReadAllText(path));
+        Assert.Contains("accepted", File.ReadAllText(export.ResponseContractPath));
+        Assert.Contains("externalInspectionId", File.ReadAllText(export.ResponseContractPath));
+        Assert.Contains("timestampUtc", File.ReadAllText(export.ResponseContractPath));
+        Assert.Contains("resultCode", File.ReadAllText(export.ResponseContractPath));
+    }
+
+    [Fact]
+    public void SecretPatternRedactionRemovesAuthValuesFromExportStrings()
+    {
+        var redacted = MesIntegrationSettingsService.RedactSecrets("Authorization: Bearer abc.def.ghi; password=plain; token: xyz; Basic dXNlcjpwYXNz");
+
+        Assert.DoesNotContain("abc.def.ghi", redacted);
+        Assert.DoesNotContain("plain", redacted);
+        Assert.DoesNotContain("xyz", redacted);
+        Assert.DoesNotContain("dXNlcjpwYXNz", redacted);
+        Assert.Contains("***", redacted);
     }
 
     [Fact]

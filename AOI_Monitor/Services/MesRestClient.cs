@@ -156,10 +156,20 @@ public sealed class MesRestClient : IMesClient, ITraceabilityUploader, IDisposab
                 using var response = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
+                    var successBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    var validation = ValidateSuccessResponse(successBody);
+                    if (!validation.Accepted)
+                    {
+                        return new IntegrationCommandResult(
+                            false,
+                            IntegrationConnectionStatus.Error,
+                            MesIntegrationSettingsService.RedactSecrets($"MES REST response schema validation failed for {payloadName}: {validation.Message}", _settings));
+                    }
+
                     return new IntegrationCommandResult(
                         true,
                         IntegrationConnectionStatus.Ready,
-                        $"MES REST uploaded {payloadName}: {(int)response.StatusCode} {response.ReasonPhrase}.");
+                        MesIntegrationSettingsService.RedactSecrets($"MES REST uploaded {payloadName}: {(int)response.StatusCode} {response.ReasonPhrase}. {validation.Message}", _settings));
                 }
 
                 var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -182,6 +192,48 @@ public sealed class MesRestClient : IMesClient, ITraceabilityUploader, IDisposab
         }
 
         return new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, lastMessage);
+    }
+
+    private static IntegrationCommandResult ValidateSuccessResponse(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return new IntegrationCommandResult(
+                true,
+                IntegrationConnectionStatus.Ready,
+                "No response body returned; schema validation skipped for legacy endpoint.");
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                return new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, "response must be a JSON object.");
+
+            var missing = new List<string>();
+            if (!root.TryGetProperty("accepted", out var accepted) || accepted.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+                missing.Add("accepted:boolean");
+            if (!root.TryGetProperty("message", out var message) || message.ValueKind != JsonValueKind.String)
+                missing.Add("message:string");
+            if (!root.TryGetProperty("externalInspectionId", out var externalInspectionId) || externalInspectionId.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(externalInspectionId.GetString()))
+                missing.Add("externalInspectionId:string");
+            if (!root.TryGetProperty("timestampUtc", out var timestamp) || timestamp.ValueKind != JsonValueKind.String || !DateTime.TryParse(timestamp.GetString(), out _))
+                missing.Add("timestampUtc:ISO-8601");
+            if (!root.TryGetProperty("resultCode", out var resultCode) || resultCode.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(resultCode.GetString()))
+                missing.Add("resultCode:string");
+
+            if (missing.Count > 0)
+                return new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, $"missing or invalid field(s): {string.Join(", ", missing)}.");
+            if (!accepted.GetBoolean())
+                return new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, $"accepted=false; message={message.GetString()}.");
+
+            return new IntegrationCommandResult(true, IntegrationConnectionStatus.Ready, $"Response schema valid; externalInspectionId={externalInspectionId.GetString()}; resultCode={resultCode.GetString()}.");
+        }
+        catch (JsonException ex)
+        {
+            return new IntegrationCommandResult(false, IntegrationConnectionStatus.Error, $"response body is not valid JSON: {ex.Message}");
+        }
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativePath)

@@ -290,9 +290,17 @@ public static class FactoryReadinessService
             var latestAcceptance = AoiDatabase.GetLatestModelAcceptanceRun(configuration.ActiveModelId);
             var hasPassAcceptance = latestAcceptance is not null &&
                 string.Equals(latestAcceptance.Status, "PASS", StringComparison.OrdinalIgnoreCase);
-            if (!criteria.RequireProductionModel && !string.IsNullOrWhiteSpace(activeModel?.DeploymentWaiverReason))
+            if (activeModel is not null && !string.IsNullOrWhiteSpace(activeModel.DeploymentWaiverReason))
             {
-                Add(report, "Active model readiness", "Conditional", $"Active ONNX model is deployed with Admin waiver by {activeModel.DeploymentWaivedBy}: {activeModel.DeploymentWaiverReason}", "Keep Stage 1/customer evidence scoped; complete PASS model acceptance before production readiness claims.");
+                var waiverExpired = activeModel.WaiverExpiresAtUtc is not null && activeModel.WaiverExpiresAtUtc.Value.ToUniversalTime() <= DateTime.UtcNow;
+                Add(
+                    report,
+                    "Active model readiness",
+                    waiverExpired ? "No-Go" : "Conditional",
+                    $"Active ONNX model is deployed with Admin waiver by {activeModel.DeploymentWaivedBy}: {activeModel.DeploymentWaiverReason}; expires={activeModel.WaiverExpiresAtUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "not recorded"}.",
+                    waiverExpired
+                        ? "Waiver has expired. Retire or replace the model, or record a new Admin waiver after review."
+                        : "Active waiver downgrades readiness to Conditional at best. Complete PASS model acceptance, release packaging, and approved lifecycle promotion before Go readiness claims.");
                 return;
             }
 
@@ -301,13 +309,6 @@ public static class FactoryReadinessService
                 if (activeModel is null)
                 {
                     Add(report, "Active model readiness", "No-Go", $"Active ONNX model configuration has no matching model registry lifecycle record. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}.", "Register the model and complete lifecycle promotion before full factory automation.");
-                    return;
-                }
-
-                var hasWaiver = !string.IsNullOrWhiteSpace(activeModel.DeploymentWaiverReason);
-                if (hasWaiver)
-                {
-                    Add(report, "Active model readiness", "No-Go", $"Model {activeModel.ModelId} is deployed with Admin waiver by {activeModel.DeploymentWaivedBy}: {activeModel.DeploymentWaiverReason}", "Replace waiver with PASS model acceptance, release package, and approved lifecycle promotion before full factory automation.");
                     return;
                 }
 
@@ -375,12 +376,28 @@ public static class FactoryReadinessService
             return;
         }
 
-        var status = manifest.DatasetQualitySummary.Status.Equals("PASS", StringComparison.OrdinalIgnoreCase)
+        var preflightStatus = string.IsNullOrWhiteSpace(manifest.DatasetPreflightStatus)
+            ? "CONDITIONAL"
+            : manifest.DatasetPreflightStatus;
+        var datasetStatus = manifest.DatasetQualitySummary.Status.Equals("PASS", StringComparison.OrdinalIgnoreCase)
             ? "Go"
             : manifest.DatasetQualitySummary.Status.Equals("FAIL", StringComparison.OrdinalIgnoreCase)
                 ? "No-Go"
                 : "Conditional";
-        Add(report, "Dataset quality status", status, $"Dataset quality={manifest.DatasetQualitySummary.Status}; total={manifest.DatasetQualitySummary.TotalImages}; known GT={manifest.DatasetQualitySummary.KnownGroundTruthImages}; OK={manifest.DatasetQualitySummary.OkImages}; NG={manifest.DatasetQualitySummary.NgImages}.", status == "Go" ? "No action required." : "Balance dataset labels, reduce UNKNOWN labels, and include required golden images.");
+        var preflightGate = preflightStatus.Equals("PASS", StringComparison.OrdinalIgnoreCase)
+            ? "Go"
+            : preflightStatus.Equals("FAIL", StringComparison.OrdinalIgnoreCase)
+                ? "No-Go"
+                : "Conditional";
+        var status = datasetStatus == "No-Go" || preflightGate == "No-Go"
+            ? "No-Go"
+            : datasetStatus == "Conditional" || preflightGate == "Conditional"
+                ? "Conditional"
+                : "Go";
+        var preflightEvidence = preflightStatus.Equals("PASS", StringComparison.OrdinalIgnoreCase)
+            ? "preflight=PASS"
+            : $"preflight={preflightStatus}; failures={manifest.DatasetPreflightFailures.Count}; warnings={manifest.DatasetPreflightWarnings.Count}";
+        Add(report, "Dataset quality status", status, $"Dataset quality={manifest.DatasetQualitySummary.Status}; {preflightEvidence}; total={manifest.DatasetQualitySummary.TotalImages}; known GT={manifest.DatasetQualitySummary.KnownGroundTruthImages}; OK={manifest.DatasetQualitySummary.OkImages}; NG={manifest.DatasetQualitySummary.NgImages}.", status == "Go" ? "No action required." : "Run Dataset Preflight, balance dataset labels, reduce UNKNOWN labels, and include required golden images.");
     }
 
     private static void AddExportVerification(FactoryReadinessReport report, FactoryReadinessCriteria criteria, IReadOnlyList<ExportVerificationRecord> verifications)
@@ -502,7 +519,7 @@ public static class FactoryReadinessService
             "MES Mock Only" or "MES Not Configured" => productionMes ? "No-Go" : "Conditional",
             _ => "Conditional",
         };
-        Add(report, "MES/spool status", status, $"{mes.Status}; mode={mes.Mode}; pending={mes.PendingCount}; oldPending={mes.OldPendingCount}; failed={mes.FailedCount}; sent={mes.SentCount}; abandoned={mes.AbandonedCount}; latestTraceabilityTest={mes.LatestTraceabilityTestStatus}. {string.Join(" ", mes.Messages)}", status == "Go" ? "No action required." : "Resolve pending/failed MES queue items, configure production REST or accepted adapter, and run a passing traceability signoff.");
+        Add(report, "MES/spool status", status, $"{mes.Status}; mode={mes.Mode}; pending={mes.PendingCount}; oldPending={mes.OldPendingCount}; failed={mes.FailedCount}; sent={mes.SentCount}; abandoned={mes.AbandonedCount}; traceability={mes.LatestTraceabilityTestStatus}; latestTraceabilityTest={mes.LatestTraceabilityTestStatus}. {string.Join(" ", mes.Messages)}", status == "Go" ? "No action required." : "Resolve pending/failed MES queue items, configure production REST or accepted adapter, and run a passing traceability signoff.");
     }
 
     private static void AddCentralSync(FactoryReadinessReport report, FactoryReadinessCriteria criteria, CentralSyncReadinessSummary summary)
@@ -633,6 +650,8 @@ public static class FactoryReadinessService
             File.WriteAllText(Path.Combine(evidence, "latest_robot_acceptance.json"), JsonSerializer.Serialize(robot, JsonOptions), Encoding.UTF8);
         if (AoiDatabase.GetLatestSoakTestRun() is { } soak)
             File.WriteAllText(Path.Combine(evidence, "latest_soak_test.json"), JsonSerializer.Serialize(soak, JsonOptions), Encoding.UTF8);
+        if (ModelRegistryService.GetActiveModel() is { } activeModel)
+            File.WriteAllText(Path.Combine(evidence, "active_model_lifecycle.json"), JsonSerializer.Serialize(activeModel, JsonOptions), Encoding.UTF8);
 
         var mesReport = MesSpoolService.EvaluateReadiness();
         File.WriteAllText(Path.Combine(evidence, "latest_mes_readiness.json"), JsonSerializer.Serialize(mesReport, JsonOptions), Encoding.UTF8);

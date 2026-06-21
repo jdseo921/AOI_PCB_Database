@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -140,6 +141,30 @@ public partial class AIModelTestView : UserControl
         }
     }
 
+    private void OnOpenManifestTemplateClick(object sender, RoutedEventArgs e)
+    {
+        var templatePath = FindManifestTemplatePath();
+        if (templatePath is null)
+        {
+            MessageBox.Show(
+                "The manifest template was not found. Expected SampleData/customer_validation_manifest_template.csv.",
+                "Dataset Preflight",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(templatePath) { UseShellExecute = true });
+            WorkflowState.Instance.AddEvent("DATASET_PREFLIGHT", $"Opened customer validation manifest template: {templatePath}");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
+        {
+            MessageBox.Show($"Could not open manifest template:\n{ex.Message}", "Dataset Preflight", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private async void OnRunBatchClick(object sender, RoutedEventArgs e)
     {
         if (_workCts is not null)
@@ -224,11 +249,30 @@ public partial class AIModelTestView : UserControl
                             item.ImagePath,
                             string.IsNullOrWhiteSpace(item.Manifest.GoldenPath) ? null : item.Manifest.GoldenPath,
                             WorkflowState.Instance.DetectionPriority);
+                        var analysisEndUtc = DateTime.UtcNow;
 
                         if (analysis.Timing.IsOverOneSecond)
                             errors.Add($"Performance warning: {Path.GetFileName(item.ImagePath)} took {analysis.Timing.TotalInspectionMilliseconds:F0} ms, above the 1 second target.");
 
                         rows.Add(BatchValidationService.ToRow(item.ImagePath, item.Manifest, analysis));
+                        try
+                        {
+                            var (width, height) = ReadImageDimensions(item.ImagePath);
+                            var trace = InspectionLatencyService.StartTrace(
+                                "BatchValidation",
+                                engine.Name,
+                                engine.Version,
+                                width,
+                                height,
+                                File.GetLastWriteTimeUtc(item.ImagePath));
+                            PopulateLatencyTrace(trace, analysis.Timing, analysisEndUtc.AddMilliseconds(-Math.Max(0, analysis.Timing.TotalInspectionMilliseconds)), analysisEndUtc);
+                            trace.Trace.Verdict = analysis.Verdict;
+                            InspectionLatencyService.Persist(trace, saved: false);
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or NotSupportedException)
+                        {
+                            errors.Add($"Latency trace warning for {Path.GetFileName(item.ImagePath)}: {ex.Message}");
+                        }
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException)
                     {
@@ -878,7 +922,7 @@ public partial class AIModelTestView : UserControl
 
     private void ApplyPreflightResult(CustomerDatasetPreflightResult result)
     {
-        DatasetPreflightText.Text = $"Preflight {result.Status}: rows {result.ManifestRows}, OK {result.OkCount}, NG {result.NgCount}, defect classes {result.DefectClassCount}, missing images {result.MissingImageCount}, missing golden {result.MissingGoldenCount}.";
+        DatasetPreflightText.Text = $"Preflight {result.Status}: rows {result.ManifestRows}, OK {result.OkCount}, NG {result.NgCount}, defect classes {result.DefectClassCount}, sides {result.SideCoverageCount}, missing images {result.MissingImageCount}, missing golden {result.MissingGoldenCount}, duplicate hashes {result.DuplicateFileHashCount}.";
         DatasetPreflightText.Foreground = result.Status switch
         {
             "PASS" => Brushes.LightGreen,
@@ -888,6 +932,9 @@ public partial class AIModelTestView : UserControl
         var issues = result.BlockingFailures.Concat(result.Warnings).Take(3).ToArray();
         if (issues.Length > 0)
             DatasetQualityWarningsText.Text = string.Join(" ", issues);
+
+        Replace(PreflightFailuresList.Items, result.BlockingFailures.Take(12));
+        Replace(PreflightWarningsList.Items, result.Warnings.Take(12));
     }
 
     private void ApplyBreakdown(ValidationBreakdownSummary summary)
@@ -904,6 +951,36 @@ public partial class AIModelTestView : UserControl
         target.Clear();
         foreach (var item in source)
             target.Add(item);
+    }
+
+    private static void Replace(ItemCollection target, IEnumerable<string> source)
+    {
+        target.Clear();
+        foreach (var item in source)
+            target.Add(item);
+    }
+
+    private static string? FindManifestTemplatePath()
+    {
+        foreach (var root in CandidateRoots())
+        {
+            var candidate = Path.Combine(root, "SampleData", "customer_validation_manifest_template.csv");
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> CandidateRoots()
+    {
+        yield return Environment.CurrentDirectory;
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            yield return directory.FullName;
+            directory = directory.Parent;
+        }
     }
 
     private void ApplyPerformance(BatchPerformanceSummary performance)
@@ -1211,6 +1288,34 @@ public partial class AIModelTestView : UserControl
             IOException => $"File could not be read or written: {name} ({ex.Message})",
             _ => $"{name}: {ex.Message}",
         };
+    }
+
+    private static (int Width, int Height) ReadImageDimensions(string imagePath)
+    {
+        var decoder = BitmapDecoder.Create(
+            new Uri(imagePath, UriKind.Absolute),
+            BitmapCreateOptions.DelayCreation,
+            BitmapCacheOption.None);
+        var frame = decoder.Frames.FirstOrDefault();
+        return frame is null ? (0, 0) : (frame.PixelWidth, frame.PixelHeight);
+    }
+
+    private static void PopulateLatencyTrace(InspectionLatencyTraceBuilder trace, InspectionTiming timing, DateTime analysisStartUtc, DateTime analysisEndUtc)
+    {
+        var cursor = analysisStartUtc.AddMilliseconds(Math.Max(0, timing.ImageLoadMilliseconds));
+        trace.StartSpan("preprocessing", cursor);
+        cursor = cursor.AddMilliseconds(Math.Max(0, timing.PreprocessingMilliseconds));
+        trace.StopSpan("preprocessing", cursor);
+        trace.StartSpan("inference", cursor);
+        cursor = cursor.AddMilliseconds(Math.Max(0, timing.InferenceMilliseconds));
+        if (cursor > analysisEndUtc)
+            cursor = analysisEndUtc;
+        trace.StopSpan("inference", cursor);
+        trace.StartSpan("postprocess", cursor);
+        trace.StopSpan("postprocess", analysisEndUtc);
+        trace.StartSpan("overlay", analysisEndUtc);
+        cursor = analysisEndUtc.AddMilliseconds(Math.Max(0, timing.OverlayRenderingMilliseconds));
+        trace.StopSpan("overlay", cursor);
     }
 
     private sealed record WorkProgress(int Completed, int Total, string Message);

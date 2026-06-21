@@ -94,6 +94,34 @@ foreach ($path in $templateProjectFiles) {
     }
 }
 
+$mainProjectPath = Join-Path $repoRoot "AOI_Monitor/AOI_Monitor.csproj"
+if (Test-Path -LiteralPath $mainProjectPath -PathType Leaf) {
+    $mainProjectXml = Get-Content -LiteralPath $mainProjectPath -Raw
+    $forbiddenVendorSdkPatterns = @(
+        'Basler',
+        'Pylon',
+        'Hikrobot',
+        'MvCam',
+        'Cognex',
+        'Keyence',
+        'Spinnaker',
+        'Sapera',
+        'Fanuc',
+        'Epson',
+        'Yamaha',
+        'Denso',
+        'UniversalRobots',
+        'OpcUa',
+        'Plc'
+    )
+
+    foreach ($pattern in $forbiddenVendorSdkPatterns) {
+        if ($mainProjectXml -match "(?i)<PackageReference\b[^>]*\bInclude\s*=\s*`"[^`"]*$pattern") {
+            Add-Issue $issues "main-app" "AOI_Monitor/AOI_Monitor.csproj" "vendor SDK package '$pattern' must live in an external adapter project, not the main app"
+        }
+    }
+}
+
 $imageExtensions = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($extension in @(".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp", ".gif")) {
     [void]$imageExtensions.Add($extension)

@@ -26,12 +26,17 @@ public sealed class ConfigurationRestorePreview
     public bool IsCompatible { get; set; }
     public string SchemaVersion { get; set; } = string.Empty;
     public int DatabaseSchemaVersion { get; set; }
+    public string TargetStoragePath { get; set; } = string.Empty;
     public int ModelRegistryCount { get; set; }
     public int ThresholdProfileCount { get; set; }
     public int RecipeRevisionCount { get; set; }
     public List<string> SettingsKeys { get; set; } = new();
     public List<string> Warnings { get; set; } = new();
     public List<string> BlockingIssues { get; set; } = new();
+    public List<string> Conflicts { get; set; } = new();
+    public List<string> MissingModelFiles { get; set; } = new();
+    public List<string> MissingPluginFolders { get; set; } = new();
+    public List<string> SettingsChanges { get; set; } = new();
     public string Summary => IsCompatible
         ? $"Compatible backup: models={ModelRegistryCount}, thresholdProfiles={ThresholdProfileCount}, recipes={RecipeRevisionCount}."
         : $"Backup cannot be restored: {string.Join(" ", BlockingIssues)}";
@@ -73,6 +78,7 @@ public static class ConfigurationBackupService
             var package = ReadPackage(backupPath);
             preview.SchemaVersion = package.SchemaVersion;
             preview.DatabaseSchemaVersion = package.DatabaseSchemaVersion;
+            preview.TargetStoragePath = AoiDatabase.StorageRoot;
             preview.ModelRegistryCount = package.ModelRegistry.Count;
             preview.ThresholdProfileCount = package.ThresholdProfiles.Count;
             preview.RecipeRevisionCount = package.RecipeRevisions.Count;
@@ -84,6 +90,7 @@ public static class ConfigurationBackupService
                 preview.BlockingIssues.Add($"Backup database schema {package.DatabaseSchemaVersion} is newer than this app supports ({AoiDatabase.LatestSchemaVersion}).");
             if (package.ExcludedData.Count == 0)
                 preview.Warnings.Add("Backup does not list excluded runtime/customer image data.");
+            AddRestorePreviewDetails(package, preview);
             preview.IsCompatible = preview.BlockingIssues.Count == 0;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
@@ -151,12 +158,12 @@ public static class ConfigurationBackupService
                 settings[key] = JsonSerializer.Deserialize<JsonElement>(File.ReadAllText(path));
         }
 
-        settings.TryAdd("inspectionModel", JsonSerializer.SerializeToElement(InspectionModelConfigurationService.Load(), JsonOptions));
-        settings.TryAdd("cameraSource", JsonSerializer.SerializeToElement(CameraSourceSettingsService.Load(), JsonOptions));
-        settings.TryAdd("lighting", JsonSerializer.SerializeToElement(LightingSettingsService.Load(), JsonOptions));
-        settings.TryAdd("mesIntegration", JsonSerializer.SerializeToElement(MesIntegrationSettingsService.Load(), JsonOptions));
-        settings.TryAdd("centralSync", JsonSerializer.SerializeToElement(CentralSyncSettingsService.Load(), JsonOptions));
-        settings.TryAdd("deploymentProfile", JsonSerializer.SerializeToElement(DeploymentProfileSettingsService.Load(), JsonOptions));
+        settings["inspectionModel"] = JsonSerializer.SerializeToElement(InspectionModelConfigurationService.Load(), JsonOptions);
+        settings["cameraSource"] = JsonSerializer.SerializeToElement(CameraSourceSettingsService.Load(), JsonOptions);
+        settings["lighting"] = JsonSerializer.SerializeToElement(LightingSettingsService.Load(), JsonOptions);
+        settings["mesIntegration"] = ProtectedMesSettingsElement(MesIntegrationSettingsService.Load());
+        settings["centralSync"] = ProtectedCentralSyncSettingsElement(CentralSyncSettingsService.Load());
+        settings["deploymentProfile"] = JsonSerializer.SerializeToElement(DeploymentProfileSettingsService.Load(), JsonOptions);
         return settings;
     }
 
@@ -176,9 +183,9 @@ public static class ConfigurationBackupService
         if (settings.TryGetValue("lighting", out var lighting))
             LightingSettingsService.Save(lighting.Deserialize<LightingSettings>(JsonOptions) ?? new LightingSettings());
         if (settings.TryGetValue("mesIntegration", out var mes))
-            MesIntegrationSettingsService.Save(mes.Deserialize<MesIntegrationSettings>(JsonOptions) ?? new MesIntegrationSettings());
+            MesIntegrationSettingsService.Save(UnprotectMesSettingsForRestore(mes.Deserialize<MesIntegrationSettings>(JsonOptions) ?? new MesIntegrationSettings()));
         if (settings.TryGetValue("centralSync", out var central))
-            CentralSyncSettingsService.Save(central.Deserialize<CentralSyncSettings>(JsonOptions) ?? new CentralSyncSettings());
+            CentralSyncSettingsService.Save(UnprotectCentralSyncSettingsForRestore(central.Deserialize<CentralSyncSettings>(JsonOptions) ?? new CentralSyncSettings()));
         if (settings.TryGetValue("deploymentProfile", out var profile) &&
             profile.Deserialize<DeploymentProfile>(JsonOptions) is { } deploymentProfile)
         {
@@ -198,6 +205,169 @@ public static class ConfigurationBackupService
 
         return JsonSerializer.Deserialize<ConfigurationBackupPackage>(File.ReadAllText(backupPath), JsonOptions)
             ?? throw new InvalidDataException("Configuration backup could not be read.");
+    }
+
+    private static void AddRestorePreviewDetails(ConfigurationBackupPackage package, ConfigurationRestorePreview preview)
+    {
+        if (!string.IsNullOrWhiteSpace(package.SourceStorageRoot) &&
+            !string.Equals(Path.GetFullPath(package.SourceStorageRoot), Path.GetFullPath(AoiDatabase.StorageRoot), StringComparison.OrdinalIgnoreCase))
+        {
+            preview.Warnings.Add($"Backup source storage root was {package.SourceStorageRoot}; target storage root is {AoiDatabase.StorageRoot}.");
+        }
+
+        var currentModels = AoiDatabase.GetModelRegistryRecords().Select(model => model.ModelId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var model in package.ModelRegistry)
+        {
+            if (currentModels.Contains(model.ModelId))
+                preview.Conflicts.Add($"Model registry entry already exists and will be updated: {model.ModelId}.");
+            if (!string.IsNullOrWhiteSpace(model.StoredModelPath) && !File.Exists(model.StoredModelPath))
+                preview.MissingModelFiles.Add(model.StoredModelPath);
+        }
+
+        var currentProfiles = AoiDatabase.GetThresholdProfiles()
+            .Select(profile => $"{profile.ProfileId}/{profile.Revision}")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var profile in package.ThresholdProfiles)
+        {
+            var key = $"{profile.ProfileId}/{profile.Revision}";
+            if (currentProfiles.Contains(key))
+                preview.Conflicts.Add($"Threshold profile already exists and will be updated: {key}.");
+        }
+
+        if (TryDeserializeSetting<InspectionModelConfiguration>(package.Settings, "inspectionModel", out var inspection) &&
+            !string.IsNullOrWhiteSpace(inspection.ModelFilePath) &&
+            !File.Exists(inspection.ModelFilePath))
+        {
+            preview.MissingModelFiles.Add(inspection.ModelFilePath);
+        }
+
+        if (TryDeserializeSetting<CameraSourceSettings>(package.Settings, "cameraSource", out var camera) &&
+            !string.IsNullOrWhiteSpace(camera.AdapterFolder) &&
+            !Directory.Exists(camera.AdapterFolder))
+        {
+            preview.MissingPluginFolders.Add(camera.AdapterFolder);
+        }
+
+        AddSettingChange(preview, "inspectionModel", package.Settings, InspectionModelConfigurationService.Load());
+        AddSettingChange(preview, "cameraSource", package.Settings, CameraSourceSettingsService.Load());
+        AddSettingChange(preview, "lighting", package.Settings, LightingSettingsService.Load());
+        AddSettingChange(preview, "mesIntegration", package.Settings, ProtectedComparableMesSettings(MesIntegrationSettingsService.Load()));
+        AddSettingChange(preview, "centralSync", package.Settings, ProtectedComparableCentralSyncSettings(CentralSyncSettingsService.Load()));
+        AddSettingChange(preview, "deploymentProfile", package.Settings, DeploymentProfileSettingsService.Load());
+
+        if (preview.MissingModelFiles.Count > 0)
+            preview.Warnings.Add($"{preview.MissingModelFiles.Count} model file path(s) in the backup do not exist on this PC.");
+        if (preview.MissingPluginFolders.Count > 0)
+            preview.Warnings.Add($"{preview.MissingPluginFolders.Count} plugin folder path(s) in the backup do not exist on this PC.");
+        preview.MissingModelFiles = preview.MissingModelFiles.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        preview.MissingPluginFolders = preview.MissingPluginFolders.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static void AddSettingChange<T>(ConfigurationRestorePreview preview, string key, Dictionary<string, JsonElement> settings, T current)
+    {
+        if (!settings.TryGetValue(key, out var backup))
+            return;
+
+        var currentJson = JsonSerializer.Serialize(current, JsonOptions);
+        if (!JsonEquivalent(backup.GetRawText(), currentJson))
+            preview.SettingsChanges.Add($"{key} will change.");
+    }
+
+    private static bool JsonEquivalent(string left, string right)
+    {
+        using var leftDocument = JsonDocument.Parse(left);
+        using var rightDocument = JsonDocument.Parse(right);
+        return JsonSerializer.Serialize(leftDocument.RootElement, JsonOptions) ==
+               JsonSerializer.Serialize(rightDocument.RootElement, JsonOptions);
+    }
+
+    private static bool TryDeserializeSetting<T>(Dictionary<string, JsonElement> settings, string key, out T value)
+    {
+        value = default!;
+        if (!settings.TryGetValue(key, out var element))
+            return false;
+        try
+        {
+            value = element.Deserialize<T>(JsonOptions)!;
+            return value is not null;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static JsonElement ProtectedMesSettingsElement(MesIntegrationSettings settings)
+        => JsonSerializer.SerializeToElement(ProtectedComparableMesSettings(settings), JsonOptions);
+
+    private static MesIntegrationSettings ProtectedComparableMesSettings(MesIntegrationSettings settings)
+        => new()
+        {
+            Mode = settings.Mode,
+            MockEndpointUrl = settings.MockEndpointUrl,
+            UploadTimeoutSeconds = settings.UploadTimeoutSeconds,
+            AutoUploadEnabled = settings.AutoUploadEnabled,
+            BaseUrl = settings.BaseUrl,
+            UploadResultPath = settings.UploadResultPath,
+            UploadImagePath = settings.UploadImagePath,
+            AuthMode = settings.AuthMode,
+            ApiKeyHeaderName = settings.ApiKeyHeaderName,
+            ApiKey = string.IsNullOrWhiteSpace(settings.ApiKey) ? string.Empty : SecretProtectionService.Protect(settings.ApiKey),
+            BearerToken = string.IsNullOrWhiteSpace(settings.BearerToken) ? string.Empty : SecretProtectionService.Protect(settings.BearerToken),
+            Username = settings.Username,
+            Password = string.IsNullOrWhiteSpace(settings.Password) ? string.Empty : SecretProtectionService.Protect(settings.Password),
+            TimeoutSeconds = settings.TimeoutSeconds,
+            MaxRetryCount = settings.MaxRetryCount,
+            RetryBackoffMs = settings.RetryBackoffMs,
+        };
+
+    private static JsonElement ProtectedCentralSyncSettingsElement(CentralSyncSettings settings)
+        => JsonSerializer.SerializeToElement(ProtectedComparableCentralSyncSettings(settings), JsonOptions);
+
+    private static CentralSyncSettings ProtectedComparableCentralSyncSettings(CentralSyncSettings settings)
+        => new()
+        {
+            Mode = settings.Mode,
+            EndpointOrFolder = settings.EndpointOrFolder,
+            EndpointUrl = settings.EndpointUrl,
+            FileDropFolder = settings.FileDropFolder,
+            StationId = settings.StationId,
+            SyncIntervalSeconds = settings.SyncIntervalSeconds,
+            IncludeImages = settings.IncludeImages,
+            RedactOperatorId = settings.RedactOperatorId,
+            RedactImagePaths = settings.RedactImagePaths,
+            RedactEndpointInExports = settings.RedactEndpointInExports,
+            MaxRetryCount = settings.MaxRetryCount,
+            RetryBackoffMs = settings.RetryBackoffMs,
+            SharedSecret = string.IsNullOrWhiteSpace(settings.SharedSecret) ? string.Empty : SecretProtectionService.Protect(settings.SharedSecret),
+        };
+
+    private static MesIntegrationSettings UnprotectMesSettingsForRestore(MesIntegrationSettings settings)
+    {
+        settings.ApiKey = TryUnprotectForRestore(settings.ApiKey);
+        settings.BearerToken = TryUnprotectForRestore(settings.BearerToken);
+        settings.Password = TryUnprotectForRestore(settings.Password);
+        return settings;
+    }
+
+    private static CentralSyncSettings UnprotectCentralSyncSettingsForRestore(CentralSyncSettings settings)
+    {
+        settings.SharedSecret = TryUnprotectForRestore(settings.SharedSecret);
+        return settings;
+    }
+
+    private static string TryUnprotectForRestore(string value)
+    {
+        if (!SecretProtectionService.IsProtected(value))
+            return value;
+        try
+        {
+            return SecretProtectionService.Unprotect(value);
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     private static IEnumerable<(string Key, string Path)> SettingsFiles()

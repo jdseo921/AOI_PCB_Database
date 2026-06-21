@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace AOI_Monitor.Services;
 
@@ -46,6 +47,9 @@ public static class SecretProtectionService
                 redacted = redacted.Replace(secret, Redacted, StringComparison.Ordinal);
         }
 
+        redacted = Regex.Replace(redacted, @"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+", $"Bearer {Redacted}");
+        redacted = Regex.Replace(redacted, @"(?i)\bBasic\s+[A-Za-z0-9+/=]+", $"Basic {Redacted}");
+        redacted = Regex.Replace(redacted, @"(?i)\b(api[-_ ]?key|token|shared[-_ ]?secret|password)\s*[:=]\s*[^,\s;""']+", $"$1={Redacted}");
         return redacted;
     }
 }

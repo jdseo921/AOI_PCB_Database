@@ -73,7 +73,7 @@ public sealed class ConfigurationBackupServiceTests : IDisposable
     }
 
     [Fact]
-    public void BackupRestoreRoundTripPreservesActiveModelIdAndThresholds()
+    public void BackupRestoreRoundTripPreservesActiveDeploymentProfileModelThresholdCameraAndMesSettings()
     {
         AoiDatabase.Initialize();
         var modelPath = Path.Combine(_root, "candidate.onnx");
@@ -119,7 +119,35 @@ public sealed class ConfigurationBackupServiceTests : IDisposable
         };
         AoiDatabase.SaveThresholdProfile(profile);
         ThresholdProfileService.DeployProfile(profile.ProfileId, profile.Revision, UserRole.Engineer, "Engineer01 [Engineer]");
+        var pluginFolder = Path.Combine(_root, "plugins", "camera");
+        Directory.CreateDirectory(pluginFolder);
+        CameraSourceSettingsService.Save(new CameraSourceSettings
+        {
+            SourceKey = CameraSourceFactory.GenericVisionAdapterSourceKey,
+            AdapterFolder = pluginFolder,
+            TopDeviceId = "CAM-TOP-001",
+            BoardModel = "CUSTOMER-A",
+            LotId = "LOT-RESTORE",
+        });
+        const string apiKey = "restore-api-key-secret";
+        MesIntegrationSettingsService.Save(new MesIntegrationSettings
+        {
+            Mode = MesIntegrationMode.Rest,
+            BaseUrl = "https://mes.restore.test",
+            UploadResultPath = "/api/results",
+            UploadImagePath = "/api/images",
+            AuthMode = MesRestAuthMode.ApiKey,
+            ApiKeyHeaderName = "X-Restore-Key",
+            ApiKey = apiKey,
+            TimeoutSeconds = 12,
+            MaxRetryCount = 4,
+        });
+        DeploymentProfileSettingsService.Save(DeploymentProfile.Stage4MesPilot);
         var backupPath = ConfigurationBackupService.Export(Path.Combine(_root, "backup"), "Admin01 [Admin]").BackupPath;
+        var backupJson = File.ReadAllText(backupPath);
+
+        Assert.DoesNotContain(apiKey, backupJson, StringComparison.Ordinal);
+        Assert.Contains(SecretProtectionService.ProtectedPrefix, backupJson, StringComparison.Ordinal);
 
         var restoreRoot = Path.Combine(_root, "restore-target");
         AoiDatabase.ConfigureStorageRoot(restoreRoot);
@@ -128,13 +156,54 @@ public sealed class ConfigurationBackupServiceTests : IDisposable
         var preview = ConfigurationBackupService.Import(backupPath, "Admin01 [Admin]");
         var restoredModel = ModelRegistryService.GetActiveModel();
         var restoredProfile = AoiDatabase.GetActiveThresholdProfile("CUSTOMER-A", "PROGRAM-A", "RECIPE-A");
+        var restoredCamera = CameraSourceSettingsService.Load();
+        var restoredMes = MesIntegrationSettingsService.Load();
 
         Assert.True(preview.IsCompatible);
+        Assert.Equal(DeploymentProfile.Stage4MesPilot, DeploymentProfileSettingsService.Load());
         Assert.NotNull(restoredModel);
         Assert.Equal(model.ModelId, restoredModel.ModelId);
         Assert.NotNull(restoredProfile);
         Assert.Equal(profile.ProfileId, restoredProfile.ProfileId);
         Assert.Equal(0.74, restoredProfile.Rules.Single().ConfidenceThreshold, precision: 3);
         Assert.Equal(13, restoredProfile.Rules.Single().NgThreshold, precision: 3);
+        Assert.Equal(CameraSourceFactory.GenericVisionAdapterSourceKey, restoredCamera.SourceKey);
+        Assert.Equal(pluginFolder, restoredCamera.AdapterFolder);
+        Assert.Equal("CAM-TOP-001", restoredCamera.TopDeviceId);
+        Assert.Equal(MesIntegrationMode.Rest, restoredMes.Mode);
+        Assert.Equal("https://mes.restore.test", restoredMes.BaseUrl);
+        Assert.Equal("X-Restore-Key", restoredMes.ApiKeyHeaderName);
+        Assert.Equal(apiKey, restoredMes.ApiKey);
+        Assert.Equal(4, restoredMes.MaxRetryCount);
+    }
+
+    [Fact]
+    public void RestorePreviewReportsTargetPathMissingFilesPluginFoldersAndSettingsChanges()
+    {
+        AoiDatabase.Initialize();
+        var missingModel = Path.Combine(_root, "missing.onnx");
+        var missingPlugin = Path.Combine(_root, "missing-plugin");
+        InspectionModelConfigurationService.Save(new InspectionModelConfiguration { ModelFilePath = missingModel });
+        CameraSourceSettingsService.Save(new CameraSourceSettings
+        {
+            SourceKey = CameraSourceFactory.GenericVisionAdapterSourceKey,
+            AdapterFolder = missingPlugin,
+        });
+        DeploymentProfileSettingsService.Save(DeploymentProfile.FullFactoryAutomation);
+        var backupPath = ConfigurationBackupService.Export(Path.Combine(_root, "preview-backup"), "Admin01 [Admin]").BackupPath;
+
+        AoiDatabase.ConfigureStorageRoot(Path.Combine(_root, "preview-target"));
+        AoiDatabase.Initialize();
+        DeploymentProfileSettingsService.Save(DeploymentProfile.Stage1ImageValidation);
+
+        var preview = ConfigurationBackupService.Preview(backupPath);
+
+        Assert.True(preview.IsCompatible);
+        Assert.Equal(AoiDatabase.StorageRoot, preview.TargetStoragePath);
+        Assert.Contains(preview.MissingModelFiles, path => path == missingModel);
+        Assert.Contains(preview.MissingPluginFolders, path => path == missingPlugin);
+        Assert.Contains(preview.SettingsChanges, change => change.Contains("deploymentProfile", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(preview.Warnings, warning => warning.Contains("model file", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(preview.Warnings, warning => warning.Contains("plugin folder", StringComparison.OrdinalIgnoreCase));
     }
 }

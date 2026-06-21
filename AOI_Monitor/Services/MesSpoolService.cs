@@ -161,9 +161,10 @@ public static class MesSpoolService
         Directory.CreateDirectory(root);
         var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
         var rows = AoiDatabase.GetMesSpoolQueue(1000);
+        var settings = MesIntegrationSettingsService.Load();
         var jsonPath = Path.Combine(root, $"mes_queue_{stamp}.json");
         var htmlPath = Path.Combine(root, $"mes_queue_{stamp}.html");
-        File.WriteAllText(jsonPath, JsonSerializer.Serialize(rows.Select(ToReportRow), JsonOptions), Encoding.UTF8);
+        File.WriteAllText(jsonPath, JsonSerializer.Serialize(rows.Select(row => ToReportRow(row, settings)), JsonOptions), Encoding.UTF8);
         File.WriteAllText(htmlPath, BuildHtml(rows, EvaluateReadiness()), Encoding.UTF8);
         ExportVerificationService.RecordVerifiedExport("MesQueueReportJson", jsonPath);
         ExportVerificationService.RecordVerifiedExport("MesQueueReportHtml", htmlPath);
@@ -216,18 +217,18 @@ public static class MesSpoolService
     private static string Escape(string value)
         => System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
 
-    private static MesQueueReportRow ToReportRow(MesSpoolQueueRecord row)
+    private static MesQueueReportRow ToReportRow(MesSpoolQueueRecord row, MesIntegrationSettings settings)
         => new(
             row.Id,
             row.CreatedAtUtc,
             row.LastAttemptAtUtc,
             row.NextAttemptAtUtc,
             row.PayloadType,
-            MesIntegrationSettingsService.RedactSecrets(row.EndpointUrl),
+            MesIntegrationSettingsService.RedactSecrets(row.EndpointUrl, settings),
             row.RetryCount,
             row.MaxRetryCount,
             row.Status,
-            MesIntegrationSettingsService.RedactSecrets(row.LastError),
+            MesIntegrationSettingsService.RedactSecrets(row.LastError, settings),
             row.LotId,
             row.BoardModel,
             row.Result);

@@ -87,6 +87,7 @@
             <TextBlock Text="Engine" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
             <TextBox x:Name="EngineText" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference Prototype Engine"/>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Run Dataset Preflight" Margin="0,8,0,0" Click="OnRunDatasetPreflightClick"/>
+            <Button Style="{StaticResource ActionBtn}" Content="Open Manifest Template" Margin="0,6,0,0" Click="OnOpenManifestTemplateClick"/>
             <Button Style="{StaticResource ActionBtnGreen}" Content="Run Batch Inspection" Margin="0,6,0,0" Click="OnRunBatchClick"/>
           </StackPanel>
         </Grid>
@@ -147,6 +148,21 @@
           <TextBlock x:Name="DatasetQualityText" Text="--" FontWeight="Bold" FontSize="14"/>
           <TextBlock x:Name="DatasetPreflightText" Text="Preflight: not run" Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap"/>
           <TextBlock x:Name="DatasetQualityWarningsText" Text="" Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap"/>
+          <Grid Margin="0,6,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="8"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <TextBlock Text="Blocking Failures" Foreground="#FFCDD0" FontWeight="Bold" FontSize="10.5" Margin="0,0,0,3"/>
+              <ListBox x:Name="PreflightFailuresList" Height="62" Background="#151A1E" BorderBrush="#343D44" Foreground="#FFCDD0"/>
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+              <TextBlock Text="Warnings" Foreground="#E1A334" FontWeight="Bold" FontSize="10.5" Margin="0,0,0,3"/>
+              <ListBox x:Name="PreflightWarningsList" Height="62" Background="#151A1E" BorderBrush="#343D44" Foreground="#FFE1A3"/>
+            </StackPanel>
+          </Grid>
         </StackPanel>
       </Border>
       <Border Style="{StaticResource FieldBox}" Margin="0,6,0,0">

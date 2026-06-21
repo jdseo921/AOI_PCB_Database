@@ -54,6 +54,7 @@ public sealed class InspectionLatencyServiceTests : IDisposable
             ModelId = "MODEL",
             ImageWidth = 1280,
             ImageHeight = 720,
+            Verdict = "OK",
         };
 
         InspectionLatencyService.Persist(trace);
@@ -61,6 +62,7 @@ public sealed class InspectionLatencyServiceTests : IDisposable
 
         Assert.Equal(700, saved.TotalFrameToOverlayMs, precision: 3);
         Assert.Equal(820, saved.TotalFrameToSavedResultMs, precision: 3);
+        Assert.Equal("OK", saved.Verdict);
         Assert.Empty(saved.Warnings);
     }
 
@@ -106,5 +108,77 @@ public sealed class InspectionLatencyServiceTests : IDisposable
 
         Assert.Contains(saved.Warnings, warning => warning.Contains("overlay", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(saved.Warnings, warning => warning.Contains("Frame captured", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DateRangeSummaryReturnsOnlyMatchingTraces()
+    {
+        AoiDatabase.Initialize();
+        var baseTime = DateTime.UtcNow.Date.AddHours(8);
+        InspectionLatencyService.Persist(new InspectionLatencyTrace
+        {
+            TraceId = Guid.NewGuid().ToString("N"),
+            CreatedAtUtc = baseTime,
+            FrameCapturedAtUtc = baseTime,
+            OverlayRenderEndUtc = baseTime.AddMilliseconds(300),
+            TotalFrameToOverlayMs = 300,
+            SourceKind = "UnitTest",
+            Engine = "Engine",
+            Verdict = "OK",
+        });
+        InspectionLatencyService.Persist(new InspectionLatencyTrace
+        {
+            TraceId = Guid.NewGuid().ToString("N"),
+            CreatedAtUtc = baseTime.AddDays(-2),
+            FrameCapturedAtUtc = baseTime.AddDays(-2),
+            OverlayRenderEndUtc = baseTime.AddDays(-2).AddMilliseconds(1300),
+            TotalFrameToOverlayMs = 1300,
+            SourceKind = "UnitTest",
+            Engine = "Engine",
+            Verdict = "NG",
+        });
+
+        var summary = InspectionLatencyService.GetSummary(baseTime.AddMinutes(-1), baseTime.AddMinutes(1));
+
+        Assert.Equal(1, summary.TraceCount);
+        Assert.Equal(0, summary.OverOneSecondCount);
+        Assert.Equal(300, summary.P95FrameToOverlayMs, precision: 3);
+    }
+
+    [Fact]
+    public void ReadinessReportIncludesLatencySummary()
+    {
+        AoiDatabase.Initialize();
+        var start = DateTime.UtcNow;
+        InspectionLatencyService.Persist(new InspectionLatencyTrace
+        {
+            TraceId = Guid.NewGuid().ToString("N"),
+            CreatedAtUtc = start,
+            FrameCapturedAtUtc = start,
+            FrameReceivedAtUtc = start,
+            PreprocessingStartUtc = start.AddMilliseconds(10),
+            PreprocessingEndUtc = start.AddMilliseconds(20),
+            InferenceStartUtc = start.AddMilliseconds(20),
+            InferenceEndUtc = start.AddMilliseconds(80),
+            PostprocessStartUtc = start.AddMilliseconds(80),
+            PostprocessEndUtc = start.AddMilliseconds(90),
+            OverlayRenderStartUtc = start.AddMilliseconds(90),
+            OverlayRenderEndUtc = start.AddMilliseconds(250),
+            SourceKind = "UnitTest",
+            Engine = "Unit Test Engine",
+            ModelId = "MODEL",
+            Verdict = "OK",
+        });
+
+        var report = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
+        {
+            DeploymentProfile = DeploymentProfile.Stage1ImageValidation,
+            Stage1Only = true,
+        });
+
+        Assert.Contains(report.Categories, category =>
+            category.Name == "Inspection latency trace" &&
+            category.Evidence.Contains("p95 frame-to-overlay", StringComparison.OrdinalIgnoreCase) &&
+            category.Evidence.Contains("over1s=0", StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -13,7 +13,9 @@ public sealed class ManagementDashboardFilter
     public DateTime? ToDate { get; set; }
     public string BoardModel { get; set; } = string.Empty;
     public string LotId { get; set; } = string.Empty;
+    public string OperatorId { get; set; } = string.Empty;
     public string ModelVersion { get; set; } = string.Empty;
+    public DeploymentProfile? DeploymentProfile { get; set; }
 }
 
 public sealed class ManagementDashboardReport
@@ -31,6 +33,7 @@ public sealed class ManagementDashboardReport
     public double AverageInspectionTimeMs { get; set; }
     public double P95InspectionTimeMs { get; set; }
     public string MesSyncStatus { get; set; } = string.Empty;
+    public string CentralSyncStatus { get; set; } = string.Empty;
     public string AcceptanceReadinessStatus { get; set; } = string.Empty;
     public List<ManagementDashboardContributor> TopDefectClasses { get; set; } = new();
     public List<ManagementDashboardContributor> TopRoiRefdesContributors { get; set; } = new();
@@ -91,6 +94,7 @@ public static class ManagementDashboardService
             FromDate = filter.FromDate,
             ToDate = filter.ToDate,
             BoardProgram = NullIfBlank(filter.BoardModel),
+            OperatorId = NullIfBlank(filter.OperatorId),
         })
         .Where(row => Matches(row.ModelVersion, filter.ModelVersion))
         .ToArray();
@@ -116,6 +120,8 @@ public static class ManagementDashboardService
             P95InspectionTimeMs = Percentile(inspections.Select(row => row.TotalInspectionMilliseconds), 0.95),
         };
 
+        ApplyLatencySummary(report, filter);
+
         var falseCalls = validationRows.Where(IsFalseCall).ToArray();
         var possibleEscapes = validationRows.Where(IsPossibleEscape).ToArray();
         var reviewRows = validationRows.Where(row => IsVerdict(row.EngineResult, "REVIEW")).ToArray();
@@ -130,8 +136,11 @@ public static class ManagementDashboardService
 
         var mes = MesSpoolService.EvaluateReadiness();
         var central = CentralSyncService.EvaluateReadiness();
-        var readiness = FactoryReadinessService.Evaluate();
-        report.MesSyncStatus = $"{mes.Status}; mode={mes.Mode}; pending={mes.PendingCount}; failed={mes.FailedCount}; sent={mes.SentCount}. Central sync: {central.Status}; mode={central.Mode}; pending={central.PendingCount}; failed={central.FailedCount}.";
+        var readiness = filter.DeploymentProfile is { } profile
+            ? FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(profile))
+            : FactoryReadinessService.Evaluate();
+        report.MesSyncStatus = $"{mes.Status}; mode={mes.Mode}; pending={mes.PendingCount}; failed={mes.FailedCount}; sent={mes.SentCount}; abandoned={mes.AbandonedCount}.";
+        report.CentralSyncStatus = $"{central.Status}; mode={central.Mode}; pending={central.PendingCount}; failed={central.FailedCount}; sent={central.SentCount}; skipped={central.SkippedCount}.";
         report.AcceptanceReadinessStatus = $"{readiness.OverallStatus}; profile={readiness.DeploymentProfile}; warnings={readiness.Warnings.Count}; blocking={readiness.BlockingIssues.Count}.";
 
         if (latestRun is null)
@@ -171,7 +180,7 @@ public static class ManagementDashboardService
         sb.AppendLine("<!doctype html><html><head><meta charset=\"utf-8\"><title>Management Dashboard</title>");
         sb.AppendLine("<style>body{font-family:Segoe UI,Arial,sans-serif;margin:24px;color:#17212b;background:#f7f9fb}.hero{background:#fff;border:1px solid #d7e0e8;padding:18px;margin-bottom:16px}.metric{display:inline-block;background:#fff;border:1px solid #d7e0e8;padding:10px;margin:0 8px 8px 0;min-width:150px}table{border-collapse:collapse;width:100%;background:#fff;margin-bottom:16px}td,th{border:1px solid #d7e0e8;padding:7px;text-align:left}th{background:#eef3f7}</style></head><body>");
         sb.AppendLine("<div class=\"hero\"><h1>Management Dashboard</h1>");
-        sb.AppendLine($"<p>Generated UTC: {report.GeneratedAtUtc:O}<br>Acceptance readiness: {Html(report.AcceptanceReadinessStatus)}<br>MES/Central sync: {Html(report.MesSyncStatus)}</p></div>");
+        sb.AppendLine($"<p>Generated UTC: {report.GeneratedAtUtc:O}<br>Acceptance readiness: {Html(report.AcceptanceReadinessStatus)}<br>MES: {Html(report.MesSyncStatus)}<br>Central sync: {Html(report.CentralSyncStatus)}</p></div>");
         AddMetric(sb, "Boards inspected", report.TotalBoardsInspected.ToString("N0", CultureInfo.InvariantCulture));
         AddMetric(sb, "OK / NG / REVIEW", $"{report.OkCount:N0} / {report.NgCount:N0} / {report.ReviewCount:N0}");
         AddMetric(sb, "False-call rate", report.FalseCallRate.ToString("P1", CultureInfo.InvariantCulture));
@@ -209,6 +218,7 @@ public static class ManagementDashboardService
         Csv(sb, "summary", "average_inspection_time_ms", report.AverageInspectionTimeMs.ToString("F2", CultureInfo.InvariantCulture));
         Csv(sb, "summary", "p95_inspection_time_ms", report.P95InspectionTimeMs.ToString("F2", CultureInfo.InvariantCulture));
         Csv(sb, "summary", "mes_sync_status", report.MesSyncStatus);
+        Csv(sb, "summary", "central_sync_status", report.CentralSyncStatus);
         Csv(sb, "summary", "acceptance_readiness_status", report.AcceptanceReadinessStatus);
         foreach (var row in report.TopDefectClasses)
             Csv(sb, "top_defect_class", row.Name, $"count={row.Count}; falseCalls={row.FalseCalls}; escapes={row.PossibleEscapes}; reviews={row.Reviews}");
@@ -257,6 +267,29 @@ public static class ManagementDashboardService
             .ThenBy(item => item.Name)
             .Take(10)
             .ToList();
+    }
+
+    private static void ApplyLatencySummary(ManagementDashboardReport report, ManagementDashboardFilter filter)
+    {
+        var fromUtc = filter.FromDate?.Date.ToUniversalTime() ?? DateTime.MinValue;
+        var toUtc = filter.ToDate?.Date.AddDays(1).AddTicks(-1).ToUniversalTime() ?? DateTime.MaxValue;
+        var traces = AoiDatabase.GetInspectionLatencyTraces(fromUtc, toUtc)
+            .Where(trace => Matches(trace.ModelId, filter.ModelVersion))
+            .ToArray();
+        if (traces.Length == 0)
+            return;
+
+        var overlayTotals = traces
+            .Select(trace => trace.TotalFrameToOverlayMs)
+            .Where(value => value > 0)
+            .OrderBy(value => value)
+            .ToArray();
+        if (overlayTotals.Length == 0)
+            return;
+
+        report.AverageInspectionTimeMs = overlayTotals.Average();
+        report.P95InspectionTimeMs = Percentile(overlayTotals, 0.95);
+        report.Notes.Add($"Latency metrics use {traces.Length:N0} persisted frame-to-overlay trace(s) for the selected date/model filter.");
     }
 
     private static List<ManagementDashboardContributor> BuildRoiRefdesContributors(IReadOnlyList<BatchTestResultRecord> rows)

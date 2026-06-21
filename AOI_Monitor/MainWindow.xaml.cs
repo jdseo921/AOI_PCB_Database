@@ -324,7 +324,7 @@ public partial class MainWindow : Window
         var mode = WorkflowState.Instance.AuthenticationMode;
         if (mode == AuthenticationMode.LocalUsers)
         {
-            if (!AuthenticationSettingsService.TryAuthenticate(UserIdText.Text, LoginPasswordBox.Password, out var user))
+            if (!LocalUserService.TryAuthenticate(UserIdText.Text, LoginPasswordBox.Password, out var user))
             {
                 WorkflowState.Instance.AddEvent("ACCESS_DENIED", $"LocalUsers login failed for {UserIdText.Text.Trim()}.");
                 MessageBox.Show("Local user login failed.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -391,12 +391,75 @@ public partial class MainWindow : Window
                 1 => UserRole.Engineer,
                 _ => UserRole.Operator,
             };
-            var user = AuthenticationSettingsService.CreateUser(UserIdText.Text, role, password, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
+            var user = LocalUserService.CreateUser(UserIdText.Text, role, password, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
             MessageBox.Show($"Local user created: {user.UserId} [{user.Role}]. Password was stored as a salted hash.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or UnauthorizedAccessException or IOException)
         {
             MessageBox.Show($"Local user could not be created:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnChangeLocalPasswordClick(object sender, RoutedEventArgs e)
+    {
+        if (!EnsurePermission(RoleAuthorization.CanManageSettings, "Changing local user password"))
+            return;
+
+        var password = PromptForPassword("Set Local User Password", $"New password for {UserIdText.Text.Trim()}");
+        if (string.IsNullOrWhiteSpace(password))
+            return;
+
+        try
+        {
+            var user = LocalUserService.ChangePassword(UserIdText.Text, password, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
+            MessageBox.Show($"Password updated for local user {user.UserId}.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or UnauthorizedAccessException or IOException)
+        {
+            MessageBox.Show($"Local user password could not be changed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnDisableLocalUserClick(object sender, RoutedEventArgs e)
+    {
+        if (!EnsurePermission(RoleAuthorization.CanManageSettings, "Disabling local users"))
+            return;
+
+        var targetUserId = UserIdText.Text.Trim();
+        if (string.IsNullOrWhiteSpace(targetUserId))
+            return;
+
+        try
+        {
+            var user = LocalUserService.DisableUser(targetUserId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole, "Disabled from local user management UI.");
+            MessageBox.Show($"Local user disabled: {user.UserId}.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException)
+        {
+            MessageBox.Show($"Local user could not be disabled:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnDeleteLocalUserClick(object sender, RoutedEventArgs e)
+    {
+        if (!EnsurePermission(RoleAuthorization.CanManageSettings, "Deleting local users"))
+            return;
+
+        var targetUserId = UserIdText.Text.Trim();
+        if (string.IsNullOrWhiteSpace(targetUserId))
+            return;
+
+        if (MessageBox.Show($"Delete local user {targetUserId}? This removes the local login record.", "AOI Monitor", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            LocalUserService.DeleteUser(targetUserId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
+            MessageBox.Show($"Local user deleted: {targetUserId}.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException)
+        {
+            MessageBox.Show($"Local user could not be deleted:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -406,7 +469,11 @@ public partial class MainWindow : Window
         FileMenuBtn.IsEnabled = isAdmin;
         LockRecipeBtn.IsEnabled = isAdmin;
         ExportBtn.IsEnabled = isAdmin;
-        CreateUserBtn.IsEnabled = isAdmin;
+        var canManageLocalUsers = isAdmin && WorkflowState.Instance.AuthenticationMode == AuthenticationMode.LocalUsers;
+        CreateUserBtn.IsEnabled = canManageLocalUsers;
+        ChangePasswordBtn.IsEnabled = canManageLocalUsers;
+        DisableUserBtn.IsEnabled = canManageLocalUsers;
+        DeleteUserBtn.IsEnabled = canManageLocalUsers;
         LoginPasswordBox.IsEnabled = WorkflowState.Instance.AuthenticationMode == AuthenticationMode.LocalUsers;
         RoleCombo.IsEnabled = WorkflowState.Instance.AuthenticationMode == AuthenticationMode.DemoLocalRoleSelector || isAdmin;
     }

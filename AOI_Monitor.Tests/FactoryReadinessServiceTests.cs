@@ -289,6 +289,30 @@ public sealed class FactoryReadinessServiceTests : IDisposable
     }
 
     [Fact]
+    public void Stage4ReadinessIsNoGoWhenMesTraceabilityTestFails()
+    {
+        AoiDatabase.RecordTraceabilityTestReport(new TraceabilityTestReport
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            Status = "FAIL",
+            Mode = "REST",
+            EndpointUrl = "http://mes.test/api/aoi/results",
+            ResultStatus = "FAIL",
+            ImageStatus = "NOT SENT",
+            Message = "Response schema validation failed.",
+            OperatorId = "Engineer01 [Engineer]",
+        });
+
+        var report = FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(DeploymentProfile.Stage4MesPilot));
+
+        Assert.Equal("NoGo", report.OverallStatus);
+        Assert.Contains(report.Categories, category =>
+            category.Name == "MES/spool status" &&
+            category.Status == "No-Go" &&
+            category.Evidence.Contains("traceability=FAIL", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void JsonReportContainsAllReadinessCategories()
     {
         RecordStage1Package("PASS");

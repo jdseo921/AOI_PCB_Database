@@ -99,6 +99,8 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Contains("SoakTestRuns", tables);
         Assert.Contains("SoakTestIterations", tables);
         Assert.Contains("AuditEvents", tables);
+        Assert.Contains("LocalUsers", tables);
+        Assert.Contains("LocalUserSessions", tables);
         Assert.Contains("SchemaInfo", tables);
     }
 
@@ -404,6 +406,8 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.True(AoiDatabase.TableExists(migrated, "SoakTestRuns"));
         Assert.True(AoiDatabase.TableExists(migrated, "SoakTestIterations"));
         Assert.True(AoiDatabase.TableExists(migrated, "MesSpoolQueue"));
+        Assert.True(AoiDatabase.TableExists(migrated, "LocalUsers"));
+        Assert.True(AoiDatabase.TableExists(migrated, "LocalUserSessions"));
         Assert.True(AoiDatabase.IndexExists(migrated, "IX_InspectionResults_BoardProgram"));
     }
 
@@ -1451,10 +1455,16 @@ public sealed class AoiDatabaseTests : IDisposable
         var quality = root.GetProperty("datasetQualitySummary");
         Assert.Equal("FAIL", quality.GetProperty("status").GetString());
         Assert.True(quality.GetProperty("blockingFailures").GetArrayLength() > 0);
+        Assert.Equal("FAIL", root.GetProperty("datasetPreflightStatus").GetString());
+        Assert.True(root.GetProperty("datasetPreflightFailures").GetArrayLength() > 0);
         var included = root.GetProperty("includedFiles").EnumerateArray().ToArray();
         Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "validation_results.csv");
         Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "customer_validation_report.html");
         Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "validation_manifest.json");
+        Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "dataset_preflight_summary.json");
+        var reportHtml = File.ReadAllText(result.ReportPath);
+        Assert.Contains("Dataset Preflight Gate", reportHtml);
+        Assert.Contains("Dataset preflight has blocking failures", reportHtml);
 
         var packageFiles = Directory.EnumerateFiles(result.PackageFolder, "*", SearchOption.AllDirectories)
             .Select(Path.GetFileName)
@@ -2626,11 +2636,12 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
-    public void WaiverIsConditionalForStage1ButNoGoForFullFactoryAutomation()
+    public void AdminWaiverIsRecordedAndKeepsFactoryReadinessConditional()
     {
         AoiDatabase.Initialize();
         var model = RegisterLifecycleModel();
-        ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]", "Customer pilot waiver while acceptance dataset is pending.");
+        var expiresAt = DateTime.UtcNow.AddDays(14);
+        ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]", "Customer pilot waiver while acceptance dataset is pending.", expiresAt);
 
         var stage1 = FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(DeploymentProfile.Stage1ImageValidation));
         var full = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
@@ -2648,8 +2659,45 @@ public sealed class AoiDatabaseTests : IDisposable
             category.Evidence.Contains("waiver", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(full.Categories, category =>
             category.Name == "Active model readiness" &&
-            category.Status == "No-Go" &&
+            category.Status == "Conditional" &&
             category.Evidence.Contains("waiver", StringComparison.OrdinalIgnoreCase));
+        var updated = ModelRegistryService.GetModel(model.ModelId)!;
+        Assert.NotNull(updated.WaiverExpiresAtUtc);
+        Assert.InRange(
+            Math.Abs((updated.WaiverExpiresAtUtc!.Value.ToUniversalTime() - expiresAt.ToUniversalTime()).TotalSeconds),
+            0,
+            1);
+        Assert.NotNull(updated.DeployedAtUtc);
+    }
+
+    [Fact]
+    public void ExpiredAdminWaiverBlocksFactoryReadiness()
+    {
+        AoiDatabase.Initialize();
+        var model = RegisterLifecycleModel();
+        ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]", "Short pilot waiver.", DateTime.UtcNow.AddDays(1));
+        AoiDatabase.UpdateModelLifecycle(
+            model.ModelId,
+            ModelLifecycleState.Deployed,
+            deploymentWaiverReason: "Expired pilot waiver.",
+            waiverExpiresAtUtc: DateTime.UtcNow.AddDays(-1),
+            deploymentWaivedBy: "Admin01 [Admin]",
+            deploymentWaivedAtUtc: DateTime.UtcNow.AddDays(-2),
+            replaceDeploymentWaiver: true);
+
+        var report = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
+        {
+            DeploymentProfile = DeploymentProfile.FullFactoryAutomation,
+            Stage1Only = false,
+            RequireProductionModel = true,
+            RequireSuccessfulLatestValidationPackage = false,
+            RequireDatasetQualityEvidence = false,
+        });
+
+        Assert.Contains(report.Categories, category =>
+            category.Name == "Active model readiness" &&
+            category.Status == "No-Go" &&
+            category.Evidence.Contains("Expired pilot waiver", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

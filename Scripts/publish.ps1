@@ -5,6 +5,7 @@ param(
     [switch]$SelfContained,
     [switch]$ValidationOnly,
     [switch]$IncludeTemplates,
+    [switch]$IncludeSampleManifestTemplate,
     [switch]$IncludeDocs,
     [switch]$NoRestore
 )
@@ -17,6 +18,7 @@ $projectPath = Join-Path $repoRoot "AOI_Monitor\AOI_Monitor.csproj"
 $solutionPath = Join-Path $repoRoot "AOI_PCB_Database.slnx"
 $docsPath = Join-Path $repoRoot "Docs"
 $templatesPath = Join-Path $repoRoot "Templates"
+$sampleManifestTemplatePath = Join-Path $repoRoot "SampleData\customer_validation_manifest_template.csv"
 $featureDocPath = Join-Path $repoRoot "IMPLEMENTED_FEATURES.md"
 $rootReadmePath = Join-Path $repoRoot "README.md"
 $releaseRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
@@ -35,6 +37,7 @@ $releaseDir = Join-Path $releaseRoot $releaseName
 $publishDir = Join-Path $releaseDir "app"
 $releaseDocsDir = Join-Path $releaseDir "Docs"
 $releaseTemplatesDir = Join-Path $releaseDir "Templates"
+$releaseSampleDataDir = Join-Path $releaseDir "SampleData"
 
 function Invoke-Step {
     param(
@@ -57,6 +60,7 @@ Write-Host "Mode:       $(if ($SelfContained) { 'self-contained' } else { 'frame
 Write-Host "Validation: $(if ($ValidationOnly) { 'yes' } else { 'no' })"
 Write-Host "Docs:       $(if ($IncludeDocs -or !$ValidationOnly) { 'include' } else { 'skip for validation-only package' })"
 Write-Host "Templates:  $(if ($IncludeTemplates) { 'include adapter templates' } else { 'skip' })"
+Write-Host "Sample manifest template: $(if ($IncludeSampleManifestTemplate) { 'include' } else { 'skip' })"
 Write-Host "Restore:    $(if ($NoRestore) { 'skip; use existing restore assets' } else { 'allow dotnet commands to restore as needed' })"
 
 if (!(Test-Path $projectPath)) {
@@ -150,6 +154,16 @@ if ($IncludeTemplates) {
         Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
+if ($IncludeSampleManifestTemplate) {
+    if (!(Test-Path $sampleManifestTemplatePath)) {
+        throw "Sample manifest template was requested but not found: $sampleManifestTemplatePath"
+    }
+
+    Write-Host "Copying customer validation manifest template..."
+    New-Item -ItemType Directory -Force -Path $releaseSampleDataDir | Out-Null
+    Copy-Item -LiteralPath $sampleManifestTemplatePath -Destination (Join-Path $releaseSampleDataDir "customer_validation_manifest_template.csv") -Force
+}
+
 $releaseReadme = @"
 # AOI Monitor Windows Desktop PoC Release
 
@@ -168,6 +182,7 @@ Publish mode: $(if ($SelfContained) { "Self-contained" } else { "Framework-depen
 - app/ - Published Windows desktop application files.
 $(if ($IncludeDocs -or !$ValidationOnly) { "- Docs/ - Installation guide, deployment package guide, user manual, stage mapping, integration boundaries, and acceptance checklist.`n- README.md - Repository-level overview and operating notes.`n- IMPLEMENTED_FEATURES.md - Current PoC feature inventory." } else { "- Docs were skipped for this validation-only package. Pass -IncludeDocs to include them." })
 $(if ($IncludeTemplates) { "- Templates/ - Fake/no-op adapter template source projects for camera, lighting, and robot integrations." } else { "- Adapter templates were not included. Pass -IncludeTemplates for developer handoff packages." })
+$(if ($IncludeSampleManifestTemplate) { "- SampleData/customer_validation_manifest_template.csv - Empty customer validation manifest template only; no customer images are included." } else { "- Sample manifest template was not included. Pass -IncludeSampleManifestTemplate when preparing customer validation kits." })
 
 ## Not Included
 

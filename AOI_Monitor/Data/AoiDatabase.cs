@@ -314,13 +314,13 @@ public static class AoiDatabase
                  PreprocessingStartUtc, PreprocessingEndUtc, InferenceStartUtc, InferenceEndUtc,
                  PostprocessStartUtc, PostprocessEndUtc, OverlayRenderStartUtc, OverlayRenderEndUtc,
                  ResultPersistStartUtc, ResultPersistEndUtc, TotalFrameToOverlayMs, TotalFrameToSavedResultMs,
-                 SourceKind, Engine, ModelId, ImageWidth, ImageHeight, WarningsJson)
+                 SourceKind, Engine, ModelId, ImageWidth, ImageHeight, Verdict, WarningsJson)
             VALUES
                 ($traceId, $createdAtUtc, $frameCapturedAtUtc, $frameReceivedAtUtc,
                  $preprocessingStartUtc, $preprocessingEndUtc, $inferenceStartUtc, $inferenceEndUtc,
                  $postprocessStartUtc, $postprocessEndUtc, $overlayRenderStartUtc, $overlayRenderEndUtc,
                  $resultPersistStartUtc, $resultPersistEndUtc, $totalFrameToOverlayMs, $totalFrameToSavedResultMs,
-                 $sourceKind, $engine, $modelId, $imageWidth, $imageHeight, $warningsJson);
+                 $sourceKind, $engine, $modelId, $imageWidth, $imageHeight, $verdict, $warningsJson);
             SELECT last_insert_rowid();
             """;
         BindInspectionLatencyTrace(command, trace);
@@ -342,12 +342,47 @@ public static class AoiDatabase
                    PreprocessingStartUtc, PreprocessingEndUtc, InferenceStartUtc, InferenceEndUtc,
                    PostprocessStartUtc, PostprocessEndUtc, OverlayRenderStartUtc, OverlayRenderEndUtc,
                    ResultPersistStartUtc, ResultPersistEndUtc, TotalFrameToOverlayMs, TotalFrameToSavedResultMs,
-                   SourceKind, Engine, ModelId, ImageWidth, ImageHeight, WarningsJson
+                   SourceKind, Engine, ModelId, ImageWidth, ImageHeight, Verdict, WarningsJson
             FROM InspectionLatencyTraces
             ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 10000));
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            traces.Add(ReadInspectionLatencyTrace(reader));
+
+        return traces;
+    }
+
+    public static IReadOnlyList<InspectionLatencyTrace> GetInspectionLatencyTraces(DateTime fromUtc, DateTime toUtc, int limit = 10000)
+    {
+        EnsureInitialized();
+
+        var from = fromUtc.ToUniversalTime();
+        var to = toUtc.ToUniversalTime();
+        if (to < from)
+            (from, to) = (to, from);
+
+        var traces = new List<InspectionLatencyTrace>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, TraceId, CreatedAtUtc, FrameCapturedAtUtc, FrameReceivedAtUtc,
+                   PreprocessingStartUtc, PreprocessingEndUtc, InferenceStartUtc, InferenceEndUtc,
+                   PostprocessStartUtc, PostprocessEndUtc, OverlayRenderStartUtc, OverlayRenderEndUtc,
+                   ResultPersistStartUtc, ResultPersistEndUtc, TotalFrameToOverlayMs, TotalFrameToSavedResultMs,
+                   SourceKind, Engine, ModelId, ImageWidth, ImageHeight, Verdict, WarningsJson
+            FROM InspectionLatencyTraces
+            WHERE CreatedAtUtc >= $fromUtc
+              AND CreatedAtUtc <= $toUtc
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$fromUtc", from.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$toUtc", to.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 100000));
         using var reader = command.ExecuteReader();
         while (reader.Read())
             traces.Add(ReadInspectionLatencyTrace(reader));
@@ -1653,8 +1688,8 @@ public static class AoiDatabase
                    StoredModelPath, StoredLabelMapPath, MetadataPath, Sha256, InputTensorName, OutputTensorName,
                    InputWidth, InputHeight, ConfidenceThreshold, LabelsJson, ValidationStatus, LastValidatedAtUtc,
                    ValidationMessage, Notes, IsActive, AuditEventId, LifecycleState, LatestAcceptanceStatus,
-                   LatestReleasePackagePath, DeploymentWaiverReason, DeploymentWaivedBy, DeploymentWaivedAtUtc,
-                   RetiredReason, RetiredAtUtc
+                   LatestAcceptanceRunId, LatestReleasePackageId, LatestReleasePackagePath, DeploymentWaiverReason,
+                   WaiverExpiresAtUtc, DeploymentWaivedBy, DeploymentWaivedAtUtc, DeployedAtUtc, RetiredReason, RetiredAtUtc
             FROM ModelRegistry
             ORDER BY IsActive DESC, datetime(RegisteredAtUtc) DESC, Id DESC;
             """;
@@ -1678,8 +1713,8 @@ public static class AoiDatabase
                    StoredModelPath, StoredLabelMapPath, MetadataPath, Sha256, InputTensorName, OutputTensorName,
                    InputWidth, InputHeight, ConfidenceThreshold, LabelsJson, ValidationStatus, LastValidatedAtUtc,
                    ValidationMessage, Notes, IsActive, AuditEventId, LifecycleState, LatestAcceptanceStatus,
-                   LatestReleasePackagePath, DeploymentWaiverReason, DeploymentWaivedBy, DeploymentWaivedAtUtc,
-                   RetiredReason, RetiredAtUtc
+                   LatestAcceptanceRunId, LatestReleasePackageId, LatestReleasePackagePath, DeploymentWaiverReason,
+                   WaiverExpiresAtUtc, DeploymentWaivedBy, DeploymentWaivedAtUtc, DeployedAtUtc, RetiredReason, RetiredAtUtc
             FROM ModelRegistry
             WHERE IsActive = 1
             ORDER BY datetime(RegisteredAtUtc) DESC, Id DESC
@@ -2074,6 +2109,75 @@ public static class AoiDatabase
         return (long)(command.ExecuteScalar() ?? 0L);
     }
 
+    public static void UpsertLocalUserMetadata(string userId, string role, bool isDisabled, DateTime createdAtUtc, string createdBy, DateTime? updatedAtUtc = null)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO LocalUsers (UserId, Role, IsDisabled, CreatedAtUtc, CreatedBy, UpdatedAtUtc)
+            VALUES ($userId, $role, $isDisabled, $createdAtUtc, $createdBy, $updatedAtUtc)
+            ON CONFLICT(UserId) DO UPDATE SET
+                Role = excluded.Role,
+                IsDisabled = excluded.IsDisabled,
+                CreatedAtUtc = excluded.CreatedAtUtc,
+                CreatedBy = excluded.CreatedBy,
+                UpdatedAtUtc = excluded.UpdatedAtUtc;
+            """;
+        command.Parameters.AddWithValue("$userId", userId);
+        command.Parameters.AddWithValue("$role", role);
+        command.Parameters.AddWithValue("$isDisabled", isDisabled ? 1 : 0);
+        command.Parameters.AddWithValue("$createdAtUtc", createdAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$createdBy", createdBy);
+        command.Parameters.AddWithValue("$updatedAtUtc", (updatedAtUtc ?? DateTime.UtcNow).ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.ExecuteNonQuery();
+    }
+
+    public static void MarkLocalUserDeleted(string userId, string operatorWithRole)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE LocalUsers
+            SET IsDeleted = 1,
+                IsDisabled = 1,
+                UpdatedAtUtc = $updatedAtUtc
+            WHERE UserId = $userId;
+            """;
+        command.Parameters.AddWithValue("$userId", userId);
+        command.Parameters.AddWithValue("$updatedAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.ExecuteNonQuery();
+        RecordAuditEvent("LOCAL_USER_DELETE", $"Local user deleted: {userId}.", operatorWithRole: operatorWithRole, relatedEntityType: "LocalUser", relatedEntityId: userId);
+    }
+
+    public static long RecordLocalUserSession(string userId, string role, string authenticationMode, bool success, string message)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO LocalUserSessions
+                (UserId, UserRole, AuthenticationMode, LoginAtUtc, Success, Message)
+            VALUES
+                ($userId, $userRole, $authenticationMode, $loginAtUtc, $success, $message);
+            SELECT last_insert_rowid();
+            """;
+        command.Parameters.AddWithValue("$userId", userId);
+        command.Parameters.AddWithValue("$userRole", role);
+        command.Parameters.AddWithValue("$authenticationMode", authenticationMode);
+        command.Parameters.AddWithValue("$loginAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$success", success ? 1 : 0);
+        command.Parameters.AddWithValue("$message", message);
+        return (long)(command.ExecuteScalar() ?? 0L);
+    }
+
     public static void RecordTrainingSample(string sourcePath, string label, string notes)
     {
         EnsureInitialized();
@@ -2156,15 +2260,15 @@ public static class AoiDatabase
                  StoredModelPath, StoredLabelMapPath, MetadataPath, Sha256, InputTensorName, OutputTensorName,
                  InputWidth, InputHeight, ConfidenceThreshold, LabelsJson, ValidationStatus, LastValidatedAtUtc,
                  ValidationMessage, Notes, IsActive, AuditEventId, LifecycleState, LatestAcceptanceStatus,
-                 LatestReleasePackagePath, DeploymentWaiverReason, DeploymentWaivedBy, DeploymentWaivedAtUtc,
-                 RetiredReason, RetiredAtUtc)
+                 LatestAcceptanceRunId, LatestReleasePackageId, LatestReleasePackagePath, DeploymentWaiverReason,
+                 WaiverExpiresAtUtc, DeploymentWaivedBy, DeploymentWaivedAtUtc, DeployedAtUtc, RetiredReason, RetiredAtUtc)
             VALUES
                 ($modelId, $displayName, $version, $createdAtUtc, $registeredAtUtc, $sourceFileName,
                  $storedModelPath, $storedLabelMapPath, $metadataPath, $sha256, $inputTensorName, $outputTensorName,
                  $inputWidth, $inputHeight, $confidenceThreshold, $labelsJson, $validationStatus, $lastValidatedAtUtc,
                  $validationMessage, $notes, $isActive, $auditEventId, $lifecycleState, $latestAcceptanceStatus,
-                 $latestReleasePackagePath, $deploymentWaiverReason, $deploymentWaivedBy, $deploymentWaivedAtUtc,
-                 $retiredReason, $retiredAtUtc)
+                 $latestAcceptanceRunId, $latestReleasePackageId, $latestReleasePackagePath, $deploymentWaiverReason,
+                 $waiverExpiresAtUtc, $deploymentWaivedBy, $deploymentWaivedAtUtc, $deployedAtUtc, $retiredReason, $retiredAtUtc)
             ON CONFLICT(ModelId) DO UPDATE SET
                 DisplayName = excluded.DisplayName,
                 Version = excluded.Version,
@@ -2189,10 +2293,14 @@ public static class AoiDatabase
                 AuditEventId = excluded.AuditEventId,
                 LifecycleState = excluded.LifecycleState,
                 LatestAcceptanceStatus = excluded.LatestAcceptanceStatus,
+                LatestAcceptanceRunId = excluded.LatestAcceptanceRunId,
+                LatestReleasePackageId = excluded.LatestReleasePackageId,
                 LatestReleasePackagePath = excluded.LatestReleasePackagePath,
                 DeploymentWaiverReason = excluded.DeploymentWaiverReason,
+                WaiverExpiresAtUtc = excluded.WaiverExpiresAtUtc,
                 DeploymentWaivedBy = excluded.DeploymentWaivedBy,
                 DeploymentWaivedAtUtc = excluded.DeploymentWaivedAtUtc,
+                DeployedAtUtc = excluded.DeployedAtUtc,
                 RetiredReason = excluded.RetiredReason,
                 RetiredAtUtc = excluded.RetiredAtUtc;
             """;
@@ -2254,10 +2362,14 @@ public static class AoiDatabase
         string modelId,
         ModelLifecycleState lifecycleState,
         string latestAcceptanceStatus = "",
+        long? latestAcceptanceRunId = null,
+        long? latestReleasePackageId = null,
         string latestReleasePackagePath = "",
         string deploymentWaiverReason = "",
+        DateTime? waiverExpiresAtUtc = null,
         string deploymentWaivedBy = "",
         DateTime? deploymentWaivedAtUtc = null,
+        DateTime? deployedAtUtc = null,
         string retiredReason = "",
         DateTime? retiredAtUtc = null,
         bool? isActive = null,
@@ -2272,10 +2384,14 @@ public static class AoiDatabase
             UPDATE ModelRegistry
             SET LifecycleState = $lifecycleState,
                 LatestAcceptanceStatus = CASE WHEN $latestAcceptanceStatus = '' THEN LatestAcceptanceStatus ELSE $latestAcceptanceStatus END,
+                LatestAcceptanceRunId = CASE WHEN $latestAcceptanceRunId IS NULL THEN LatestAcceptanceRunId ELSE $latestAcceptanceRunId END,
+                LatestReleasePackageId = CASE WHEN $latestReleasePackageId IS NULL THEN LatestReleasePackageId ELSE $latestReleasePackageId END,
                 LatestReleasePackagePath = CASE WHEN $latestReleasePackagePath = '' THEN LatestReleasePackagePath ELSE $latestReleasePackagePath END,
                 DeploymentWaiverReason = CASE WHEN $replaceDeploymentWaiver = 1 THEN $deploymentWaiverReason WHEN $deploymentWaiverReason = '' THEN DeploymentWaiverReason ELSE $deploymentWaiverReason END,
+                WaiverExpiresAtUtc = CASE WHEN $replaceDeploymentWaiver = 1 THEN $waiverExpiresAtUtc WHEN $waiverExpiresAtUtc IS NULL THEN WaiverExpiresAtUtc ELSE $waiverExpiresAtUtc END,
                 DeploymentWaivedBy = CASE WHEN $replaceDeploymentWaiver = 1 THEN $deploymentWaivedBy WHEN $deploymentWaivedBy = '' THEN DeploymentWaivedBy ELSE $deploymentWaivedBy END,
                 DeploymentWaivedAtUtc = CASE WHEN $replaceDeploymentWaiver = 1 THEN $deploymentWaivedAtUtc WHEN $deploymentWaivedAtUtc IS NULL THEN DeploymentWaivedAtUtc ELSE $deploymentWaivedAtUtc END,
+                DeployedAtUtc = CASE WHEN $deployedAtUtc IS NULL THEN DeployedAtUtc ELSE $deployedAtUtc END,
                 RetiredReason = CASE WHEN $retiredReason = '' THEN RetiredReason ELSE $retiredReason END,
                 RetiredAtUtc = CASE WHEN $retiredAtUtc IS NULL THEN RetiredAtUtc ELSE $retiredAtUtc END,
                 IsActive = CASE WHEN $isActive IS NULL THEN IsActive ELSE $isActive END
@@ -2284,10 +2400,14 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$modelId", modelId);
         command.Parameters.AddWithValue("$lifecycleState", lifecycleState.ToString());
         command.Parameters.AddWithValue("$latestAcceptanceStatus", latestAcceptanceStatus ?? string.Empty);
+        command.Parameters.AddWithValue("$latestAcceptanceRunId", latestAcceptanceRunId is { } acceptanceId ? (object)acceptanceId : DBNull.Value);
+        command.Parameters.AddWithValue("$latestReleasePackageId", latestReleasePackageId is { } releaseId ? (object)releaseId : DBNull.Value);
         command.Parameters.AddWithValue("$latestReleasePackagePath", latestReleasePackagePath ?? string.Empty);
         command.Parameters.AddWithValue("$deploymentWaiverReason", deploymentWaiverReason ?? string.Empty);
+        command.Parameters.AddWithValue("$waiverExpiresAtUtc", waiverExpiresAtUtc is { } expiresAt ? (object)expiresAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
         command.Parameters.AddWithValue("$deploymentWaivedBy", deploymentWaivedBy ?? string.Empty);
         command.Parameters.AddWithValue("$deploymentWaivedAtUtc", deploymentWaivedAtUtc is { } waivedAt ? (object)waivedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
+        command.Parameters.AddWithValue("$deployedAtUtc", deployedAtUtc is { } deployedAt ? (object)deployedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
         command.Parameters.AddWithValue("$retiredReason", retiredReason ?? string.Empty);
         command.Parameters.AddWithValue("$retiredAtUtc", retiredAtUtc is { } retiredAt ? (object)retiredAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
         command.Parameters.AddWithValue("$isActive", isActive is { } active ? (object)(active ? 1 : 0) : DBNull.Value);
@@ -3947,12 +4067,16 @@ public static class AoiDatabase
                 ? ModelLifecycleState.Registered
                 : lifecycleState,
             reader.IsDBNull(24) ? string.Empty : reader.GetString(24),
-            reader.IsDBNull(25) ? string.Empty : reader.GetString(25),
-            reader.IsDBNull(26) ? string.Empty : reader.GetString(26),
+            reader.IsDBNull(25) ? null : reader.GetInt64(25),
+            reader.IsDBNull(26) ? null : reader.GetInt64(26),
             reader.IsDBNull(27) ? string.Empty : reader.GetString(27),
-            reader.IsDBNull(28) ? null : ParseDateTime(reader.GetString(28)),
-            reader.IsDBNull(29) ? string.Empty : reader.GetString(29),
-            reader.IsDBNull(30) ? null : ParseDateTime(reader.GetString(30)));
+            reader.IsDBNull(28) ? string.Empty : reader.GetString(28),
+            reader.IsDBNull(29) ? null : ParseDateTime(reader.GetString(29)),
+            reader.IsDBNull(30) ? string.Empty : reader.GetString(30),
+            reader.IsDBNull(31) ? null : ParseDateTime(reader.GetString(31)),
+            reader.IsDBNull(32) ? null : ParseDateTime(reader.GetString(32)),
+            reader.IsDBNull(33) ? string.Empty : reader.GetString(33),
+            reader.IsDBNull(34) ? null : ParseDateTime(reader.GetString(34)));
     }
 
     private static InspectionLatencyTrace ReadInspectionLatencyTrace(SqliteDataReader reader)
@@ -3980,7 +4104,8 @@ public static class AoiDatabase
             ModelId = reader.IsDBNull(19) ? string.Empty : reader.GetString(19),
             ImageWidth = reader.IsDBNull(20) ? 0 : reader.GetInt32(20),
             ImageHeight = reader.IsDBNull(21) ? 0 : reader.GetInt32(21),
-            Warnings = DeserializeStringList(reader.IsDBNull(22) ? "[]" : reader.GetString(22)).ToList(),
+            Verdict = reader.IsDBNull(22) ? string.Empty : reader.GetString(22),
+            Warnings = DeserializeStringList(reader.IsDBNull(23) ? "[]" : reader.GetString(23)).ToList(),
         };
 
     private static ModelAcceptanceRun ReadModelAcceptanceRun(SqliteDataReader reader)
@@ -4151,10 +4276,14 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$auditEventId", record.AuditEventId is { } id ? (object)id : DBNull.Value);
         command.Parameters.AddWithValue("$lifecycleState", record.LifecycleState.ToString());
         command.Parameters.AddWithValue("$latestAcceptanceStatus", record.LatestAcceptanceStatus ?? string.Empty);
+        command.Parameters.AddWithValue("$latestAcceptanceRunId", record.LatestAcceptanceRunId is { } acceptanceId ? (object)acceptanceId : DBNull.Value);
+        command.Parameters.AddWithValue("$latestReleasePackageId", record.LatestReleasePackageId is { } releaseId ? (object)releaseId : DBNull.Value);
         command.Parameters.AddWithValue("$latestReleasePackagePath", record.LatestReleasePackagePath ?? string.Empty);
         command.Parameters.AddWithValue("$deploymentWaiverReason", record.DeploymentWaiverReason ?? string.Empty);
+        command.Parameters.AddWithValue("$waiverExpiresAtUtc", record.WaiverExpiresAtUtc is { } expiresAt ? (object)expiresAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
         command.Parameters.AddWithValue("$deploymentWaivedBy", record.DeploymentWaivedBy ?? string.Empty);
         command.Parameters.AddWithValue("$deploymentWaivedAtUtc", record.DeploymentWaivedAtUtc is { } waivedAt ? (object)waivedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
+        command.Parameters.AddWithValue("$deployedAtUtc", record.DeployedAtUtc is { } deployedAt ? (object)deployedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
         command.Parameters.AddWithValue("$retiredReason", record.RetiredReason ?? string.Empty);
         command.Parameters.AddWithValue("$retiredAtUtc", record.RetiredAtUtc is { } retiredAt ? (object)retiredAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
     }
@@ -4182,6 +4311,7 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$modelId", trace.ModelId ?? string.Empty);
         command.Parameters.AddWithValue("$imageWidth", trace.ImageWidth);
         command.Parameters.AddWithValue("$imageHeight", trace.ImageHeight);
+        command.Parameters.AddWithValue("$verdict", trace.Verdict ?? string.Empty);
         command.Parameters.AddWithValue("$warningsJson", JsonSerializer.Serialize(trace.Warnings));
     }
 
@@ -4634,6 +4764,41 @@ public static class AoiDatabase
         command.ExecuteNonQuery();
     }
 
+    internal static void EnsureLocalAuthenticationTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS LocalUsers
+            (
+                UserId TEXT PRIMARY KEY,
+                Role TEXT NOT NULL,
+                IsDisabled INTEGER NOT NULL DEFAULT 0,
+                IsDeleted INTEGER NOT NULL DEFAULT 0,
+                CreatedAtUtc TEXT NOT NULL,
+                CreatedBy TEXT NOT NULL DEFAULT 'UNKNOWN',
+                UpdatedAtUtc TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS LocalUserSessions
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                UserId TEXT NOT NULL,
+                UserRole TEXT NOT NULL,
+                AuthenticationMode TEXT NOT NULL,
+                LoginAtUtc TEXT NOT NULL,
+                LogoutAtUtc TEXT NULL,
+                Success INTEGER NOT NULL DEFAULT 0,
+                Message TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_LocalUserSessions_UserId ON LocalUserSessions(UserId);
+            CREATE INDEX IF NOT EXISTS IX_LocalUserSessions_LoginAtUtc ON LocalUserSessions(LoginAtUtc);
+            """;
+        command.ExecuteNonQuery();
+    }
+
     internal static void EnsureInspectionLatencyTraceTable(SqliteConnection connection, SqliteTransaction? transaction = null)
     {
         using var command = connection.CreateCommand();
@@ -4664,6 +4829,7 @@ public static class AoiDatabase
                 ModelId TEXT NOT NULL DEFAULT '',
                 ImageWidth INTEGER NOT NULL DEFAULT 0,
                 ImageHeight INTEGER NOT NULL DEFAULT 0,
+                Verdict TEXT NOT NULL DEFAULT '',
                 WarningsJson TEXT NOT NULL DEFAULT '[]'
             );
 
@@ -4671,6 +4837,7 @@ public static class AoiDatabase
             CREATE INDEX IF NOT EXISTS IX_InspectionLatencyTraces_SourceKind ON InspectionLatencyTraces(SourceKind);
             """;
         command.ExecuteNonQuery();
+        AddColumnIfMissing(connection, transaction, "InspectionLatencyTraces", "Verdict", "TEXT NOT NULL DEFAULT ''");
     }
 
     internal static void EnsureProfile3DAcceptanceTable(SqliteConnection connection, SqliteTransaction? transaction = null)
@@ -5142,10 +5309,14 @@ public static class AoiDatabase
                 AuditEventId INTEGER NULL,
                 LifecycleState TEXT NOT NULL DEFAULT 'Registered',
                 LatestAcceptanceStatus TEXT NOT NULL DEFAULT '',
+                LatestAcceptanceRunId INTEGER NULL,
+                LatestReleasePackageId INTEGER NULL,
                 LatestReleasePackagePath TEXT NOT NULL DEFAULT '',
                 DeploymentWaiverReason TEXT NOT NULL DEFAULT '',
+                WaiverExpiresAtUtc TEXT NULL,
                 DeploymentWaivedBy TEXT NOT NULL DEFAULT '',
                 DeploymentWaivedAtUtc TEXT NULL,
+                DeployedAtUtc TEXT NULL,
                 RetiredReason TEXT NOT NULL DEFAULT '',
                 RetiredAtUtc TEXT NULL
             );
@@ -5162,10 +5333,14 @@ public static class AoiDatabase
     {
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "LifecycleState", "TEXT NOT NULL DEFAULT 'Registered'");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "LatestAcceptanceStatus", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, transaction, "ModelRegistry", "LatestAcceptanceRunId", "INTEGER NULL");
+        AddColumnIfMissing(connection, transaction, "ModelRegistry", "LatestReleasePackageId", "INTEGER NULL");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "LatestReleasePackagePath", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "DeploymentWaiverReason", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, transaction, "ModelRegistry", "WaiverExpiresAtUtc", "TEXT NULL");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "DeploymentWaivedBy", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "DeploymentWaivedAtUtc", "TEXT NULL");
+        AddColumnIfMissing(connection, transaction, "ModelRegistry", "DeployedAtUtc", "TEXT NULL");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "RetiredReason", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "RetiredAtUtc", "TEXT NULL");
     }
@@ -5488,6 +5663,7 @@ public static class AoiDatabase
             ModelId TEXT NOT NULL DEFAULT '',
             ImageWidth INTEGER NOT NULL DEFAULT 0,
             ImageHeight INTEGER NOT NULL DEFAULT 0,
+            Verdict TEXT NOT NULL DEFAULT '',
             WarningsJson TEXT NOT NULL DEFAULT '[]'
         );
 
@@ -5537,6 +5713,29 @@ public static class AoiDatabase
             RelatedEntityType TEXT NOT NULL DEFAULT '',
             RelatedEntityId TEXT NOT NULL DEFAULT '',
             RelatedPath TEXT NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS LocalUsers
+        (
+            UserId TEXT PRIMARY KEY,
+            Role TEXT NOT NULL,
+            IsDisabled INTEGER NOT NULL DEFAULT 0,
+            IsDeleted INTEGER NOT NULL DEFAULT 0,
+            CreatedAtUtc TEXT NOT NULL,
+            CreatedBy TEXT NOT NULL DEFAULT 'UNKNOWN',
+            UpdatedAtUtc TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS LocalUserSessions
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            UserId TEXT NOT NULL,
+            UserRole TEXT NOT NULL,
+            AuthenticationMode TEXT NOT NULL,
+            LoginAtUtc TEXT NOT NULL,
+            LogoutAtUtc TEXT NULL,
+            Success INTEGER NOT NULL DEFAULT 0,
+            Message TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS RecipeRevisions
@@ -5743,10 +5942,14 @@ public static class AoiDatabase
             AuditEventId INTEGER NULL,
             LifecycleState TEXT NOT NULL DEFAULT 'Registered',
             LatestAcceptanceStatus TEXT NOT NULL DEFAULT '',
+            LatestAcceptanceRunId INTEGER NULL,
+            LatestReleasePackageId INTEGER NULL,
             LatestReleasePackagePath TEXT NOT NULL DEFAULT '',
             DeploymentWaiverReason TEXT NOT NULL DEFAULT '',
+            WaiverExpiresAtUtc TEXT NULL,
             DeploymentWaivedBy TEXT NOT NULL DEFAULT '',
             DeploymentWaivedAtUtc TEXT NULL,
+            DeployedAtUtc TEXT NULL,
             RetiredReason TEXT NOT NULL DEFAULT '',
             RetiredAtUtc TEXT NULL
         );
@@ -6178,6 +6381,8 @@ public static class AoiDatabase
         CREATE INDEX IF NOT EXISTS IX_InspectionResults_BoardProgram ON InspectionResults(BoardProgram);
         CREATE INDEX IF NOT EXISTS IX_InspectionResults_OperatorId ON InspectionResults(OperatorId);
         CREATE INDEX IF NOT EXISTS IX_InspectionResults_Verdict ON InspectionResults(Verdict);
+        CREATE INDEX IF NOT EXISTS IX_LocalUserSessions_UserId ON LocalUserSessions(UserId);
+        CREATE INDEX IF NOT EXISTS IX_LocalUserSessions_LoginAtUtc ON LocalUserSessions(LoginAtUtc);
         CREATE INDEX IF NOT EXISTS IX_InspectionLatencyTraces_CreatedAtUtc ON InspectionLatencyTraces(CreatedAtUtc);
         CREATE INDEX IF NOT EXISTS IX_InspectionLatencyTraces_SourceKind ON InspectionLatencyTraces(SourceKind);
         CREATE INDEX IF NOT EXISTS IX_ReviewEvents_EventTimeUtc ON ReviewEvents(EventTimeUtc);

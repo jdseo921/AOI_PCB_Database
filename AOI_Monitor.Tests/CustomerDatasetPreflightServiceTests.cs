@@ -107,6 +107,40 @@ public sealed class CustomerDatasetPreflightServiceTests : IDisposable
         Assert.Equal(2, result.DefectClassCount);
     }
 
+    [Fact]
+    public void DuplicateFileHashesFailPreflight()
+    {
+        var dataset = CreateDataset();
+        WriteGolden(dataset, "golden/ref_top.png");
+        WriteImage(dataset, "images/board_0001_ok.png", "same-image-content");
+        WriteImage(dataset, "images/board_0002_bridge.png", "same-image-content");
+        var manifest = WriteManifest(dataset,
+            Row("images/board_0001_ok.png", "OK", "golden/ref_top.png", "OK"),
+            Row("images/board_0002_bridge.png", "NG", "golden/ref_top.png", "solder_bridge"));
+
+        var result = CustomerDatasetPreflightService.Validate(dataset, manifest, RelaxedBalance());
+
+        Assert.Equal("FAIL", result.Status);
+        Assert.True(result.DuplicateFileHashCount > 0);
+        Assert.Contains(result.BlockingFailures, failure => failure.Contains("duplicate image file hashes", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void IncompleteRoiMetadataFailsPreflight()
+    {
+        var dataset = CreateDataset();
+        WriteGolden(dataset, "golden/ref_top.png");
+        WriteImage(dataset, "images/board_0001_bridge.png");
+        var manifest = WriteManifest(dataset,
+            "images/board_0001_bridge.png,NG,golden/ref_top.png,solder_bridge,top,U1,,pad,LOT-1,TBOX,incomplete ROI metadata");
+
+        var result = CustomerDatasetPreflightService.Validate(dataset, manifest, RelaxedBalance());
+
+        Assert.Equal("FAIL", result.Status);
+        Assert.True(result.MissingMetadataCount > 0);
+        Assert.Contains(result.BlockingFailures, failure => failure.Contains("ROI/refdes metadata is incomplete", StringComparison.OrdinalIgnoreCase));
+    }
+
     private string CreateDataset(string name = "dataset")
     {
         var dataset = Path.Combine(_root, name);
@@ -156,11 +190,11 @@ public sealed class CustomerDatasetPreflightServiceTests : IDisposable
     private static string Row(string image, string groundTruth, string golden, string defectType)
         => $"{image},{groundTruth},{golden},{defectType},top,U1,ROI-U1,pad,LOT-1,TBOX,test row";
 
-    private static void WriteImage(string dataset, string relativePath)
+    private static void WriteImage(string dataset, string relativePath, string? content = null)
     {
         var path = Path.Combine(dataset, relativePath.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, $"synthetic image {relativePath} {Guid.NewGuid():N}");
+        File.WriteAllText(path, content ?? $"synthetic image {relativePath} {Guid.NewGuid():N}");
     }
 
     private static void WriteGolden(string dataset, string relativePath)

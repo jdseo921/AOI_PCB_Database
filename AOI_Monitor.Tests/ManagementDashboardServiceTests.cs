@@ -90,6 +90,75 @@ public sealed class ManagementDashboardServiceTests : IDisposable
         Assert.True(File.Exists(export.PdfPath));
     }
 
+    [Fact]
+    public void DateOperatorModelLotAndDeploymentProfileFiltersWork()
+    {
+        SeedOperationalInspections();
+        SeedValidationRun();
+
+        var report = ManagementDashboardService.Build(new ManagementDashboardFilter
+        {
+            FromDate = DateTime.Today.AddDays(-1),
+            ToDate = DateTime.Today.AddDays(1),
+            BoardModel = "BOARD-A",
+            LotId = "LOT-1",
+            OperatorId = "Engineer01",
+            ModelVersion = "MODEL-1",
+            DeploymentProfile = DeploymentProfile.Stage4MesPilot,
+        });
+
+        Assert.Equal(4, report.TotalBoardsInspected);
+        Assert.Single(report.LotModelBreakdown);
+        Assert.Equal(DeploymentProfile.Stage4MesPilot, report.Filter.DeploymentProfile);
+
+        var operatorFilteredOut = ManagementDashboardService.Build(new ManagementDashboardFilter { OperatorId = "OperatorThatDidNotRun" });
+        Assert.Equal(0, operatorFilteredOut.TotalBoardsInspected);
+
+        var dateFilteredOut = ManagementDashboardService.Build(new ManagementDashboardFilter { FromDate = DateTime.Today.AddDays(10), ToDate = DateTime.Today.AddDays(11) });
+        Assert.Equal(0, dateFilteredOut.TotalBoardsInspected);
+        Assert.Empty(dateFilteredOut.LotModelBreakdown);
+    }
+
+    [Fact]
+    public void PersistedLatencyTracesDriveAverageAndP95WhenAvailable()
+    {
+        SeedOperationalInspections();
+        SeedValidationRun();
+        var now = DateTime.UtcNow;
+        InspectionLatencyService.Persist(new InspectionLatencyTrace
+        {
+            TraceId = "trace-1",
+            CreatedAtUtc = now,
+            FrameCapturedAtUtc = now,
+            FrameReceivedAtUtc = now,
+            OverlayRenderStartUtc = now.AddMilliseconds(10),
+            OverlayRenderEndUtc = now.AddMilliseconds(80),
+            TotalFrameToOverlayMs = 80,
+            TotalFrameToSavedResultMs = 100,
+            ModelId = "MODEL-1",
+            SourceKind = "UnitTest",
+        });
+        InspectionLatencyService.Persist(new InspectionLatencyTrace
+        {
+            TraceId = "trace-2",
+            CreatedAtUtc = now.AddMilliseconds(1),
+            FrameCapturedAtUtc = now,
+            FrameReceivedAtUtc = now,
+            OverlayRenderStartUtc = now.AddMilliseconds(10),
+            OverlayRenderEndUtc = now.AddMilliseconds(180),
+            TotalFrameToOverlayMs = 180,
+            TotalFrameToSavedResultMs = 200,
+            ModelId = "MODEL-1",
+            SourceKind = "UnitTest",
+        });
+
+        var report = ManagementDashboardService.Build(new ManagementDashboardFilter { ModelVersion = "MODEL-1" });
+
+        Assert.Equal(130, report.AverageInspectionTimeMs, precision: 2);
+        Assert.Equal(180, report.P95InspectionTimeMs, precision: 2);
+        Assert.Contains(report.Notes, note => note.Contains("persisted frame-to-overlay", StringComparison.OrdinalIgnoreCase));
+    }
+
     private void SeedOperationalInspections()
     {
         AoiDatabase.Initialize();

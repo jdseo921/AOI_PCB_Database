@@ -223,6 +223,7 @@
                 <Button x:Name="ValidateRegisteredModelBtn" Style="{StaticResource MiniBtn}" Content="Validate" Margin="0,0,6,6" Click="OnValidateRegisteredModelClick"/>
                 <Button x:Name="SetActiveModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Set Active" Margin="0,0,6,6" Click="OnSetActiveModelClick"/>
                 <Button x:Name="RunModelAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Run Model Acceptance" Margin="0,0,6,6" Click="OnRunModelAcceptanceClick"/>
+                <Button x:Name="CancelModelAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel Acceptance" Margin="0,0,6,6" Click="OnCancelModelAcceptanceClick" IsEnabled="False"/>
                 <Button x:Name="ViewModelAcceptanceRunsBtn" Style="{StaticResource MiniBtn}" Content="View Acceptance Runs" Margin="0,0,6,6" Click="OnViewModelAcceptanceRunsClick"/>
                 <Button x:Name="CreateModelReleasePackageBtn" Style="{StaticResource MiniBtnGreen}" Content="Create Model Release Package" Margin="0,0,6,6" Click="OnCreateModelReleasePackageClick"/>
                 <Button x:Name="PromoteProductionCandidateBtn" Style="{StaticResource MiniBtnAmber}" Content="Promote to Production Candidate" Margin="0,0,6,6" Click="OnPromoteProductionCandidateClick"/>
@@ -230,6 +231,10 @@
                 <Button x:Name="WaiveDeployModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Deploy with Waiver" Margin="0,0,6,6" Click="OnWaiveDeployModelClick"/>
                 <Button x:Name="RetireModelBtn" Style="{StaticResource MiniBtn}" Content="Retire" Margin="0,0,0,6" Click="OnRetireModelClick"/>
               </WrapPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <ProgressBar x:Name="ModelAcceptanceProgressBar" Width="170" Height="12" Minimum="0" Maximum="100" Value="0" IsIndeterminate="False" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="ModelAcceptanceProgressText" Text="Model acceptance idle." Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap" VerticalAlignment="Center"/>
+              </StackPanel>
               <DataGrid x:Name="ModelAcceptanceRunsGrid" Height="82" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" CanUserAddRows="False" Margin="0,4,0,0">
                 <DataGrid.Columns>
                   <DataGridTextColumn Header="Run" Binding="{Binding Id}" Width="50"/>
@@ -248,7 +253,8 @@
             <Button x:Name="RunSetupWizardBtn" Style="{StaticResource ActionBtnAmber}" Content="Run Setup Wizard Again" Click="OnRunSetupWizardClick" Margin="0,0,8,0"/>
             <Button x:Name="ExportDiagnosticsBtn" Style="{StaticResource ActionBtn}" Content="Export Diagnostics Report" Click="OnExportDiagnosticsClick" Margin="0,0,8,0"/>
             <Button x:Name="BackupConfigurationBtn" Style="{StaticResource ActionBtnGreen}" Content="Backup Configuration" Click="OnBackupConfigurationClick" Margin="0,0,8,0"/>
-            <Button x:Name="RestoreConfigurationPreviewBtn" Style="{StaticResource ActionBtnAmber}" Content="Restore Configuration Preview" Click="OnRestoreConfigurationPreviewClick"/>
+            <Button x:Name="RestoreConfigurationPreviewBtn" Style="{StaticResource ActionBtnAmber}" Content="Restore Configuration Preview" Click="OnRestoreConfigurationPreviewClick" Margin="0,0,8,0"/>
+            <Button x:Name="ApplyRestoreBtn" Style="{StaticResource ActionBtnGreen}" Content="Apply Restore" Click="OnApplyRestoreClick" IsEnabled="False"/>
           </StackPanel>
         </StackPanel>
       </Grid>
@@ -306,7 +312,7 @@
                 <ComboBox x:Name="CameraSourceCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                   <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="No Camera / Not Connected"/>
                   <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Folder Simulation"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Generic Vision Adapter"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Generic Vision Adapter (Real Hardware)"/>
                 </ComboBox>
               </Grid>
               <Grid Margin="0,0,0,8">
@@ -406,8 +412,8 @@
                 <ComboBox x:Name="LightingModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                   <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="None / Not Connected"/>
                   <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Simulated"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="TCP Text Protocol"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Serial Text Protocol"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="TCP Text Protocol (Real Hardware)"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Serial Text Protocol (Real Hardware)"/>
                 </ComboBox>
               </Grid>
               <Grid Margin="0,0,0,8">
@@ -468,7 +474,7 @@
                 <Button x:Name="CancelRobotCellAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,6,6" Click="OnCancelRobotCellAcceptanceClick" IsEnabled="False"/>
                 <Button x:Name="ExportRobotCellAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" Margin="0,0,0,6" Click="OnExportRobotCellAcceptanceClick"/>
               </WrapPanel>
-              <TextBlock x:Name="RobotAcceptanceDiagnosticsText" Text="Robot/PLC controls default to Not Connected. Simulated evidence never claims real hardware readiness or safety certification." Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
+              <TextBlock x:Name="RobotAcceptanceDiagnosticsText" Text="Robot/PLC controls default to Not Connected. Real Hardware is not connected from this screen. Simulated evidence never claims real hardware readiness or safety certification." Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
             </StackPanel>
           </Border>
           <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">

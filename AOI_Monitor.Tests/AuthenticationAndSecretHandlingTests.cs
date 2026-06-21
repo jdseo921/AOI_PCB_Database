@@ -42,23 +42,45 @@ public sealed class AuthenticationAndSecretHandlingTests : IDisposable
         AoiDatabase.Initialize();
         const string password = "CorrectHorseBatteryStaple!";
 
-        var user = AuthenticationSettingsService.CreateUser("AdminLocal", UserRole.Admin, password, UserRole.Admin, "RootAdmin [Admin]");
+        var user = LocalUserService.CreateUser("AdminLocal", UserRole.Admin, password, UserRole.Admin, "RootAdmin [Admin]");
         var userStoreJson = File.ReadAllText(AuthenticationSettingsService.LocalUsersPath);
 
         Assert.NotEqual(password, user.PasswordHash);
         Assert.DoesNotContain(password, userStoreJson, StringComparison.Ordinal);
-        Assert.True(AuthenticationSettingsService.TryAuthenticate("AdminLocal", password, out var authenticated));
+        Assert.True(LocalUserService.TryAuthenticate("AdminLocal", password, out var authenticated));
         Assert.Equal(UserRole.Admin, authenticated.Role);
-        Assert.False(AuthenticationSettingsService.TryAuthenticate("AdminLocal", "wrong-password", out _));
+        Assert.False(LocalUserService.TryAuthenticate("AdminLocal", "wrong-password", out _));
     }
 
     [Fact]
-    public void OperatorCannotCreateLocalUsers()
+    public void OperatorCannotAccessEngineerOrAdminLocalUserActions()
     {
         AoiDatabase.Initialize();
 
         Assert.Throws<UnauthorizedAccessException>(() =>
-            AuthenticationSettingsService.CreateUser("BlockedAdmin", UserRole.Admin, "CorrectHorseBatteryStaple!", UserRole.Operator, "Operator01 [Operator]"));
+            LocalUserService.CreateUser("BlockedAdmin", UserRole.Admin, "CorrectHorseBatteryStaple!", UserRole.Operator, "Operator01 [Operator]"));
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            LocalUserService.DisableUser("AnyUser", UserRole.Operator, "Operator01 [Operator]"));
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            LocalUserService.ChangePassword("AnyUser", "CorrectHorseBatteryStaple!", UserRole.Operator, "Operator01 [Operator]"));
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            LocalUserService.DeleteUser("AnyUser", UserRole.Operator, "Operator01 [Operator]"));
+    }
+
+    [Fact]
+    public void DisabledUserCannotLogIn()
+    {
+        AoiDatabase.Initialize();
+        const string password = "CorrectHorseBatteryStaple!";
+
+        LocalUserService.CreateUser("EngineerLocal", UserRole.Engineer, password, UserRole.Admin, "RootAdmin [Admin]");
+
+        Assert.True(LocalUserService.TryAuthenticate("EngineerLocal", password, out var authenticated));
+        Assert.Equal(UserRole.Engineer, authenticated.Role);
+
+        LocalUserService.DisableUser("EngineerLocal", UserRole.Admin, "RootAdmin [Admin]", "Offboarded test user");
+
+        Assert.False(LocalUserService.TryAuthenticate("EngineerLocal", password, out _));
     }
 
     [Fact]
@@ -129,5 +151,17 @@ public sealed class AuthenticationAndSecretHandlingTests : IDisposable
         Assert.Equal("Conditional", category.Status);
         Assert.Contains("DemoLocalRoleSelector", category.Evidence);
         Assert.Contains(report.Warnings, warning => warning.Contains("DemoLocalRoleSelector", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void AuditRecordsIncludeUserIdAndRole()
+    {
+        AoiDatabase.Initialize();
+
+        AoiDatabase.RecordAuditEvent("UNIT_AUTH_AUDIT", "Authentication audit accountability test.", operatorWithRole: "EngineerAudit [Engineer]");
+
+        var audit = Assert.Single(AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "UNIT_AUTH_AUDIT" }));
+        Assert.Equal("EngineerAudit", audit.UserId);
+        Assert.Equal("Engineer", audit.UserRole);
     }
 }

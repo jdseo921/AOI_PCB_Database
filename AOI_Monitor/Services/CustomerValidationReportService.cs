@@ -38,6 +38,7 @@ public sealed class CustomerValidationReportContext
     public ThresholdProfileEvidenceSummary ThresholdProfileEvidence { get; init; } = new();
     public ValidationBreakdownSummary BreakdownSummary { get; init; } = new();
     public DatasetQualitySummary DatasetQualitySummary { get; init; } = new();
+    public CustomerDatasetPreflightResult DatasetPreflightResult { get; init; } = new();
     public CameraAcceptanceSummary CameraAcceptanceSummary { get; init; } = new();
     public RobotAcceptanceSummary RobotAcceptanceSummary { get; init; } = new();
     public MesReadinessSummary MesReadinessSummary { get; init; } = new();
@@ -168,6 +169,7 @@ public static class CustomerValidationReportService
         if (context.LatencySummary.Warnings.Count > 0)
             AppendList(sb, context.LatencySummary.Warnings);
 
+        AppendDatasetPreflightSection(sb, context.DatasetPreflightResult);
         AppendDatasetQualitySection(sb, context.DatasetQualitySummary);
         AppendCameraAcceptanceSection(sb, context.CameraAcceptanceSummary);
         AppendRobotAcceptanceSection(sb, context.RobotAcceptanceSummary);
@@ -294,6 +296,7 @@ public static class CustomerValidationReportService
         sb.AppendLine($"- Max time: {FormatMilliseconds(context.PerformanceSummary.MaxMilliseconds)}");
         sb.AppendLine($"- Min time: {FormatMilliseconds(context.PerformanceSummary.MinMilliseconds)}");
         sb.AppendLine($"- Count over 1 second: {context.PerformanceSummary.CountOverOneSecond}");
+        AppendMarkdownDatasetPreflightSection(sb, context.DatasetPreflightResult);
         AppendMarkdownDatasetQualitySection(sb, context.DatasetQualitySummary);
         AppendMarkdownCameraAcceptanceSection(sb, context.CameraAcceptanceSummary);
         AppendMarkdownRobotAcceptanceSection(sb, context.RobotAcceptanceSummary);
@@ -514,6 +517,47 @@ public static class CustomerValidationReportService
         sb.AppendLine($"- Approved by: {EscapeMarkdown(string.IsNullOrWhiteSpace(summary.ApprovedBy) ? "Not approved" : summary.ApprovedBy)}");
         sb.AppendLine($"- Rules: {summary.RuleCount}");
         sb.AppendLine($"- Limitation: {EscapeMarkdown(summary.EvidenceBoundary)}");
+    }
+
+    private static void AppendDatasetPreflightSection(StringBuilder sb, CustomerDatasetPreflightResult result)
+    {
+        sb.AppendLine("  <h2>Dataset Preflight Gate</h2>");
+        sb.AppendLine("  <table class=\"details\">");
+        AppendDetailRow(sb, "Status", result.Status);
+        AppendDetailRow(sb, "Manifest rows", result.ManifestRows.ToString(CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "OK / NG images", $"{result.OkCount} / {result.NgCount}");
+        AppendDetailRow(sb, "Defect classes", result.DefectClassCount.ToString(CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "Missing images / golden", $"{result.MissingImageCount} / {result.MissingGoldenCount}");
+        AppendDetailRow(sb, "Duplicate names / hashes", $"{result.DuplicateImageCount} / {result.DuplicateFileHashCount}");
+        AppendDetailRow(sb, "Side/view coverage", result.SideCoverageCount.ToString(CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "Metadata gaps", result.MissingMetadataCount.ToString(CultureInfo.InvariantCulture));
+        sb.AppendLine("  </table>");
+        if (result.BlockingFailures.Count > 0)
+        {
+            sb.AppendLine("  <div class=\"notice\"><strong>Dataset preflight has blocking failures.</strong></div>");
+            AppendList(sb, result.BlockingFailures);
+        }
+        if (result.Warnings.Count > 0)
+            AppendList(sb, result.Warnings);
+    }
+
+    private static void AppendMarkdownDatasetPreflightSection(StringBuilder sb, CustomerDatasetPreflightResult result)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## Dataset Preflight Gate");
+        sb.AppendLine();
+        sb.AppendLine($"- Status: {EscapeMarkdown(result.Status)}");
+        sb.AppendLine($"- Manifest rows: {result.ManifestRows}");
+        sb.AppendLine($"- OK / NG images: {result.OkCount} / {result.NgCount}");
+        sb.AppendLine($"- Defect classes: {result.DefectClassCount}");
+        sb.AppendLine($"- Missing images / golden: {result.MissingImageCount} / {result.MissingGoldenCount}");
+        sb.AppendLine($"- Duplicate names / hashes: {result.DuplicateImageCount} / {result.DuplicateFileHashCount}");
+        sb.AppendLine($"- Side/view coverage: {result.SideCoverageCount}");
+        sb.AppendLine($"- Metadata gaps: {result.MissingMetadataCount}");
+        foreach (var failure in result.BlockingFailures)
+            sb.AppendLine($"- FAIL: {EscapeMarkdown(failure)}");
+        foreach (var warning in result.Warnings)
+            sb.AppendLine($"- WARNING: {EscapeMarkdown(warning)}");
     }
 
     private static void AppendDatasetQualitySection(StringBuilder sb, DatasetQualitySummary summary)

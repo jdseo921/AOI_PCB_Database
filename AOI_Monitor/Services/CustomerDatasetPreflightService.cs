@@ -24,6 +24,9 @@ public sealed class CustomerDatasetPreflightResult
     public int MissingImageCount { get; set; }
     public int MissingGoldenCount { get; set; }
     public int DuplicateImageCount { get; set; }
+    public int DuplicateFileHashCount { get; set; }
+    public int SideCoverageCount { get; set; }
+    public int MissingMetadataCount { get; set; }
     public DatasetQualitySummary DatasetQuality { get; set; } = new();
     public List<string> BlockingFailures { get; set; } = new();
     public List<string> Warnings { get; set; } = new();
@@ -112,6 +115,9 @@ public static class CustomerDatasetPreflightService
                 if (!SupportedImageExtensions.Contains(Path.GetExtension(entry.ImagePath)))
                     result.Warnings.Add($"Image file uses a non-preferred extension: {entry.ImagePath}. Use PNG/JPG/JPEG.");
 
+                ValidateNaming(result, entry.ImagePath);
+                ValidateMetadataCompleteness(result, entry);
+
                 if (string.IsNullOrWhiteSpace(entry.GoldenPath) || !File.Exists(entry.GoldenPath))
                 {
                     result.MissingGoldenCount++;
@@ -144,8 +150,18 @@ public static class CustomerDatasetPreflightService
 
             result.DatasetQuality = DatasetQualityService.Analyze(rows, manifest, criteria.DatasetQualityCriteria);
             result.DefectClassCount = result.DatasetQuality.DefectClassCount;
+            result.DuplicateFileHashCount = result.DatasetQuality.DuplicateFileHashes;
+            if (result.DuplicateFileHashCount > 0)
+                result.BlockingFailures.Add($"Dataset contains {result.DuplicateFileHashCount} row(s) with duplicate image file hashes.");
+            result.SideCoverageCount = rows
+                .Select(row => BatchValidationService.NormalizeSide(row.Side))
+                .Where(side => side != "UNASSIGNED")
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+            if (rows.Length > 0 && result.SideCoverageCount == 0)
+                result.BlockingFailures.Add("Manifest must identify side/view coverage for the validation rows.");
             result.BlockingFailures.AddRange(result.DatasetQuality.BlockingFailures);
-            result.Warnings.AddRange(result.DatasetQuality.Warnings);
+            result.Warnings.AddRange(result.DatasetQuality.Warnings.Where(warning => !warning.Contains("duplicate file hashes", StringComparison.OrdinalIgnoreCase)));
             result.Warnings.AddRange(manifest.Warnings);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
@@ -172,6 +188,40 @@ public static class CustomerDatasetPreflightService
         {
             if (!headers.Contains(column))
                 result.BlockingFailures.Add($"Manifest CSV is missing required column '{column}'.");
+        }
+    }
+
+    private static void ValidateNaming(CustomerDatasetPreflightResult result, string imagePath)
+    {
+        var fileName = Path.GetFileName(imagePath);
+        if (string.IsNullOrWhiteSpace(fileName))
+            return;
+
+        if (fileName.Any(char.IsWhiteSpace))
+            result.Warnings.Add($"Image file name contains whitespace: {fileName}. Use stable snake_case names.");
+    }
+
+    private static void ValidateMetadataCompleteness(CustomerDatasetPreflightResult result, GroundTruthEntry entry)
+    {
+        if (BatchValidationService.NormalizeSide(entry.Side) == "UNASSIGNED")
+        {
+            result.MissingMetadataCount++;
+            result.BlockingFailures.Add($"Manifest row is missing side/view metadata for {Path.GetFileName(entry.ImagePath ?? string.Empty)}.");
+        }
+
+        var hasAnyRoiMetadata =
+            !string.IsNullOrWhiteSpace(entry.RefDes) ||
+            !string.IsNullOrWhiteSpace(entry.RoiId) ||
+            !string.IsNullOrWhiteSpace(entry.RoiType);
+        var hasAllRoiMetadata =
+            !string.IsNullOrWhiteSpace(entry.RefDes) &&
+            !string.IsNullOrWhiteSpace(entry.RoiId) &&
+            !string.IsNullOrWhiteSpace(entry.RoiType);
+
+        if (hasAnyRoiMetadata && !hasAllRoiMetadata)
+        {
+            result.MissingMetadataCount++;
+            result.BlockingFailures.Add($"ROI/refdes metadata is incomplete for {Path.GetFileName(entry.ImagePath ?? string.Empty)}. Provide refdes, roi_id, and roi_type together.");
         }
     }
 

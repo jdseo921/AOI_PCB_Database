@@ -318,8 +318,8 @@ public partial class MonitorView : UserControl
 
         try
         {
-            RobotAcceptanceStatusText.Text = "Robot acceptance: running...";
-            var run = await RobotAcceptanceTestService.RunAsync(progress: new Progress<string>(message => RobotAcceptanceStatusText.Text = message), cancellationToken: token);
+            RobotAcceptanceStatusText.Text = "Robot cell acceptance: running...";
+            var run = await RobotCellAcceptanceTestService.RunAsync(progress: new Progress<string>(message => RobotAcceptanceStatusText.Text = message), cancellationToken: token);
             AoiDatabase.RecordRobotAcceptanceRun(run, WorkflowState.Instance.OperatorWithRole);
             _lastRobotAcceptanceRun = run;
             RobotAcceptanceStatusText.Text = BuildRobotAcceptanceStatus(run);
@@ -352,7 +352,7 @@ public partial class MonitorView : UserControl
 
         try
         {
-            var export = RobotAcceptanceTestService.ExportReport(run);
+            var export = RobotCellAcceptanceTestService.ExportReport(run);
             LogEvent("ROBOT ACCEPTANCE", $"Robot acceptance report exported: {Path.GetFileName(export.JsonPath)}.");
             MessageBox.Show(
                 $"Robot acceptance report exported.\n\nJSON: {export.JsonPath}\nHTML: {export.HtmlPath}",

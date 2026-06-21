@@ -144,14 +144,20 @@ public sealed class SafetyStatus
     public bool IsAirPressureOk { get; set; } = true;
     public bool IsRobotServoReady { get; set; } = true;
     public bool IsBoardClampReady { get; set; } = true;
+    public bool IsLightCurtainClear { get; set; } = true;
+    public List<string> ActiveFaults { get; set; } = new();
     public string Message { get; set; } = "Safety interlocks OK.";
 
-    public bool IsOk =>
+    public bool IsSafeToMove =>
         IsGuardDoorClosed &&
         !IsEmergencyStopActive &&
         IsAirPressureOk &&
         IsRobotServoReady &&
-        IsBoardClampReady;
+        IsBoardClampReady &&
+        IsLightCurtainClear &&
+        ActiveFaults.Count == 0;
+
+    public bool IsOk => IsSafeToMove;
 
     public string BlockingReason()
     {
@@ -166,6 +172,9 @@ public sealed class SafetyStatus
             reasons.Add("robot servo not ready");
         if (!IsBoardClampReady)
             reasons.Add("board clamp not ready");
+        if (!IsLightCurtainClear)
+            reasons.Add("light curtain not clear");
+        reasons.AddRange(ActiveFaults.Where(fault => !string.IsNullOrWhiteSpace(fault)));
         return reasons.Count == 0 ? Message : string.Join(", ", reasons);
     }
 }
@@ -177,7 +186,9 @@ public interface IPlcSafetyController : IIntegrationEndpoint
     bool IsAirPressureOk { get; }
     bool IsRobotServoReady { get; }
     bool IsBoardClampReady { get; }
+    bool IsLightCurtainClear { get; }
     Task<IntegrationCommandResult> ResetSafetyFaultAsync(CancellationToken cancellationToken = default);
+    SafetyStatus GetSafetyStatus();
     SafetyStatus GetDiagnostics();
 }
 
@@ -230,11 +241,12 @@ public sealed class NullPlcSafetyController : IPlcSafetyController
     public bool IsAirPressureOk => false;
     public bool IsRobotServoReady => false;
     public bool IsBoardClampReady => false;
+    public bool IsLightCurtainClear => false;
 
     public Task<IntegrationCommandResult> ResetSafetyFaultAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(IntegrationCommandResult.NotConnected(StatusMessage));
 
-    public SafetyStatus GetDiagnostics()
+    public SafetyStatus GetSafetyStatus()
         => new()
         {
             IsGuardDoorClosed = false,
@@ -242,8 +254,12 @@ public sealed class NullPlcSafetyController : IPlcSafetyController
             IsAirPressureOk = false,
             IsRobotServoReady = false,
             IsBoardClampReady = false,
+            IsLightCurtainClear = false,
+            ActiveFaults = { "PLC/safety controller not connected" },
             Message = StatusMessage,
         };
+
+    public SafetyStatus GetDiagnostics() => GetSafetyStatus();
 }
 
 public sealed class NullCentralProductionDatabaseClient : ICentralProductionDatabaseClient
@@ -271,12 +287,14 @@ public sealed class SimulatedPlcSafetyController : IPlcSafetyController
     public bool IsAirPressureOk { get; private set; } = true;
     public bool IsRobotServoReady { get; private set; } = true;
     public bool IsBoardClampReady { get; private set; } = true;
+    public bool IsLightCurtainClear { get; private set; } = true;
 
     public void SetGuardDoorClosed(bool value) => IsGuardDoorClosed = value;
     public void SetEmergencyStopActive(bool value) => IsEmergencyStopActive = value;
     public void SetAirPressureOk(bool value) => IsAirPressureOk = value;
     public void SetRobotServoReady(bool value) => IsRobotServoReady = value;
     public void SetBoardClampReady(bool value) => IsBoardClampReady = value;
+    public void SetLightCurtainClear(bool value) => IsLightCurtainClear = value;
 
     public Task<IntegrationCommandResult> ResetSafetyFaultAsync(CancellationToken cancellationToken = default)
     {
@@ -286,19 +304,38 @@ public sealed class SimulatedPlcSafetyController : IPlcSafetyController
         IsAirPressureOk = true;
         IsRobotServoReady = true;
         IsBoardClampReady = true;
+        IsLightCurtainClear = true;
         return Task.FromResult(new IntegrationCommandResult(true, IntegrationConnectionStatus.Simulated, "Simulated PLC safety fault reset. No real safety circuit was reset."));
     }
 
-    public SafetyStatus GetDiagnostics()
-        => new()
+    public SafetyStatus GetSafetyStatus()
+    {
+        var status = new SafetyStatus
         {
             IsGuardDoorClosed = IsGuardDoorClosed,
             IsEmergencyStopActive = IsEmergencyStopActive,
             IsAirPressureOk = IsAirPressureOk,
             IsRobotServoReady = IsRobotServoReady,
             IsBoardClampReady = IsBoardClampReady,
+            IsLightCurtainClear = IsLightCurtainClear,
             Message = StatusMessage,
         };
+        if (!IsGuardDoorClosed)
+            status.ActiveFaults.Add("guard door open");
+        if (IsEmergencyStopActive)
+            status.ActiveFaults.Add("emergency stop active");
+        if (!IsAirPressureOk)
+            status.ActiveFaults.Add("air pressure not OK");
+        if (!IsRobotServoReady)
+            status.ActiveFaults.Add("robot servo not ready");
+        if (!IsBoardClampReady)
+            status.ActiveFaults.Add("board clamp not ready");
+        if (!IsLightCurtainClear)
+            status.ActiveFaults.Add("light curtain not clear");
+        return status;
+    }
+
+    public SafetyStatus GetDiagnostics() => GetSafetyStatus();
 }
 
 public sealed class TcpTextPlcSafetyController : IPlcSafetyController
@@ -320,11 +357,12 @@ public sealed class TcpTextPlcSafetyController : IPlcSafetyController
     public bool IsAirPressureOk => false;
     public bool IsRobotServoReady => false;
     public bool IsBoardClampReady => false;
+    public bool IsLightCurtainClear => false;
 
     public Task<IntegrationCommandResult> ResetSafetyFaultAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(IntegrationCommandResult.NotConnected("TCP text PLC reset is a boundary only in this build. No vendor PLC or safety-certified reset command was sent."));
 
-    public SafetyStatus GetDiagnostics()
+    public SafetyStatus GetSafetyStatus()
         => new()
         {
             IsGuardDoorClosed = false,
@@ -332,8 +370,12 @@ public sealed class TcpTextPlcSafetyController : IPlcSafetyController
             IsAirPressureOk = false,
             IsRobotServoReady = false,
             IsBoardClampReady = false,
+            IsLightCurtainClear = false,
+            ActiveFaults = { "TCP text PLC boundary does not read safety state in this build" },
             Message = StatusMessage,
         };
+
+    public SafetyStatus GetDiagnostics() => GetSafetyStatus();
 }
 
 public sealed class SimulatedRobotController : IRobotController

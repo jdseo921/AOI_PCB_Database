@@ -11,6 +11,7 @@ namespace AOI_Monitor.Services;
 public static class ExportVerificationService
 {
     private static readonly byte[] PngSignature = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+    private static readonly byte[] PdfSignature = Encoding.ASCII.GetBytes("%PDF");
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -163,6 +164,8 @@ public static class ExportVerificationService
             VerifyCsv(result, path, exportType);
         else if (extension.Equals(".png", StringComparison.OrdinalIgnoreCase))
             VerifyPng(result, path);
+        else if (extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+            VerifyPdf(result, path);
         else if (extension.Equals(".json", StringComparison.OrdinalIgnoreCase))
             VerifyJson(result, path, exportType);
         else if (extension.Equals(".ndjson", StringComparison.OrdinalIgnoreCase))
@@ -206,6 +209,9 @@ public static class ExportVerificationService
         foreach (var png in files.Where(path => Path.GetExtension(path).Equals(".png", StringComparison.OrdinalIgnoreCase)))
             VerifyPng(result, png, NormalizeRelative(Path.GetRelativePath(folder, png)));
 
+        foreach (var pdf in files.Where(path => Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase)))
+            VerifyPdf(result, pdf, NormalizeRelative(Path.GetRelativePath(folder, pdf)));
+
         foreach (var csv in files.Where(path => Path.GetExtension(path).Equals(".csv", StringComparison.OrdinalIgnoreCase)))
             VerifyCsv(result, csv, exportType);
 
@@ -246,6 +252,17 @@ public static class ExportVerificationService
             Add(result, ExportVerificationStatus.OK, $"PNG signature verified: {displayPath ?? Path.GetFileName(path)}.");
         else
             Add(result, ExportVerificationStatus.ERROR, $"PNG signature invalid: {displayPath ?? Path.GetFileName(path)}.");
+    }
+
+    private static void VerifyPdf(ExportVerificationResult result, string path, string? displayPath = null)
+    {
+        using var stream = File.OpenRead(path);
+        Span<byte> signature = stackalloc byte[PdfSignature.Length];
+        var read = stream.Read(signature);
+        if (read == PdfSignature.Length && signature.SequenceEqual(PdfSignature))
+            Add(result, ExportVerificationStatus.OK, $"PDF signature verified: {displayPath ?? Path.GetFileName(path)}.");
+        else
+            Add(result, ExportVerificationStatus.ERROR, $"PDF signature invalid: {displayPath ?? Path.GetFileName(path)}.");
     }
 
     private static void VerifyJson(ExportVerificationResult result, string path, string exportType)

@@ -5,6 +5,7 @@ public enum CentralSyncMode
     Disabled,
     FileDrop,
     RestApi,
+    ProductionDatabaseBoundary,
     PostgreSqlBoundary,
 }
 
@@ -20,6 +21,8 @@ public sealed class CentralSyncSettings
 {
     public CentralSyncMode Mode { get; set; } = CentralSyncMode.Disabled;
     public string EndpointOrFolder { get; set; } = string.Empty;
+    public string EndpointUrl { get; set; } = string.Empty;
+    public string FileDropFolder { get; set; } = string.Empty;
     public string StationId { get; set; } = Environment.MachineName;
     public int SyncIntervalSeconds { get; set; } = 300;
     public bool IncludeImages { get; set; }

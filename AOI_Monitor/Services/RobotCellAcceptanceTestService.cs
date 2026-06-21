@@ -82,9 +82,16 @@ public static class RobotCellAcceptanceTestService
             cancellationToken).ConfigureAwait(false);
         await simulated.ResetSafetyFaultAsync(cancellationToken).ConfigureAwait(false);
 
-        run.SafetyFaultBlocked = guardBlocked && clampBlocked;
+        var lightCurtainBlocked = await CheckSafetyFaultAsync(
+            run,
+            "LightCurtainBlocked",
+            () => simulated.SetLightCurtainClear(false),
+            cancellationToken).ConfigureAwait(false);
+        await simulated.ResetSafetyFaultAsync(cancellationToken).ConfigureAwait(false);
+
+        run.SafetyFaultBlocked = guardBlocked && clampBlocked && lightCurtainBlocked;
         if (!run.SafetyFaultBlocked)
-            run.Failures.Add("Robot cell acceptance did not prove simulated guard/clamp safety faults blocked movement.");
+            run.Failures.Add("Robot cell acceptance did not prove simulated guard, clamp, and light-curtain safety faults blocked movement.");
     }
 
     private static async Task<bool> CheckSafetyFaultAsync(

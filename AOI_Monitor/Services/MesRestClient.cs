@@ -162,7 +162,11 @@ public sealed class MesRestClient : IMesClient, ITraceabilityUploader, IDisposab
                         $"MES REST uploaded {payloadName}: {(int)response.StatusCode} {response.ReasonPhrase}.");
                 }
 
-                lastMessage = $"MES REST upload failed for {payloadName}: HTTP {(int)response.StatusCode} {response.ReasonPhrase}.";
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                var bodyDetail = string.IsNullOrWhiteSpace(body)
+                    ? string.Empty
+                    : $" Response: {MesIntegrationSettingsService.RedactSecrets(body, _settings)}";
+                lastMessage = $"MES REST upload failed for {payloadName}: HTTP {(int)response.StatusCode} {response.ReasonPhrase}.{bodyDetail}";
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -170,7 +174,7 @@ public sealed class MesRestClient : IMesClient, ITraceabilityUploader, IDisposab
             }
             catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or UriFormatException)
             {
-                lastMessage = $"MES REST upload failed for {payloadName}: {ex.Message}";
+                lastMessage = $"MES REST upload failed for {payloadName}: {MesIntegrationSettingsService.RedactSecrets(ex.Message, _settings)}";
             }
 
             if (attempt < attempts && _settings.RetryBackoffMs > 0)

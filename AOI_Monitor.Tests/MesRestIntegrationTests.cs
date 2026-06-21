@@ -136,7 +136,7 @@ public sealed class MesRestIntegrationTests : IDisposable
         MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
         MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
 
-        var report = await TraceabilitySignoffService.RunAsync(operatorId: "Engineer01 [Engineer]");
+        var report = await TraceabilityAcceptanceTestService.RunAsync(operatorId: "Engineer01 [Engineer]");
         var latest = AoiDatabase.GetLatestTraceabilityTestReport();
 
         Assert.Equal("PASS", report.Status);
@@ -157,12 +157,39 @@ public sealed class MesRestIntegrationTests : IDisposable
         settings.BaseUrl = "http://mes.test?token=bearer-secret-for-test";
         MesIntegrationSettingsService.Save(settings);
 
-        var report = await TraceabilitySignoffService.RunAsync(operatorId: "Engineer01 [Engineer]");
+        var report = await TraceabilityAcceptanceTestService.RunAsync(operatorId: "Engineer01 [Engineer]");
         var json = File.ReadAllText(report.ReportJsonPath);
         var audits = AoiDatabase.GetAuditEvents(new LogFilter());
 
         Assert.DoesNotContain("bearer-secret-for-test", json);
         Assert.DoesNotContain(audits, audit => audit.ActionDetail.Contains("bearer-secret-for-test", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task MesRestFailureResponseBodyIsRedactedBeforeSpoolAndReports()
+    {
+        var settings = RestSettings(maxRetryCount: 0);
+        settings.AuthMode = MesRestAuthMode.ApiKey;
+        settings.ApiKey = "secret-api-key";
+        MesIntegrationSettingsService.RestClientFactory = configured => new MesRestClient(
+            configured,
+            new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                ReasonPhrase = "Unauthorized",
+                Content = new StringContent("rejected token secret-api-key"),
+            }));
+        MesIntegrationSettingsService.Save(settings);
+
+        var report = await TraceabilityAcceptanceTestService.RunResultOnlyAsync("Engineer01 [Engineer]");
+        var spool = Assert.Single(AoiDatabase.GetMesSpoolQueue());
+        var json = File.ReadAllText(report.ReportJsonPath);
+        var audits = AoiDatabase.GetAuditEvents(new LogFilter());
+
+        Assert.Equal("FAIL", report.Status);
+        Assert.Contains("***", spool.LastError);
+        Assert.DoesNotContain("secret-api-key", spool.LastError);
+        Assert.DoesNotContain("secret-api-key", json);
+        Assert.DoesNotContain(audits, audit => audit.ActionDetail.Contains("secret-api-key", StringComparison.Ordinal));
     }
 
     [Fact]

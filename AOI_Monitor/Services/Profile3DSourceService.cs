@@ -14,6 +14,7 @@ public interface IProfile3DSource
     string Name { get; }
     string Status { get; }
     string StatusMessage { get; }
+    bool IsAcquiring { get; }
     void StartAcquisition();
     void StopAcquisition();
     Profile3DFrame? GetNextHeightMap(CancellationToken cancellationToken = default);
@@ -25,6 +26,7 @@ public sealed class NullProfile3DSource : IProfile3DSource
     public string Name => "No 3D Profile Source";
     public string Status => "NotConnected";
     public string StatusMessage => "No 3D profile source is configured.";
+    public bool IsAcquiring => false;
 
     public void StartAcquisition()
     {
@@ -40,6 +42,7 @@ public sealed class NullProfile3DSource : IProfile3DSource
         => new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["source"] = "none",
+            ["sourceKind"] = "NotConnected",
             ["status"] = Status,
             ["message"] = StatusMessage,
         };
@@ -58,6 +61,7 @@ public sealed class CsvProfile3DSource : IProfile3DSource
     public string Name => "Sample CSV 3D Profile Source";
     public string Status => _started ? "Ready" : "Stopped";
     public string StatusMessage => string.IsNullOrWhiteSpace(_csvPath) ? "No CSV height map is selected." : $"CSV height map: {Path.GetFileName(_csvPath)}";
+    public bool IsAcquiring => _started;
 
     public void StartAcquisition()
     {
@@ -96,7 +100,7 @@ public sealed class CsvProfile3DSource : IProfile3DSource
         return new Profile3DFrame
         {
             FrameId = $"CSV-{Path.GetFileNameWithoutExtension(_csvPath)}-{DateTime.UtcNow:yyyyMMddHHmmssfff}",
-            SourceKind = "Sample CSV",
+            SourceKind = "CSV Sample",
             IsSimulated = true,
             CapturedAtUtc = DateTime.UtcNow,
             Width = width,
@@ -113,6 +117,7 @@ public sealed class CsvProfile3DSource : IProfile3DSource
         => new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["source"] = "csv",
+            ["sourceKind"] = "CSV Sample",
             ["path"] = _csvPath,
             ["status"] = Status,
             ["message"] = StatusMessage,
@@ -196,6 +201,7 @@ public sealed class GenericProfile3DAdapter : IProfile3DSource
     public string Name => "Generic 3D Adapter Boundary";
     public string Status => "NotConnected";
     public string StatusMessage => "Generic 3D adapter boundary is ready for a vendor SDK implementation, but no real hardware adapter is configured.";
+    public bool IsAcquiring => false;
 
     public void StartAcquisition() => throw new NotSupportedException(StatusMessage);
     public void StopAcquisition()
@@ -208,6 +214,7 @@ public sealed class GenericProfile3DAdapter : IProfile3DSource
         => new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["source"] = "generic-adapter-boundary",
+            ["sourceKind"] = "NotConnected",
             ["status"] = Status,
             ["message"] = StatusMessage,
             ["productionClaim"] = "No real 3D camera movement or acquisition is validated by this boundary.",
@@ -233,6 +240,7 @@ public static class Profile3DAcceptanceTestService
         {
             CreatedAtUtc = DateTime.UtcNow,
             SourceName = source.Name,
+            SourceKind = ClassifySourceKind(source),
             Criteria = criteria,
             Diagnostics = source.GetDiagnostics().ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
         };
@@ -362,6 +370,22 @@ public static class Profile3DAcceptanceTestService
         run.FrameId = frame.FrameId;
         run.MissingHeightCount = Math.Max(0, frame.Width * frame.Height - frame.HeightValues.Length);
         run.NaNHeightCount = frame.HeightValues.Count(value => double.IsNaN(value) || double.IsInfinity(value));
+    }
+
+    private static string ClassifySourceKind(IProfile3DSource source)
+    {
+        var diagnostics = source.GetDiagnostics();
+        if (diagnostics.TryGetValue("sourceKind", out var sourceKind) && !string.IsNullOrWhiteSpace(sourceKind))
+            return sourceKind;
+
+        if (source.Status.Equals("NotConnected", StringComparison.OrdinalIgnoreCase))
+            return "NotConnected";
+
+        return source.Name.Contains("CSV", StringComparison.OrdinalIgnoreCase)
+            ? "CSV Sample"
+            : source.Name.Contains("Simulated", StringComparison.OrdinalIgnoreCase)
+                ? "Simulation"
+                : "Real Hardware";
     }
 
     private static void ValidateFrame(Profile3DAcceptanceRun run, Profile3DFrame frame, Profile3DAcceptanceCriteria criteria)

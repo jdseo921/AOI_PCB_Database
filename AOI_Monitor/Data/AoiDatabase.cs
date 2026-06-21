@@ -185,7 +185,9 @@ public static class AoiDatabase
 
         var images = new List<ImportedImage>();
         using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText =
             """
             SELECT Id, OriginalPath, VaultPath, FileName, BoardModel, LotId, ViewType, ImportedAtUtc, FileHash
@@ -424,7 +426,9 @@ public static class AoiDatabase
         EnsureInitialized();
 
         using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText =
             """
             SELECT Id, ImageFolder, GroundTruthCsvPath, EngineName, ModelVersion, CreatedAtUtc, Accuracy, Precision,
@@ -2167,7 +2171,9 @@ public static class AoiDatabase
             relatedPath: run.DatasetFolder);
 
         using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText =
             """
             INSERT INTO ModelAcceptanceRuns
@@ -2187,7 +2193,46 @@ public static class AoiDatabase
             SELECT last_insert_rowid();
             """;
         BindModelAcceptanceRun(command, run, effectiveOperator, auditEventId);
-        return (long)(command.ExecuteScalar() ?? 0L);
+        var id = (long)(command.ExecuteScalar() ?? 0L);
+        RecordModelAcceptanceMetrics(connection, transaction, id, run);
+        transaction.Commit();
+        return id;
+    }
+
+    private static void RecordModelAcceptanceMetrics(SqliteConnection connection, SqliteTransaction transaction, long runId, ModelAcceptanceRun run)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO ModelAcceptanceMetrics
+                (RunId, MetricName, MetricValue, MetricText)
+            VALUES
+                ($runId, $metricName, $metricValue, $metricText);
+            """;
+
+        foreach (var metric in ModelAcceptanceMetricRows(run))
+        {
+            command.Parameters.Clear();
+            command.Parameters.AddWithValue("$runId", runId);
+            command.Parameters.AddWithValue("$metricName", metric.Name);
+            command.Parameters.AddWithValue("$metricValue", metric.Value);
+            command.Parameters.AddWithValue("$metricText", metric.Text);
+            command.ExecuteNonQuery();
+        }
+    }
+
+    private static IEnumerable<(string Name, double Value, string Text)> ModelAcceptanceMetricRows(ModelAcceptanceRun run)
+    {
+        yield return ("accuracy", run.Metrics.Accuracy, run.Metrics.Accuracy.ToString("P3", CultureInfo.InvariantCulture));
+        yield return ("precision", run.Metrics.Precision, run.Metrics.Precision.ToString("P3", CultureInfo.InvariantCulture));
+        yield return ("recall", run.Metrics.Recall, run.Metrics.Recall.ToString("P3", CultureInfo.InvariantCulture));
+        yield return ("false_call_rate", run.Metrics.FalseCallRate, run.Metrics.FalseCallRate.ToString("P3", CultureInfo.InvariantCulture));
+        yield return ("possible_escape_rate", run.FalseCallRecommendation.PossibleEscapeRate, run.FalseCallRecommendation.PossibleEscapeRate.ToString("P3", CultureInfo.InvariantCulture));
+        var totalImages = run.Metrics.OkCount + run.Metrics.NgCount + run.Metrics.Unknown;
+        yield return ("review_rate", totalImages == 0 ? 0 : run.Metrics.ReviewCount / (double)Math.Max(1, totalImages), string.Empty);
+        yield return ("average_inference_ms", run.PerformanceSummary.AverageMilliseconds, run.PerformanceSummary.AverageMilliseconds.ToString("F3", CultureInfo.InvariantCulture));
+        yield return ("p95_inference_ms", run.P95InferenceMs, run.P95InferenceMs.ToString("F3", CultureInfo.InvariantCulture));
     }
 
     public static void PromoteModelAcceptanceRun(long id, string approvedBy)
@@ -2447,7 +2492,8 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$payloadPath", payloadPath);
         command.Parameters.AddWithValue("$endpointUrl", endpointUrl);
         command.Parameters.AddWithValue("$maxRetryCount", maxRetryCount);
-        command.Parameters.AddWithValue("$lastError", lastError);
+        var safeLastError = MesIntegrationSettingsService.RedactSecrets(lastError);
+        command.Parameters.AddWithValue("$lastError", safeLastError);
         command.Parameters.AddWithValue("$operatorId", string.IsNullOrWhiteSpace(operatorId) ? "UNKNOWN" : operatorId);
         command.Parameters.AddWithValue("$lotId", lotId);
         command.Parameters.AddWithValue("$boardModel", boardModel);
@@ -2459,7 +2505,7 @@ public static class AoiDatabase
         var id = Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
         RecordAuditEvent(
             "MES_SPOOL",
-            $"MES REST payload spooled: id={id}; type={payloadType}; result={result}; message={lastError}.",
+            $"MES REST payload spooled: id={id}; type={payloadType}; result={result}; message={safeLastError}.",
             operatorWithRole: operatorId,
             relatedEntityType: "MesSpoolQueue",
             relatedEntityId: id.ToString(CultureInfo.InvariantCulture),
@@ -2520,6 +2566,7 @@ public static class AoiDatabase
     public static void MarkMesSpoolItemSent(long id, string message)
     {
         EnsureInitialized();
+        var safeMessage = MesIntegrationSettingsService.RedactSecrets(message);
 
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
@@ -2534,12 +2581,12 @@ public static class AoiDatabase
             """;
         command.Parameters.AddWithValue("$id", id);
         command.Parameters.AddWithValue("$lastAttemptAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
-        command.Parameters.AddWithValue("$message", message);
+        command.Parameters.AddWithValue("$message", safeMessage);
         command.ExecuteNonQuery();
 
         RecordAuditEvent(
             "MES_SPOOL",
-            $"MES spool item {id} marked Sent. {message}",
+            $"MES spool item {id} marked Sent. {safeMessage}",
             relatedEntityType: "MesSpoolQueue",
             relatedEntityId: id.ToString(CultureInfo.InvariantCulture));
     }
@@ -2550,6 +2597,7 @@ public static class AoiDatabase
     public static void RecordMesSpoolRetryFailure(long id, string message, int retryBackoffMs)
     {
         EnsureInitialized();
+        var safeMessage = MesIntegrationSettingsService.RedactSecrets(message);
 
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
@@ -2567,12 +2615,12 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$id", id);
         command.Parameters.AddWithValue("$lastAttemptAtUtc", now.ToString("O", CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$nextAttemptAtUtc", now.AddMilliseconds(Math.Max(0, retryBackoffMs)).ToString("O", CultureInfo.InvariantCulture));
-        command.Parameters.AddWithValue("$lastError", message);
+        command.Parameters.AddWithValue("$lastError", safeMessage);
         command.ExecuteNonQuery();
 
         RecordAuditEvent(
             "MES_SPOOL",
-            $"MES spool item {id} retry failed: {message}",
+            $"MES spool item {id} retry failed: {safeMessage}",
             relatedEntityType: "MesSpoolQueue",
             relatedEntityId: id.ToString(CultureInfo.InvariantCulture));
     }
@@ -2580,6 +2628,7 @@ public static class AoiDatabase
     public static void MarkMesSpoolItemAbandoned(long id, string message, string operatorId)
     {
         EnsureInitialized();
+        var safeMessage = MesIntegrationSettingsService.RedactSecrets(message);
 
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
@@ -2594,12 +2643,12 @@ public static class AoiDatabase
             """;
         command.Parameters.AddWithValue("$id", id);
         command.Parameters.AddWithValue("$lastAttemptAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
-        command.Parameters.AddWithValue("$message", message);
+        command.Parameters.AddWithValue("$message", safeMessage);
         command.ExecuteNonQuery();
 
         RecordAuditEvent(
             "MES_SPOOL_ABANDON",
-            $"MES spool item {id} marked Abandoned. {message}",
+            $"MES spool item {id} marked Abandoned. {safeMessage}",
             operatorWithRole: operatorId,
             relatedEntityType: "MesSpoolQueue",
             relatedEntityId: id.ToString(CultureInfo.InvariantCulture));
@@ -4848,6 +4897,16 @@ public static class AoiDatabase
                 AuditEventId INTEGER NULL
             );
 
+            CREATE TABLE IF NOT EXISTS ModelAcceptanceMetrics
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                RunId INTEGER NOT NULL,
+                MetricName TEXT NOT NULL,
+                MetricValue REAL NOT NULL DEFAULT 0,
+                MetricText TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (RunId) REFERENCES ModelAcceptanceRuns(Id)
+            );
+
             CREATE TABLE IF NOT EXISTS ModelReleasePackages
             (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -4867,6 +4926,7 @@ public static class AoiDatabase
 
             CREATE INDEX IF NOT EXISTS IX_ModelAcceptanceRuns_Model_Status ON ModelAcceptanceRuns(ModelId, Status, IsProductionCandidate);
             CREATE INDEX IF NOT EXISTS IX_ModelAcceptanceRuns_CreatedAtUtc ON ModelAcceptanceRuns(CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_ModelAcceptanceMetrics_RunId ON ModelAcceptanceMetrics(RunId);
             CREATE INDEX IF NOT EXISTS IX_ModelReleasePackages_Model ON ModelReleasePackages(ModelId, CreatedAtUtc);
             """;
         command.ExecuteNonQuery();

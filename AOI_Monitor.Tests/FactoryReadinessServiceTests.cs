@@ -187,6 +187,43 @@ public sealed class FactoryReadinessServiceTests : IDisposable
     }
 
     [Fact]
+    public void SimulationOnlyProfile3DEvidenceCannotSatisfyRealHardwareReadiness()
+    {
+        AoiDatabase.RecordProfile3DAcceptanceRun(new Profile3DAcceptanceRun
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            SourceName = "Sample CSV 3D Profile Source",
+            SourceKind = "CSV Sample",
+            IsSimulated = true,
+            Status = "WARN",
+            FactoryReadinessStatus = "NOT VALIDATED",
+            FrameId = "CSV-SAMPLE",
+            Width = 4,
+            Height = 4,
+            Unit = "microns",
+            XPitchMicrons = 1,
+            YPitchMicrons = 1,
+            Warnings = new() { "Simulation/sample CSV evidence only; no real 3D camera hardware was validated." },
+        });
+
+        var report = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
+        {
+            DeploymentProfile = DeploymentProfile.FullFactoryAutomation,
+            Stage1Only = false,
+            RequireSuccessfulLatestValidationPackage = false,
+            RequireDatasetQualityEvidence = false,
+            RequireProfile3DAcceptance = true,
+            RequireRealHardwareAcceptance = true,
+        });
+
+        Assert.Equal("NoGo", report.OverallStatus);
+        Assert.Contains(report.Categories, category =>
+            category.Name == "3D profile acceptance status" &&
+            category.Status == "No-Go" &&
+            category.Evidence.Contains("simulated=True", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void VerifiedStage1PackageWithoutHardwareRequirementIsNotNoGo()
     {
         RecordStage1Package("PASS");
@@ -227,6 +264,28 @@ public sealed class FactoryReadinessServiceTests : IDisposable
         Assert.Contains(report.Categories, category =>
             category.Name == "MES/spool status" &&
             category.Status == "No-Go");
+    }
+
+    [Fact]
+    public void FailedMesQueueMakesStage4ReadinessNoGo()
+    {
+        var id = EnqueueMesItem(maxRetryCount: 1);
+        AoiDatabase.RecordMesSpoolRetryFailure(id, "MES REST upload failed after retry.", retryBackoffMs: 0);
+
+        var report = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
+        {
+            DeploymentProfile = DeploymentProfile.Stage4MesPilot,
+            Stage1Only = false,
+            RequireSuccessfulLatestValidationPackage = false,
+            RequireDatasetQualityEvidence = false,
+            RequireNoPendingMesQueueForProductionMode = true,
+        });
+
+        Assert.Equal("NoGo", report.OverallStatus);
+        Assert.Contains(report.Categories, category =>
+            category.Name == "MES/spool status" &&
+            category.Status == "No-Go" &&
+            category.Evidence.Contains("failed=1", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -275,11 +334,11 @@ public sealed class FactoryReadinessServiceTests : IDisposable
     {
         var checklist = FactoryAcceptanceChecklistService.Generate(DeploymentProfile.Stage1ImageValidation);
 
-        Assert.Contains(checklist.Items, item => item.RequirementId == "S3-ROBOT-001" && item.Status == "Not Required");
-        Assert.Contains(checklist.Items, item => item.RequirementId == "S4-MES-001" && item.Status == "Not Required");
+        Assert.Contains(checklist.Items, item => item.RequirementId == "S3-ROBOT-001" && item.Status == "Waived");
+        Assert.Contains(checklist.Items, item => item.RequirementId == "S4-MES-001" && item.Status == "Waived");
         Assert.DoesNotContain(checklist.Items, item =>
             (item.RequirementId == "S3-ROBOT-001" || item.RequirementId == "S4-MES-001") &&
-            item.Status.Contains("No-Go", StringComparison.OrdinalIgnoreCase));
+            item.Status is "Open" or "Failed");
     }
 
     [Fact]
@@ -289,7 +348,7 @@ public sealed class FactoryReadinessServiceTests : IDisposable
         var requiredIds = new[] { "S1-001", "S2-CAM-001", "S2-LIGHT-001", "S3-ROBOT-001", "S4-MES-001", "TR-009" };
 
         foreach (var id in requiredIds)
-            Assert.Contains(checklist.Items, item => item.RequirementId == id && item.Status != "Not Required");
+            Assert.Contains(checklist.Items, item => item.RequirementId == id && item.Status != "Waived");
     }
 
     [Fact]
@@ -297,8 +356,8 @@ public sealed class FactoryReadinessServiceTests : IDisposable
     {
         var checklist = FactoryAcceptanceChecklistService.Generate(DeploymentProfile.FullFactoryAutomation);
 
-        Assert.Contains(checklist.Items, item => item.RequirementId == "S2-CAM-001" && item.Status == "Open/No-Go");
-        Assert.Contains(checklist.Items, item => item.RequirementId == "TR-009" && item.Status == "No-Go");
+        Assert.Contains(checklist.Items, item => item.RequirementId == "S2-CAM-001" && item.Status == "Open");
+        Assert.Contains(checklist.Items, item => item.RequirementId == "TR-009" && item.Status == "Open");
     }
 
     [Fact]
@@ -309,7 +368,7 @@ public sealed class FactoryReadinessServiceTests : IDisposable
         var csv = File.ReadAllText(export.CsvPath);
         var html = File.ReadAllText(export.HtmlPath);
 
-        foreach (var id in new[] { "GUI-001", "PERF-001", "BT-001", "S1-001", "S2-CAM-001", "S3-ROBOT-001", "S4-MES-001", "TR-009", "FA-001" })
+        foreach (var id in new[] { "GUI-001", "TR-010", "BT-001", "S1-DATA-001", "S1-MODEL-001", "S1-001", "S2-CAM-001", "S2-007", "S3-ROBOT-001", "S4-MES-001", "TR-009", "CENTRAL-SYNC-001", "FA-001" })
         {
             Assert.Contains(id, json);
             Assert.Contains(id, csv);
@@ -424,7 +483,7 @@ public sealed class FactoryReadinessServiceTests : IDisposable
         ExportVerificationService.RecordVerifiedExport("FactoryReadinessEvidenceText", path);
     }
 
-    private static void EnqueueMesItem()
+    private static long EnqueueMesItem(int maxRetryCount = 3)
     {
         var payload = new TraceabilityPayload
         {
@@ -432,12 +491,12 @@ public sealed class FactoryReadinessServiceTests : IDisposable
             BoardModel = "TBOX",
             Result = "NG",
         };
-        AoiDatabase.EnqueueMesSpoolItem(
+        return AoiDatabase.EnqueueMesSpoolItem(
             nameof(TraceabilityPayload),
             JsonSerializer.Serialize(payload),
             @"C:\payloads\traceability.json",
             "http://mes.test/api/aoi/results",
-            3,
+            maxRetryCount,
             "Synthetic pending upload",
             "TestAdmin [Admin]",
             payload.LotId,

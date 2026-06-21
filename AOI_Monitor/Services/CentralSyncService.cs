@@ -93,6 +93,21 @@ public static class CentralSyncSettingsService
             settings.Mode = CentralSyncMode.Disabled;
 
         settings.EndpointOrFolder = settings.EndpointOrFolder?.Trim() ?? string.Empty;
+        settings.EndpointUrl = settings.EndpointUrl?.Trim() ?? string.Empty;
+        settings.FileDropFolder = settings.FileDropFolder?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(settings.EndpointOrFolder))
+        {
+            settings.EndpointOrFolder = settings.Mode == CentralSyncMode.FileDrop
+                ? settings.FileDropFolder
+                : settings.EndpointUrl;
+        }
+        if (settings.Mode == CentralSyncMode.FileDrop && string.IsNullOrWhiteSpace(settings.FileDropFolder))
+            settings.FileDropFolder = settings.EndpointOrFolder;
+        if (settings.Mode is CentralSyncMode.RestApi or CentralSyncMode.ProductionDatabaseBoundary or CentralSyncMode.PostgreSqlBoundary &&
+            string.IsNullOrWhiteSpace(settings.EndpointUrl))
+        {
+            settings.EndpointUrl = settings.EndpointOrFolder;
+        }
         settings.StationId = string.IsNullOrWhiteSpace(settings.StationId) ? Environment.MachineName : settings.StationId.Trim();
         settings.SyncIntervalSeconds = Math.Clamp(settings.SyncIntervalSeconds <= 0 ? 300 : settings.SyncIntervalSeconds, 10, 86400);
         settings.MaxRetryCount = Math.Clamp(settings.MaxRetryCount <= 0 ? 5 : settings.MaxRetryCount, 1, 100);
@@ -105,6 +120,8 @@ public static class CentralSyncSettingsService
         {
             Mode = source.Mode,
             EndpointOrFolder = source.EndpointOrFolder,
+            EndpointUrl = source.EndpointUrl,
+            FileDropFolder = source.FileDropFolder,
             StationId = source.StationId,
             SyncIntervalSeconds = source.SyncIntervalSeconds,
             IncludeImages = source.IncludeImages,
@@ -132,8 +149,10 @@ public static class CentralSyncService
 
         queued += QueueInspections(settings, limitPerType);
         queued += QueueReviews(settings, limitPerType);
+        queued += QueueAuditEvents(settings, limitPerType);
         queued += QueueValidationPackages(settings, limitPerType);
         queued += QueueExportVerifications(settings, limitPerType);
+        queued += QueueLatestEvidence(settings);
 
         AoiDatabase.RecordAuditEvent("CENTRAL_SYNC_QUEUE", $"Central sync queued {queued} local item(s).");
         return queued;
@@ -361,6 +380,171 @@ public static class CentralSyncService
         return count;
     }
 
+    private static int QueueAuditEvents(CentralSyncSettings settings, int limit)
+    {
+        var count = 0;
+        foreach (var row in AoiDatabase.GetAuditEvents(new LogFilter(), limit))
+        {
+            var itemId = row.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (AoiDatabase.CentralSyncQueueContains("AuditEvent", itemId))
+                continue;
+
+            QueuePayload(settings, new CentralSyncPayload
+            {
+                ItemType = "AuditEvent",
+                ItemId = itemId,
+                StationId = settings.StationId,
+                Data =
+                {
+                    ["timestampUtc"] = row.TimestampUtc,
+                    ["userId"] = settings.RedactOperatorId ? "REDACTED" : row.UserId,
+                    ["userRole"] = row.UserRole,
+                    ["stationId"] = row.StationId,
+                    ["actionCategory"] = row.ActionCategory,
+                    ["actionDetail"] = row.ActionDetail,
+                    ["relatedEntityType"] = row.RelatedEntityType,
+                    ["relatedEntityId"] = row.RelatedEntityId,
+                    ["relatedPath"] = settings.RedactImagePaths ? "REDACTED" : row.RelatedPath,
+                },
+                MappingNotes = { "Maps to central audit/event table for management reporting." },
+            });
+            count++;
+        }
+
+        return count;
+    }
+
+    private static int QueueLatestEvidence(CentralSyncSettings settings)
+    {
+        var count = 0;
+        count += QueueLatest(settings, "BuildTestEvidence", AoiDatabase.GetLatestBuildTestEvidence()?.Id, () =>
+        {
+            var row = AoiDatabase.GetLatestBuildTestEvidence()!;
+            return new CentralSyncPayload
+            {
+                ItemType = "BuildTestEvidence",
+                ItemId = row.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                StationId = settings.StationId,
+                Data =
+                {
+                    ["generatedAtUtc"] = row.GeneratedAtUtc,
+                    ["configuration"] = row.Configuration,
+                    ["hygieneStatus"] = row.HygieneStatus,
+                    ["restoreStatus"] = row.RestoreStatus,
+                    ["buildStatus"] = row.BuildStatus,
+                    ["testStatus"] = row.TestStatus,
+                    ["publishValidationStatus"] = row.PublishValidationStatus,
+                    ["commitSha"] = row.CommitSha,
+                    ["operatorId"] = settings.RedactOperatorId ? "REDACTED" : row.OperatorId,
+                    ["evidencePath"] = settings.RedactImagePaths ? "REDACTED" : row.EvidencePath,
+                },
+                MappingNotes = { "Maps to central build/test evidence table." },
+            };
+        });
+        count += QueueLatest(settings, "CameraAcceptanceRun", AoiDatabase.GetLatestCameraAcceptanceRun(realHardwareOnly: false)?.Id, () =>
+        {
+            var row = AoiDatabase.GetLatestCameraAcceptanceRun(realHardwareOnly: false)!;
+            return AcceptancePayload(settings, "CameraAcceptanceRun", row.Id, row.CreatedAtUtc, row.Status, new()
+            {
+                ["factoryReadinessStatus"] = row.FactoryReadinessStatus,
+                ["adapterName"] = row.AdapterName,
+                ["sourceKey"] = row.SourceKey,
+                ["isRealHardware"] = row.IsRealHardware,
+                ["requestedFrames"] = row.TotalRequestedFrames,
+                ["receivedFrames"] = row.TotalReceivedFrames,
+                ["droppedFrames"] = row.DroppedFrameCount,
+            });
+        });
+        count += QueueLatest(settings, "LightingAcceptanceRun", AoiDatabase.GetLatestLightingAcceptanceRun()?.Id, () =>
+        {
+            var row = AoiDatabase.GetLatestLightingAcceptanceRun()!;
+            return AcceptancePayload(settings, "LightingAcceptanceRun", row.Id, row.CreatedAtUtc, row.Status, new()
+            {
+                ["controllerName"] = row.ControllerName,
+                ["mode"] = row.Mode,
+                ["isSimulated"] = row.IsSimulated,
+                ["stepCount"] = row.StepCount,
+                ["passedStepCount"] = row.PassedStepCount,
+            });
+        });
+        count += QueueLatest(settings, "RobotAcceptanceRun", AoiDatabase.GetLatestRobotAcceptanceRun()?.Id, () =>
+        {
+            var row = AoiDatabase.GetLatestRobotAcceptanceRun()!;
+            return AcceptancePayload(settings, "RobotAcceptanceRun", row.Id, row.CreatedAtUtc, row.Status, new()
+            {
+                ["controllerName"] = row.ControllerName,
+                ["sourceKind"] = row.SourceKind,
+                ["safetyControllerName"] = row.SafetyControllerName,
+                ["safetySourceKind"] = row.SafetySourceKind,
+                ["emergencyStopBlocked"] = row.EmergencyStopBlocked,
+                ["safetyFaultBlocked"] = row.SafetyFaultBlocked,
+                ["fullCycleMs"] = row.FullCycleMs,
+            });
+        });
+        count += QueueLatest(settings, "TraceabilityAcceptanceRun", AoiDatabase.GetLatestTraceabilityTestReport()?.Id, () =>
+        {
+            var row = AoiDatabase.GetLatestTraceabilityTestReport()!;
+            return AcceptancePayload(settings, "TraceabilityAcceptanceRun", row.Id, row.CreatedAtUtc, row.Status, new()
+            {
+                ["mode"] = row.Mode,
+                ["endpointUrl"] = settings.RedactEndpointInExports ? "REDACTED" : row.EndpointUrl,
+                ["resultStatus"] = row.ResultStatus,
+                ["imageStatus"] = row.ImageStatus,
+                ["productionModeConfirmed"] = row.ProductionModeConfirmed,
+                ["reportJsonPath"] = settings.RedactImagePaths ? "REDACTED" : row.ReportJsonPath,
+            });
+        });
+        count += QueueLatest(settings, "Profile3DAcceptanceRun", AoiDatabase.GetLatestProfile3DAcceptanceRun()?.Id, () =>
+        {
+            var row = AoiDatabase.GetLatestProfile3DAcceptanceRun()!;
+            return AcceptancePayload(settings, "Profile3DAcceptanceRun", row.Id, row.CreatedAtUtc, row.Status, new()
+            {
+                ["factoryReadinessStatus"] = row.FactoryReadinessStatus,
+                ["sourceName"] = row.SourceName,
+                ["sourceKind"] = row.SourceKind,
+                ["isSimulated"] = row.IsSimulated,
+                ["width"] = row.Width,
+                ["height"] = row.Height,
+            });
+        });
+
+        return count;
+    }
+
+    private static int QueueLatest(CentralSyncSettings settings, string itemType, long? id, Func<CentralSyncPayload> buildPayload)
+    {
+        if (id is null or <= 0)
+            return 0;
+        var itemId = id.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (AoiDatabase.CentralSyncQueueContains(itemType, itemId))
+            return 0;
+
+        QueuePayload(settings, buildPayload());
+        return 1;
+    }
+
+    private static CentralSyncPayload AcceptancePayload(
+        CentralSyncSettings settings,
+        string itemType,
+        long id,
+        DateTime createdAtUtc,
+        string status,
+        Dictionary<string, object?> fields)
+    {
+        var payload = new CentralSyncPayload
+        {
+            ItemType = itemType,
+            ItemId = id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            StationId = settings.StationId,
+            MappingNotes = { "Maps to central factory acceptance/readiness evidence table; raw customer images are not included." },
+        };
+        payload.Data["createdAtUtc"] = createdAtUtc;
+        payload.Data["status"] = status;
+        foreach (var pair in fields)
+            payload.Data[pair.Key] = pair.Value;
+        return payload;
+    }
+
     private static void QueuePayload(CentralSyncSettings settings, CentralSyncPayload payload)
     {
         var json = JsonSerializer.Serialize(payload, JsonOptions);
@@ -424,7 +608,7 @@ public static class CentralSyncService
             {
                 CentralSyncMode.Disabled => new(false, IntegrationConnectionStatus.NotConnected, "Central sync disabled; item skipped.", string.Empty),
                 CentralSyncMode.FileDrop => await WriteFileDropAsync(item, settings, cancellationToken).ConfigureAwait(false),
-                CentralSyncMode.PostgreSqlBoundary => await UploadToCentralDatabaseBoundaryAsync(item, cancellationToken).ConfigureAwait(false),
+                CentralSyncMode.ProductionDatabaseBoundary or CentralSyncMode.PostgreSqlBoundary => await UploadToCentralDatabaseBoundaryAsync(item, cancellationToken).ConfigureAwait(false),
                 CentralSyncMode.RestApi => new(false, IntegrationConnectionStatus.NotConnected, "Central sync REST API boundary is configured, but no production REST client is installed in this build.", string.Empty),
                 _ => new(false, IntegrationConnectionStatus.Error, "Unknown central sync mode.", string.Empty),
             };

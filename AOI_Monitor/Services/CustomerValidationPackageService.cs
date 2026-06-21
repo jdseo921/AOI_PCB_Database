@@ -176,6 +176,7 @@ public static class CustomerValidationPackageService
         var csvPath = Path.Combine(packageFolder, "validation_results.csv");
         var breakdownCsvPath = Path.Combine(packageFolder, "validation_breakdown.csv");
         var reportPath = Path.Combine(packageFolder, "customer_validation_report.html");
+        var reportPdfPath = Path.Combine(packageFolder, "customer_validation_report.pdf");
         var instructionsPath = Path.Combine(packageFolder, "print_to_pdf_instructions.txt");
         var readmePath = Path.Combine(packageFolder, "README.txt");
         var manifestPath = Path.Combine(packageFolder, "validation_manifest.json");
@@ -247,6 +248,7 @@ public static class CustomerValidationPackageService
         };
 
         File.WriteAllText(reportPath, CustomerValidationReportService.BuildHtml(reportContext), Encoding.UTF8);
+        PdfExportService.ExportHtmlFileToPdf(reportPath, reportPdfPath, "Customer Validation Report");
         File.WriteAllText(instructionsPath, CustomerValidationReportService.BuildPrintToPdfInstructions(reportPath), Encoding.UTF8);
         File.WriteAllText(readmePath, BuildReadme(packageId, acceptance, warnings), Encoding.UTF8);
 
@@ -379,6 +381,8 @@ public static class CustomerValidationPackageService
             return "CSV validation breakdown";
         if (string.Equals(fileName, "customer_validation_report.html", StringComparison.OrdinalIgnoreCase))
             return "HTML report";
+        if (string.Equals(fileName, "customer_validation_report.pdf", StringComparison.OrdinalIgnoreCase))
+            return "PDF report";
         if (string.Equals(fileName, "print_to_pdf_instructions.txt", StringComparison.OrdinalIgnoreCase))
             return "Print-to-PDF instructions";
         if (string.Equals(fileName, "README.txt", StringComparison.OrdinalIgnoreCase))
@@ -414,6 +418,7 @@ public static class CustomerValidationPackageService
         - validation_results.csv: per-image validation results exported from the batch run.
         - validation_breakdown.csv: per-class, per-side, and per-ROI validation breakdown.
         - customer_validation_report.html: browser-readable customer validation report.
+        - customer_validation_report.pdf: native PDF rendering of the customer validation report.
         - print_to_pdf_instructions.txt: browser print-to-PDF workflow.
         - annotated_images/: generated overlays only. Raw source customer datasets are not copied into this package.
 

@@ -23,10 +23,13 @@ public sealed record SoakTestOptions(
 
 public enum SoakTestProfile
 {
-    QuickSmoke,
-    ShortStability,
-    FactoryPoc,
-    Custom,
+    Smoke = 0,
+    QuickSmoke = Smoke,
+    ThirtyMinute = 1,
+    ShortStability = ThirtyMinute,
+    EightHourFactoryPoC = 2,
+    FactoryPoc = EightHourFactoryPoC,
+    Custom = 3,
 }
 
 public sealed record SoakTestProgress(
@@ -61,6 +64,9 @@ public sealed class SoakTestResult
     public string RunId { get; init; } = Guid.NewGuid().ToString("N");
     public DateTime StartTime { get; init; } = DateTime.Now;
     public DateTime EndTime { get; set; } = DateTime.Now;
+    public DateTime StartedAtUtc => StartTime.ToUniversalTime();
+    public DateTime CompletedAtUtc => EndTime.ToUniversalTime();
+    public TimeSpan Duration => ActualDuration;
     public string ImageFolder { get; init; } = string.Empty;
     public string OutputFolder { get; init; } = string.Empty;
     public string EngineName { get; set; } = "Unknown";
@@ -76,13 +82,23 @@ public sealed class SoakTestResult
     public string BoardModel { get; init; } = "TBOX-MAIN";
     public string LotId { get; init; } = "SOAK-TEST";
     public bool WasCanceled { get; set; }
+    public bool Cancelled
+    {
+        get => WasCanceled;
+        set => WasCanceled = value;
+    }
     public int TotalCycles { get; set; }
     public int SuccessfulCycles { get; set; }
     public int FailedCycles { get; set; }
+    public int IterationCount => TotalCycles;
+    public int FailureCount => FailedCycles;
     public double AverageInspectionMilliseconds { get; set; }
     public double MinInspectionMilliseconds { get; set; }
     public double MaxInspectionMilliseconds { get; set; }
     public double P95InspectionMilliseconds { get; set; }
+    public double AverageMs => AverageInspectionMilliseconds;
+    public double P95Ms => P95InspectionMilliseconds;
+    public double MaxMs => MaxInspectionMilliseconds;
     public double AverageTotalCycleMilliseconds { get; set; }
     public double MaxTotalCycleMilliseconds { get; set; }
     public double P95TotalCycleMilliseconds { get; set; }
@@ -92,6 +108,10 @@ public sealed class SoakTestResult
     public double StartWorkingSetMegabytes { get; init; }
     public double EndWorkingSetMegabytes { get; set; }
     public double PeakWorkingSetMegabytes { get; set; }
+    public double WorkingSetStartMb => StartWorkingSetMegabytes;
+    public double WorkingSetEndMb => EndWorkingSetMegabytes;
+    public double WorkingSetMaxMb => PeakWorkingSetMegabytes;
+    public int OverOneSecondCount => CountOverOneSecond;
     public string CancellationReason { get; set; } = string.Empty;
     public string FirstCriticalError { get; set; } = string.Empty;
     public bool IsCompletedFactoryEvidence => !WasCanceled &&
@@ -123,9 +143,9 @@ public static class SoakTestService
     {
         var duration = profile switch
         {
-            SoakTestProfile.QuickSmoke => TimeSpan.FromMinutes(5),
-            SoakTestProfile.ShortStability => TimeSpan.FromMinutes(30),
-            SoakTestProfile.FactoryPoc => TimeSpan.FromHours(8),
+            SoakTestProfile.Smoke => TimeSpan.FromMinutes(5),
+            SoakTestProfile.ThirtyMinute => TimeSpan.FromMinutes(30),
+            SoakTestProfile.EightHourFactoryPoC => TimeSpan.FromHours(8),
             _ => TimeSpan.FromMinutes(2),
         };
 
@@ -154,7 +174,7 @@ public static class SoakTestService
             ImageFolder = options.ImageFolder,
             OutputFolder = options.OutputFolder,
             EngineKey = InspectionEngineFactory.NormalizeEngineKey(options.EngineKey),
-            ProfileName = InferProfile(options.Duration).ToString(),
+            ProfileName = ProfileDisplayName(InferProfile(options.Duration)),
             RequestedDuration = options.Duration,
             DelayBetweenInspections = options.DelayBetweenInspections,
             OperatorId = options.OperatorId,
@@ -535,13 +555,22 @@ public static class SoakTestService
     private static SoakTestProfile InferProfile(TimeSpan duration)
     {
         if (duration == TimeSpan.FromMinutes(5))
-            return SoakTestProfile.QuickSmoke;
+            return SoakTestProfile.Smoke;
         if (duration == TimeSpan.FromMinutes(30))
-            return SoakTestProfile.ShortStability;
+            return SoakTestProfile.ThirtyMinute;
         if (duration == TimeSpan.FromHours(8))
-            return SoakTestProfile.FactoryPoc;
+            return SoakTestProfile.EightHourFactoryPoC;
         return SoakTestProfile.Custom;
     }
+
+    public static string ProfileDisplayName(SoakTestProfile profile)
+        => profile switch
+        {
+            SoakTestProfile.Smoke => "Smoke",
+            SoakTestProfile.ThirtyMinute => "30Minute",
+            SoakTestProfile.EightHourFactoryPoC => "8HourFactoryPoC",
+            _ => "Custom",
+        };
 
     private static string FormatMilliseconds(double value)
         => value <= 0 ? "--" : $"{value:F0} ms";

@@ -201,13 +201,12 @@
               <DataGrid x:Name="FactoryAcceptanceGrid" Grid.Row="1" CanUserSortColumns="True">
                 <DataGrid.Columns>
                   <DataGridTextColumn Header="ID" Binding="{Binding RequirementId}" Width="95"/>
-                  <DataGridTextColumn Header="Requirement" Binding="{Binding Requirement}" Width="220"/>
-                  <DataGridTextColumn Header="Expected Evidence" Binding="{Binding ExpectedEvidence}" Width="240"/>
+                  <DataGridTextColumn Header="Requirement" Binding="{Binding RequirementText}" Width="220"/>
+                  <DataGridTextColumn Header="Required Evidence" Binding="{Binding RequiredEvidence}" Width="240"/>
                   <DataGridTextColumn Header="Evidence Path" Binding="{Binding CurrentEvidencePath}" Width="190"/>
                   <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="105"/>
-                  <DataGridTextColumn Header="Operator" Binding="{Binding OperatorSignoff}" Width="90"/>
-                  <DataGridTextColumn Header="Engineer" Binding="{Binding EngineerSignoff}" Width="90"/>
-                  <DataGridTextColumn Header="Admin" Binding="{Binding AdminSignoff}" Width="90"/>
+                  <DataGridTextColumn Header="Signoff Role" Binding="{Binding SignoffRole}" Width="105"/>
+                  <DataGridTextColumn Header="Signed By" Binding="{Binding SignedBy}" Width="105"/>
                   <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*"/>
                 </DataGrid.Columns>
               </DataGrid>

@@ -239,12 +239,19 @@ public sealed class IntegrationContractsTests
         var plc = new SimulatedPlcSafetyController();
         plc.SetBoardClampReady(false);
         plc.SetEmergencyStopActive(true);
+        plc.SetLightCurtainClear(false);
+
+        var beforeReset = plc.GetSafetyStatus();
+        Assert.False(beforeReset.IsSafeToMove);
+        Assert.Contains(beforeReset.ActiveFaults, fault => fault.Contains("light curtain", StringComparison.OrdinalIgnoreCase));
 
         var reset = await plc.ResetSafetyFaultAsync();
 
         Assert.True(reset.Accepted);
-        Assert.True(plc.GetDiagnostics().IsOk);
+        Assert.True(plc.GetSafetyStatus().IsOk);
+        Assert.True(plc.GetSafetyStatus().IsSafeToMove);
         Assert.False(plc.IsEmergencyStopActive);
+        Assert.True(plc.IsLightCurtainClear);
     }
 
     [Fact]
@@ -277,6 +284,7 @@ public sealed class IntegrationContractsTests
             Assert.Equal("PASS", run.Status);
             Assert.Equal("Simulated", run.SafetySourceKind);
             Assert.True(run.SafetyFaultBlocked);
+            Assert.Contains(run.Steps, step => step.StepName == "LightCurtainBlocked" && step.Status == "PASS");
             Assert.Contains("Simulated PLC Safety Controller", html);
             Assert.Contains("not safety certification", html, StringComparison.OrdinalIgnoreCase);
         });

@@ -111,7 +111,10 @@ public static class ModelAcceptanceService
 
         var manifestPath = Path.Combine(folder, "model_release_manifest.json");
         var reportPath = Path.Combine(folder, "model_acceptance_report.html");
-        var breakdownPath = Path.Combine(folder, "class_roi_breakdown.csv");
+        var reportPdfPath = Path.Combine(folder, "model_acceptance_report.pdf");
+        var metricsPath = Path.Combine(folder, "model_acceptance_metrics.csv");
+        var breakdownPath = Path.Combine(folder, "validation_breakdown.csv");
+        File.WriteAllText(metricsPath, BuildMetricsCsv(run), Encoding.UTF8);
         File.WriteAllText(breakdownPath, ClassMetricsService.BuildCsv(run.BreakdownSummary), Encoding.UTF8);
         if (!string.IsNullOrWhiteSpace(run.LabelMapPath) && File.Exists(run.LabelMapPath))
             File.Copy(run.LabelMapPath, Path.Combine(folder, Path.GetFileName(run.LabelMapPath)), overwrite: true);
@@ -134,12 +137,16 @@ public static class ModelAcceptanceService
             validationDatasetHash = DatasetHash(run.DatasetFolder, run.GroundTruthCsvPath),
             criteria = run.Criteria,
             metrics = run.Metrics,
+            metricsCsv = Path.GetFileName(metricsPath),
+            validationBreakdownCsv = Path.GetFileName(breakdownPath),
             datasetQuality = run.DatasetQualitySummary,
             falseCallRecommendation = run.FalseCallRecommendation,
             limitations = run.Limitations,
         };
         File.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, JsonOptions), Encoding.UTF8);
         File.WriteAllText(reportPath, BuildHtml(run, approvedBy), Encoding.UTF8);
+        PdfExportService.ExportHtmlFileToPdf(reportPath, reportPdfPath, "Model Acceptance Report");
+        ExportVerificationService.RecordVerifiedExport("ModelAcceptanceReportPdf", reportPdfPath, run.Status, approvedBy);
 
         var record = new ModelReleasePackageRecord(0, DateTime.UtcNow, run.Id, run.ModelId, run.ModelVersion, run.ModelSha256, folder, manifestPath, reportPath, run.Status, approvedBy, null);
         var id = AoiDatabase.RecordModelReleasePackage(record);
@@ -256,6 +263,33 @@ public static class ModelAcceptanceService
         sb.AppendLine($"<h2>Metrics</h2><table><tr><th>Accuracy</th><th>Precision</th><th>Recall</th><th>False Call</th><th>P95 Inference</th></tr><tr><td>{run.Metrics.Accuracy:P1}</td><td>{run.Metrics.Precision:P1}</td><td>{run.Metrics.Recall:P1}</td><td>{run.Metrics.FalseCallRate:P1}</td><td>{run.P95InferenceMs:F1} ms</td></tr></table>");
         sb.AppendLine($"<h2>Limitations</h2><ul>{string.Join("", run.Limitations.Select(item => $"<li>{Escape(item)}</li>"))}</ul>");
         sb.AppendLine("</body></html>");
+        return sb.ToString();
+    }
+
+    private static string BuildMetricsCsv(ModelAcceptanceRun run)
+    {
+        var totalImages = run.Metrics.OkCount + run.Metrics.NgCount + run.Metrics.Unknown;
+        var reviewRate = totalImages == 0 ? 0 : run.Metrics.ReviewCount / (double)Math.Max(1, totalImages);
+        var possibleEscapeRate = run.FalseCallRecommendation.PossibleEscapeRate;
+        var averageInference = run.PerformanceSummary.AverageMilliseconds;
+        var rows = new[]
+        {
+            ("status", run.Status),
+            ("accuracy", run.Metrics.Accuracy.ToString("F6", CultureInfo.InvariantCulture)),
+            ("precision", run.Metrics.Precision.ToString("F6", CultureInfo.InvariantCulture)),
+            ("recall", run.Metrics.Recall.ToString("F6", CultureInfo.InvariantCulture)),
+            ("false_call_rate", run.Metrics.FalseCallRate.ToString("F6", CultureInfo.InvariantCulture)),
+            ("possible_escape_rate", possibleEscapeRate.ToString("F6", CultureInfo.InvariantCulture)),
+            ("review_rate", reviewRate.ToString("F6", CultureInfo.InvariantCulture)),
+            ("average_inference_ms", averageInference.ToString("F3", CultureInfo.InvariantCulture)),
+            ("p95_inference_ms", run.P95InferenceMs.ToString("F3", CultureInfo.InvariantCulture)),
+            ("dataset_quality", run.DatasetQualitySummary.Status),
+        };
+
+        var sb = new StringBuilder();
+        sb.AppendLine("metric,value");
+        foreach (var (name, value) in rows)
+            sb.AppendLine($"\"{name}\",\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"");
         return sb.ToString();
     }
 

@@ -289,7 +289,7 @@ public sealed class RobotCycleService
     private IntegrationCommandResult? BlockIfSafetyNotOk(string action)
     {
         var plc = IntegrationBoundaryRegistry.PlcSafetyController;
-        var status = plc.GetDiagnostics();
+        var status = plc.GetSafetyStatus();
         if (status.IsOk)
             return null;
 

@@ -20,6 +20,7 @@ public partial class SettingsView : UserControl
     private readonly MainViewModel _vm;
     private readonly ObservableCollection<ModelRegistryRow> _modelRegistryRows = new();
     private readonly ObservableCollection<ThresholdProfileRow> _thresholdProfileRows = new();
+    private readonly ObservableCollection<ModelAcceptanceRunRow> _modelAcceptanceRows = new();
     private CancellationTokenSource? _cameraAcceptanceCancellation;
     private CameraAcceptanceRun? _lastCameraAcceptanceRun;
     private CancellationTokenSource? _lightingAcceptanceCancellation;
@@ -32,6 +33,7 @@ public partial class SettingsView : UserControl
         _vm = vm;
         ModelRegistryGrid.ItemsSource = _modelRegistryRows;
         ThresholdProfilesGrid.ItemsSource = _thresholdProfileRows;
+        ModelAcceptanceRunsGrid.ItemsSource = _modelAcceptanceRows;
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -519,6 +521,7 @@ public partial class SettingsView : UserControl
         try
         {
             var run = ModelAcceptanceService.RunAcceptance(datasetDialog.FolderName, csvDialog.FileName, operatorId: WorkflowState.Instance.OperatorWithRole);
+            RefreshModelAcceptanceRunsUi();
             WorkflowState.Instance.AddEvent("MODEL_ACCEPTANCE", $"Model acceptance {run.Status}: model={run.ModelId}; run={run.Id}; dataset={run.DatasetName}.");
             MessageBox.Show($"Model acceptance {run.Status}.\n\nRun ID: {run.Id}\n{string.Join(Environment.NewLine, run.Messages.Take(5))}", "Model Acceptance", MessageBoxButton.OK, run.Status == "PASS" ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
@@ -547,6 +550,7 @@ public partial class SettingsView : UserControl
         try
         {
             var package = ModelAcceptanceService.CreateReleasePackage(latest.Id, outputDialog.FolderName, WorkflowState.Instance.OperatorWithRole);
+            RefreshModelAcceptanceRunsUi();
             WorkflowState.Instance.AddEvent("MODEL_RELEASE_PACKAGE", $"Model release package created: model={package.ModelId}; status={package.Status}.");
             MessageBox.Show($"Model release package created:\n{package.PackagePath}", "Model Release", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -579,6 +583,7 @@ public partial class SettingsView : UserControl
         try
         {
             ModelAcceptanceService.PromoteToProductionCandidate(latest.Id, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
+            RefreshModelAcceptanceRunsUi();
             WorkflowState.Instance.AddEvent("MODEL_PRODUCTION_CANDIDATE", $"Promoted model acceptance run {latest.Id} for {latest.ModelId}.");
             MessageBox.Show("Model acceptance run promoted to production candidate.", "Model Acceptance", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -587,6 +592,9 @@ public partial class SettingsView : UserControl
             MessageBox.Show(ex.Message, "Model Acceptance", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
+
+    private void OnViewModelAcceptanceRunsClick(object sender, RoutedEventArgs e)
+        => RefreshModelAcceptanceRunsUi(showMessage: true);
 
     private void OnBrowseCameraTopClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Top);
     private void OnBrowseCameraSideClick(object sender, RoutedEventArgs e) => BrowseCameraFolder(CameraViewType.Side);
@@ -675,6 +683,29 @@ public partial class SettingsView : UserControl
         }
     }
 
+    private void OnDiscoverCameraAdaptersClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Discovering camera adapters"))
+            return;
+
+        var settings = BuildCameraSourceSettingsFromUi();
+        var load = CameraAdapterPluginService.LoadFactory(settings.AdapterFolder);
+        if (!load.Success || load.Factory is null)
+        {
+            CameraDiagnosticsText.Text = load.Message;
+            MessageBox.Show(load.Message, "Camera Adapter Discovery", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        CameraSourceCombo.SelectedIndex = 2;
+        CameraDiagnosticsText.Text =
+            $"Loaded adapter {load.Factory.DisplayName} {load.Factory.Version}. " +
+            $"Interfaces: {string.Join(", ", load.Factory.SupportedInterfaces)}. " +
+            $"Pixel formats: {string.Join(", ", load.Factory.SupportedPixelFormats)}. " +
+            "Adapter loading is opt-in and does not claim real hardware readiness until camera acceptance captures real hardware frames.";
+        MessageBox.Show(CameraDiagnosticsText.Text, "Camera Adapter Discovery", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     private void OnDiscoverCamerasClick(object sender, RoutedEventArgs e)
     {
         if (!Authorize(RoleAuthorization.CanManageSettings, "Discovering cameras"))
@@ -697,7 +728,7 @@ public partial class SettingsView : UserControl
         AssignDiscoveredDevices(devices);
         var summary = devices.Count == 0
             ? "No cameras discovered."
-            : string.Join(Environment.NewLine, devices.Select(device => $"{device.ViewAssignment}: {device.DeviceId} {device.Vendor} {device.Model} {device.InterfaceType} {device.Status}"));
+            : string.Join(Environment.NewLine, devices.Select(device => $"{device.SuggestedView}: {device.DeviceId} {device.Vendor} {device.Model} {device.InterfaceType} {device.Status} {string.Join("/", device.Capabilities ?? Array.Empty<string>())}"));
         CameraDiagnosticsText.Text = $"{loadMessage} Discovered {devices.Count} device(s). {summary}";
         MessageBox.Show(CameraDiagnosticsText.Text, "Camera Discovery", MessageBoxButton.OK, devices.Any(d => !string.IsNullOrWhiteSpace(d.DeviceId)) ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
@@ -741,7 +772,7 @@ public partial class SettingsView : UserControl
     {
         foreach (var device in devices.Where(device => !string.IsNullOrWhiteSpace(device.DeviceId)))
         {
-            switch (device.ViewAssignment.Trim().ToLowerInvariant())
+            switch (device.SuggestedView.Trim().ToLowerInvariant())
             {
                 case "side":
                     CameraSideDeviceIdText.Text = device.DeviceId;
@@ -898,6 +929,7 @@ public partial class SettingsView : UserControl
         RefreshRoleControls();
         RefreshInspectionConfigurationUi();
         RefreshModelRegistryUi();
+        RefreshModelAcceptanceRunsUi();
         RefreshCameraSourceUi();
         RefreshLightingUi();
         RefreshMesIntegrationUi();
@@ -974,6 +1006,7 @@ public partial class SettingsView : UserControl
         BrowseCameraSideBtn.IsEnabled = canManageSettings;
         BrowseCameraBottomBtn.IsEnabled = canManageSettings;
         TestCameraSourceBtn.IsEnabled = canManageSettings;
+        DiscoverCameraAdaptersBtn.IsEnabled = canManageSettings;
         DiscoverCamerasBtn.IsEnabled = canManageSettings;
         RunCameraAcceptanceBtn.IsEnabled = canManageSettings && _cameraAcceptanceCancellation is null;
         CancelCameraAcceptanceBtn.IsEnabled = _cameraAcceptanceCancellation is not null;
@@ -997,6 +1030,7 @@ public partial class SettingsView : UserControl
         TestModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
         ValidateRegisteredModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
         RunModelAcceptanceBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
+        ViewModelAcceptanceRunsBtn.IsEnabled = canManageSettings;
         CreateModelReleasePackageBtn.IsEnabled = canChangeThresholds;
         PromoteProductionCandidateBtn.IsEnabled = canChangeThresholds;
         ApproveThresholdProfileBtn.IsEnabled = canChangeThresholds;
@@ -1123,6 +1157,31 @@ public partial class SettingsView : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             ModelCheckMessageText.Text = $"Model registry could not be loaded: {ex.Message}";
+        }
+    }
+
+    private void RefreshModelAcceptanceRunsUi(bool showMessage = false)
+    {
+        _modelAcceptanceRows.Clear();
+        try
+        {
+            if (AoiDatabase.GetLatestModelAcceptanceRun() is { } latest)
+                _modelAcceptanceRows.Add(new ModelAcceptanceRunRow(latest));
+
+            if (showMessage)
+            {
+                MessageBox.Show(
+                    _modelAcceptanceRows.Count == 0
+                        ? "No model acceptance runs are recorded."
+                        : "Latest model acceptance run loaded.",
+                    "Model Acceptance",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            ModelCheckMessageText.Text = $"Model acceptance runs could not be loaded: {ex.Message}";
         }
     }
 
@@ -1656,7 +1715,7 @@ public partial class SettingsView : UserControl
         {
             CentralSyncMode.FileDrop => 1,
             CentralSyncMode.RestApi => 2,
-            CentralSyncMode.PostgreSqlBoundary => 3,
+            CentralSyncMode.ProductionDatabaseBoundary or CentralSyncMode.PostgreSqlBoundary => 3,
             _ => 0,
         };
         CentralSyncEndpointText.Text = settings.EndpointOrFolder;
@@ -1780,10 +1839,12 @@ public partial class SettingsView : UserControl
             {
                 1 => CentralSyncMode.FileDrop,
                 2 => CentralSyncMode.RestApi,
-                3 => CentralSyncMode.PostgreSqlBoundary,
+                3 => CentralSyncMode.ProductionDatabaseBoundary,
                 _ => CentralSyncMode.Disabled,
             },
             EndpointOrFolder = CentralSyncEndpointText.Text.Trim(),
+            EndpointUrl = CentralSyncModeCombo.SelectedIndex == 1 ? string.Empty : CentralSyncEndpointText.Text.Trim(),
+            FileDropFolder = CentralSyncModeCombo.SelectedIndex == 1 ? CentralSyncEndpointText.Text.Trim() : string.Empty,
             StationId = CentralSyncStationIdText.Text.Trim(),
             SyncIntervalSeconds = int.TryParse(
                 CentralSyncIntervalText.Text,
@@ -2147,6 +2208,24 @@ public partial class SettingsView : UserControl
         public string ThresholdDisplay { get; }
         public string LastValidatedDisplay { get; }
         public string ActiveDisplay { get; }
+    }
+
+    private sealed class ModelAcceptanceRunRow
+    {
+        public ModelAcceptanceRunRow(ModelAcceptanceRun run)
+        {
+            Id = run.Id;
+            ModelId = string.IsNullOrWhiteSpace(run.ModelId) ? "--" : run.ModelId;
+            Status = run.Status;
+            DatasetName = run.DatasetName;
+            CandidateDisplay = run.IsProductionCandidate ? "Yes" : "No";
+        }
+
+        public long Id { get; }
+        public string ModelId { get; }
+        public string Status { get; }
+        public string DatasetName { get; }
+        public string CandidateDisplay { get; }
     }
 
     private sealed class ThresholdProfileRow

@@ -221,9 +221,19 @@
                 <Button x:Name="ValidateRegisteredModelBtn" Style="{StaticResource MiniBtn}" Content="Validate" Margin="0,0,6,6" Click="OnValidateRegisteredModelClick"/>
                 <Button x:Name="SetActiveModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Set Active" Margin="0,0,6,6" Click="OnSetActiveModelClick"/>
                 <Button x:Name="RunModelAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Run Model Acceptance" Margin="0,0,6,6" Click="OnRunModelAcceptanceClick"/>
+                <Button x:Name="ViewModelAcceptanceRunsBtn" Style="{StaticResource MiniBtn}" Content="View Acceptance Runs" Margin="0,0,6,6" Click="OnViewModelAcceptanceRunsClick"/>
                 <Button x:Name="CreateModelReleasePackageBtn" Style="{StaticResource MiniBtnGreen}" Content="Create Model Release Package" Margin="0,0,6,6" Click="OnCreateModelReleasePackageClick"/>
                 <Button x:Name="PromoteProductionCandidateBtn" Style="{StaticResource MiniBtnAmber}" Content="Promote to Production Candidate" Margin="0,0,0,6" Click="OnPromoteProductionCandidateClick"/>
               </WrapPanel>
+              <DataGrid x:Name="ModelAcceptanceRunsGrid" Height="82" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" CanUserAddRows="False" Margin="0,4,0,0">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Run" Binding="{Binding Id}" Width="50"/>
+                  <DataGridTextColumn Header="Model" Binding="{Binding ModelId}" Width="*"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
+                  <DataGridTextColumn Header="Dataset" Binding="{Binding DatasetName}" Width="110"/>
+                  <DataGridTextColumn Header="Candidate" Binding="{Binding CandidateDisplay}" Width="80"/>
+                </DataGrid.Columns>
+              </DataGrid>
             </StackPanel>
           </Border>
           <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
@@ -370,6 +380,7 @@
               </UniformGrid>
               <WrapPanel Margin="0,6,0,0">
                 <Button x:Name="TestCameraSourceBtn" Style="{StaticResource MiniBtn}" Content="Test Camera Source" Margin="0,0,6,6" Click="OnTestCameraSourceClick"/>
+                <Button x:Name="DiscoverCameraAdaptersBtn" Style="{StaticResource MiniBtn}" Content="Discover Adapters" Margin="0,0,6,6" Click="OnDiscoverCameraAdaptersClick"/>
                 <Button x:Name="DiscoverCamerasBtn" Style="{StaticResource MiniBtn}" Content="Discover Cameras" Margin="0,0,6,6" Click="OnDiscoverCamerasClick"/>
                 <Button x:Name="RunCameraAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Camera Acceptance Test" Margin="0,0,6,6" Click="OnRunCameraAcceptanceClick"/>
                 <Button x:Name="CancelCameraAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,6,6" Click="OnCancelCameraAcceptanceClick" IsEnabled="False"/>
@@ -519,7 +530,7 @@
                   <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Disabled"/>
                   <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="File Drop"/>
                   <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="REST API Boundary"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="PostgreSQL Boundary"/>
+                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Production Database Boundary"/>
                 </ComboBox>
               </Grid>
               <Grid Margin="0,0,0,8">

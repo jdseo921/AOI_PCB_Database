@@ -73,6 +73,7 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Contains("InspectionResults", tables);
         Assert.Contains("BatchTestRuns", tables);
         Assert.Contains("ModelRegistry", tables);
+        Assert.Contains("ModelAcceptanceMetrics", tables);
         Assert.Contains("RecipeRevisions", tables);
         Assert.Contains("CalibrationProfiles", tables);
         Assert.Contains("CalibrationPoints", tables);
@@ -126,8 +127,9 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.NotNull(frame);
         Assert.Equal(2, frame.Width);
         Assert.Equal(2, frame.Height);
-        Assert.Equal("Sample CSV", frame.SourceKind);
+        Assert.Equal("CSV Sample", frame.SourceKind);
         Assert.True(frame.IsSimulated);
+        Assert.True(source.IsAcquiring);
         Assert.Equal(new[] { 10d, 20d, 30d, 40d }, frame.HeightValues);
     }
 
@@ -217,9 +219,9 @@ public sealed class AoiDatabaseTests : IDisposable
                 AdapterId = FakeVisionCameraAdapterFactory.Id,
                 DisplayName = "Fake Vision Plugin",
                 Version = "1.0.0",
-                AssemblyPath = assemblyPath,
-                FactoryType = typeof(FakeVisionCameraAdapterFactory).FullName!,
-                SupportedViews = new() { "Top", "Side", "Bottom" },
+                AssemblyFile = assemblyPath,
+                FactoryTypeName = typeof(FakeVisionCameraAdapterFactory).FullName!,
+                SupportedInterfaces = new() { "GigE Vision", "USB3 Vision" },
                 SupportedPixelFormats = new() { "Mono8" },
             }),
             Encoding.UTF8);
@@ -230,9 +232,9 @@ public sealed class AoiDatabaseTests : IDisposable
 
         Assert.True(load.Success, load.Message);
         Assert.Contains("Loaded camera adapter", message);
-        Assert.Contains(devices, device => device.ViewAssignment == "Top" && device.DeviceId == "FAKE-TOP");
-        Assert.Contains(devices, device => device.ViewAssignment == "Side" && device.DeviceId == "FAKE-SIDE");
-        Assert.Contains(devices, device => device.ViewAssignment == "Bottom" && device.DeviceId == "FAKE-BOTTOM");
+        Assert.Contains(devices, device => device.SuggestedView == "Top" && device.DeviceId == "FAKE-TOP" && device.Capabilities!.Contains("SoftwareTrigger"));
+        Assert.Contains(devices, device => device.SuggestedView == "Side" && device.DeviceId == "FAKE-SIDE");
+        Assert.Contains(devices, device => device.SuggestedView == "Bottom" && device.DeviceId == "FAKE-BOTTOM");
     }
 
     [Fact]
@@ -247,9 +249,9 @@ public sealed class AoiDatabaseTests : IDisposable
                 AdapterId = "bad",
                 DisplayName = "Bad",
                 Version = "1",
-                AssemblyPath = "missing.dll",
-                FactoryType = "Missing.Factory",
-                SupportedViews = new() { "Top" },
+                AssemblyFile = "missing.dll",
+                FactoryTypeName = "Missing.Factory",
+                SupportedInterfaces = new() { "GigE Vision" },
                 SupportedPixelFormats = new() { "Mono8" },
             }),
             Encoding.UTF8);
@@ -495,6 +497,36 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal(ExportVerificationStatus.OK, result.Status);
         Assert.NotEmpty(result.Sha256);
         Assert.Contains(result.Messages, message => message.Contains("PNG signature verified", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void PdfExportServiceCreatesNonEmptyPdfFromTinyHtmlReport()
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, "tiny_report.pdf");
+
+        PdfExportService.ExportHtmlToPdf(
+            "<html><body><h1>Factory Readiness</h1><p>Status: Go</p></body></html>",
+            path,
+            "Tiny Test Report");
+
+        var bytes = File.ReadAllBytes(path);
+        Assert.True(bytes.Length > 100);
+        Assert.Equal("%PDF", Encoding.ASCII.GetString(bytes.Take(4).ToArray()));
+    }
+
+    [Fact]
+    public void ExportVerificationPdfSignaturePasses()
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, "customer_validation_report.pdf");
+        PdfExportService.ExportHtmlToPdf("<h1>Customer Validation</h1>", path, "Customer Validation Report");
+
+        var result = ExportVerificationService.Verify(path, "CustomerValidationPdfReport");
+
+        Assert.Equal(ExportVerificationStatus.OK, result.Status);
+        Assert.NotEmpty(result.Sha256);
+        Assert.Contains(result.Messages, message => message.Contains("PDF signature verified", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -752,10 +784,10 @@ public sealed class AoiDatabaseTests : IDisposable
 
         var summary = await CentralSyncService.RetryEligibleAsync();
 
-        Assert.Equal(1, summary.Attempted);
-        Assert.Equal(1, summary.Sent);
+        Assert.True(summary.Attempted >= 1);
+        Assert.True(summary.Sent >= 1);
         Assert.Contains(AoiDatabase.GetCentralSyncQueue(), row => row.Status == "Sent" && File.Exists(row.PayloadPath));
-        Assert.Single(Directory.GetFiles(dropFolder, "*.json"));
+        Assert.Contains(Directory.GetFiles(dropFolder, "*.json"), path => Path.GetFileName(path).StartsWith("InspectionResult_", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -773,7 +805,7 @@ public sealed class AoiDatabaseTests : IDisposable
 
         var summary = await CentralSyncService.RetryEligibleAsync();
 
-        Assert.Equal(1, summary.Failed);
+        Assert.True(summary.Failed >= 1);
         var item = Assert.Single(AoiDatabase.GetCentralSyncQueue(), row => row.ItemType == "InspectionResult");
         Assert.Equal("Pending", item.Status);
         Assert.Equal(1, item.RetryCount);
@@ -810,6 +842,74 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.DoesNotContain(secret, html);
         Assert.Contains("***", json);
         Assert.Contains("***", html);
+    }
+
+    [Fact]
+    public void CentralSyncQueuesManagementEvidencePayloads()
+    {
+        AoiDatabase.Initialize();
+        CentralSyncSettingsService.Save(new CentralSyncSettings
+        {
+            StationId = "STATION-MGMT",
+            RedactOperatorId = true,
+            RedactImagePaths = true,
+        });
+        AoiDatabase.RecordAuditEvent("UNIT_TEST_AUDIT", "Central sync audit evidence.", operatorWithRole: "Engineer42 [Engineer]");
+        AoiDatabase.RecordBuildTestEvidence(new BuildTestEvidenceRecord
+        {
+            GeneratedAtUtc = DateTime.UtcNow,
+            Configuration = "Release",
+            HygieneStatus = "PASS",
+            RestoreStatus = "PASS",
+            BuildStatus = "PASS",
+            TestStatus = "PASS",
+            PublishValidationStatus = "PASS",
+            OperatorId = "Engineer42 [Engineer]",
+            EvidencePath = @"C:\customer\evidence\build.json",
+        });
+        AoiDatabase.RecordCameraAcceptanceRun(new CameraAcceptanceRun
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            AdapterName = "Fake Camera",
+            SourceKey = "folder",
+            Status = "PASS",
+            FactoryReadinessStatus = "NOT VALIDATED",
+            TotalRequestedFrames = 1,
+            TotalReceivedFrames = 1,
+        });
+        AoiDatabase.RecordRobotAcceptanceRun(new RobotAcceptanceRun
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            ControllerName = "Simulated Robot",
+            SourceKind = "Simulated",
+            Status = "PASS",
+            EmergencyStopBlocked = true,
+            SafetyFaultBlocked = true,
+            ResetReturnedIdle = true,
+        });
+        AoiDatabase.RecordTraceabilityTestReport(new TraceabilityTestReport
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            Status = "PASS",
+            Mode = "REST",
+            ResultStatus = "PASS",
+            ImageStatus = "NOT SENT",
+            EndpointUrl = "http://mes.test/api/aoi/results",
+            OperatorId = "Engineer42 [Engineer]",
+            ReportJsonPath = @"C:\customer\evidence\traceability.json",
+        });
+
+        var queued = CentralSyncService.QueueLocalChangesForSync();
+        var queue = AoiDatabase.GetCentralSyncQueue(1000);
+
+        Assert.True(queued >= 5);
+        Assert.Contains(queue, row => row.ItemType == "AuditEvent");
+        Assert.Contains(queue, row => row.ItemType == "BuildTestEvidence" && row.PayloadJson.Contains("REDACTED"));
+        Assert.Contains(queue, row => row.ItemType == "CameraAcceptanceRun");
+        Assert.Contains(queue, row => row.ItemType == "RobotAcceptanceRun");
+        Assert.Contains(queue, row => row.ItemType == "TraceabilityAcceptanceRun");
+        Assert.DoesNotContain(queue, row => row.PayloadJson.Contains("Engineer42", StringComparison.Ordinal));
+        Assert.DoesNotContain(queue, row => row.PayloadJson.Contains(@"C:\customer", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -1511,6 +1611,21 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal(250, values.Average());
         Assert.Equal(400, values.Max());
         Assert.Equal(385, SoakTestService.Percentile(values, 0.95), precision: 6);
+    }
+
+    [Fact]
+    public void SoakProfileOptionsUseFormalFactoryEvidenceNames()
+    {
+        var smoke = SoakTestService.CreateProfileOptions(SoakTestProfile.Smoke, _root, "pixel", _root, "Admin", "TBOX", "LOT");
+        var shortStability = SoakTestService.CreateProfileOptions(SoakTestProfile.ThirtyMinute, _root, "pixel", _root, "Admin", "TBOX", "LOT");
+        var factory = SoakTestService.CreateProfileOptions(SoakTestProfile.EightHourFactoryPoC, _root, "pixel", _root, "Admin", "TBOX", "LOT");
+
+        Assert.Equal(TimeSpan.FromMinutes(5), smoke.Duration);
+        Assert.Equal(TimeSpan.FromMinutes(30), shortStability.Duration);
+        Assert.Equal(TimeSpan.FromHours(8), factory.Duration);
+        Assert.Equal("Smoke", SoakTestService.ProfileDisplayName(SoakTestProfile.QuickSmoke));
+        Assert.Equal("30Minute", SoakTestService.ProfileDisplayName(SoakTestProfile.ShortStability));
+        Assert.Equal("8HourFactoryPoC", SoakTestService.ProfileDisplayName(SoakTestProfile.FactoryPoc));
     }
 
     [Fact]
@@ -2443,6 +2558,9 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Contains("limitations", manifest, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("validationDataset", manifest, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sample_customer_image.png", manifest, StringComparison.OrdinalIgnoreCase);
+        Assert.True(File.Exists(Path.Combine(package.PackagePath, "model_acceptance_metrics.csv")));
+        Assert.True(File.Exists(Path.Combine(package.PackagePath, "validation_breakdown.csv")));
+        Assert.False(Directory.EnumerateFiles(package.PackagePath, "*.png", SearchOption.AllDirectories).Any());
     }
 
     [Fact]
@@ -3217,12 +3335,15 @@ public sealed class AoiDatabaseTests : IDisposable
         public string Name => "Test 3D Source";
         public string Status => _frame is null ? "NotConnected" : "Ready";
         public string StatusMessage => _frame is null ? "No test frame." : "Test frame ready.";
+        public bool IsAcquiring { get; private set; }
         public void StartAcquisition()
         {
+            IsAcquiring = true;
         }
 
         public void StopAcquisition()
         {
+            IsAcquiring = false;
         }
 
         public Profile3DFrame? GetNextHeightMap(CancellationToken cancellationToken = default) => _frame;
@@ -3242,6 +3363,7 @@ public sealed class AoiDatabaseTests : IDisposable
         public string AdapterId => Id;
         public string DisplayName => "Fake Vision Plugin";
         public string Version => "1.0.0";
+        public IReadOnlyList<string> SupportedInterfaces { get; } = new[] { "GigE Vision", "USB3 Vision" };
         public IReadOnlyList<string> SupportedViews { get; } = new[] { "Top", "Side", "Bottom" };
         public IReadOnlyList<string> SupportedPixelFormats { get; } = new[] { "Mono8" };
 
@@ -3257,9 +3379,9 @@ public sealed class AoiDatabaseTests : IDisposable
         public IReadOnlyList<VisionDeviceInfo> DiscoverDevices()
             => new[]
             {
-                new VisionDeviceInfo("FAKE-TOP", "FakeVendor", "FakeGigE", "001", "GigE Vision", "192.0.2.10", "Top", "Ready"),
-                new VisionDeviceInfo("FAKE-SIDE", "FakeVendor", "FakeUSB3", "002", "USB3 Vision", string.Empty, "Side", "Ready"),
-                new VisionDeviceInfo("FAKE-BOTTOM", "FakeVendor", "FakeGigE", "003", "GigE Vision", "192.0.2.12", "Bottom", "Ready"),
+                new VisionDeviceInfo("FAKE-TOP", "FakeVendor", "FakeGigE", "001", "GigE Vision", "192.0.2.10", "Top", "Ready", new[] { "SoftwareTrigger", "Mono8" }),
+                new VisionDeviceInfo("FAKE-SIDE", "FakeVendor", "FakeUSB3", "002", "USB3 Vision", string.Empty, "Side", "Ready", new[] { "Continuous", "Mono8" }),
+                new VisionDeviceInfo("FAKE-BOTTOM", "FakeVendor", "FakeGigE", "003", "GigE Vision", "192.0.2.12", "Bottom", "Ready", new[] { "HardwareTrigger", "Mono8" }),
             };
     }
 

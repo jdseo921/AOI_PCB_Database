@@ -106,7 +106,7 @@
                 <Button x:Name="RobotResetButton" Style="{StaticResource MiniBtn}" Content="Reset" Margin="0,0,5,0" Click="OnRobotResetClick"/>
                 <Button x:Name="RobotEmergencyStopButton" Style="{StaticResource MiniBtn}" Content="E-Stop Sim" Margin="0,0,5,0" Click="OnRobotEmergencyStopClick"/>
                 <Button x:Name="RunRobotCycleButton" Style="{StaticResource MiniBtn}" Content="Run Cycle" Margin="0,0,5,0" Click="OnRobotCycleClick"/>
-                <Button x:Name="RunRobotAcceptanceButton" Style="{StaticResource MiniBtn}" Content="Run Robot Acceptance Test" Margin="0,0,5,0" Click="OnRobotAcceptanceClick"/>
+                <Button x:Name="RunRobotAcceptanceButton" Style="{StaticResource MiniBtn}" Content="Run Robot Cell Acceptance Test" Margin="0,0,5,0" Click="OnRobotAcceptanceClick"/>
                 <Button x:Name="ExportRobotAcceptanceButton" Style="{StaticResource MiniBtn}" Content="Export Report" Click="OnExportRobotAcceptanceClick"/>
               </WrapPanel>
             </Grid>

@@ -32,6 +32,7 @@ public interface IVisionCameraAdapterFactory
     string AdapterId { get; }
     string DisplayName { get; }
     string Version { get; }
+    IReadOnlyList<string> SupportedInterfaces { get; }
     IReadOnlyList<string> SupportedViews { get; }
     IReadOnlyList<string> SupportedPixelFormats { get; }
     IVisionCameraAdapter CreateAdapter(CameraSourceSettings settings);
@@ -50,18 +51,29 @@ public sealed record VisionDeviceInfo(
     string Serial,
     string InterfaceType,
     string IpAddress,
-    string ViewAssignment,
-    string Status);
+    string SuggestedView,
+    string Status,
+    IReadOnlyList<string>? Capabilities = null)
+{
+    public string ViewAssignment => SuggestedView;
+}
 
 public sealed class VisionCameraAdapterManifest
 {
     public string AdapterId { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
+    public string AssemblyFile { get; set; } = string.Empty;
     public string AssemblyPath { get; set; } = string.Empty;
+    public string FactoryTypeName { get; set; } = string.Empty;
     public string FactoryType { get; set; } = string.Empty;
+    public List<string> SupportedInterfaces { get; set; } = new();
     public List<string> SupportedViews { get; set; } = new();
     public List<string> SupportedPixelFormats { get; set; } = new();
+
+    public string EffectiveAssemblyFile => string.IsNullOrWhiteSpace(AssemblyFile) ? AssemblyPath : AssemblyFile;
+    public string EffectiveFactoryTypeName => string.IsNullOrWhiteSpace(FactoryTypeName) ? FactoryType : FactoryTypeName;
+    public IReadOnlyList<string> EffectiveSupportedInterfaces => SupportedInterfaces;
 }
 
 public sealed record VisionCameraPluginLoadResult(
@@ -112,20 +124,22 @@ public static class VisionCameraPluginLoader
             if (validation.Count > 0)
                 return VisionCameraPluginLoadResult.Fail(string.Join(" ", validation));
 
-            var assemblyPath = Path.IsPathRooted(manifest.AssemblyPath)
-                ? manifest.AssemblyPath
-                : Path.Combine(manifestFolder, manifest.AssemblyPath);
+            var assemblyFile = manifest.EffectiveAssemblyFile;
+            var assemblyPath = Path.IsPathRooted(assemblyFile)
+                ? assemblyFile
+                : Path.Combine(manifestFolder, assemblyFile);
             if (!File.Exists(assemblyPath))
                 return VisionCameraPluginLoadResult.Fail($"Camera adapter assembly was not found: {assemblyPath}");
 
             var assembly = Assembly.LoadFrom(assemblyPath);
-            var factoryType = assembly.GetType(manifest.FactoryType, throwOnError: false);
+            var factoryTypeName = manifest.EffectiveFactoryTypeName;
+            var factoryType = assembly.GetType(factoryTypeName, throwOnError: false);
             if (factoryType is null)
-                return VisionCameraPluginLoadResult.Fail($"Factory type '{manifest.FactoryType}' was not found in adapter assembly.");
+                return VisionCameraPluginLoadResult.Fail($"Factory type '{factoryTypeName}' was not found in adapter assembly.");
             if (!typeof(IVisionCameraAdapterFactory).IsAssignableFrom(factoryType))
-                return VisionCameraPluginLoadResult.Fail($"Factory type '{manifest.FactoryType}' does not implement IVisionCameraAdapterFactory.");
+                return VisionCameraPluginLoadResult.Fail($"Factory type '{factoryTypeName}' does not implement IVisionCameraAdapterFactory.");
             if (Activator.CreateInstance(factoryType) is not IVisionCameraAdapterFactory factory)
-                return VisionCameraPluginLoadResult.Fail($"Factory type '{manifest.FactoryType}' could not be created.");
+                return VisionCameraPluginLoadResult.Fail($"Factory type '{factoryTypeName}' could not be created.");
 
             var identityErrors = ValidateFactoryIdentity(manifest, factory);
             if (identityErrors.Count > 0)
@@ -176,12 +190,12 @@ public static class VisionCameraPluginLoader
             errors.Add("DisplayName is required.");
         if (string.IsNullOrWhiteSpace(manifest.Version))
             errors.Add("Version is required.");
-        if (string.IsNullOrWhiteSpace(manifest.AssemblyPath))
-            errors.Add("AssemblyPath is required.");
-        if (string.IsNullOrWhiteSpace(manifest.FactoryType))
-            errors.Add("FactoryType is required.");
-        if (manifest.SupportedViews.Count == 0)
-            errors.Add("SupportedViews must list at least one view.");
+        if (string.IsNullOrWhiteSpace(manifest.EffectiveAssemblyFile))
+            errors.Add("AssemblyFile is required.");
+        if (string.IsNullOrWhiteSpace(manifest.EffectiveFactoryTypeName))
+            errors.Add("FactoryTypeName is required.");
+        if (manifest.SupportedInterfaces.Count == 0 && manifest.SupportedViews.Count == 0)
+            errors.Add("SupportedInterfaces must list at least one interface, such as GigE Vision or USB3 Vision.");
         if (manifest.SupportedPixelFormats.Count == 0)
             errors.Add("SupportedPixelFormats must list at least one pixel format.");
         return errors;
@@ -194,7 +208,9 @@ public static class VisionCameraPluginLoader
             errors.Add("Adapter factory identity does not match manifest AdapterId.");
         if (!string.Equals(manifest.Version, factory.Version, StringComparison.OrdinalIgnoreCase))
             errors.Add("Adapter factory version does not match manifest Version.");
-        if (!ContainsAll(factory.SupportedViews, manifest.SupportedViews))
+        if (manifest.SupportedInterfaces.Count > 0 && !ContainsAll(factory.SupportedInterfaces, manifest.SupportedInterfaces))
+            errors.Add("Adapter factory supported interfaces do not satisfy manifest SupportedInterfaces.");
+        if (manifest.SupportedViews.Count > 0 && !ContainsAll(factory.SupportedViews, manifest.SupportedViews))
             errors.Add("Adapter factory supported views do not satisfy manifest SupportedViews.");
         if (!ContainsAll(factory.SupportedPixelFormats, manifest.SupportedPixelFormats))
             errors.Add("Adapter factory supported pixel formats do not satisfy manifest SupportedPixelFormats.");
@@ -203,6 +219,21 @@ public static class VisionCameraPluginLoader
 
     private static bool ContainsAll(IReadOnlyList<string> actual, IReadOnlyList<string> required)
         => required.All(item => actual.Contains(item, StringComparer.OrdinalIgnoreCase));
+}
+
+public static class CameraAdapterPluginService
+{
+    public static VisionCameraPluginLoadResult LoadFactory(string adapterFolder)
+        => VisionCameraPluginLoader.LoadFactory(adapterFolder);
+
+    public static VisionCameraPluginLoadResult LoadFactoryFromManifest(string manifestPath)
+        => VisionCameraPluginLoader.LoadFactoryFromManifest(manifestPath);
+
+    public static IVisionDeviceDiscovery CreateDiscovery(CameraSourceSettings settings, out string message)
+        => VisionCameraPluginLoader.CreateDiscovery(settings, out message);
+
+    public static IVisionCameraAdapter CreateAdapterOrNull(CameraSourceSettings settings, out string message)
+        => VisionCameraPluginLoader.CreateAdapterOrNull(settings, out message);
 }
 
 public sealed class NullVisionCameraAdapter : IVisionCameraAdapter

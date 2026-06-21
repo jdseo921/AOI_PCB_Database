@@ -177,9 +177,11 @@ public static class FactoryReadinessService
 
         var jsonPath = Path.Combine(packageFolder, "factory_readiness_summary.json");
         var htmlPath = Path.Combine(packageFolder, "factory_readiness_summary.html");
+        var pdfPath = Path.Combine(packageFolder, "factory_readiness_summary.pdf");
         var readmePath = Path.Combine(packageFolder, "README.txt");
         File.WriteAllText(jsonPath, JsonSerializer.Serialize(report, JsonOptions), Encoding.UTF8);
         File.WriteAllText(htmlPath, BuildHtml(report), Encoding.UTF8);
+        PdfExportService.ExportHtmlFileToPdf(htmlPath, pdfPath, "Factory Readiness Go/No-Go Summary");
         File.WriteAllText(readmePath, BuildReadme(report), Encoding.UTF8);
 
         CopyLatestValidationManifest(packageFolder);
@@ -620,6 +622,7 @@ public static class FactoryReadinessService
 
         Contents:
         - factory_readiness_summary.html: management-readable Go/No-Go summary.
+        - factory_readiness_summary.pdf: native PDF rendering of the Go/No-Go summary.
         - factory_readiness_summary.json: machine-readable category evidence.
         - latest_validation_manifest.json: copied when a Stage 1 validation package exists.
         - latest_export_verification_report.json: copied when export verification records exist.

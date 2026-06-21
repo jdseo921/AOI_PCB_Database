@@ -381,8 +381,10 @@ public partial class ReportsView : UserControl
                 cts.Token.ThrowIfCancellationRequested();
                 ((IProgress<WorkProgress>)progress).Report(new WorkProgress(6, 6, "Writing package README..."));
                 var reportPath = Path.Combine(validationDir, "customer_validation_report.html");
+                var reportPdfPath = Path.Combine(validationDir, "customer_validation_report.pdf");
                 var reportContext = BuildCustomerValidationReportContext(latestRun, validationRows, sampleImages.Images, warnings);
                 File.WriteAllText(reportPath, CustomerValidationReportService.BuildHtml(reportContext), CsvEncoding);
+                PdfExportService.ExportHtmlFileToPdf(reportPath, reportPdfPath, "Customer Validation Report");
                 File.WriteAllText(Path.Combine(validationDir, "customer_validation_report.md"), CustomerValidationReportService.BuildMarkdown(reportContext), CsvEncoding);
                 File.WriteAllText(
                     Path.Combine(validationDir, "customer_validation_report_print_to_pdf.txt"),
@@ -924,7 +926,7 @@ public partial class ReportsView : UserControl
         var cts = BeginWork("Running MES traceability signoff...");
         try
         {
-            var report = await TraceabilitySignoffService.RunAsync(imagePath, productionConfirmed, WorkflowState.Instance.OperatorWithRole, cts.Token);
+            var report = await TraceabilityAcceptanceTestService.RunAsync(imagePath, productionConfirmed, WorkflowState.Instance.OperatorWithRole, cts.Token);
             WorkflowState.Instance.AddEvent(report.Status == "PASS" ? "MES_TRACEABILITY_TEST" : "MES_TRACEABILITY_TEST_ERROR", $"Traceability signoff {report.Status}; result={report.ResultStatus}; image={report.ImageStatus}; report={Path.GetFileName(report.ReportHtmlPath)}.");
             RefreshAfterExport($"Traceability signoff {report.Status}. HTML: {report.ReportHtmlPath}. JSON: {report.ReportJsonPath}.");
         }
@@ -1715,7 +1717,8 @@ public partial class ReportsView : UserControl
         sb.AppendLine("## Contents");
         sb.AppendLine();
         sb.AppendLine("- `validation/customer_validation_report.html` - Customer-facing Stage 1 validation report with summary metrics, failed samples, sample annotated images, prototype limitations, and signature/approval section.");
-        sb.AppendLine("- `validation/customer_validation_report_print_to_pdf.txt` - Instructions for creating a PDF from the HTML report with a browser print workflow.");
+        sb.AppendLine("- `validation/customer_validation_report.pdf` - Native PDF rendering of the customer validation report.");
+        sb.AppendLine("- `validation/customer_validation_report_print_to_pdf.txt` - Fallback instructions for creating a PDF from the HTML report with a browser print workflow.");
         sb.AppendLine("- `validation/customer_validation_report.md` - Markdown companion copy of the validation report.");
         sb.AppendLine("- `validation/sample_annotated_images/` - Sample annotated images referenced by the validation report.");
         sb.AppendLine("- `validation/validation_results.csv` - Row-level validation results from the latest persisted Stage 1 validation run.");
@@ -1808,6 +1811,8 @@ public partial class ReportsView : UserControl
             return "Annotated image";
         if (fileName.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
             return "HTML report";
+        if (fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            return "PDF report";
         if (fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
             return "Markdown";
         if (fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
@@ -2106,9 +2111,9 @@ public partial class ReportsView : UserControl
 
         private void ConfigureProfileOptions()
         {
-            _profileCombo.Items.Add(new ComboBoxItem { Content = "Quick smoke (5 min)", Tag = SoakTestProfile.QuickSmoke });
-            _profileCombo.Items.Add(new ComboBoxItem { Content = "Short stability (30 min)", Tag = SoakTestProfile.ShortStability });
-            _profileCombo.Items.Add(new ComboBoxItem { Content = "Factory PoC (8 hours)", Tag = SoakTestProfile.FactoryPoc });
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "Smoke (5 min)", Tag = SoakTestProfile.Smoke });
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "30Minute (30 min)", Tag = SoakTestProfile.ThirtyMinute });
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "8HourFactoryPoC (8 hours)", Tag = SoakTestProfile.EightHourFactoryPoC });
             _profileCombo.Items.Add(new ComboBoxItem { Content = "Custom", Tag = SoakTestProfile.Custom });
             _profileCombo.SelectedIndex = 0;
             _durationMinutesText.Text = "5";
@@ -2119,9 +2124,9 @@ public partial class ReportsView : UserControl
                 _durationMinutesText.IsEnabled = profile == SoakTestProfile.Custom;
                 _durationMinutesText.Text = profile switch
                 {
-                    SoakTestProfile.QuickSmoke => "5",
-                    SoakTestProfile.ShortStability => "30",
-                    SoakTestProfile.FactoryPoc => "480",
+                    SoakTestProfile.Smoke => "5",
+                    SoakTestProfile.ThirtyMinute => "30",
+                    SoakTestProfile.EightHourFactoryPoC => "480",
                     _ => _durationMinutesText.Text,
                 };
             };

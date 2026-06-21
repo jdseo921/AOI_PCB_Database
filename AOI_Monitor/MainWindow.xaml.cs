@@ -27,6 +27,7 @@ public partial class MainWindow : Window
         ["recipe"]   = "RECIPE EDITOR",
         ["modeltest"] = "AI MODEL TEST / STAGE 1 CUSTOMER VALIDATION",
         ["reports"]  = "LOG & EXPORT / TRACEABILITY PACKAGE",
+        ["pilot"]    = "CUSTOMER PILOT WIZARD / STAGE 1-2 EVIDENCE",
         ["spc"]      = "LOG & EXPORT / DATABASE HEALTH",
         ["profile"]  = "3D PROFILE VIEWER / SAMPLE DATA MODE",
         ["calibration"] = "2D CALIBRATION PROFILE / STAGE 2 PREPARATION",
@@ -73,6 +74,7 @@ public partial class MainWindow : Window
         AuthModeCombo.SelectedIndex = AuthenticationModeToCombo(WorkflowState.Instance.AuthenticationMode);
         _vm.RefreshRolePermissions(WorkflowState.Instance.CurrentRole);
         RefreshRoleUi();
+        RefreshOperatingModeBanner();
         _vm.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(MainViewModel.CurrentPage))
@@ -85,12 +87,14 @@ public partial class MainWindow : Window
         LightingSettingsService.SettingsChanged += OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
         AuthenticationSettingsService.AuthenticationChanged += OnAuthenticationChanged;
+        OperatingModeSettingsService.SettingsChanged += OnOperatingModeSettingsChanged;
         Closed += (_, _) => WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         Closed += (_, _) => InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
         Closed += (_, _) => CameraSourceFactory.ActiveSourceChanged -= OnCameraSourceChanged;
         Closed += (_, _) => LightingSettingsService.SettingsChanged -= OnLightingSettingsChanged;
         Closed += (_, _) => MesIntegrationSettingsService.SettingsChanged -= OnMesIntegrationSettingsChanged;
         Closed += (_, _) => AuthenticationSettingsService.AuthenticationChanged -= OnAuthenticationChanged;
+        Closed += (_, _) => OperatingModeSettingsService.SettingsChanged -= OnOperatingModeSettingsChanged;
 
         SwitchPage("monitor");
         UpdateWorkflowPanel();
@@ -138,6 +142,7 @@ public partial class MainWindow : Window
                 "calibration" => new CalibrationView(),
                 "spc"      => new SpcView(),
                 "reports"  => new ReportsView(),
+                "pilot"    => new PilotWizardView(),
                 "install"  => new InstallView(),
                 "settings" => new SettingsView(_vm),
                 "guide"    => new GuideView(),
@@ -200,6 +205,10 @@ public partial class MainWindow : Window
         else if (PageContent.Content is ReportsView reports)
         {
             reports.RefreshFromState();
+        }
+        else if (PageContent.Content is PilotWizardView pilot)
+        {
+            pilot.RefreshFromState();
         }
         else if (PageContent.Content is SpcView spc)
         {
@@ -285,6 +294,8 @@ public partial class MainWindow : Window
     {
         if (!IsLoaded)
             return;
+        if (!OperatingModePolicyService.IsDemoRoleSelectorAllowed())
+            return;
         if (WorkflowState.Instance.AuthenticationMode != AuthenticationMode.DemoLocalRoleSelector)
             return;
 
@@ -313,6 +324,14 @@ public partial class MainWindow : Window
         }
 
         var mode = ComboToAuthenticationMode(AuthModeCombo.SelectedIndex);
+        if (mode == AuthenticationMode.DemoLocalRoleSelector &&
+            !OperatingModePolicyService.IsDemoRoleSelectorAllowed())
+        {
+            MessageBox.Show("DemoLocalRoleSelector is available only in Demo Mode. Select LocalUsers or the MES authentication boundary for Pilot/Production.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AuthModeCombo.SelectedIndex = AuthenticationModeToCombo(WorkflowState.Instance.AuthenticationMode);
+            return;
+        }
+
         AuthenticationSettingsService.Save(new AuthenticationSettings { Mode = mode }, WorkflowState.Instance.OperatorWithRole);
         WorkflowState.Instance.SetAuthenticationMode(mode);
         RefreshRoleUi();
@@ -322,6 +341,13 @@ public partial class MainWindow : Window
     private void OnLocalLoginClick(object sender, RoutedEventArgs e)
     {
         var mode = WorkflowState.Instance.AuthenticationMode;
+        if (mode == AuthenticationMode.DemoLocalRoleSelector &&
+            !OperatingModePolicyService.IsDemoRoleSelectorAllowed())
+        {
+            MessageBox.Show("Demo role selection is disabled outside Demo Mode. Switch authentication to LocalUsers or MES boundary.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         if (mode == AuthenticationMode.LocalUsers)
         {
             if (!LocalUserService.TryAuthenticate(UserIdText.Text, LoginPasswordBox.Password, out var user))
@@ -475,7 +501,9 @@ public partial class MainWindow : Window
         DisableUserBtn.IsEnabled = canManageLocalUsers;
         DeleteUserBtn.IsEnabled = canManageLocalUsers;
         LoginPasswordBox.IsEnabled = WorkflowState.Instance.AuthenticationMode == AuthenticationMode.LocalUsers;
-        RoleCombo.IsEnabled = WorkflowState.Instance.AuthenticationMode == AuthenticationMode.DemoLocalRoleSelector || isAdmin;
+        RoleCombo.IsEnabled = WorkflowState.Instance.AuthenticationMode == AuthenticationMode.DemoLocalRoleSelector &&
+            OperatingModePolicyService.IsDemoRoleSelectorAllowed();
+        AuthModeCombo.IsEnabled = isAdmin;
     }
 
     private bool EnsurePageAccess(string key)
@@ -525,6 +553,38 @@ public partial class MainWindow : Window
             AuthModeCombo.SelectedIndex = AuthenticationModeToCombo(WorkflowState.Instance.AuthenticationMode);
             RefreshRoleUi();
         });
+    }
+
+    private void OnOperatingModeSettingsChanged()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            RefreshOperatingModeBanner();
+            RefreshRoleUi();
+            if (PageContent.Content is LibraryView library)
+                library.RefreshFromState();
+        });
+    }
+
+    private void RefreshOperatingModeBanner()
+    {
+        var mode = OperatingModeSettingsService.Load();
+        OperatingModeBannerText.Text = mode switch
+        {
+            OperatingMode.Production => "Production Mode",
+            OperatingMode.Pilot => "Pilot Mode",
+            _ => "Demo Mode",
+        };
+        var (bg, border, fg, tooltip) = mode switch
+        {
+            OperatingMode.Production => ("#35191B", "#9A393E", "#FFBFC1", "Production Mode: demo/fallback rows are blocked and factory readiness gates are enforced."),
+            OperatingMode.Pilot => ("#372914", "#8C6C35", "#FFE0A7", "Pilot Mode: demo rows are hidden by default and simulated hardware must be clearly labeled."),
+            _ => ("#14311D", "#377849", "#C6FFD0", "Demo Mode: sample data, demo role selector, and simulated sources are allowed."),
+        };
+        OperatingModeBanner.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(bg));
+        OperatingModeBanner.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(border));
+        OperatingModeBannerText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(fg));
+        OperatingModeBanner.ToolTip = tooltip;
     }
 
     private void OnLightingSettingsChanged()

@@ -52,6 +52,7 @@ public partial class SettingsView : UserControl
         LightingSettingsService.SettingsChanged += OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
         CentralSyncSettingsService.SettingsChanged += OnCentralSyncSettingsChanged;
+        OperatingModeSettingsService.SettingsChanged += OnOperatingModeSettingsChanged;
         RefreshWorkflowUi();
         RefreshThresholdProfilesUi();
         ApplyLanguageVisuals();
@@ -67,6 +68,7 @@ public partial class SettingsView : UserControl
         LightingSettingsService.SettingsChanged -= OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged -= OnMesIntegrationSettingsChanged;
         CentralSyncSettingsService.SettingsChanged -= OnCentralSyncSettingsChanged;
+        OperatingModeSettingsService.SettingsChanged -= OnOperatingModeSettingsChanged;
     }
 
     private void OnWorkflowStateChanged() => Dispatcher.Invoke(RefreshWorkflowUi);
@@ -76,6 +78,7 @@ public partial class SettingsView : UserControl
     private void OnLightingSettingsChanged() => Dispatcher.Invoke(RefreshLightingUi);
     private void OnMesIntegrationSettingsChanged() => Dispatcher.Invoke(RefreshMesIntegrationUi);
     private void OnCentralSyncSettingsChanged() => Dispatcher.Invoke(RefreshCentralSyncUi);
+    private void OnOperatingModeSettingsChanged() => Dispatcher.Invoke(RefreshOperatingModeUi);
 
     private void OnApply(object sender, RoutedEventArgs e)
     {
@@ -92,6 +95,8 @@ public partial class SettingsView : UserControl
         var newCentralSync = BuildCentralSyncSettingsFromUi();
         var existingDeploymentProfile = DeploymentProfileSettingsService.Load();
         var newDeploymentProfile = ComboToDeploymentProfile(DeploymentProfileCombo.SelectedIndex);
+        var existingOperatingMode = OperatingModeSettingsService.Load();
+        var newOperatingMode = ComboToOperatingMode(OperatingModeCombo.SelectedIndex);
         var newStorageRoot = string.IsNullOrWhiteSpace(StorageRootText.Text)
             ? AoiDatabase.DefaultStorageRoot
             : StorageRootText.Text.Trim();
@@ -163,11 +168,12 @@ public partial class SettingsView : UserControl
             !string.Equals(existingLighting.CommandTemplate, newLighting.CommandTemplate, StringComparison.Ordinal) ||
             existingLighting.ResponseTimeoutMs != newLighting.ResponseTimeoutMs;
         var deploymentProfileChanged = existingDeploymentProfile != newDeploymentProfile;
+        var operatingModeChanged = existingOperatingMode != newOperatingMode;
         var thresholdChanged =
             ComboToPriority(DetectionPriorityCombo.SelectedIndex) != state.DetectionPriority ||
             Math.Abs(existingConfig.ConfidenceThreshold - newConfig.ConfidenceThreshold) > 0.0001;
 
-        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || lightingConfigChanged || mesConfigChanged || centralSyncConfigChanged || deploymentProfileChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, deployment target, camera source, lighting sync, MES integration, or central sync settings"))
+        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || lightingConfigChanged || mesConfigChanged || centralSyncConfigChanged || deploymentProfileChanged || operatingModeChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, deployment target, operating mode, camera source, lighting sync, MES integration, or central sync settings"))
             return;
 
         if (thresholdChanged && !Authorize(RoleAuthorization.CanChangeThresholds, "Changing inspection thresholds or detection priority"))
@@ -185,6 +191,8 @@ public partial class SettingsView : UserControl
         SaveCentralSyncSettings(newCentralSync);
         if (deploymentProfileChanged)
             DeploymentProfileSettingsService.Save(newDeploymentProfile);
+        if (operatingModeChanged)
+            OperatingModeSettingsService.Save(newOperatingMode, WorkflowState.Instance.OperatorWithRole);
 
         if (!state.TrySetDetectionPriority(ComboToPriority(DetectionPriorityCombo.SelectedIndex), out var message))
         {
@@ -206,6 +214,7 @@ public partial class SettingsView : UserControl
         FontCombo.SelectedIndex = 1;
         DetectionPriorityCombo.SelectedIndex = 0;
         DeploymentProfileCombo.SelectedIndex = 0;
+        OperatingModeCombo.SelectedIndex = 0;
         InspectionEngineCombo.SelectedIndex = 0;
         ModelPathText.Text = string.Empty;
         StorageRootText.Text = AoiDatabase.DefaultStorageRoot;
@@ -271,6 +280,7 @@ public partial class SettingsView : UserControl
         CentralSyncRedactEndpointCheck.IsChecked = true;
         CentralSyncSettingsService.Save(new CentralSyncSettings());
         DeploymentProfileSettingsService.Save(DeploymentProfile.Stage1ImageValidation);
+        OperatingModeSettingsService.Save(OperatingMode.Demo, WorkflowState.Instance.OperatorWithRole);
 
         ApplyLanguageVisuals();
         ApplyFontPreset();
@@ -429,6 +439,93 @@ public partial class SettingsView : UserControl
         }
     }
 
+    private void OnRollbackRestoreClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Rolling back workstation configuration restore"))
+            return;
+
+        var info = ConfigurationBackupService.GetLastRollbackInfo();
+        if (info is null)
+        {
+            MessageBox.Show("No restore rollback package is available.", "AOI Monitor Restore Rollback", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"Rollback the last configuration restore using:\n{info.RollbackBackupPath}\n\nThis re-applies the configuration backup captured immediately before the last restore.",
+            "Rollback Configuration Restore",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            var preview = ConfigurationBackupService.RollbackLastRestore(WorkflowState.Instance.OperatorWithRole);
+            if (!preview.IsCompatible)
+            {
+                MessageBox.Show(BuildRestorePreviewMessage(preview), "AOI Monitor Restore Rollback", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            _pendingRestoreBackupPath = null;
+            ApplyRestoreBtn.IsEnabled = false;
+            RefreshWorkflowUi();
+            RefreshThresholdProfilesUi();
+            MessageBox.Show("Configuration restore rolled back. Restart the app before production use so all integration boundaries reload cleanly.", "AOI Monitor Restore Rollback", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        {
+            MessageBox.Show($"Configuration restore rollback failed:\n{ex.Message}", "AOI Monitor Restore Rollback", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnExportSupportBundleClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Exporting support bundle"))
+            return;
+
+        if (SupportBundleIncludeModelsCheck.IsChecked == true)
+        {
+            var confirm = MessageBox.Show(
+                "Including model files may expose customer or vendor model IP. Continue with model files included?",
+                "Export Support Bundle",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (confirm != MessageBoxResult.Yes)
+                return;
+        }
+
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select support bundle export folder",
+            InitialDirectory = AoiDatabase.StorageRoot,
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var result = SupportBundleService.Export(new SupportBundleOptions
+            {
+                OutputRoot = dialog.FolderName,
+                IncludeModelFiles = SupportBundleIncludeModelsCheck.IsChecked == true,
+                RedactCustomerImagePaths = SupportBundleRedactPathsCheck.IsChecked != false,
+                RedactStorageRoot = SupportBundleRedactPathsCheck.IsChecked != false,
+            }, WorkflowState.Instance.OperatorWithRole);
+            WorkflowState.Instance.AddEvent("SUPPORT_BUNDLE", $"Support bundle exported: {Path.GetFileName(result.ZipPath)}.");
+            MessageBox.Show(
+                $"Support bundle exported.\n\n{result.ZipPath}\n\nRaw customer images and secrets are excluded/redacted by default.",
+                "Export Support Bundle",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        {
+            MessageBox.Show($"Support bundle export failed:\n{ex.Message}", "Export Support Bundle", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void OnStartTrainingClick(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
@@ -530,6 +627,58 @@ public partial class SettingsView : UserControl
 
         LabelMapPathText.Text = dialog.FileName;
         RefreshInspectionConfigurationUi(BuildConfigurationFromUi());
+    }
+
+    private void OnImportTaxonomyClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanChangeThresholds, "Importing defect taxonomy CSV"))
+            return;
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import defect taxonomy CSV",
+            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var taxonomy = DefectTaxonomyService.ImportCsv(dialog.FileName, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
+            WorkflowState.Instance.AddEvent("DEFECT_TAXONOMY", $"Imported active defect taxonomy {taxonomy.Taxonomy.Name} with {taxonomy.Entries.Count} class(es).");
+            RefreshDefectTaxonomyUi();
+            MessageBox.Show("Defect taxonomy imported and activated.", "Defect Taxonomy", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
+        {
+            MessageBox.Show($"Defect taxonomy import failed:\n{ex.Message}", "Defect Taxonomy", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnExportTaxonomyClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanChangeThresholds, "Exporting defect taxonomy CSV"))
+            return;
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export defect taxonomy CSV",
+            FileName = $"defect_taxonomy_{DateTime.Now:yyyyMMdd_HHmmss}.csv",
+            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var path = DefectTaxonomyService.ExportCsv(dialog.FileName);
+            WorkflowState.Instance.AddEvent("DEFECT_TAXONOMY", $"Exported active defect taxonomy CSV: {Path.GetFileName(path)}.");
+            MessageBox.Show($"Defect taxonomy exported.\n\n{path}", "Defect Taxonomy", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            MessageBox.Show($"Defect taxonomy export failed:\n{ex.Message}", "Defect Taxonomy", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OnRegisterModelClick(object sender, RoutedEventArgs e)
@@ -656,7 +805,7 @@ public partial class SettingsView : UserControl
                 ModelCheckMessageText.Text = message;
             });
             var token = _modelAcceptanceCancellation.Token;
-            var run = await Task.Run(() => ModelAcceptanceService.RunAcceptance(datasetFolder, csvPath, operatorId: operatorId, progress: progress, cancellationToken: token), token);
+            var run = await Task.Run(() => ModelAcceptanceService.RunAcceptance(datasetFolder, csvPath, operatorId: operatorId, role: WorkflowState.Instance.CurrentRole, progress: progress, cancellationToken: token), token);
             RefreshModelAcceptanceRunsUi();
             WorkflowState.Instance.AddEvent("MODEL_ACCEPTANCE", $"Model acceptance {run.Status}: model={run.ModelId}; run={run.Id}; dataset={run.DatasetName}.");
             ModelAcceptanceProgressBar.IsIndeterminate = false;
@@ -770,6 +919,22 @@ public partial class SettingsView : UserControl
 
         try
         {
+            var model = ModelRegistryService.GetModel(row.ModelId);
+            var latestAcceptance = AoiDatabase.GetLatestModelAcceptanceRun(row.ModelId);
+            if (model is null)
+            {
+                MessageBox.Show("The selected model registry entry could not be found.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                $"Deploy model {model.DisplayName} v{model.Version}?\n\nSHA-256: {model.Sha256}\nAcceptance run ID: {latestAcceptance?.Id.ToString(CultureInfo.InvariantCulture) ?? "none"}\nAcceptance status: {latestAcceptance?.Status ?? "none"}\n\nFull automation readiness still requires PASS acceptance with no active waiver and the remaining factory evidence.",
+                "Confirm Deploy Model",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
             ModelLifecycleService.DeployModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
             RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
             RefreshModelRegistryUi();
@@ -806,13 +971,16 @@ public partial class SettingsView : UserControl
             MessageBox.Show("A valid future waiver expiry date is required.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        var riskClassification = PromptForText("Deployment Waiver Risk", "Risk classification, for example Low / Medium / High / Safety Critical");
+        if (string.IsNullOrWhiteSpace(riskClassification))
+            return;
 
         try
         {
-            ModelLifecycleService.DeployModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole, reason, waiverExpiresAtUtc);
+            ModelLifecycleService.DeployModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole, reason, waiverExpiresAtUtc, riskClassification);
             RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
             RefreshModelRegistryUi();
-            WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT_WAIVER", $"Deployed model {row.ModelId} with Admin waiver expiring {waiverExpiresAtUtc:O}. Full automation remains blocked without real PASS evidence.");
+            WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT_WAIVER", $"Deployed model {row.ModelId} with Admin waiver risk={riskClassification}; expiring {waiverExpiresAtUtc:O}. Full automation remains blocked without real PASS evidence.");
             MessageBox.Show("Model deployed with waiver. Readiness packages will show this waiver and will not claim full production readiness.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or ArgumentException)
@@ -1172,6 +1340,7 @@ public partial class SettingsView : UserControl
 
         ReviewDefaultText.Text = DetectionPriorityDisplay(state.DetectionPriority, _isKorean);
         DeploymentProfileCombo.SelectedIndex = DeploymentProfileToCombo(DeploymentProfileSettingsService.Load());
+        RefreshOperatingModeUi();
         TrainingStatusText.Text = state.Training.IsRunning ? "RUNNING" : "IDLE";
         TrainingQueueText.Text = state.Training.QueuedSamples.ToString();
         TrainingEpochText.Text = state.Training.EpochsCompleted.ToString();
@@ -1188,6 +1357,7 @@ public partial class SettingsView : UserControl
         RefreshLightingUi();
         RefreshMesIntegrationUi();
         RefreshCentralSyncUi();
+        RefreshDefectTaxonomyUi();
     }
 
     private void RefreshRoleControls()
@@ -1198,6 +1368,7 @@ public partial class SettingsView : UserControl
 
         DetectionPriorityCombo.IsEnabled = canChangeThresholds;
         DeploymentProfileCombo.IsEnabled = canManageSettings;
+        OperatingModeCombo.IsEnabled = canManageSettings;
         InspectionEngineCombo.IsEnabled = canManageSettings;
         CameraSourceCombo.IsEnabled = canManageSettings;
         CameraTopFolderText.IsEnabled = canManageSettings;
@@ -1286,6 +1457,10 @@ public partial class SettingsView : UserControl
         BackupConfigurationBtn.IsEnabled = canManageSettings;
         RestoreConfigurationPreviewBtn.IsEnabled = canManageSettings;
         ApplyRestoreBtn.IsEnabled = canManageSettings && !string.IsNullOrWhiteSpace(_pendingRestoreBackupPath);
+        RollbackRestoreBtn.IsEnabled = canManageSettings && ConfigurationBackupService.GetLastRollbackInfo() is not null;
+        ExportSupportBundleBtn.IsEnabled = canManageSettings;
+        SupportBundleRedactPathsCheck.IsEnabled = canManageSettings;
+        SupportBundleIncludeModelsCheck.IsEnabled = canManageSettings;
         ConfidenceThresholdText.IsEnabled = canChangeThresholds;
         TestModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
         ValidateRegisteredModelBtn.IsEnabled = RoleAuthorization.CanTestModelConfiguration(role);
@@ -1299,6 +1474,40 @@ public partial class SettingsView : UserControl
         RetireModelBtn.IsEnabled = canManageSettings;
         ApproveThresholdProfileBtn.IsEnabled = canChangeThresholds;
         DeployThresholdProfileBtn.IsEnabled = canChangeThresholds;
+        ImportTaxonomyBtn.IsEnabled = canChangeThresholds;
+        ExportTaxonomyBtn.IsEnabled = canChangeThresholds;
+    }
+
+    private void RefreshOperatingModeUi()
+    {
+        var mode = OperatingModeSettingsService.Load();
+        OperatingModeCombo.SelectedIndex = OperatingModeToCombo(mode);
+        OperatingModePolicyText.Text = mode switch
+        {
+            OperatingMode.Production => "Production Mode blocks demo/fallback rows and enforces authentication, production model, real hardware, MES, export, and signoff gates.",
+            OperatingMode.Pilot => "Pilot Mode hides demo rows by default, requires customer dataset preflight and readiness evidence, and labels simulated hardware clearly.",
+            _ => "Demo Mode allows sample data, demo role selection, and simulated sources.",
+        };
+        OperatingModePolicyText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(mode switch
+        {
+            OperatingMode.Production => "#FFBFC1",
+            OperatingMode.Pilot => "#FFE0A7",
+            _ => "#E1A334",
+        }));
+    }
+
+    private void RefreshDefectTaxonomyUi()
+    {
+        try
+        {
+            var taxonomy = DefectTaxonomyService.GetActiveTaxonomy();
+            var classes = taxonomy.Entries.Count(entry => entry.IsActive);
+            TaxonomySummaryText.Text = $"{taxonomy.Taxonomy.Name} ({taxonomy.Taxonomy.CustomerName}); classes={classes}; aliases={taxonomy.Aliases.Count}; MES mappings={taxonomy.MesMappings.Count}.";
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            TaxonomySummaryText.Text = $"Active taxonomy unavailable: {ex.Message}";
+        }
     }
 
     private void RefreshThresholdProfilesUi()
@@ -2548,6 +2757,20 @@ public partial class SettingsView : UserControl
         _ => 0,
     };
 
+    private static OperatingMode ComboToOperatingMode(int selectedIndex) => selectedIndex switch
+    {
+        1 => OperatingMode.Pilot,
+        2 => OperatingMode.Production,
+        _ => OperatingMode.Demo,
+    };
+
+    private static int OperatingModeToCombo(OperatingMode mode) => mode switch
+    {
+        OperatingMode.Pilot => 1,
+        OperatingMode.Production => 2,
+        _ => 0,
+    };
+
     private static string PromptForText(string title, string label)
     {
         var input = new TextBox
@@ -2614,6 +2837,13 @@ public partial class SettingsView : UserControl
             lines.AddRange(preview.Warnings.Select(warning => $"- {warning}"));
         }
 
+        if (preview.SecretProtectionStatus.Count > 0)
+        {
+            lines.Add(string.Empty);
+            lines.Add("Secret protection:");
+            lines.AddRange(preview.SecretProtectionStatus.Select(status => $"- {status}"));
+        }
+
         if (preview.BlockingIssues.Count > 0)
         {
             lines.Add(string.Empty);
@@ -2644,9 +2874,13 @@ public partial class SettingsView : UserControl
             ValidationStatus = ModelConfigurationValidator.ToDisplay(entry.ValidationStatus);
             LifecycleState = entry.LifecycleState.ToString();
             LatestAcceptanceStatus = string.IsNullOrWhiteSpace(entry.LatestAcceptanceStatus) ? "--" : entry.LatestAcceptanceStatus;
+            LatestAcceptanceRunDisplay = entry.LatestAcceptanceRunId?.ToString(CultureInfo.InvariantCulture) ?? "--";
             ReleasePackageDisplay = string.IsNullOrWhiteSpace(entry.LatestReleasePackagePath)
                 ? "--"
                 : $"{entry.LatestReleasePackagePath} (#{entry.LatestReleasePackageId?.ToString(CultureInfo.InvariantCulture) ?? "--"})";
+            WaiverDisplay = string.IsNullOrWhiteSpace(entry.DeploymentWaiverReason)
+                ? "--"
+                : $"{entry.DeploymentWaiverRiskClassification}; expires {entry.WaiverExpiresAtUtc?.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "--"}";
             ThresholdDisplay = entry.ConfidenceThreshold.ToString("P0", CultureInfo.InvariantCulture);
             LastValidatedDisplay = entry.LastValidatedAtUtc is { } timestamp
                 ? timestamp.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.InvariantCulture)
@@ -2660,7 +2894,9 @@ public partial class SettingsView : UserControl
         public string ValidationStatus { get; }
         public string LifecycleState { get; }
         public string LatestAcceptanceStatus { get; }
+        public string LatestAcceptanceRunDisplay { get; }
         public string ReleasePackageDisplay { get; }
+        public string WaiverDisplay { get; }
         public string ThresholdDisplay { get; }
         public string LastValidatedDisplay { get; }
         public string ActiveDisplay { get; }

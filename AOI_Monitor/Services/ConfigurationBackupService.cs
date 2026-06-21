@@ -18,6 +18,8 @@ public sealed class ConfigurationBackupPackage
     public List<ModelRegistryRecord> ModelRegistry { get; set; } = new();
     public List<ThresholdProfile> ThresholdProfiles { get; set; } = new();
     public List<RecipeRevisionRecord> RecipeRevisions { get; set; } = new();
+    public DefectTaxonomySnapshot? ActiveTaxonomy { get; set; }
+    public List<string> PluginFolderReferences { get; set; } = new();
     public List<string> ExcludedData { get; set; } = new();
 }
 
@@ -37,16 +39,19 @@ public sealed class ConfigurationRestorePreview
     public List<string> MissingModelFiles { get; set; } = new();
     public List<string> MissingPluginFolders { get; set; } = new();
     public List<string> SettingsChanges { get; set; } = new();
+    public List<string> SecretProtectionStatus { get; set; } = new();
     public string Summary => IsCompatible
         ? $"Compatible backup: models={ModelRegistryCount}, thresholdProfiles={ThresholdProfileCount}, recipes={RecipeRevisionCount}."
         : $"Backup cannot be restored: {string.Join(" ", BlockingIssues)}";
 }
 
 public sealed record ConfigurationBackupResult(string BackupPath, ConfigurationBackupPackage Package);
+public sealed record ConfigurationRollbackInfo(string RollbackBackupPath, string RestoredBackupPath, DateTime CreatedAtUtc);
 
 public static class ConfigurationBackupService
 {
     public const string CurrentSchemaVersion = "configuration-backup/v1";
+    private const string RollbackMarkerFileName = "last_restore_rollback.json";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -90,6 +95,8 @@ public static class ConfigurationBackupService
                 preview.BlockingIssues.Add($"Backup database schema {package.DatabaseSchemaVersion} is newer than this app supports ({AoiDatabase.LatestSchemaVersion}).");
             if (package.ExcludedData.Count == 0)
                 preview.Warnings.Add("Backup does not list excluded runtime/customer image data.");
+            if (package.ActiveTaxonomy is null)
+                preview.Warnings.Add("Backup does not include an active defect taxonomy; current taxonomy will remain unless restore data is available.");
             AddRestorePreviewDetails(package, preview);
             preview.IsCompatible = preview.BlockingIssues.Count == 0;
         }
@@ -103,6 +110,45 @@ public static class ConfigurationBackupService
     }
 
     public static ConfigurationRestorePreview Import(string backupPath, string operatorId = "UNKNOWN")
+        => Import(backupPath, operatorId, createRollback: true);
+
+    public static ConfigurationRestorePreview RollbackLastRestore(string operatorId = "UNKNOWN")
+    {
+        var info = GetLastRollbackInfo()
+            ?? throw new InvalidOperationException("No restore rollback package is available.");
+        if (string.IsNullOrWhiteSpace(info.RollbackBackupPath) || !File.Exists(info.RollbackBackupPath))
+            throw new FileNotFoundException("The last restore rollback package was not found.", info.RollbackBackupPath);
+
+        var preview = Import(info.RollbackBackupPath, operatorId, createRollback: false);
+        if (preview.IsCompatible)
+        {
+            AoiDatabase.RecordAuditEvent(
+                "CONFIG_RESTORE_ROLLBACK",
+                $"Configuration restore rolled back using {Path.GetFileName(info.RollbackBackupPath)}.",
+                operatorWithRole: operatorId,
+                relatedEntityType: "ConfigurationBackup",
+                relatedPath: info.RollbackBackupPath);
+        }
+
+        return preview;
+    }
+
+    public static ConfigurationRollbackInfo? GetLastRollbackInfo()
+    {
+        var path = RollbackMarkerPath();
+        if (!File.Exists(path))
+            return null;
+        try
+        {
+            return JsonSerializer.Deserialize<ConfigurationRollbackInfo>(File.ReadAllText(path), JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static ConfigurationRestorePreview Import(string backupPath, string operatorId, bool createRollback)
     {
         var preview = Preview(backupPath);
         if (!preview.IsCompatible)
@@ -110,7 +156,12 @@ public static class ConfigurationBackupService
 
         var package = ReadPackage(backupPath);
         AoiDatabase.Initialize();
+        if (createRollback)
+            CreateRollbackPackage(backupPath, operatorId);
+
         ApplySettings(package.Settings);
+        if (package.ActiveTaxonomy is not null)
+            AoiDatabase.SaveDefectTaxonomySnapshot(package.ActiveTaxonomy, operatorId);
         foreach (var record in package.ModelRegistry)
             AoiDatabase.UpsertModelRegistryRecord(record);
         foreach (var profile in package.ThresholdProfiles)
@@ -137,13 +188,16 @@ public static class ConfigurationBackupService
             ModelRegistry = AoiDatabase.GetModelRegistryRecords().ToList(),
             ThresholdProfiles = AoiDatabase.GetThresholdProfiles().ToList(),
             RecipeRevisions = AoiDatabase.GetRecipeRevisions().ToList(),
+            ActiveTaxonomy = DefectTaxonomyService.GetActiveTaxonomy(),
+            PluginFolderReferences = GetPluginFolderReferences().Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             ExcludedData =
             {
                 "image_vault/",
                 "training/",
-                "exports/",
+                "exports/ (generated exports are excluded unless explicitly selected by a future backup option)",
                 "customer images and datasets",
                 "raw production images",
+                "SQLite WAL/SHM runtime files",
                 "SQLite database runtime files",
             },
         };
@@ -248,12 +302,23 @@ public static class ConfigurationBackupService
             preview.MissingPluginFolders.Add(camera.AdapterFolder);
         }
 
+        foreach (var pluginFolder in package.PluginFolderReferences.Where(path => !string.IsNullOrWhiteSpace(path)))
+        {
+            if (!Directory.Exists(pluginFolder))
+                preview.MissingPluginFolders.Add(pluginFolder);
+        }
+
         AddSettingChange(preview, "inspectionModel", package.Settings, InspectionModelConfigurationService.Load());
         AddSettingChange(preview, "cameraSource", package.Settings, CameraSourceSettingsService.Load());
         AddSettingChange(preview, "lighting", package.Settings, LightingSettingsService.Load());
         AddSettingChange(preview, "mesIntegration", package.Settings, ProtectedComparableMesSettings(MesIntegrationSettingsService.Load()));
         AddSettingChange(preview, "centralSync", package.Settings, ProtectedComparableCentralSyncSettings(CentralSyncSettingsService.Load()));
         AddSettingChange(preview, "deploymentProfile", package.Settings, DeploymentProfileSettingsService.Load());
+        AddSettingChange(preview, "activeTaxonomy", new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["activeTaxonomy"] = JsonSerializer.SerializeToElement(package.ActiveTaxonomy, JsonOptions),
+        }, DefectTaxonomyService.GetActiveTaxonomy());
+        AddSecretProtectionStatus(package, preview);
 
         if (preview.MissingModelFiles.Count > 0)
             preview.Warnings.Add($"{preview.MissingModelFiles.Count} model file path(s) in the backup do not exist on this PC.");
@@ -369,6 +434,69 @@ public static class ConfigurationBackupService
             return string.Empty;
         }
     }
+
+    private static void CreateRollbackPackage(string restoreBackupPath, string operatorId)
+    {
+        var folder = Path.Combine(AoiDatabase.StorageRoot, "configuration_rollback");
+        Directory.CreateDirectory(folder);
+        var rollback = Export(folder, operatorId);
+        var info = new ConfigurationRollbackInfo(rollback.BackupPath, restoreBackupPath, DateTime.UtcNow);
+        File.WriteAllText(RollbackMarkerPath(), JsonSerializer.Serialize(info, JsonOptions));
+        AoiDatabase.RecordAuditEvent(
+            "CONFIG_RESTORE_ROLLBACK_PACKAGE",
+            $"Rollback package created before restore: {Path.GetFileName(rollback.BackupPath)}.",
+            operatorWithRole: operatorId,
+            relatedEntityType: "ConfigurationBackup",
+            relatedPath: rollback.BackupPath);
+    }
+
+    private static string RollbackMarkerPath()
+        => Path.Combine(AoiDatabase.StorageRoot, RollbackMarkerFileName);
+
+    private static IEnumerable<string> GetPluginFolderReferences()
+    {
+        var camera = CameraSourceSettingsService.Load();
+        if (!string.IsNullOrWhiteSpace(camera.AdapterFolder))
+            yield return camera.AdapterFolder;
+    }
+
+    private static void AddSecretProtectionStatus(ConfigurationBackupPackage package, ConfigurationRestorePreview preview)
+    {
+        AddSecretProtectionStatus(package.Settings, preview, "mesIntegration", nameof(MesIntegrationSettings.ApiKey));
+        AddSecretProtectionStatus(package.Settings, preview, "mesIntegration", nameof(MesIntegrationSettings.BearerToken));
+        AddSecretProtectionStatus(package.Settings, preview, "mesIntegration", nameof(MesIntegrationSettings.Password));
+        AddSecretProtectionStatus(package.Settings, preview, "centralSync", nameof(CentralSyncSettings.SharedSecret));
+    }
+
+    private static void AddSecretProtectionStatus(Dictionary<string, JsonElement> settings, ConfigurationRestorePreview preview, string key, string propertyName)
+    {
+        if (!settings.TryGetValue(key, out var element) ||
+            (!element.TryGetProperty(propertyName, out var valueElement) &&
+             !element.TryGetProperty(JsonName(propertyName), out valueElement)))
+        {
+            return;
+        }
+
+        var value = valueElement.GetString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            preview.SecretProtectionStatus.Add($"{key}.{propertyName}: empty/not configured.");
+        }
+        else if (SecretProtectionService.IsProtected(value))
+        {
+            preview.SecretProtectionStatus.Add($"{key}.{propertyName}: protected.");
+        }
+        else
+        {
+            preview.Warnings.Add($"{key}.{propertyName} is not marked protected in the backup; it will be treated as unsafe legacy data.");
+            preview.SecretProtectionStatus.Add($"{key}.{propertyName}: NOT PROTECTED.");
+        }
+    }
+
+    private static string JsonName(string propertyName)
+        => string.IsNullOrWhiteSpace(propertyName)
+            ? propertyName
+            : char.ToLowerInvariant(propertyName[0]) + propertyName[1..];
 
     private static IEnumerable<(string Key, string Path)> SettingsFiles()
     {

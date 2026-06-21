@@ -1689,7 +1689,8 @@ public static class AoiDatabase
                    InputWidth, InputHeight, ConfidenceThreshold, LabelsJson, ValidationStatus, LastValidatedAtUtc,
                    ValidationMessage, Notes, IsActive, AuditEventId, LifecycleState, LatestAcceptanceStatus,
                    LatestAcceptanceRunId, LatestReleasePackageId, LatestReleasePackagePath, DeploymentWaiverReason,
-                   WaiverExpiresAtUtc, DeploymentWaivedBy, DeploymentWaivedAtUtc, DeployedAtUtc, RetiredReason, RetiredAtUtc
+                   WaiverExpiresAtUtc, DeploymentWaivedBy, DeploymentWaivedAtUtc, DeploymentWaiverRiskClassification,
+                   DeployedAtUtc, RetiredReason, RetiredAtUtc
             FROM ModelRegistry
             ORDER BY IsActive DESC, datetime(RegisteredAtUtc) DESC, Id DESC;
             """;
@@ -1714,7 +1715,8 @@ public static class AoiDatabase
                    InputWidth, InputHeight, ConfidenceThreshold, LabelsJson, ValidationStatus, LastValidatedAtUtc,
                    ValidationMessage, Notes, IsActive, AuditEventId, LifecycleState, LatestAcceptanceStatus,
                    LatestAcceptanceRunId, LatestReleasePackageId, LatestReleasePackagePath, DeploymentWaiverReason,
-                   WaiverExpiresAtUtc, DeploymentWaivedBy, DeploymentWaivedAtUtc, DeployedAtUtc, RetiredReason, RetiredAtUtc
+                   WaiverExpiresAtUtc, DeploymentWaivedBy, DeploymentWaivedAtUtc, DeploymentWaiverRiskClassification,
+                   DeployedAtUtc, RetiredReason, RetiredAtUtc
             FROM ModelRegistry
             WHERE IsActive = 1
             ORDER BY datetime(RegisteredAtUtc) DESC, Id DESC
@@ -2247,6 +2249,266 @@ public static class AoiDatabase
         return (long)(command.ExecuteScalar() ?? 0L);
     }
 
+    public static long CreateCustomerPilotSession(CustomerPilotSessionRecord session)
+    {
+        EnsureInitialized();
+        var now = DateTime.UtcNow;
+        session.SessionId = string.IsNullOrWhiteSpace(session.SessionId)
+            ? $"PILOT-{now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
+            : session.SessionId.Trim();
+        session.CreatedAtUtc = session.CreatedAtUtc == DateTime.MinValue ? now : session.CreatedAtUtc.ToUniversalTime();
+        session.UpdatedAtUtc = now;
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO CustomerPilotSessions
+                (SessionId, DeploymentProfile, Status, DatasetFolder, ManifestPath, OperatorId, CreatedAtUtc, UpdatedAtUtc, CompletedAtUtc)
+            VALUES
+                ($sessionId, $deploymentProfile, $status, $datasetFolder, $manifestPath, $operatorId, $createdAtUtc, $updatedAtUtc, $completedAtUtc);
+            SELECT last_insert_rowid();
+            """;
+        AddCustomerPilotSessionParameters(command, session);
+        session.Id = (long)(command.ExecuteScalar() ?? 0L);
+        return session.Id;
+    }
+
+    public static void UpdateCustomerPilotSession(CustomerPilotSessionRecord session)
+    {
+        EnsureInitialized();
+        session.UpdatedAtUtc = DateTime.UtcNow;
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE CustomerPilotSessions
+            SET DeploymentProfile = $deploymentProfile,
+                Status = $status,
+                DatasetFolder = $datasetFolder,
+                ManifestPath = $manifestPath,
+                OperatorId = $operatorId,
+                UpdatedAtUtc = $updatedAtUtc,
+                CompletedAtUtc = $completedAtUtc
+            WHERE Id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", session.Id);
+        AddCustomerPilotSessionParameters(command, session);
+        command.ExecuteNonQuery();
+    }
+
+    public static CustomerPilotSessionRecord? GetCustomerPilotSession(long id)
+    {
+        EnsureInitialized();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT * FROM CustomerPilotSessions WHERE Id = $id;";
+        command.Parameters.AddWithValue("$id", id);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadCustomerPilotSession(reader) : null;
+    }
+
+    public static CustomerPilotSessionRecord? GetLatestIncompleteCustomerPilotSession()
+    {
+        EnsureInitialized();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT * FROM CustomerPilotSessions
+            WHERE Status != 'Completed'
+            ORDER BY UpdatedAtUtc DESC, Id DESC
+            LIMIT 1;
+            """;
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadCustomerPilotSession(reader) : null;
+    }
+
+    public static IReadOnlyList<CustomerPilotStepRecord> GetCustomerPilotSteps(long sessionId)
+    {
+        EnsureInitialized();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT * FROM CustomerPilotSteps WHERE SessionId = $sessionId ORDER BY StepOrder, Id;";
+        command.Parameters.AddWithValue("$sessionId", sessionId);
+        using var reader = command.ExecuteReader();
+        var rows = new List<CustomerPilotStepRecord>();
+        while (reader.Read())
+            rows.Add(ReadCustomerPilotStep(reader));
+        return rows;
+    }
+
+    public static long UpsertCustomerPilotStep(CustomerPilotStepRecord step)
+    {
+        EnsureInitialized();
+        step.UpdatedAtUtc = DateTime.UtcNow;
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO CustomerPilotSteps
+                (SessionId, StepKey, StepOrder, Status, EvidencePath, MessagesJson, Waived, WaiverReason, WaivedBy, WaivedAtUtc, UpdatedAtUtc)
+            VALUES
+                ($sessionId, $stepKey, $stepOrder, $status, $evidencePath, $messagesJson, $waived, $waiverReason, $waivedBy, $waivedAtUtc, $updatedAtUtc)
+            ON CONFLICT(SessionId, StepKey) DO UPDATE SET
+                StepOrder = excluded.StepOrder,
+                Status = excluded.Status,
+                EvidencePath = excluded.EvidencePath,
+                MessagesJson = excluded.MessagesJson,
+                Waived = excluded.Waived,
+                WaiverReason = excluded.WaiverReason,
+                WaivedBy = excluded.WaivedBy,
+                WaivedAtUtc = excluded.WaivedAtUtc,
+                UpdatedAtUtc = excluded.UpdatedAtUtc;
+            """;
+        AddCustomerPilotStepParameters(command, step);
+        command.ExecuteNonQuery();
+
+        using var idCommand = connection.CreateCommand();
+        idCommand.CommandText = "SELECT Id FROM CustomerPilotSteps WHERE SessionId = $sessionId AND StepKey = $stepKey;";
+        idCommand.Parameters.AddWithValue("$sessionId", step.SessionId);
+        idCommand.Parameters.AddWithValue("$stepKey", step.StepKey.ToString());
+        step.Id = Convert.ToInt64(idCommand.ExecuteScalar(), CultureInfo.InvariantCulture);
+        return step.Id;
+    }
+
+    public static void SavePilotIssue(PilotIssue issue, string eventType, string message, string operatorId, string previousStatus = "")
+    {
+        EnsureInitialized();
+        var now = DateTime.UtcNow;
+        issue.IssueId = string.IsNullOrWhiteSpace(issue.IssueId)
+            ? $"ISSUE-{now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}"
+            : issue.IssueId.Trim();
+        issue.CreatedAtUtc = issue.CreatedAtUtc == DateTime.MinValue ? now : issue.CreatedAtUtc.ToUniversalTime();
+        if (issue.Status is PilotIssueStatus.Closed or PilotIssueStatus.Waived or PilotIssueStatus.Fixed)
+            issue.ClosedAtUtc ??= now;
+        else
+            issue.ClosedAtUtc = null;
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO PilotIssues
+                (IssueId, CreatedAtUtc, Category, Severity, BoardModel, LotId, ImagePath, RelatedInspectionId,
+                 RelatedAcceptanceRunId, Status, Owner, Notes, Resolution, ClosedAtUtc)
+            VALUES
+                ($issueId, $createdAtUtc, $category, $severity, $boardModel, $lotId, $imagePath, $relatedInspectionId,
+                 $relatedAcceptanceRunId, $status, $owner, $notes, $resolution, $closedAtUtc)
+            ON CONFLICT(IssueId) DO UPDATE SET
+                Category = excluded.Category,
+                Severity = excluded.Severity,
+                BoardModel = excluded.BoardModel,
+                LotId = excluded.LotId,
+                ImagePath = excluded.ImagePath,
+                RelatedInspectionId = excluded.RelatedInspectionId,
+                RelatedAcceptanceRunId = excluded.RelatedAcceptanceRunId,
+                Status = excluded.Status,
+                Owner = excluded.Owner,
+                Notes = excluded.Notes,
+                Resolution = excluded.Resolution,
+                ClosedAtUtc = excluded.ClosedAtUtc;
+            """;
+        AddPilotIssueParameters(command, issue);
+        command.ExecuteNonQuery();
+
+        using var eventCommand = connection.CreateCommand();
+        eventCommand.Transaction = transaction;
+        eventCommand.CommandText =
+            """
+            INSERT INTO PilotIssueEvents
+                (IssueId, CreatedAtUtc, EventType, OperatorId, Message, PreviousStatus, NewStatus)
+            VALUES
+                ($issueId, $createdAtUtc, $eventType, $operatorId, $message, $previousStatus, $newStatus);
+            """;
+        eventCommand.Parameters.AddWithValue("$issueId", issue.IssueId);
+        eventCommand.Parameters.AddWithValue("$createdAtUtc", now.ToString("O", CultureInfo.InvariantCulture));
+        eventCommand.Parameters.AddWithValue("$eventType", eventType);
+        eventCommand.Parameters.AddWithValue("$operatorId", operatorId);
+        eventCommand.Parameters.AddWithValue("$message", message);
+        eventCommand.Parameters.AddWithValue("$previousStatus", previousStatus);
+        eventCommand.Parameters.AddWithValue("$newStatus", issue.Status.ToString());
+        eventCommand.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
+    public static PilotIssue? GetPilotIssue(string issueId)
+    {
+        EnsureInitialized();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT * FROM PilotIssues WHERE IssueId = $issueId;";
+        command.Parameters.AddWithValue("$issueId", issueId);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadPilotIssue(reader) : null;
+    }
+
+    public static IReadOnlyList<PilotIssue> GetPilotIssues(PilotIssueFilter? filter = null, int limit = 500)
+    {
+        EnsureInitialized();
+        filter ??= new PilotIssueFilter();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        var where = new List<string>();
+        if (filter.Category is { } category)
+        {
+            where.Add("Category = $category");
+            command.Parameters.AddWithValue("$category", category.ToString());
+        }
+        if (filter.Status is { } status)
+        {
+            where.Add("Status = $status");
+            command.Parameters.AddWithValue("$status", status.ToString());
+        }
+        if (filter.OpenOnly)
+            where.Add("Status IN ('Open', 'Investigating')");
+        if (!string.IsNullOrWhiteSpace(filter.Severity))
+        {
+            where.Add("Severity = $severity");
+            command.Parameters.AddWithValue("$severity", filter.Severity.Trim());
+        }
+        if (!string.IsNullOrWhiteSpace(filter.BoardModel))
+        {
+            where.Add("BoardModel LIKE $boardModel");
+            command.Parameters.AddWithValue("$boardModel", $"%{filter.BoardModel.Trim()}%");
+        }
+        if (!string.IsNullOrWhiteSpace(filter.LotId))
+        {
+            where.Add("LotId LIKE $lotId");
+            command.Parameters.AddWithValue("$lotId", $"%{filter.LotId.Trim()}%");
+        }
+
+        command.CommandText =
+            $"""
+            SELECT * FROM PilotIssues
+            {(where.Count == 0 ? string.Empty : "WHERE " + string.Join(" AND ", where))}
+            ORDER BY datetime(CreatedAtUtc) DESC, IssueId DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 5000));
+        using var reader = command.ExecuteReader();
+        var rows = new List<PilotIssue>();
+        while (reader.Read())
+            rows.Add(ReadPilotIssue(reader));
+        return rows;
+    }
+
+    public static IReadOnlyList<PilotIssueEvent> GetPilotIssueEvents(string issueId)
+    {
+        EnsureInitialized();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT * FROM PilotIssueEvents WHERE IssueId = $issueId ORDER BY datetime(CreatedAtUtc), Id;";
+        command.Parameters.AddWithValue("$issueId", issueId);
+        using var reader = command.ExecuteReader();
+        var rows = new List<PilotIssueEvent>();
+        while (reader.Read())
+            rows.Add(ReadPilotIssueEvent(reader));
+        return rows;
+    }
+
     public static void UpsertModelRegistryRecord(ModelRegistryRecord record)
     {
         EnsureInitialized();
@@ -2261,14 +2523,16 @@ public static class AoiDatabase
                  InputWidth, InputHeight, ConfidenceThreshold, LabelsJson, ValidationStatus, LastValidatedAtUtc,
                  ValidationMessage, Notes, IsActive, AuditEventId, LifecycleState, LatestAcceptanceStatus,
                  LatestAcceptanceRunId, LatestReleasePackageId, LatestReleasePackagePath, DeploymentWaiverReason,
-                 WaiverExpiresAtUtc, DeploymentWaivedBy, DeploymentWaivedAtUtc, DeployedAtUtc, RetiredReason, RetiredAtUtc)
+                 WaiverExpiresAtUtc, DeploymentWaivedBy, DeploymentWaivedAtUtc, DeploymentWaiverRiskClassification,
+                 DeployedAtUtc, RetiredReason, RetiredAtUtc)
             VALUES
                 ($modelId, $displayName, $version, $createdAtUtc, $registeredAtUtc, $sourceFileName,
                  $storedModelPath, $storedLabelMapPath, $metadataPath, $sha256, $inputTensorName, $outputTensorName,
                  $inputWidth, $inputHeight, $confidenceThreshold, $labelsJson, $validationStatus, $lastValidatedAtUtc,
                  $validationMessage, $notes, $isActive, $auditEventId, $lifecycleState, $latestAcceptanceStatus,
                  $latestAcceptanceRunId, $latestReleasePackageId, $latestReleasePackagePath, $deploymentWaiverReason,
-                 $waiverExpiresAtUtc, $deploymentWaivedBy, $deploymentWaivedAtUtc, $deployedAtUtc, $retiredReason, $retiredAtUtc)
+                 $waiverExpiresAtUtc, $deploymentWaivedBy, $deploymentWaivedAtUtc, $deploymentWaiverRiskClassification,
+                 $deployedAtUtc, $retiredReason, $retiredAtUtc)
             ON CONFLICT(ModelId) DO UPDATE SET
                 DisplayName = excluded.DisplayName,
                 Version = excluded.Version,
@@ -2300,6 +2564,7 @@ public static class AoiDatabase
                 WaiverExpiresAtUtc = excluded.WaiverExpiresAtUtc,
                 DeploymentWaivedBy = excluded.DeploymentWaivedBy,
                 DeploymentWaivedAtUtc = excluded.DeploymentWaivedAtUtc,
+                DeploymentWaiverRiskClassification = excluded.DeploymentWaiverRiskClassification,
                 DeployedAtUtc = excluded.DeployedAtUtc,
                 RetiredReason = excluded.RetiredReason,
                 RetiredAtUtc = excluded.RetiredAtUtc;
@@ -2369,6 +2634,7 @@ public static class AoiDatabase
         DateTime? waiverExpiresAtUtc = null,
         string deploymentWaivedBy = "",
         DateTime? deploymentWaivedAtUtc = null,
+        string deploymentWaiverRiskClassification = "",
         DateTime? deployedAtUtc = null,
         string retiredReason = "",
         DateTime? retiredAtUtc = null,
@@ -2391,6 +2657,7 @@ public static class AoiDatabase
                 WaiverExpiresAtUtc = CASE WHEN $replaceDeploymentWaiver = 1 THEN $waiverExpiresAtUtc WHEN $waiverExpiresAtUtc IS NULL THEN WaiverExpiresAtUtc ELSE $waiverExpiresAtUtc END,
                 DeploymentWaivedBy = CASE WHEN $replaceDeploymentWaiver = 1 THEN $deploymentWaivedBy WHEN $deploymentWaivedBy = '' THEN DeploymentWaivedBy ELSE $deploymentWaivedBy END,
                 DeploymentWaivedAtUtc = CASE WHEN $replaceDeploymentWaiver = 1 THEN $deploymentWaivedAtUtc WHEN $deploymentWaivedAtUtc IS NULL THEN DeploymentWaivedAtUtc ELSE $deploymentWaivedAtUtc END,
+                DeploymentWaiverRiskClassification = CASE WHEN $replaceDeploymentWaiver = 1 THEN $deploymentWaiverRiskClassification WHEN $deploymentWaiverRiskClassification = '' THEN DeploymentWaiverRiskClassification ELSE $deploymentWaiverRiskClassification END,
                 DeployedAtUtc = CASE WHEN $deployedAtUtc IS NULL THEN DeployedAtUtc ELSE $deployedAtUtc END,
                 RetiredReason = CASE WHEN $retiredReason = '' THEN RetiredReason ELSE $retiredReason END,
                 RetiredAtUtc = CASE WHEN $retiredAtUtc IS NULL THEN RetiredAtUtc ELSE $retiredAtUtc END,
@@ -2407,6 +2674,7 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$waiverExpiresAtUtc", waiverExpiresAtUtc is { } expiresAt ? (object)expiresAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
         command.Parameters.AddWithValue("$deploymentWaivedBy", deploymentWaivedBy ?? string.Empty);
         command.Parameters.AddWithValue("$deploymentWaivedAtUtc", deploymentWaivedAtUtc is { } waivedAt ? (object)waivedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
+        command.Parameters.AddWithValue("$deploymentWaiverRiskClassification", deploymentWaiverRiskClassification ?? string.Empty);
         command.Parameters.AddWithValue("$deployedAtUtc", deployedAtUtc is { } deployedAt ? (object)deployedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
         command.Parameters.AddWithValue("$retiredReason", retiredReason ?? string.Empty);
         command.Parameters.AddWithValue("$retiredAtUtc", retiredAtUtc is { } retiredAt ? (object)retiredAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
@@ -2856,6 +3124,97 @@ public static class AoiDatabase
             records.Add(ReadMesSpoolQueueRecord(reader));
 
         return records;
+    }
+
+    public static DefectTaxonomySnapshot? GetActiveDefectTaxonomy()
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        EnsureDefectTaxonomyTables(connection);
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT TaxonomyId, Name, CustomerName, IsActive, CreatedAtUtc, UpdatedAtUtc
+            FROM DefectTaxonomies
+            WHERE IsActive = 1
+            ORDER BY datetime(UpdatedAtUtc) DESC
+            LIMIT 1;
+            """;
+        using var reader = command.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        var taxonomy = ReadDefectTaxonomy(reader);
+        return new DefectTaxonomySnapshot
+        {
+            Taxonomy = taxonomy,
+            Entries = GetDefectTaxonomyEntries(connection, taxonomy.TaxonomyId).ToList(),
+            Aliases = GetDefectClassAliases(connection, taxonomy.TaxonomyId).ToList(),
+            MesMappings = GetMesDefectCodeMappings(connection, taxonomy.TaxonomyId).ToList(),
+        };
+    }
+
+    public static IReadOnlyList<DefectTaxonomyEntry> GetActiveDefectTaxonomyEntries()
+        => GetActiveDefectTaxonomy()?.Entries ?? (IReadOnlyList<DefectTaxonomyEntry>)Array.Empty<DefectTaxonomyEntry>();
+
+    public static void SaveDefectTaxonomySnapshot(DefectTaxonomySnapshot snapshot, string operatorWithRole = "SYSTEM")
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (string.IsNullOrWhiteSpace(snapshot.Taxonomy.TaxonomyId))
+            throw new ArgumentException("Taxonomy ID is required.", nameof(snapshot));
+
+        var now = DateTime.UtcNow;
+        snapshot.Taxonomy.CreatedAtUtc = snapshot.Taxonomy.CreatedAtUtc == default ? now : snapshot.Taxonomy.CreatedAtUtc;
+        snapshot.Taxonomy.UpdatedAtUtc = now;
+
+        using var connection = OpenConnection();
+        EnsureDefectTaxonomyTables(connection);
+        using var transaction = connection.BeginTransaction();
+        if (snapshot.Taxonomy.IsActive)
+        {
+            using var deactivate = connection.CreateCommand();
+            deactivate.Transaction = transaction;
+            deactivate.CommandText = "UPDATE DefectTaxonomies SET IsActive = 0;";
+            deactivate.ExecuteNonQuery();
+        }
+
+        using var taxonomy = connection.CreateCommand();
+        taxonomy.Transaction = transaction;
+        taxonomy.CommandText =
+            """
+            INSERT INTO DefectTaxonomies (TaxonomyId, Name, CustomerName, IsActive, CreatedAtUtc, UpdatedAtUtc)
+            VALUES ($id, $name, $customerName, $isActive, $createdAtUtc, $updatedAtUtc)
+            ON CONFLICT(TaxonomyId) DO UPDATE SET
+                Name = excluded.Name,
+                CustomerName = excluded.CustomerName,
+                IsActive = excluded.IsActive,
+                UpdatedAtUtc = excluded.UpdatedAtUtc;
+            """;
+        taxonomy.Parameters.AddWithValue("$id", snapshot.Taxonomy.TaxonomyId);
+        taxonomy.Parameters.AddWithValue("$name", snapshot.Taxonomy.Name);
+        taxonomy.Parameters.AddWithValue("$customerName", snapshot.Taxonomy.CustomerName);
+        taxonomy.Parameters.AddWithValue("$isActive", snapshot.Taxonomy.IsActive ? 1 : 0);
+        taxonomy.Parameters.AddWithValue("$createdAtUtc", snapshot.Taxonomy.CreatedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+        taxonomy.Parameters.AddWithValue("$updatedAtUtc", snapshot.Taxonomy.UpdatedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+        taxonomy.ExecuteNonQuery();
+
+        DeleteTaxonomyChildren(connection, transaction, snapshot.Taxonomy.TaxonomyId);
+        foreach (var entry in snapshot.Entries)
+            InsertDefectTaxonomyEntry(connection, transaction, snapshot.Taxonomy.TaxonomyId, entry);
+        foreach (var alias in snapshot.Aliases)
+            InsertDefectClassAlias(connection, transaction, snapshot.Taxonomy.TaxonomyId, alias);
+        foreach (var mapping in snapshot.MesMappings)
+            InsertMesDefectCodeMapping(connection, transaction, snapshot.Taxonomy.TaxonomyId, mapping);
+
+        transaction.Commit();
+        RecordAuditEvent(
+            "DEFECT_TAXONOMY",
+            $"Defect taxonomy saved: {snapshot.Taxonomy.Name}; entries={snapshot.Entries.Count}; aliases={snapshot.Aliases.Count}; MES mappings={snapshot.MesMappings.Count}.",
+            operatorWithRole: operatorWithRole,
+            relatedEntityType: "DefectTaxonomy",
+            relatedEntityId: snapshot.Taxonomy.TaxonomyId);
     }
 
     public static void MarkMesSpoolItemSent(long id, string message)
@@ -3614,6 +3973,142 @@ public static class AoiDatabase
             reader.IsDBNull(9) ? null : reader.GetInt64(9));
     }
 
+    private static CustomerPilotSessionRecord ReadCustomerPilotSession(SqliteDataReader reader)
+    {
+        return new CustomerPilotSessionRecord
+        {
+            Id = reader.GetInt64(reader.GetOrdinal("Id")),
+            SessionId = reader.GetString(reader.GetOrdinal("SessionId")),
+            DeploymentProfile = Enum.TryParse<DeploymentProfile>(reader.GetString(reader.GetOrdinal("DeploymentProfile")), out var profile)
+                ? profile
+                : DeploymentProfile.Stage1ImageValidation,
+            Status = reader.GetString(reader.GetOrdinal("Status")),
+            DatasetFolder = reader.GetString(reader.GetOrdinal("DatasetFolder")),
+            ManifestPath = reader.GetString(reader.GetOrdinal("ManifestPath")),
+            OperatorId = reader.GetString(reader.GetOrdinal("OperatorId")),
+            CreatedAtUtc = ParseDateTime(reader.GetString(reader.GetOrdinal("CreatedAtUtc"))),
+            UpdatedAtUtc = ParseDateTime(reader.GetString(reader.GetOrdinal("UpdatedAtUtc"))),
+            CompletedAtUtc = reader.IsDBNull(reader.GetOrdinal("CompletedAtUtc"))
+                ? null
+                : ParseDateTime(reader.GetString(reader.GetOrdinal("CompletedAtUtc"))),
+        };
+    }
+
+    private static CustomerPilotStepRecord ReadCustomerPilotStep(SqliteDataReader reader)
+    {
+        return new CustomerPilotStepRecord
+        {
+            Id = reader.GetInt64(reader.GetOrdinal("Id")),
+            SessionId = reader.GetInt64(reader.GetOrdinal("SessionId")),
+            StepKey = Enum.TryParse<CustomerPilotStepKind>(reader.GetString(reader.GetOrdinal("StepKey")), out var step)
+                ? step
+                : CustomerPilotStepKind.ConfirmDeploymentProfile,
+            StepOrder = reader.GetInt32(reader.GetOrdinal("StepOrder")),
+            Status = Enum.TryParse<CustomerPilotStepStatus>(reader.GetString(reader.GetOrdinal("Status")), out var status)
+                ? status
+                : CustomerPilotStepStatus.NotStarted,
+            EvidencePath = reader.GetString(reader.GetOrdinal("EvidencePath")),
+            Messages = DeserializeOrDefault(reader.GetString(reader.GetOrdinal("MessagesJson")), new List<string>()),
+            Waived = reader.GetInt32(reader.GetOrdinal("Waived")) != 0,
+            WaiverReason = reader.GetString(reader.GetOrdinal("WaiverReason")),
+            WaivedBy = reader.GetString(reader.GetOrdinal("WaivedBy")),
+            WaivedAtUtc = reader.IsDBNull(reader.GetOrdinal("WaivedAtUtc"))
+                ? null
+                : ParseDateTime(reader.GetString(reader.GetOrdinal("WaivedAtUtc"))),
+            UpdatedAtUtc = ParseDateTime(reader.GetString(reader.GetOrdinal("UpdatedAtUtc"))),
+        };
+    }
+
+    private static PilotIssue ReadPilotIssue(SqliteDataReader reader)
+    {
+        var categoryText = reader.GetString(reader.GetOrdinal("Category"));
+        var statusText = reader.GetString(reader.GetOrdinal("Status"));
+        return new PilotIssue
+        {
+            IssueId = reader.GetString(reader.GetOrdinal("IssueId")),
+            CreatedAtUtc = ParseDateTime(reader.GetString(reader.GetOrdinal("CreatedAtUtc"))),
+            Category = Enum.TryParse<PilotIssueCategory>(categoryText, ignoreCase: true, out var category) ? category : PilotIssueCategory.Other,
+            Severity = reader.GetString(reader.GetOrdinal("Severity")),
+            BoardModel = reader.GetString(reader.GetOrdinal("BoardModel")),
+            LotId = reader.GetString(reader.GetOrdinal("LotId")),
+            ImagePath = reader.GetString(reader.GetOrdinal("ImagePath")),
+            RelatedInspectionId = reader.GetString(reader.GetOrdinal("RelatedInspectionId")),
+            RelatedAcceptanceRunId = reader.GetString(reader.GetOrdinal("RelatedAcceptanceRunId")),
+            Status = Enum.TryParse<PilotIssueStatus>(statusText, ignoreCase: true, out var status) ? status : PilotIssueStatus.Open,
+            Owner = reader.GetString(reader.GetOrdinal("Owner")),
+            Notes = reader.GetString(reader.GetOrdinal("Notes")),
+            Resolution = reader.GetString(reader.GetOrdinal("Resolution")),
+            ClosedAtUtc = reader.IsDBNull(reader.GetOrdinal("ClosedAtUtc"))
+                ? null
+                : ParseDateTime(reader.GetString(reader.GetOrdinal("ClosedAtUtc"))),
+        };
+    }
+
+    private static PilotIssueEvent ReadPilotIssueEvent(SqliteDataReader reader)
+        => new()
+        {
+            Id = reader.GetInt64(reader.GetOrdinal("Id")),
+            IssueId = reader.GetString(reader.GetOrdinal("IssueId")),
+            CreatedAtUtc = ParseDateTime(reader.GetString(reader.GetOrdinal("CreatedAtUtc"))),
+            EventType = reader.GetString(reader.GetOrdinal("EventType")),
+            OperatorId = reader.GetString(reader.GetOrdinal("OperatorId")),
+            Message = reader.GetString(reader.GetOrdinal("Message")),
+            PreviousStatus = reader.GetString(reader.GetOrdinal("PreviousStatus")),
+            NewStatus = reader.GetString(reader.GetOrdinal("NewStatus")),
+        };
+
+    private static void AddCustomerPilotSessionParameters(SqliteCommand command, CustomerPilotSessionRecord session)
+    {
+        command.Parameters.AddWithValue("$sessionId", session.SessionId);
+        command.Parameters.AddWithValue("$deploymentProfile", session.DeploymentProfile.ToString());
+        command.Parameters.AddWithValue("$status", string.IsNullOrWhiteSpace(session.Status) ? "InProgress" : session.Status);
+        command.Parameters.AddWithValue("$datasetFolder", session.DatasetFolder?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$manifestPath", session.ManifestPath?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$operatorId", string.IsNullOrWhiteSpace(session.OperatorId) ? "UNKNOWN" : session.OperatorId.Trim());
+        command.Parameters.AddWithValue("$createdAtUtc", session.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$updatedAtUtc", session.UpdatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$completedAtUtc", session.CompletedAtUtc is { } completed
+            ? completed.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
+            : DBNull.Value);
+    }
+
+    private static void AddCustomerPilotStepParameters(SqliteCommand command, CustomerPilotStepRecord step)
+    {
+        command.Parameters.AddWithValue("$sessionId", step.SessionId);
+        command.Parameters.AddWithValue("$stepKey", step.StepKey.ToString());
+        command.Parameters.AddWithValue("$stepOrder", step.StepOrder);
+        command.Parameters.AddWithValue("$status", step.Status.ToString());
+        command.Parameters.AddWithValue("$evidencePath", step.EvidencePath?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$messagesJson", JsonSerializer.Serialize(step.Messages ?? new List<string>()));
+        command.Parameters.AddWithValue("$waived", step.Waived ? 1 : 0);
+        command.Parameters.AddWithValue("$waiverReason", step.WaiverReason?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$waivedBy", step.WaivedBy?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$waivedAtUtc", step.WaivedAtUtc is { } waivedAt
+            ? waivedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
+            : DBNull.Value);
+        command.Parameters.AddWithValue("$updatedAtUtc", step.UpdatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+    }
+
+    private static void AddPilotIssueParameters(SqliteCommand command, PilotIssue issue)
+    {
+        command.Parameters.AddWithValue("$issueId", issue.IssueId);
+        command.Parameters.AddWithValue("$createdAtUtc", issue.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$category", issue.Category.ToString());
+        command.Parameters.AddWithValue("$severity", string.IsNullOrWhiteSpace(issue.Severity) ? "Medium" : issue.Severity.Trim());
+        command.Parameters.AddWithValue("$boardModel", issue.BoardModel?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$lotId", issue.LotId?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$imagePath", issue.ImagePath?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$relatedInspectionId", issue.RelatedInspectionId?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$relatedAcceptanceRunId", issue.RelatedAcceptanceRunId?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$status", issue.Status.ToString());
+        command.Parameters.AddWithValue("$owner", issue.Owner?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$notes", issue.Notes?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$resolution", issue.Resolution?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$closedAtUtc", issue.ClosedAtUtc is { } closed
+            ? closed.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
+            : DBNull.Value);
+    }
+
     private static FalseCallReductionRun ReadFalseCallReductionRun(SqliteDataReader reader)
     {
         var criteria = DeserializeOrDefault(reader.IsDBNull(7) ? "{}" : reader.GetString(7), new FalseCallReductionCriteria());
@@ -4074,9 +4569,10 @@ public static class AoiDatabase
             reader.IsDBNull(29) ? null : ParseDateTime(reader.GetString(29)),
             reader.IsDBNull(30) ? string.Empty : reader.GetString(30),
             reader.IsDBNull(31) ? null : ParseDateTime(reader.GetString(31)),
-            reader.IsDBNull(32) ? null : ParseDateTime(reader.GetString(32)),
-            reader.IsDBNull(33) ? string.Empty : reader.GetString(33),
-            reader.IsDBNull(34) ? null : ParseDateTime(reader.GetString(34)));
+            reader.IsDBNull(32) ? string.Empty : reader.GetString(32),
+            reader.IsDBNull(33) ? null : ParseDateTime(reader.GetString(33)),
+            reader.IsDBNull(34) ? string.Empty : reader.GetString(34),
+            reader.IsDBNull(35) ? null : ParseDateTime(reader.GetString(35)));
     }
 
     private static InspectionLatencyTrace ReadInspectionLatencyTrace(SqliteDataReader reader)
@@ -4196,6 +4692,171 @@ public static class AoiDatabase
             reader.IsDBNull(15) ? string.Empty : reader.GetString(15));
     }
 
+    private static DefectTaxonomyRecord ReadDefectTaxonomy(SqliteDataReader reader)
+        => new()
+        {
+            TaxonomyId = reader.GetString(0),
+            Name = reader.GetString(1),
+            CustomerName = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+            IsActive = reader.GetInt32(3) != 0,
+            CreatedAtUtc = ParseDateTime(reader.GetString(4)),
+            UpdatedAtUtc = ParseDateTime(reader.GetString(5)),
+        };
+
+    private static IReadOnlyList<DefectTaxonomyEntry> GetDefectTaxonomyEntries(SqliteConnection connection, string taxonomyId)
+    {
+        var entries = new List<DefectTaxonomyEntry>();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT TaxonomyId, CanonicalClass, CustomerLabel, ModelLabelId, IsRequired, SortOrder, IsActive
+            FROM DefectTaxonomyEntries
+            WHERE TaxonomyId = $taxonomyId
+            ORDER BY SortOrder, CanonicalClass;
+            """;
+        command.Parameters.AddWithValue("$taxonomyId", taxonomyId);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            entries.Add(new DefectTaxonomyEntry
+            {
+                TaxonomyId = reader.GetString(0),
+                CanonicalClass = reader.GetString(1),
+                CustomerLabel = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                ModelLabelId = reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                IsRequired = reader.GetInt32(4) != 0,
+                SortOrder = reader.GetInt32(5),
+                IsActive = reader.GetInt32(6) != 0,
+            });
+        }
+
+        return entries;
+    }
+
+    private static IReadOnlyList<DefectClassAliasRecord> GetDefectClassAliases(SqliteConnection connection, string taxonomyId)
+    {
+        var aliases = new List<DefectClassAliasRecord>();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT TaxonomyId, Alias, CanonicalClass
+            FROM DefectClassAliases
+            WHERE TaxonomyId = $taxonomyId
+            ORDER BY Alias;
+            """;
+        command.Parameters.AddWithValue("$taxonomyId", taxonomyId);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            aliases.Add(new DefectClassAliasRecord
+            {
+                TaxonomyId = reader.GetString(0),
+                Alias = reader.GetString(1),
+                CanonicalClass = reader.GetString(2),
+            });
+        }
+
+        return aliases;
+    }
+
+    private static IReadOnlyList<MesDefectCodeMappingRecord> GetMesDefectCodeMappings(SqliteConnection connection, string taxonomyId)
+    {
+        var mappings = new List<MesDefectCodeMappingRecord>();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT TaxonomyId, CanonicalClass, MesCode
+            FROM MesDefectCodeMappings
+            WHERE TaxonomyId = $taxonomyId
+            ORDER BY CanonicalClass;
+            """;
+        command.Parameters.AddWithValue("$taxonomyId", taxonomyId);
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            mappings.Add(new MesDefectCodeMappingRecord
+            {
+                TaxonomyId = reader.GetString(0),
+                CanonicalClass = reader.GetString(1),
+                MesCode = reader.GetString(2),
+            });
+        }
+
+        return mappings;
+    }
+
+    private static void DeleteTaxonomyChildren(SqliteConnection connection, SqliteTransaction transaction, string taxonomyId)
+    {
+        foreach (var table in new[] { "DefectTaxonomyEntries", "DefectClassAliases", "MesDefectCodeMappings" })
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = $"DELETE FROM {table} WHERE TaxonomyId = $taxonomyId;";
+            command.Parameters.AddWithValue("$taxonomyId", taxonomyId);
+            command.ExecuteNonQuery();
+        }
+    }
+
+    private static void InsertDefectTaxonomyEntry(SqliteConnection connection, SqliteTransaction transaction, string taxonomyId, DefectTaxonomyEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.CanonicalClass))
+            return;
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO DefectTaxonomyEntries
+                (TaxonomyId, CanonicalClass, CustomerLabel, ModelLabelId, IsRequired, SortOrder, IsActive)
+            VALUES
+                ($taxonomyId, $canonicalClass, $customerLabel, $modelLabelId, $isRequired, $sortOrder, $isActive);
+            """;
+        command.Parameters.AddWithValue("$taxonomyId", taxonomyId);
+        command.Parameters.AddWithValue("$canonicalClass", entry.CanonicalClass.Trim());
+        command.Parameters.AddWithValue("$customerLabel", string.IsNullOrWhiteSpace(entry.CustomerLabel) ? entry.CanonicalClass.Trim() : entry.CustomerLabel.Trim());
+        command.Parameters.AddWithValue("$modelLabelId", entry.ModelLabelId is { } id ? (object)id : DBNull.Value);
+        command.Parameters.AddWithValue("$isRequired", entry.IsRequired ? 1 : 0);
+        command.Parameters.AddWithValue("$sortOrder", entry.SortOrder);
+        command.Parameters.AddWithValue("$isActive", entry.IsActive ? 1 : 0);
+        command.ExecuteNonQuery();
+    }
+
+    private static void InsertDefectClassAlias(SqliteConnection connection, SqliteTransaction transaction, string taxonomyId, DefectClassAliasRecord alias)
+    {
+        if (string.IsNullOrWhiteSpace(alias.Alias) || string.IsNullOrWhiteSpace(alias.CanonicalClass))
+            return;
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT OR IGNORE INTO DefectClassAliases (TaxonomyId, Alias, CanonicalClass)
+            VALUES ($taxonomyId, $alias, $canonicalClass);
+            """;
+        command.Parameters.AddWithValue("$taxonomyId", taxonomyId);
+        command.Parameters.AddWithValue("$alias", alias.Alias.Trim());
+        command.Parameters.AddWithValue("$canonicalClass", alias.CanonicalClass.Trim());
+        command.ExecuteNonQuery();
+    }
+
+    private static void InsertMesDefectCodeMapping(SqliteConnection connection, SqliteTransaction transaction, string taxonomyId, MesDefectCodeMappingRecord mapping)
+    {
+        if (string.IsNullOrWhiteSpace(mapping.CanonicalClass) || string.IsNullOrWhiteSpace(mapping.MesCode))
+            return;
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO MesDefectCodeMappings (TaxonomyId, CanonicalClass, MesCode)
+            VALUES ($taxonomyId, $canonicalClass, $mesCode);
+            """;
+        command.Parameters.AddWithValue("$taxonomyId", taxonomyId);
+        command.Parameters.AddWithValue("$canonicalClass", mapping.CanonicalClass.Trim());
+        command.Parameters.AddWithValue("$mesCode", mapping.MesCode.Trim());
+        command.ExecuteNonQuery();
+    }
+
     private static CentralSyncQueueRecord ReadCentralSyncQueueRecord(SqliteDataReader reader)
     {
         return new CentralSyncQueueRecord(
@@ -4283,6 +4944,7 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$waiverExpiresAtUtc", record.WaiverExpiresAtUtc is { } expiresAt ? (object)expiresAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
         command.Parameters.AddWithValue("$deploymentWaivedBy", record.DeploymentWaivedBy ?? string.Empty);
         command.Parameters.AddWithValue("$deploymentWaivedAtUtc", record.DeploymentWaivedAtUtc is { } waivedAt ? (object)waivedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
+        command.Parameters.AddWithValue("$deploymentWaiverRiskClassification", record.DeploymentWaiverRiskClassification ?? string.Empty);
         command.Parameters.AddWithValue("$deployedAtUtc", record.DeployedAtUtc is { } deployedAt ? (object)deployedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
         command.Parameters.AddWithValue("$retiredReason", record.RetiredReason ?? string.Empty);
         command.Parameters.AddWithValue("$retiredAtUtc", record.RetiredAtUtc is { } retiredAt ? (object)retiredAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
@@ -4730,6 +5392,152 @@ public static class AoiDatabase
             );
 
             CREATE INDEX IF NOT EXISTS IX_TraceabilityTestReports_CreatedAtUtc ON TraceabilityTestReports(CreatedAtUtc);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureCustomerPilotTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS CustomerPilotSessions
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SessionId TEXT NOT NULL UNIQUE,
+                DeploymentProfile TEXT NOT NULL,
+                Status TEXT NOT NULL DEFAULT 'InProgress',
+                DatasetFolder TEXT NOT NULL DEFAULT '',
+                ManifestPath TEXT NOT NULL DEFAULT '',
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                CreatedAtUtc TEXT NOT NULL,
+                UpdatedAtUtc TEXT NOT NULL,
+                CompletedAtUtc TEXT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS CustomerPilotSteps
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SessionId INTEGER NOT NULL,
+                StepKey TEXT NOT NULL,
+                StepOrder INTEGER NOT NULL,
+                Status TEXT NOT NULL,
+                EvidencePath TEXT NOT NULL DEFAULT '',
+                MessagesJson TEXT NOT NULL DEFAULT '[]',
+                Waived INTEGER NOT NULL DEFAULT 0,
+                WaiverReason TEXT NOT NULL DEFAULT '',
+                WaivedBy TEXT NOT NULL DEFAULT '',
+                WaivedAtUtc TEXT NULL,
+                UpdatedAtUtc TEXT NOT NULL,
+                UNIQUE(SessionId, StepKey),
+                FOREIGN KEY (SessionId) REFERENCES CustomerPilotSessions(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_CustomerPilotSessions_Status_Updated ON CustomerPilotSessions(Status, UpdatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_CustomerPilotSteps_Session_Order ON CustomerPilotSteps(SessionId, StepOrder);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsurePilotIssueTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS PilotIssues
+            (
+                IssueId TEXT PRIMARY KEY,
+                CreatedAtUtc TEXT NOT NULL,
+                Category TEXT NOT NULL,
+                Severity TEXT NOT NULL DEFAULT 'Medium',
+                BoardModel TEXT NOT NULL DEFAULT '',
+                LotId TEXT NOT NULL DEFAULT '',
+                ImagePath TEXT NOT NULL DEFAULT '',
+                RelatedInspectionId TEXT NOT NULL DEFAULT '',
+                RelatedAcceptanceRunId TEXT NOT NULL DEFAULT '',
+                Status TEXT NOT NULL DEFAULT 'Open',
+                Owner TEXT NOT NULL DEFAULT '',
+                Notes TEXT NOT NULL DEFAULT '',
+                Resolution TEXT NOT NULL DEFAULT '',
+                ClosedAtUtc TEXT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS PilotIssueEvents
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                IssueId TEXT NOT NULL,
+                CreatedAtUtc TEXT NOT NULL,
+                EventType TEXT NOT NULL,
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                Message TEXT NOT NULL DEFAULT '',
+                PreviousStatus TEXT NOT NULL DEFAULT '',
+                NewStatus TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (IssueId) REFERENCES PilotIssues(IssueId)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_PilotIssues_Status_Severity ON PilotIssues(Status, Severity);
+            CREATE INDEX IF NOT EXISTS IX_PilotIssues_Category ON PilotIssues(Category);
+            CREATE INDEX IF NOT EXISTS IX_PilotIssues_Board_Lot ON PilotIssues(BoardModel, LotId);
+            CREATE INDEX IF NOT EXISTS IX_PilotIssueEvents_IssueId ON PilotIssueEvents(IssueId, CreatedAtUtc);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureDefectTaxonomyTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS DefectTaxonomies
+            (
+                TaxonomyId TEXT PRIMARY KEY,
+                Name TEXT NOT NULL,
+                CustomerName TEXT NOT NULL DEFAULT '',
+                IsActive INTEGER NOT NULL DEFAULT 1,
+                CreatedAtUtc TEXT NOT NULL,
+                UpdatedAtUtc TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS DefectTaxonomyEntries
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                TaxonomyId TEXT NOT NULL,
+                CanonicalClass TEXT NOT NULL,
+                CustomerLabel TEXT NOT NULL DEFAULT '',
+                ModelLabelId INTEGER NULL,
+                IsRequired INTEGER NOT NULL DEFAULT 1,
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                IsActive INTEGER NOT NULL DEFAULT 1,
+                UNIQUE(TaxonomyId, CanonicalClass),
+                FOREIGN KEY (TaxonomyId) REFERENCES DefectTaxonomies(TaxonomyId)
+            );
+
+            CREATE TABLE IF NOT EXISTS DefectClassAliases
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                TaxonomyId TEXT NOT NULL,
+                Alias TEXT NOT NULL,
+                CanonicalClass TEXT NOT NULL,
+                UNIQUE(TaxonomyId, Alias),
+                FOREIGN KEY (TaxonomyId) REFERENCES DefectTaxonomies(TaxonomyId)
+            );
+
+            CREATE TABLE IF NOT EXISTS MesDefectCodeMappings
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                TaxonomyId TEXT NOT NULL,
+                CanonicalClass TEXT NOT NULL,
+                MesCode TEXT NOT NULL,
+                UNIQUE(TaxonomyId, CanonicalClass),
+                FOREIGN KEY (TaxonomyId) REFERENCES DefectTaxonomies(TaxonomyId)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_DefectTaxonomyEntries_Taxonomy ON DefectTaxonomyEntries(TaxonomyId, SortOrder);
+            CREATE INDEX IF NOT EXISTS IX_DefectClassAliases_Taxonomy ON DefectClassAliases(TaxonomyId, Alias);
+            CREATE INDEX IF NOT EXISTS IX_MesDefectCodeMappings_Taxonomy ON MesDefectCodeMappings(TaxonomyId, CanonicalClass);
             """;
         command.ExecuteNonQuery();
     }
@@ -5316,6 +6124,7 @@ public static class AoiDatabase
                 WaiverExpiresAtUtc TEXT NULL,
                 DeploymentWaivedBy TEXT NOT NULL DEFAULT '',
                 DeploymentWaivedAtUtc TEXT NULL,
+                DeploymentWaiverRiskClassification TEXT NOT NULL DEFAULT '',
                 DeployedAtUtc TEXT NULL,
                 RetiredReason TEXT NOT NULL DEFAULT '',
                 RetiredAtUtc TEXT NULL
@@ -5340,6 +6149,7 @@ public static class AoiDatabase
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "WaiverExpiresAtUtc", "TEXT NULL");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "DeploymentWaivedBy", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "DeploymentWaivedAtUtc", "TEXT NULL");
+        AddColumnIfMissing(connection, transaction, "ModelRegistry", "DeploymentWaiverRiskClassification", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "DeployedAtUtc", "TEXT NULL");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "RetiredReason", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(connection, transaction, "ModelRegistry", "RetiredAtUtc", "TEXT NULL");
@@ -5949,6 +6759,7 @@ public static class AoiDatabase
             WaiverExpiresAtUtc TEXT NULL,
             DeploymentWaivedBy TEXT NOT NULL DEFAULT '',
             DeploymentWaivedAtUtc TEXT NULL,
+            DeploymentWaiverRiskClassification TEXT NOT NULL DEFAULT '',
             DeployedAtUtc TEXT NULL,
             RetiredReason TEXT NOT NULL DEFAULT '',
             RetiredAtUtc TEXT NULL
@@ -6364,6 +7175,38 @@ public static class AoiDatabase
             AuditEventId INTEGER NULL
         );
 
+        CREATE TABLE IF NOT EXISTS CustomerPilotSessions
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            SessionId TEXT NOT NULL UNIQUE,
+            DeploymentProfile TEXT NOT NULL,
+            Status TEXT NOT NULL DEFAULT 'InProgress',
+            DatasetFolder TEXT NOT NULL DEFAULT '',
+            ManifestPath TEXT NOT NULL DEFAULT '',
+            OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+            CreatedAtUtc TEXT NOT NULL,
+            UpdatedAtUtc TEXT NOT NULL,
+            CompletedAtUtc TEXT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS CustomerPilotSteps
+        (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            SessionId INTEGER NOT NULL,
+            StepKey TEXT NOT NULL,
+            StepOrder INTEGER NOT NULL,
+            Status TEXT NOT NULL,
+            EvidencePath TEXT NOT NULL DEFAULT '',
+            MessagesJson TEXT NOT NULL DEFAULT '[]',
+            Waived INTEGER NOT NULL DEFAULT 0,
+            WaiverReason TEXT NOT NULL DEFAULT '',
+            WaivedBy TEXT NOT NULL DEFAULT '',
+            WaivedAtUtc TEXT NULL,
+            UpdatedAtUtc TEXT NOT NULL,
+            UNIQUE(SessionId, StepKey),
+            FOREIGN KEY (SessionId) REFERENCES CustomerPilotSessions(Id)
+        );
+
         CREATE TABLE IF NOT EXISTS LogArchive
         (
             Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -6429,5 +7272,7 @@ public static class AoiDatabase
         CREATE INDEX IF NOT EXISTS IX_CentralSyncQueue_Item ON CentralSyncQueue(ItemType, ItemId);
         CREATE INDEX IF NOT EXISTS IX_CentralSyncAttempts_QueueId ON CentralSyncAttempts(QueueId);
         CREATE INDEX IF NOT EXISTS IX_TraceabilityTestReports_CreatedAtUtc ON TraceabilityTestReports(CreatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_CustomerPilotSessions_Status_Updated ON CustomerPilotSessions(Status, UpdatedAtUtc);
+        CREATE INDEX IF NOT EXISTS IX_CustomerPilotSteps_Session_Order ON CustomerPilotSteps(SessionId, StepOrder);
         """;
 }

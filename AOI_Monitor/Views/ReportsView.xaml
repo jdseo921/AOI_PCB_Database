@@ -188,6 +188,48 @@
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
+          <TabItem Header="Pilot Issues">
+            <Grid Margin="8">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <WrapPanel Margin="0,0,0,8">
+                <TextBlock Text="Category" Foreground="#9AA6AF" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <ComboBox x:Name="PilotIssueCategoryFilterCombo" Width="145" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="OnPilotIssueFilterChanged"/>
+                <TextBlock Text="Status" Foreground="#9AA6AF" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <ComboBox x:Name="PilotIssueStatusFilterCombo" Width="125" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="OnPilotIssueFilterChanged"/>
+                <TextBlock Text="Severity" Foreground="#9AA6AF" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <ComboBox x:Name="PilotIssueSeverityFilterCombo" Width="115" SelectedIndex="0" Margin="0,0,12,0" SelectionChanged="OnPilotIssueFilterChanged">
+                  <ComboBoxItem Content="All"/>
+                  <ComboBoxItem Content="Critical"/>
+                  <ComboBoxItem Content="High"/>
+                  <ComboBoxItem Content="Medium"/>
+                  <ComboBoxItem Content="Low"/>
+                </ComboBox>
+                <Button Style="{StaticResource ActionBtnGreen}" Content="False Call from Inspection" Margin="0,0,6,0" Click="OnCreateFalseCallIssueClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Possible Escape from Inspection" Margin="0,0,6,0" Click="OnCreatePossibleEscapeIssueClick"/>
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Refresh Issues" Margin="0,0,6,0" Click="OnRefreshPilotIssuesClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Close Selected" Margin="0,0,6,0" Click="OnClosePilotIssueClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Export Issue Report" Click="OnExportPilotIssueReportClick"/>
+                <TextBlock x:Name="PilotIssueSummaryText" Text="Pilot issues not loaded." Foreground="#DCE5EB" VerticalAlignment="Center" Margin="12,0,0,0"/>
+              </WrapPanel>
+              <DataGrid x:Name="PilotIssuesGrid" Grid.Row="1" CanUserSortColumns="True" SelectionMode="Single">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="ID" Binding="{Binding IssueId}" Width="135"/>
+                  <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
+                  <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="115"/>
+                  <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="80"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
+                  <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
+                  <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="95"/>
+                  <DataGridTextColumn Header="Inspection" Binding="{Binding RelatedInspectionId}" Width="90"/>
+                  <DataGridTextColumn Header="Owner" Binding="{Binding Owner}" Width="110"/>
+                  <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
+          </TabItem>
           <TabItem Header="Management Dashboard">
             <Grid Margin="8">
               <Grid.RowDefinitions>
@@ -292,7 +334,7 @@
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
-          <TabItem Header="Completion Matrix">
+          <TabItem Header="Factory Readiness Completion Matrix">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -308,6 +350,7 @@
                   <DataGridTextColumn Header="Complete" Binding="{Binding PercentDisplay}" Width="90"/>
                   <DataGridTextColumn Header="Evidence Score" Binding="{Binding EvidenceSummary}" Width="300"/>
                   <DataGridTextColumn Header="Missing Evidence" Binding="{Binding MissingEvidenceDisplay}" Width="*"/>
+                  <DataGridTextColumn Header="Next Actions" Binding="{Binding NextActionsDisplay}" Width="320"/>
                 </DataGrid.Columns>
               </DataGrid>
             </Grid>
@@ -389,6 +432,7 @@
           <Button Style="{StaticResource ActionBtnAmber}" Content="Retry All Central" Margin="0,0,6,0" Click="OnRetryCentralSyncClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Export Central Sync Report" Margin="0,0,6,0" Click="OnExportCentralSyncReportClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Soak Test" Margin="0,0,6,0" Click="OnRunSoakTestClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Performance Benchmark" Margin="0,0,6,0" Click="OnRunPerformanceBenchmarkClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Export Latest Soak Evidence" Margin="0,0,6,0" Click="OnExportLatestSoakEvidenceClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Recipe" Click="OnLockActiveRecipeClick"/>
         </WrapPanel>

@@ -17,6 +17,7 @@ public sealed class CompletionAssessmentCategory
     public double PercentComplete { get; set; }
     public List<CompletionAssessmentCriterion> Criteria { get; set; } = new();
     public List<string> MissingEvidence { get; set; } = new();
+    public List<string> NextActions { get; set; } = new();
     public string EvidenceSummary { get; set; } = string.Empty;
 }
 
@@ -36,12 +37,15 @@ public static class CompletionAssessmentService
         AoiDatabase.Initialize();
         var report = new CompletionAssessmentReport();
         report.Categories.Add(AssessStage1());
+        report.Categories.Add(AssessModelReadiness());
+        report.Categories.Add(AssessFalsePositiveReductionReadiness());
         report.Categories.Add(AssessStage2());
         report.Categories.Add(AssessStage3());
         report.Categories.Add(AssessStage4());
-        report.Categories.Add(AssessModelReadiness());
+        report.Categories.Add(AssessCentralSyncManagement());
         report.Categories.Add(AssessReliability());
-        report.Categories.Add(AssessManagementReadiness());
+        report.Categories.Add(AssessDeploymentSupportability());
+        report.Categories.Add(AssessCommercialReadiness());
         return report;
     }
 
@@ -98,12 +102,11 @@ public static class CompletionAssessmentService
     {
         var mes = MesSpoolService.EvaluateReadiness(new MesReadinessCriteria { RequirePassingTraceabilityTest = true });
         var traceability = AoiDatabase.GetLatestTraceabilityTestReport();
-        var central = CentralSyncService.EvaluateReadiness();
         return Category("Stage 4 MES/ERP",
             Criterion("Passing MES traceability acceptance", 35, traceability is not null && IsPass(traceability.Status), traceability is null ? "No traceability test report." : $"status={traceability.Status}; mode={traceability.Mode}."),
             Criterion("MES REST configured and ready", 25, mes.Status == "MES REST Ready", $"MES readiness={mes.Status}; mode={mes.Mode}."),
             Criterion("MES queue has no pending or failed production items", 20, mes.PendingCount == 0 && mes.FailedCount == 0, $"pending={mes.PendingCount}; failed={mes.FailedCount}; sent={mes.SentCount}."),
-            Criterion("Central sync queue/status visible for management aggregation", 20, central.Status != "Central Sync Error" && central.Mode != "Disabled", $"centralSync={central.Status}; mode={central.Mode}; pending={central.PendingCount}; failed={central.FailedCount}."));
+            Criterion("MES abandoned-item disposition visible", 20, mes.AbandonedCount == 0, $"abandoned={mes.AbandonedCount}; latestTraceability={mes.LatestTraceabilityTestStatus}."));
     }
 
     private static CompletionAssessmentCategory AssessModelReadiness()
@@ -111,12 +114,37 @@ public static class CompletionAssessmentService
         var active = ModelRegistryService.GetActiveModel();
         var latestAcceptance = AoiDatabase.GetLatestModelAcceptanceRun(active?.ModelId);
         var passing = AoiDatabase.GetLatestPassingProductionModelAcceptance(active?.ModelId);
-        return Category("Model readiness",
+        return Category("Production model readiness",
             Criterion("Active model registered", 15, active is not null, active is null ? "No active model registry record." : $"model={active.ModelId}; state={active.LifecycleState}."),
             Criterion("Runtime validation completed", 15, active is not null && active.ValidationStatus != ModelConfigurationTestStatus.NotTested, active is null ? "No runtime validation." : $"runtime={active.ValidationStatus}."),
             Criterion("PASS model acceptance run", 35, passing is not null, latestAcceptance is null ? "No model acceptance run." : $"latest={latestAcceptance.Status}; model={latestAcceptance.ModelId}."),
             Criterion("Production candidate or deployed lifecycle state", 20, active is not null && (active.LifecycleState == ModelLifecycleState.ProductionCandidate || active.LifecycleState == ModelLifecycleState.Deployed), active is null ? "No lifecycle state." : $"state={active.LifecycleState}."),
             Criterion("Release package path recorded", 15, active is not null && !string.IsNullOrWhiteSpace(active.LatestReleasePackagePath), active is null ? "No release package evidence." : $"release={active.LatestReleasePackagePath}."));
+    }
+
+    private static CompletionAssessmentCategory AssessFalsePositiveReductionReadiness()
+    {
+        var latestBatch = AoiDatabase.GetLatestBatchTestRun();
+        var falseCall = AoiDatabase.GetLatestFalseCallReductionRun(latestBatch?.Id);
+        var anyFalseCall = falseCall ?? AoiDatabase.GetLatestFalseCallReductionRun();
+        var deployedProfile = ThresholdProfileService.GetActiveEvidenceSummary("ANY", "ANY", "ANY");
+        var hasRecommendation = anyFalseCall?.Recommendation.Point is not null;
+        return Category("False-positive reduction readiness",
+            Criterion("Validation run has measurable false-call rate", 20, latestBatch is not null, latestBatch is null ? "No validation batch run." : $"run={latestBatch.Id}; falseCall={latestBatch.FalseCallRate:P1}."),
+            Criterion("False-call sweep completed", 30, anyFalseCall is not null, anyFalseCall is null ? "No false-call reduction run." : $"run={anyFalseCall.Id}; status={anyFalseCall.Recommendation.Status}."),
+            Criterion("Recommended operating point exists", 25, hasRecommendation, hasRecommendation ? "Recommendation point persisted." : "No recommended threshold/operating point."),
+            Criterion("Approved/deployed threshold profile linked to false-call evidence", 25, deployedProfile.IsDeployed && deployedProfile.SourceFalseCallReductionRunId is not null, $"profile={deployedProfile.ProfileId}; deployed={deployedProfile.IsDeployed}; sourceFalseCallRun={deployedProfile.SourceFalseCallReductionRunId}."));
+    }
+
+    private static CompletionAssessmentCategory AssessCentralSyncManagement()
+    {
+        var central = CentralSyncService.EvaluateReadiness();
+        var exports = AoiDatabase.GetExportHistory(500);
+        return Category("Central sync/management",
+            Criterion("Central sync configured", 20, central.Mode != "Disabled", $"centralSync={central.Status}; mode={central.Mode}."),
+            Criterion("Central sync queue has no failed items", 20, central.FailedCount == 0, $"pending={central.PendingCount}; failed={central.FailedCount}; sent={central.SentCount}; skipped={central.SkippedCount}."),
+            Criterion("Management dashboard exported", 30, exports.Any(row => row.ExportType.Contains("ManagementDashboard", StringComparison.OrdinalIgnoreCase)), "Requires management dashboard export."),
+            Criterion("Central sync or management report exported", 30, exports.Any(row => row.ExportType.Contains("CentralSync", StringComparison.OrdinalIgnoreCase) || row.ExportType.Contains("ManagementDashboard", StringComparison.OrdinalIgnoreCase)), "Requires central sync or management dashboard export evidence."));
     }
 
     private static CompletionAssessmentCategory AssessReliability()
@@ -131,17 +159,31 @@ public static class CompletionAssessmentService
             Criterion("Inspection latency traces available", 10, latency.TraceCount > 0, $"latencyTraces={latency.TraceCount}; p95Overlay={latency.P95FrameToOverlayMs:F0} ms."));
     }
 
-    private static CompletionAssessmentCategory AssessManagementReadiness()
+    private static CompletionAssessmentCategory AssessDeploymentSupportability()
+    {
+        var exports = AoiDatabase.GetExportHistory(500);
+        var build = AoiDatabase.GetLatestBuildTestEvidence();
+        var backupExported = exports.Any(row => row.ExportType.Contains("ConfigurationBackup", StringComparison.OrdinalIgnoreCase)) ||
+                             AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "CONFIG_BACKUP" }, 25).Count > 0;
+        return Category("Deployment/supportability",
+            Criterion("Passing build/test/publish evidence imported", 30, build is not null && build.BuildStatus == "PASS" && build.TestStatus == "PASS" && build.PublishValidationStatus == "PASS", build is null ? "No build/test evidence." : $"build={build.BuildStatus}; test={build.TestStatus}; publish={build.PublishValidationStatus}."),
+            Criterion("Configuration backup exported", 25, backupExported, "Requires configuration backup audit/export evidence."),
+            Criterion("Factory readiness package exported", 25, exports.Any(row => row.ExportType.Contains("FactoryReadiness", StringComparison.OrdinalIgnoreCase)), "Requires exported Go/No-Go package."),
+            Criterion("Factory acceptance checklist/package exported", 20, exports.Any(row => row.ExportType.Contains("FactoryAcceptance", StringComparison.OrdinalIgnoreCase)), "Requires FAT checklist/package export."));
+    }
+
+    private static CompletionAssessmentCategory AssessCommercialReadiness()
     {
         var exports = AoiDatabase.GetExportHistory(500);
         var build = AoiDatabase.GetLatestBuildTestEvidence();
         var auth = AuthenticationSettingsService.CurrentMode;
-        return Category("Management/commercial readiness",
-            Criterion("Factory readiness package exported", 25, exports.Any(row => row.ExportType.Contains("FactoryReadiness", StringComparison.OrdinalIgnoreCase)), "Requires exported Go/No-Go package."),
-            Criterion("Factory acceptance checklist/package exported", 20, exports.Any(row => row.ExportType.Contains("FactoryAcceptance", StringComparison.OrdinalIgnoreCase)), "Requires FAT checklist/package export."),
-            Criterion("Management dashboard exported", 20, exports.Any(row => row.ExportType.Contains("ManagementDashboard", StringComparison.OrdinalIgnoreCase)), "Requires management dashboard export."),
-            Criterion("Build/test evidence imported", 20, build is not null && build.BuildStatus == "PASS" && build.TestStatus == "PASS", build is null ? "No build/test evidence." : $"build={build.BuildStatus}; test={build.TestStatus}; publish={build.PublishValidationStatus}."),
-            Criterion("Local accountability mode enabled", 15, auth == AuthenticationMode.LocalUsers, $"authMode={auth}; demo mode is not production accountability."));
+        var readiness = FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(DeploymentProfile.FullFactoryAutomation));
+        return Category("Commercial readiness",
+            Criterion("Local accountability mode enabled", 25, auth == AuthenticationMode.LocalUsers, $"authMode={auth}; demo mode is not production accountability."),
+            Criterion("Management dashboard evidence exported", 20, exports.Any(row => row.ExportType.Contains("ManagementDashboard", StringComparison.OrdinalIgnoreCase)), "Requires management dashboard export."),
+            Criterion("Full-factory readiness has no blocking issues", 25, readiness.BlockingIssues.Count == 0 && readiness.OverallStatus != FactoryReadinessOverallStatus.NoGo.ToString(), $"fullFactory={readiness.OverallStatus}; blocking={readiness.BlockingIssues.Count}."),
+            Criterion("Release/support build evidence present", 15, build is not null && build.BuildStatus == "PASS" && build.TestStatus == "PASS", build is null ? "No release/support build evidence." : $"build={build.BuildStatus}; test={build.TestStatus}."),
+            Criterion("Customer/commercial evidence package exported", 15, exports.Any(row => row.ExportType.Contains("Customer", StringComparison.OrdinalIgnoreCase) || row.ExportType.Contains("ValidationPackage", StringComparison.OrdinalIgnoreCase)), "Requires customer or validation package export evidence."));
     }
 
     private static CompletionAssessmentCategory Category(string stage, params CompletionAssessmentCriterion[] criteria)
@@ -156,6 +198,11 @@ public static class CompletionAssessmentService
         category.MissingEvidence = category.Criteria
             .Where(item => !item.IsSatisfied)
             .Select(item => $"{item.Name}: {item.Evidence}")
+            .ToList();
+        category.NextActions = category.Criteria
+            .Where(item => !item.IsSatisfied)
+            .Select(item => NextActionFor(item.Name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         category.EvidenceSummary = string.Join(" ", category.Criteria.Select(item => $"{item.Name}={item.Earned.ToString("0.#", CultureInfo.InvariantCulture)}/{item.Weight.ToString("0.#", CultureInfo.InvariantCulture)}"));
         return category;
@@ -178,4 +225,28 @@ public static class CompletionAssessmentService
         => run is null
             ? "No camera acceptance run."
             : $"status={run.Status}; realHardware={run.IsRealHardware}; adapter={run.AdapterName}.";
+
+    private static string NextActionFor(string criterionName)
+    {
+        var name = criterionName.ToLowerInvariant();
+        if (name.Contains("model", StringComparison.Ordinal) || name.Contains("release", StringComparison.Ordinal))
+            return "Run runtime validation, model acceptance, lifecycle promotion, and release packaging.";
+        if (name.Contains("false-call", StringComparison.Ordinal) || name.Contains("threshold", StringComparison.Ordinal) || name.Contains("operating point", StringComparison.Ordinal))
+            return "Run false-call reduction, approve the threshold profile, and deploy it with audit evidence.";
+        if (name.Contains("camera", StringComparison.Ordinal) || name.Contains("lighting", StringComparison.Ordinal) || name.Contains("3d", StringComparison.Ordinal))
+            return "Run real hardware camera, lighting, and 3D acceptance tests.";
+        if (name.Contains("robot", StringComparison.Ordinal) || name.Contains("safety", StringComparison.Ordinal) || name.Contains("interlock", StringComparison.Ordinal))
+            return "Run real robot cell and PLC/safety acceptance with audit events.";
+        if (name.Contains("mes", StringComparison.Ordinal) || name.Contains("traceability", StringComparison.Ordinal))
+            return "Configure MES REST, pass traceability acceptance, and clear the MES queue.";
+        if (name.Contains("central", StringComparison.Ordinal) || name.Contains("management", StringComparison.Ordinal))
+            return "Configure central sync and export the management dashboard/report package.";
+        if (name.Contains("soak", StringComparison.Ordinal) || name.Contains("latency", StringComparison.Ordinal) || name.Contains("stability", StringComparison.Ordinal))
+            return "Run soak and latency evidence, including the full factory-duration profile when required.";
+        if (name.Contains("backup", StringComparison.Ordinal) || name.Contains("build", StringComparison.Ordinal) || name.Contains("publish", StringComparison.Ordinal))
+            return "Import passing build/test evidence and export a configuration backup.";
+        if (name.Contains("accountability", StringComparison.Ordinal) || name.Contains("customer", StringComparison.Ordinal) || name.Contains("commercial", StringComparison.Ordinal))
+            return "Enable LocalUsers accountability and export customer/commercial review packages.";
+        return "Record the required evidence through the matching acceptance, export, or readiness workflow.";
+    }
 }

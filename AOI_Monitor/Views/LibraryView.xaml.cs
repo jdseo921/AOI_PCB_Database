@@ -291,12 +291,21 @@ public partial class LibraryView : UserControl
     {
         var images = AoiDatabase.GetImportedImages();
         var records = images.Select(ToLibraryRecord).ToArray();
+        var mode = OperatingModeSettingsService.Load();
+        var showDemoRows = OperatingModePolicyService.ShouldShowDemoRows(records.Length, mode);
 
-        RecordsGrid.ItemsSource = records.Length > 0 ? records : DemoRecords;
-        RecordsSourceText.Text = records.Length > 0 ? "SQLite Records" : "Demo Data";
-        RecordsSourceText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(records.Length > 0 ? "#C6FFD0" : "#FFE0A7"));
-        RecordsSourceChip.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(records.Length > 0 ? "#14311D" : "#372914"));
-        RecordsSourceChip.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(records.Length > 0 ? "#377849" : "#8C6C35"));
+        RecordsGrid.ItemsSource = records.Length > 0 ? records : showDemoRows ? DemoRecords : Array.Empty<ImageLibraryRecord>();
+        RecordsSourceText.Text = records.Length > 0
+            ? "SQLite Records"
+            : showDemoRows
+                ? "Demo Data"
+                : $"{mode} Mode: Demo Hidden";
+        var statusColor = records.Length > 0 ? "#C6FFD0" : showDemoRows ? "#FFE0A7" : "#FFBFC1";
+        var backgroundColor = records.Length > 0 ? "#14311D" : showDemoRows ? "#372914" : "#35191B";
+        var borderColor = records.Length > 0 ? "#377849" : showDemoRows ? "#8C6C35" : "#9A393E";
+        RecordsSourceText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(statusColor));
+        RecordsSourceChip.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(backgroundColor));
+        RecordsSourceChip.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(borderColor));
 
         if (selectedImageId is not null)
             RecordsGrid.SelectedItem = records.FirstOrDefault(r => r.ImageLink == selectedImageId.Value.ToString());
@@ -306,7 +315,9 @@ public partial class LibraryView : UserControl
 
         ImportStatusText.Text = records.Length > 0
             ? $"{records.Length} imported image record(s) loaded from SQLite."
-            : "No imported images yet. Showing demo records until the SQLite image table has data.";
+            : showDemoRows
+                ? "No imported images yet. Showing demo records until the SQLite image table has data."
+                : $"{mode} Mode hides demo rows. Import or select a customer dataset before pilot/production review.";
     }
 
     private static ImageLibraryRecord ToLibraryRecord(ImportedImage image)

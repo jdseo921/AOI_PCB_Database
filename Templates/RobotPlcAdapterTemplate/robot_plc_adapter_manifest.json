@@ -1,0 +1,12 @@
+{
+  "controllerId": "template.fake-robot-plc",
+  "displayName": "Template Fake Robot + PLC Safety Adapter",
+  "version": "0.1.0",
+  "assemblyFile": "RobotPlcAdapterTemplate.dll",
+  "registrationTypeName": "RobotPlcAdapterTemplate.RobotPlcTemplateRegistration",
+  "robotControllerTypeName": "RobotPlcAdapterTemplate.FakeRobotController",
+  "plcSafetyControllerTypeName": "RobotPlcAdapterTemplate.FakePlcSafetyController",
+  "supportedBoundaries": [ "IRobotController", "IPlcSafetyController" ],
+  "simulationOnly": true,
+  "registrationProcess": "Load from a reviewed commissioning bootstrap and call RobotPlcTemplateRegistration.RegisterFakeControllers(). Real robot/PLC integrations must complete hardware-in-the-loop safety validation before readiness claims."
+}

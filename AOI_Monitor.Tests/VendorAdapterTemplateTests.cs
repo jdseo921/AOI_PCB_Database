@@ -3,7 +3,13 @@ using AOI_Monitor.Services;
 using CameraAdapterTemplate;
 using LightingAdapterTemplate;
 using RobotControllerTemplate;
+using RobotPlcAdapterTemplate;
 using Xunit;
+using LegacyFakePlcSafetyController = RobotControllerTemplate.FakePlcSafetyController;
+using LegacyFakeRobotController = RobotControllerTemplate.FakeRobotController;
+using LegacyRobotTemplateRegistration = RobotControllerTemplate.RobotTemplateRegistration;
+using RobotPlcFakePlcSafetyController = RobotPlcAdapterTemplate.FakePlcSafetyController;
+using RobotPlcFakeRobotController = RobotPlcAdapterTemplate.FakeRobotController;
 
 namespace AOI_Monitor.Tests;
 
@@ -70,6 +76,28 @@ public sealed class VendorAdapterTemplateTests
     }
 
     [Fact]
+    public void InvalidCameraTemplateManifestFailsSafely()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "aoi_vendor_template_tests", $"invalid_camera_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+        var manifest = Path.Combine(folder, "camera_adapter_manifest.json");
+        File.WriteAllText(manifest, """
+        {
+          "adapterId": "template.invalid-camera",
+          "displayName": "Invalid Camera Adapter"
+        }
+        """);
+
+        var result = CameraAdapterPluginService.LoadFactoryFromManifest(manifest);
+
+        Assert.False(result.Success);
+        Assert.Null(result.Factory);
+        Assert.Contains("Version is required", result.Message);
+        Assert.Contains("AssemblyFile is required", result.Message);
+        Assert.Contains("FactoryTypeName is required", result.Message);
+    }
+
+    [Fact]
     public void FakeCameraTemplateLoadsButRemainsSimulationEvidence()
     {
         var settings = new CameraSourceSettings
@@ -131,10 +159,10 @@ public sealed class VendorAdapterTemplateTests
         var previousSafety = IntegrationBoundaryRegistry.PlcSafetyController;
         try
         {
-            RobotTemplateRegistration.RegisterFakeControllers();
+            LegacyRobotTemplateRegistration.RegisterFakeControllers();
 
-            Assert.IsType<FakeRobotController>(IntegrationBoundaryRegistry.RobotController);
-            Assert.IsType<FakePlcSafetyController>(IntegrationBoundaryRegistry.PlcSafetyController);
+            Assert.IsType<LegacyFakeRobotController>(IntegrationBoundaryRegistry.RobotController);
+            Assert.IsType<LegacyFakePlcSafetyController>(IntegrationBoundaryRegistry.PlcSafetyController);
             Assert.Equal(IntegrationConnectionStatus.Simulated, IntegrationBoundaryRegistry.RobotController.Status);
             Assert.Equal(IntegrationConnectionStatus.Simulated, IntegrationBoundaryRegistry.PlcSafetyController.Status);
 
@@ -145,6 +173,37 @@ public sealed class VendorAdapterTemplateTests
             Assert.True(load.Accepted);
             Assert.Equal(IntegrationConnectionStatus.Simulated, load.Status);
             Assert.Contains("No real motion", load.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.True(safety.IsOk);
+            Assert.Contains("Simulation-only", safety.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            IntegrationBoundaryRegistry.RobotController = previousRobot;
+            IntegrationBoundaryRegistry.PlcSafetyController = previousSafety;
+        }
+    }
+
+    [Fact]
+    public async Task RobotPlcTemplateRegistrationKeepsRobotAndPlcSafetySimulationOnly()
+    {
+        var previousRobot = IntegrationBoundaryRegistry.RobotController;
+        var previousSafety = IntegrationBoundaryRegistry.PlcSafetyController;
+        try
+        {
+            RobotPlcTemplateRegistration.RegisterFakeControllers();
+
+            Assert.IsType<RobotPlcFakeRobotController>(IntegrationBoundaryRegistry.RobotController);
+            Assert.IsType<RobotPlcFakePlcSafetyController>(IntegrationBoundaryRegistry.PlcSafetyController);
+            Assert.Equal(IntegrationConnectionStatus.Simulated, IntegrationBoundaryRegistry.RobotController.Status);
+            Assert.Equal(IntegrationConnectionStatus.Simulated, IntegrationBoundaryRegistry.PlcSafetyController.Status);
+
+            var inspect = await IntegrationBoundaryRegistry.RobotController.InspectAsync(
+                new InspectCommand("BOARD-1", "MODEL-A", "LOT-1", "STATION-1", "Top"));
+            var safety = IntegrationBoundaryRegistry.PlcSafetyController.GetSafetyStatus();
+
+            Assert.True(inspect.Accepted);
+            Assert.Equal(IntegrationConnectionStatus.Simulated, inspect.Status);
+            Assert.Contains("No real motion", inspect.Message, StringComparison.OrdinalIgnoreCase);
             Assert.True(safety.IsOk);
             Assert.Contains("Simulation-only", safety.Message, StringComparison.OrdinalIgnoreCase);
         }
@@ -170,6 +229,31 @@ public sealed class VendorAdapterTemplateTests
         Assert.Contains("Run Lighting Sync Test", guide);
         Assert.Contains("Run Robot Cell Acceptance", guide);
         Assert.Contains("Packaging Plugin Folder", guide);
+    }
+
+    [Fact]
+    public void HardwareInTheLoopChecklistCoversRequiredCommissioningEvidence()
+    {
+        var checklist = File.ReadAllText(Path.Combine(FindRepoRoot(), "Docs", "Hardware_In_The_Loop_Checklist.md"));
+
+        foreach (var required in new[]
+        {
+            "Camera Discovery",
+            "Top / Side / Bottom Assignment",
+            "Lighting Program Validation",
+            "Trigger-To-Frame Timing",
+            "3D Profile Acquisition",
+            "Robot Load / Inspect / Unload",
+            "PLC Safety Interlock Tests",
+            "E-Stop Test",
+            "Final Pass / Fail Criteria",
+            "Evidence Package",
+        })
+        {
+            Assert.Contains(required, checklist, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.Contains("Template adapters and simulated evidence are not real hardware validation", checklist, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FindRepoRoot()

@@ -143,11 +143,36 @@ public sealed class ConfigurationBackupServiceTests : IDisposable
             MaxRetryCount = 4,
         });
         DeploymentProfileSettingsService.Save(DeploymentProfile.Stage4MesPilot);
-        var backupPath = ConfigurationBackupService.Export(Path.Combine(_root, "backup"), "Admin01 [Admin]").BackupPath;
+        AoiDatabase.SaveDefectTaxonomySnapshot(new DefectTaxonomySnapshot
+        {
+            Taxonomy = new DefectTaxonomyRecord
+            {
+                TaxonomyId = "customer-taxonomy-backup",
+                Name = "Customer Backup Taxonomy",
+                CustomerName = "Customer A",
+                IsActive = true,
+            },
+            Entries =
+            {
+                new DefectTaxonomyEntry { TaxonomyId = "customer-taxonomy-backup", CanonicalClass = "OK", CustomerLabel = "PASS", ModelLabelId = 0, IsRequired = false, SortOrder = 0 },
+                new DefectTaxonomyEntry { TaxonomyId = "customer-taxonomy-backup", CanonicalClass = "Solder Bridge", CustomerLabel = "Customer Bridge", ModelLabelId = 1, IsRequired = true, SortOrder = 1 },
+            },
+            Aliases =
+            {
+                new DefectClassAliasRecord { TaxonomyId = "customer-taxonomy-backup", Alias = "Bridge", CanonicalClass = "Solder Bridge" },
+            },
+            MesMappings =
+            {
+                new MesDefectCodeMappingRecord { TaxonomyId = "customer-taxonomy-backup", CanonicalClass = "Solder Bridge", MesCode = "CUST-SB" },
+            },
+        }, "Admin01 [Admin]");
+        var backup = ConfigurationBackupService.Export(Path.Combine(_root, "backup"), "Admin01 [Admin]");
+        var backupPath = backup.BackupPath;
         var backupJson = File.ReadAllText(backupPath);
 
         Assert.DoesNotContain(apiKey, backupJson, StringComparison.Ordinal);
         Assert.Contains(SecretProtectionService.ProtectedPrefix, backupJson, StringComparison.Ordinal);
+        Assert.Contains(backup.Package.PluginFolderReferences, path => string.Equals(path, pluginFolder, StringComparison.OrdinalIgnoreCase));
 
         var restoreRoot = Path.Combine(_root, "restore-target");
         AoiDatabase.ConfigureStorageRoot(restoreRoot);
@@ -158,6 +183,7 @@ public sealed class ConfigurationBackupServiceTests : IDisposable
         var restoredProfile = AoiDatabase.GetActiveThresholdProfile("CUSTOMER-A", "PROGRAM-A", "RECIPE-A");
         var restoredCamera = CameraSourceSettingsService.Load();
         var restoredMes = MesIntegrationSettingsService.Load();
+        var restoredTaxonomy = DefectTaxonomyService.GetActiveTaxonomy();
 
         Assert.True(preview.IsCompatible);
         Assert.Equal(DeploymentProfile.Stage4MesPilot, DeploymentProfileSettingsService.Load());
@@ -175,6 +201,10 @@ public sealed class ConfigurationBackupServiceTests : IDisposable
         Assert.Equal("X-Restore-Key", restoredMes.ApiKeyHeaderName);
         Assert.Equal(apiKey, restoredMes.ApiKey);
         Assert.Equal(4, restoredMes.MaxRetryCount);
+        Assert.Equal("Customer Backup Taxonomy", restoredTaxonomy.Taxonomy.Name);
+        Assert.Contains(restoredTaxonomy.Entries, entry => entry.CanonicalClass == "Solder Bridge" && entry.CustomerLabel == "Customer Bridge");
+        Assert.Equal("CUST-SB", DefectTaxonomyService.MesCodeFor("Bridge"));
+        Assert.NotNull(ConfigurationBackupService.GetLastRollbackInfo());
     }
 
     [Fact]
@@ -205,5 +235,44 @@ public sealed class ConfigurationBackupServiceTests : IDisposable
         Assert.Contains(preview.SettingsChanges, change => change.Contains("deploymentProfile", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(preview.Warnings, warning => warning.Contains("model file", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(preview.Warnings, warning => warning.Contains("plugin folder", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(preview.SecretProtectionStatus, status => status.Contains("mesIntegration.apiKey", StringComparison.OrdinalIgnoreCase) || status.Contains("ApiKey", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void RollbackLastRestoreRevertsDeploymentProfileAndTaxonomy()
+    {
+        AoiDatabase.Initialize();
+        DeploymentProfileSettingsService.Save(DeploymentProfile.Stage1ImageValidation);
+        AoiDatabase.SaveDefectTaxonomySnapshot(DefectTaxonomyService.CreateDefaultTaxonomy(), "Admin01 [Admin]");
+
+        var originalBackup = ConfigurationBackupService.Export(Path.Combine(_root, "original"), "Admin01 [Admin]").BackupPath;
+        DeploymentProfileSettingsService.Save(DeploymentProfile.FullFactoryAutomation);
+        AoiDatabase.SaveDefectTaxonomySnapshot(new DefectTaxonomySnapshot
+        {
+            Taxonomy = new DefectTaxonomyRecord
+            {
+                TaxonomyId = "restore-taxonomy",
+                Name = "Restore Taxonomy",
+                IsActive = true,
+            },
+            Entries =
+            {
+                new DefectTaxonomyEntry { TaxonomyId = "restore-taxonomy", CanonicalClass = "OK", CustomerLabel = "OK", SortOrder = 0, IsRequired = false },
+                new DefectTaxonomyEntry { TaxonomyId = "restore-taxonomy", CanonicalClass = "Anomaly", CustomerLabel = "Customer Anomaly", SortOrder = 1, IsRequired = true },
+            },
+        }, "Admin01 [Admin]");
+        var restoreBackup = ConfigurationBackupService.Export(Path.Combine(_root, "restore"), "Admin01 [Admin]").BackupPath;
+
+        ConfigurationBackupService.Import(originalBackup, "Admin01 [Admin]");
+        Assert.Equal(DeploymentProfile.Stage1ImageValidation, DeploymentProfileSettingsService.Load());
+
+        ConfigurationBackupService.Import(restoreBackup, "Admin01 [Admin]");
+        Assert.Equal(DeploymentProfile.FullFactoryAutomation, DeploymentProfileSettingsService.Load());
+        Assert.Equal("Restore Taxonomy", DefectTaxonomyService.GetActiveTaxonomy().Taxonomy.Name);
+
+        var rollbackPreview = ConfigurationBackupService.RollbackLastRestore("Admin01 [Admin]");
+
+        Assert.True(rollbackPreview.IsCompatible);
+        Assert.Equal(DeploymentProfile.Stage1ImageValidation, DeploymentProfileSettingsService.Load());
     }
 }

@@ -11,12 +11,15 @@ Each area is scored independently from 0 to 100 percent.
 | Area | Criteria and Weights |
 | --- | --- |
 | Stage 1 image validation | Customer validation package recorded 40, persisted validation batch run 25, false-call reduction evidence 20, export verification 15 |
+| Production model readiness | Active model registered 15, runtime validation completed 15, PASS model acceptance 35, ProductionCandidate/Deployed lifecycle 20, release package path recorded 15 |
+| False-positive reduction readiness | Validation run has measurable false-call rate 20, false-call sweep completed 30, recommended operating point exists 25, deployed threshold profile linked to false-call evidence 25 |
 | Stage 2 camera/lighting/3D | Real camera acceptance PASS 35, real lighting sync PASS 25, real 3D profile PASS 25, simulated boundary exercise 15 |
 | Stage 3 robot/safety | Real robot cell acceptance PASS 35, real safety/PLC interlock evidence 30, invalid transition/reset checks 20, robot audit events 15 |
-| Stage 4 MES/ERP | Passing traceability acceptance 35, MES REST ready 25, MES queue clear 20, central sync status visible and healthy 20 |
-| Model readiness | Active model registered 15, runtime validation completed 15, PASS model acceptance 35, ProductionCandidate/Deployed lifecycle 20, release package path recorded 15 |
+| Stage 4 MES/ERP | Passing traceability acceptance 35, MES REST ready 25, MES queue clear 20, abandoned-item disposition visible 20 |
+| Central sync/management | Central sync configured 20, central sync queue has no failed items 20, management dashboard exported 30, central sync or management report exported 30 |
 | Reliability/soak | Soak run recorded 25, at least 30 minutes stability evidence 20, 8-hour factory evidence 30, no failed cycles/critical errors 15, latency traces 10 |
-| Management/commercial readiness | Factory readiness package exported 25, factory acceptance checklist/package exported 20, management dashboard exported 20, passing build/test evidence 20, LocalUsers accountability mode 15 |
+| Deployment/supportability | Passing build/test/publish evidence imported 30, configuration backup exported 25, factory readiness package exported 25, factory acceptance checklist/package exported 20 |
+| Commercial readiness | LocalUsers accountability mode 25, management dashboard evidence exported 20, FullFactoryAutomation has no blocking issues 25, release/support build evidence 15, customer/commercial package exported 15 |
 
 The overall percentage is the average of the area percentages. It is a gap indicator, not a Go/No-Go decision. Go/No-Go remains controlled by the Factory Readiness profiles and acceptance gates.
 
@@ -34,8 +37,12 @@ Model records increase model readiness only when the registry, runtime validatio
 
 Hardware scores increase when camera, lighting, 3D, robot, and safety acceptance records are recorded as real hardware with passing status. Simulated acceptance records remain visible but do not satisfy real-hardware weights.
 
-MES/ERP completion depends on traceability test evidence, MES REST readiness, queue health, and central sync visibility. Local queue status alone is not enough to claim an integrated factory system.
+MES/ERP completion depends on traceability test evidence, MES REST readiness, queue health, and abandoned-item disposition. Central sync and management reporting are scored separately so a local MES queue does not imply enterprise aggregation readiness.
 
 Reliability completion depends on soak-test and latency evidence. Short or simulated soak runs are recorded as partial evidence, while the 8-hour factory criterion requires the service to mark the run as completed factory evidence.
 
-Management/commercial readiness depends on exported readiness/FAT/dashboard packages, imported build/test evidence, and non-demo local accountability mode. Demo role selection produces a readiness warning and does not satisfy accountability completion.
+Central sync and management readiness increase when central sync is configured, the queue is healthy, and management dashboard or central-sync reports are exported. The dashboard uses local SQLite first and does not require a central server to generate the gap report.
+
+Deployment/supportability increases when build/test/publish evidence, configuration backup evidence, factory readiness packages, and FAT checklist packages exist. This category is meant to answer whether another customer/factory PC can be installed, restored, and reviewed.
+
+Commercial readiness depends on LocalUsers accountability, management review exports, customer/commercial packages, and FullFactoryAutomation having no blocking issues. Demo role selection produces a readiness warning and does not satisfy accountability completion.

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AOI_Monitor.Data;
@@ -18,6 +19,7 @@ public static class FactoryReadinessService
     public static FactoryReadinessReport Evaluate(FactoryReadinessCriteria? criteria = null)
     {
         criteria ??= CriteriaForProfile(DeploymentProfileSettingsService.Load());
+        criteria = ApplyOperatingModeCriteria(criteria, OperatingModeSettingsService.Load());
         AoiDatabase.Initialize();
 
         var report = new FactoryReadinessReport
@@ -28,6 +30,7 @@ public static class FactoryReadinessService
             KnownLimitations = CustomerValidationReportContext.DefaultPrototypeLimitations.ToList(),
         };
 
+        var operatingMode = OperatingModeSettingsService.Load();
         var diagnostics = SystemDiagnosticService.RunDiagnostics();
         var latestPackage = AoiDatabase.GetValidationPackages(1).FirstOrDefault();
         var latestRun = AoiDatabase.GetLatestBatchTestRun();
@@ -45,6 +48,7 @@ public static class FactoryReadinessService
         });
         var centralSync = CentralSyncService.EvaluateReadiness();
 
+        AddOperatingMode(report, operatingMode);
         AddBuildTest(report);
         AddDiagnosticCategory(report, "Database health", diagnostics, "Database");
         AddImageVault(report, diagnostics);
@@ -61,7 +65,8 @@ public static class FactoryReadinessService
         AddRobot(report, criteria, robot);
         AddMes(report, criteria, mes);
         AddCentralSync(report, criteria, centralSync);
-        AddAuthenticationMode(report);
+        AddPilotIssues(report);
+        AddAuthenticationMode(report, operatingMode);
         AddSecurityAudit(report);
         AddKnownLimitations(report, criteria);
 
@@ -150,10 +155,65 @@ public static class FactoryReadinessService
                 RequireSoakTestEvidenceForFactoryPilot = true,
                 RequireNoExportVerificationErrors = true,
                 RequirePassingTraceabilityTest = true,
+                RequireCentralSyncEvidence = true,
                 WarnWhenCentralSyncDisabled = true,
             },
             _ => new FactoryReadinessCriteria { DeploymentProfile = DeploymentProfile.Stage1ImageValidation },
         };
+
+    private static FactoryReadinessCriteria ApplyOperatingModeCriteria(FactoryReadinessCriteria source, OperatingMode mode)
+    {
+        var criteria = new FactoryReadinessCriteria
+        {
+            DeploymentProfile = source.DeploymentProfile,
+            Stage1Only = source.Stage1Only,
+            RequireSuccessfulLatestValidationPackage = source.RequireSuccessfulLatestValidationPackage,
+            RequireDatasetQualityEvidence = source.RequireDatasetQualityEvidence,
+            RequireProductionModel = source.RequireProductionModel,
+            MaximumFalseCallRate = source.MaximumFalseCallRate,
+            RequireFalseCallEvidence = source.RequireFalseCallEvidence,
+            RequireNoExportVerificationErrors = source.RequireNoExportVerificationErrors,
+            RequireNoPendingMesQueueForProductionMode = source.RequireNoPendingMesQueueForProductionMode,
+            RequireCameraAcceptance = source.RequireCameraAcceptance,
+            RequireProfile3DAcceptance = source.RequireProfile3DAcceptance,
+            RequireLightingAcceptance = source.RequireLightingAcceptance,
+            RequireRobotAcceptance = source.RequireRobotAcceptance,
+            RequireRealHardwareAcceptance = source.RequireRealHardwareAcceptance,
+            RequireSoakTestEvidenceForFactoryPilot = source.RequireSoakTestEvidenceForFactoryPilot,
+            RequirePassingTraceabilityTest = source.RequirePassingTraceabilityTest,
+            RequireCentralSyncEvidence = source.RequireCentralSyncEvidence,
+            WarnWhenCentralSyncDisabled = source.WarnWhenCentralSyncDisabled,
+        };
+
+        if (mode == OperatingMode.Production)
+        {
+            criteria.Stage1Only = false;
+            criteria.RequireSuccessfulLatestValidationPackage = true;
+            criteria.RequireDatasetQualityEvidence = true;
+            criteria.RequireProductionModel = true;
+            criteria.RequireFalseCallEvidence = true;
+            criteria.RequireNoExportVerificationErrors = true;
+            criteria.RequireNoPendingMesQueueForProductionMode = true;
+            criteria.RequireCameraAcceptance = true;
+            criteria.RequireProfile3DAcceptance = true;
+            criteria.RequireLightingAcceptance = true;
+            criteria.RequireRobotAcceptance = true;
+            criteria.RequireRealHardwareAcceptance = true;
+            criteria.RequireSoakTestEvidenceForFactoryPilot = true;
+            criteria.RequirePassingTraceabilityTest = true;
+            criteria.RequireCentralSyncEvidence = true;
+            criteria.WarnWhenCentralSyncDisabled = true;
+        }
+
+        if (mode == OperatingMode.Pilot)
+        {
+            criteria.RequireSuccessfulLatestValidationPackage = true;
+            criteria.RequireDatasetQualityEvidence = true;
+            criteria.RequireNoExportVerificationErrors = true;
+        }
+
+        return criteria;
+    }
 
     public static string DisplayName(DeploymentProfile profile)
         => profile switch
@@ -242,6 +302,38 @@ public static class FactoryReadinessService
             status == "Go" ? "No action required." : "Fix failing command(s), rerun the full validation chain, and import passing build/test evidence.");
     }
 
+    private static void AddOperatingMode(FactoryReadinessReport report, OperatingMode mode)
+    {
+        var settings = OperatingModeSettingsService.LoadSettings();
+        switch (mode)
+        {
+            case OperatingMode.Demo:
+                Add(
+                    report,
+                    "Operating mode",
+                    "Conditional",
+                    "Demo Mode active. Demo role selector, sample/fallback data, and simulated sources are allowed. Do not present Demo Mode evidence as customer pilot or production readiness.",
+                    "Switch to Pilot or Production before customer review or factory deployment.");
+                return;
+            case OperatingMode.Pilot:
+                Add(
+                    report,
+                    "Operating mode",
+                    "Conditional",
+                    $"Pilot Mode active. Demo rows are hidden by default; customer dataset preflight and readiness-package evidence are required. Simulated hardware is allowed only when clearly labeled. Pilot authentication waiver active={OperatingModeSettingsService.HasActivePilotAuthenticationWaiver()}; waivedBy={settings.PilotAuthenticationWaivedBy}; expires={settings.PilotAuthenticationWaiverExpiresAtUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "none"}.",
+                    "Use LocalUsers/MES authentication or record an explicit audited pilot waiver; complete customer dataset preflight and export readiness evidence.");
+                return;
+            case OperatingMode.Production:
+                Add(
+                    report,
+                    "Operating mode",
+                    "Go",
+                    "Production Mode active. Demo/fallback rows are not allowed; production model, real hardware, MES/central sync, export verification, and signoff gates are enforced.",
+                    "No action required for operating-mode selection; resolve any failing production readiness categories.");
+                return;
+        }
+    }
+
     private static void AddDiagnosticCategory(FactoryReadinessReport report, string name, SystemDiagnosticReport diagnostics, string diagnosticCategory)
     {
         var checks = diagnostics.Checks.Where(check => check.Category.Equals(diagnosticCategory, StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -297,7 +389,7 @@ public static class FactoryReadinessService
                     report,
                     "Active model readiness",
                     waiverExpired ? "No-Go" : "Conditional",
-                    $"Active ONNX model is deployed with Admin waiver by {activeModel.DeploymentWaivedBy}: {activeModel.DeploymentWaiverReason}; expires={activeModel.WaiverExpiresAtUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "not recorded"}.",
+                    $"Active ONNX model is deployed with Admin waiver by {activeModel.DeploymentWaivedBy}: risk={activeModel.DeploymentWaiverRiskClassification}; reason={activeModel.DeploymentWaiverReason}; expires={activeModel.WaiverExpiresAtUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "not recorded"}.",
                     waiverExpired
                         ? "Waiver has expired. Retire or replace the model, or record a new Admin waiver after review."
                         : "Active waiver downgrades readiness to Conditional at best. Complete PASS model acceptance, release packaging, and approved lifecycle promotion before Go readiness claims.");
@@ -416,6 +508,41 @@ public static class FactoryReadinessService
 
     private static void AddLatency(FactoryReadinessReport report, FactoryReadinessCriteria criteria)
     {
+        var benchmark = BenchmarkInspectionService.GetLatestBenchmark();
+        if (benchmark is not null)
+        {
+            var benchmarkOk = benchmark.CompletedCount > 0 &&
+                benchmark.P95FrameToOverlayMs <= benchmark.AcceptanceThresholdMs &&
+                benchmark.OverOneSecondCount == 0;
+            var realCameraBenchmarkRequired = !criteria.Stage1Only &&
+                (criteria.RequireCameraAcceptance || criteria.RequireRealHardwareAcceptance);
+            if (realCameraBenchmarkRequired)
+            {
+                var realCameraOk = benchmarkOk && benchmark.IsRealCameraSource;
+                Add(
+                    report,
+                    "Inspection performance benchmark",
+                    realCameraOk ? "Go" : "No-Go",
+                    $"Latest benchmark source={benchmark.SourceKind}; realCamera={benchmark.IsRealCameraSource}; count={benchmark.CompletedCount}; p95 frame-to-overlay={benchmark.P95FrameToOverlayMs:F0} ms; p99={benchmark.P99FrameToOverlayMs:F0} ms; max={benchmark.MaxFrameToOverlayMs:F0} ms; over1s={benchmark.OverOneSecondCount}; throughput={benchmark.ThroughputImagesPerMinute:F1}/min; report={benchmark.ReportFolder}.",
+                    realCameraOk ? "No action required." : "Run Performance Benchmark against the active real camera source. Folder simulation evidence cannot satisfy Stage 2 or full factory real-camera latency acceptance.");
+                return;
+            }
+
+            Add(
+                report,
+                "Inspection performance benchmark",
+                benchmarkOk ? "Go" : "Conditional",
+                $"Latest local benchmark source={benchmark.SourceKind}; count={benchmark.CompletedCount}; p50={benchmark.P50FrameToOverlayMs:F0} ms; p95={benchmark.P95FrameToOverlayMs:F0} ms; p99={benchmark.P99FrameToOverlayMs:F0} ms; max={benchmark.MaxFrameToOverlayMs:F0} ms; over1s={benchmark.OverOneSecondCount}; throughput={benchmark.ThroughputImagesPerMinute:F1}/min; report={benchmark.ReportFolder}.",
+                benchmarkOk ? "No action required." : "Reduce load/preprocessing/inference/overlay/persistence time and rerun the image-folder benchmark.");
+            return;
+        }
+
+        if (!criteria.Stage1Only && (criteria.RequireCameraAcceptance || criteria.RequireRealHardwareAcceptance))
+        {
+            Add(report, "Inspection performance benchmark", "No-Go", "No performance benchmark evidence has been recorded. Stage 2 and full factory readiness require a real-camera benchmark under the one-second frame-to-overlay threshold.", "Run Log & Export > Performance Benchmark against the active real camera source.");
+            return;
+        }
+
         var summary = InspectionLatencyService.GetRecentSummary();
         if (summary.TraceCount == 0)
         {
@@ -527,6 +654,9 @@ public static class FactoryReadinessService
         var status = summary.Status switch
         {
             "Central Sync Ready" => "Go",
+            "Central Sync Disabled" when criteria.RequireCentralSyncEvidence => "No-Go",
+            "Central Sync Error" when criteria.RequireCentralSyncEvidence => "No-Go",
+            "Central Sync Pending" when criteria.RequireCentralSyncEvidence => "No-Go",
             "Central Sync Error" => "Conditional",
             "Central Sync Pending" => "Conditional",
             "Central Sync Disabled" when criteria.WarnWhenCentralSyncDisabled => "Conditional",
@@ -542,6 +672,20 @@ public static class FactoryReadinessService
             status == "Go" ? "No action required." : "Configure central sync or clear pending/failed queue items before claiming multi-station management aggregation.");
     }
 
+    private static void AddPilotIssues(FactoryReadinessReport report)
+    {
+        var summary = PilotIssueService.Summarize();
+        var status = summary.CriticalOpen > 0 ? "Conditional" : "Go";
+        Add(
+            report,
+            "Pilot issue status",
+            status,
+            $"Pilot issues total={summary.Total}; open={summary.Open}; criticalOpen={summary.CriticalOpen}.",
+            summary.CriticalOpen > 0
+                ? "Resolve, waive, or close critical pilot issues before customer/factory Go claims."
+                : "No critical open pilot issues recorded.");
+    }
+
     private static void AddSecurityAudit(FactoryReadinessReport report)
     {
         var audits = AoiDatabase.GetAuditEvents(new LogFilter()).Take(50).ToArray();
@@ -549,19 +693,31 @@ public static class FactoryReadinessService
         Add(report, "Security/role audit status", audits.Length == 0 ? "Conditional" : "Go", $"Audit rows available={audits.Length}; recent access-denied events={denied}. Admin-only actions remain role-gated in the local audit trail.", audits.Length == 0 ? "Exercise role-gated workflows and export audit evidence." : "No action required.");
     }
 
-    private static void AddAuthenticationMode(FactoryReadinessReport report)
+    private static void AddAuthenticationMode(FactoryReadinessReport report, OperatingMode operatingMode)
     {
         var mode = AuthenticationSettingsService.CurrentMode;
-        var status = mode == AuthenticationMode.LocalUsers ? "Go" : "Conditional";
+        var authenticated = mode is AuthenticationMode.LocalUsers or AuthenticationMode.MesAuthenticationBoundary;
+        var waiverActive = OperatingModeSettingsService.HasActivePilotAuthenticationWaiver();
+        var status = operatingMode switch
+        {
+            OperatingMode.Production when !authenticated => "No-Go",
+            OperatingMode.Pilot when !authenticated && !waiverActive => "No-Go",
+            OperatingMode.Pilot when !authenticated && waiverActive => "Conditional",
+            _ => mode == AuthenticationMode.LocalUsers ? "Go" : "Conditional",
+        };
         var evidence = mode switch
         {
             AuthenticationMode.LocalUsers => "LocalUsers mode active. Local users authenticate with salted password hashes; roles come from the local user store.",
             AuthenticationMode.MesAuthenticationBoundary => "MES authentication boundary selected. This PoC documents the MES identity boundary but does not authenticate against a production MES identity provider.",
             _ => "DemoLocalRoleSelector mode active. The top-bar role selector is for demonstration only and is not production authentication.",
         };
-        var next = mode == AuthenticationMode.LocalUsers
-            ? "No action required for PoC local accountability."
-            : "Switch to LocalUsers for PoC accountability, or integrate the customer MES/identity provider before production readiness claims.";
+        if (operatingMode == OperatingMode.Pilot && mode == AuthenticationMode.DemoLocalRoleSelector && waiverActive)
+            evidence += " An explicit Pilot authentication waiver is active; readiness remains Conditional at best for accountability.";
+        var next = status == "Go"
+            ? "No action required for local accountability."
+            : operatingMode == OperatingMode.Production
+                ? "Switch to LocalUsers or integrate the customer MES identity provider before Production readiness claims."
+                : "Switch to LocalUsers/MES authentication, or record an explicit Pilot authentication waiver before customer pilot review.";
         Add(report, "Authentication mode", status, evidence, next);
     }
 
@@ -668,6 +824,7 @@ public static class FactoryReadinessService
                 RelativePath = Path.GetRelativePath(packageFolder, path).Replace('\\', '/'),
                 FileType = Classify(path),
                 Bytes = new FileInfo(path).Length,
+                Sha256 = ComputeSha256(path),
             })
             .ToList();
 
@@ -701,6 +858,12 @@ public static class FactoryReadinessService
         if (fileName.Equals("README.txt", StringComparison.OrdinalIgnoreCase))
             return "README";
         return "Factory readiness evidence";
+    }
+
+    private static string ComputeSha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
 
     private static string BuildReadme(FactoryReadinessReport report)

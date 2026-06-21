@@ -84,6 +84,8 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Contains("TraceabilityTestReports", tables);
         Assert.Contains("CentralSyncQueue", tables);
         Assert.Contains("CentralSyncAttempts", tables);
+        Assert.Contains("CustomerPilotSessions", tables);
+        Assert.Contains("CustomerPilotSteps", tables);
         Assert.Contains("ValidationPackages", tables);
         Assert.Contains("FalseCallReductionRuns", tables);
         Assert.Contains("FalseCallReductionPoints", tables);
@@ -2554,6 +2556,15 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
+    public void OperatorCannotRunModelAcceptance()
+    {
+        AoiDatabase.Initialize();
+
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            ModelAcceptanceService.RunAcceptance(_root, Path.Combine(_root, "gt.csv"), operatorId: "Operator01 [Operator]", role: UserRole.Operator));
+    }
+
+    [Fact]
     public void ModelReleasePackageContainsShaCriteriaMetricsAndLimitations()
     {
         AoiDatabase.Initialize();
@@ -2641,7 +2652,11 @@ public sealed class AoiDatabaseTests : IDisposable
         AoiDatabase.Initialize();
         var model = RegisterLifecycleModel();
         var expiresAt = DateTime.UtcNow.AddDays(14);
-        ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]", "Customer pilot waiver while acceptance dataset is pending.", expiresAt);
+
+        Assert.Throws<ArgumentException>(() =>
+            ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]", "Missing risk classification.", expiresAt, string.Empty));
+
+        ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]", "Customer pilot waiver while acceptance dataset is pending.", expiresAt, "Medium");
 
         var stage1 = FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(DeploymentProfile.Stage1ImageValidation));
         var full = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria
@@ -2663,6 +2678,7 @@ public sealed class AoiDatabaseTests : IDisposable
             category.Evidence.Contains("waiver", StringComparison.OrdinalIgnoreCase));
         var updated = ModelRegistryService.GetModel(model.ModelId)!;
         Assert.NotNull(updated.WaiverExpiresAtUtc);
+        Assert.Equal("Medium", updated.DeploymentWaiverRiskClassification);
         Assert.InRange(
             Math.Abs((updated.WaiverExpiresAtUtc!.Value.ToUniversalTime() - expiresAt.ToUniversalTime()).TotalSeconds),
             0,
@@ -2675,7 +2691,7 @@ public sealed class AoiDatabaseTests : IDisposable
     {
         AoiDatabase.Initialize();
         var model = RegisterLifecycleModel();
-        ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]", "Short pilot waiver.", DateTime.UtcNow.AddDays(1));
+        ModelLifecycleService.DeployModel(model.ModelId, UserRole.Admin, "Admin01 [Admin]", "Short pilot waiver.", DateTime.UtcNow.AddDays(1), "High");
         AoiDatabase.UpdateModelLifecycle(
             model.ModelId,
             ModelLifecycleState.Deployed,
@@ -2683,6 +2699,7 @@ public sealed class AoiDatabaseTests : IDisposable
             waiverExpiresAtUtc: DateTime.UtcNow.AddDays(-1),
             deploymentWaivedBy: "Admin01 [Admin]",
             deploymentWaivedAtUtc: DateTime.UtcNow.AddDays(-2),
+            deploymentWaiverRiskClassification: "High",
             replaceDeploymentWaiver: true);
 
         var report = FactoryReadinessService.Evaluate(new FactoryReadinessCriteria

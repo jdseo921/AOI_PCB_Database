@@ -82,9 +82,15 @@ public static class ModelLifecycleService
     }
 
     public static void DeployModel(string modelId, UserRole role, string approvedBy)
-        => DeployModel(modelId, role, approvedBy, waiverReason: null, waiverExpiresAtUtc: null);
+        => DeployModel(modelId, role, approvedBy, waiverReason: null, waiverExpiresAtUtc: null, riskClassification: null);
 
-    public static void DeployModel(string modelId, UserRole role, string approvedBy, string? waiverReason, DateTime? waiverExpiresAtUtc)
+    public static void DeployModel(
+        string modelId,
+        UserRole role,
+        string approvedBy,
+        string? waiverReason,
+        DateTime? waiverExpiresAtUtc,
+        string? riskClassification)
     {
         if (!RoleAuthorization.CanManageSettings(role))
             throw new UnauthorizedAccessException(RoleAuthorization.DeniedMessage(role, "deploying model lifecycle state"));
@@ -99,6 +105,8 @@ public static class ModelLifecycleService
         var hasWaiver = !string.IsNullOrWhiteSpace(waiverReason);
         if (hasWaiver && waiverExpiresAtUtc is null)
             throw new ArgumentException("Admin deployment waiver expiry date is required.", nameof(waiverExpiresAtUtc));
+        if (hasWaiver && string.IsNullOrWhiteSpace(riskClassification))
+            throw new ArgumentException("Admin deployment waiver risk classification is required.", nameof(riskClassification));
         var normalizedWaiverExpiresAtUtc = waiverExpiresAtUtc?.ToUniversalTime();
         if (hasWaiver && normalizedWaiverExpiresAtUtc <= DateTime.UtcNow)
             throw new ArgumentException("Admin deployment waiver expiry date must be in the future.", nameof(waiverExpiresAtUtc));
@@ -106,6 +114,7 @@ public static class ModelLifecycleService
             throw new InvalidOperationException("Model deployment requires PASS model acceptance or an Admin deployment waiver reason.");
 
         var normalizedWaiver = hasWaiver ? waiverReason!.Trim() : string.Empty;
+        var normalizedRisk = hasWaiver ? riskClassification!.Trim() : string.Empty;
         var now = DateTime.UtcNow;
         AoiDatabase.UpdateModelLifecycle(
             model.ModelId,
@@ -116,6 +125,7 @@ public static class ModelLifecycleService
             waiverExpiresAtUtc: hasWaiver ? normalizedWaiverExpiresAtUtc : null,
             deploymentWaivedBy: hasWaiver ? approvedBy : string.Empty,
             deploymentWaivedAtUtc: hasWaiver ? now : null,
+            deploymentWaiverRiskClassification: normalizedRisk,
             deployedAtUtc: now,
             isActive: true,
             replaceDeploymentWaiver: true);
@@ -123,7 +133,7 @@ public static class ModelLifecycleService
         AoiDatabase.RecordAuditEvent(
             hasWaiver ? "MODEL_DEPLOYMENT_WAIVER" : "MODEL_DEPLOYMENT",
             hasWaiver
-                ? $"Deployed model {model.ModelId} with Admin waiver. Reason={normalizedWaiver}; expires={normalizedWaiverExpiresAtUtc:O}"
+                ? $"Deployed model {model.ModelId} with Admin waiver. Risk={normalizedRisk}; reason={normalizedWaiver}; expires={normalizedWaiverExpiresAtUtc:O}"
                 : $"Deployed model {model.ModelId} with PASS acceptance run {latestAcceptance?.Id.ToString(CultureInfo.InvariantCulture) ?? "unknown"}.",
             operatorWithRole: approvedBy,
             relatedEntityType: "ModelRegistry",

@@ -17,12 +17,18 @@ public sealed class FactoryReadinessServiceTests : IDisposable
         AoiDatabase.Initialize();
         InspectionModelConfigurationService.Save(new InspectionModelConfiguration());
         MesIntegrationSettingsService.Save(new MesIntegrationSettings());
+        CentralSyncSettingsService.ResetForTests();
+        CentralSyncSettingsService.Save(new CentralSyncSettings());
         DeploymentProfileSettingsService.ResetForTests();
+        OperatingModeSettingsService.ResetForTests();
+        OperatingModeSettingsService.Save(OperatingMode.Demo, "TestAdmin [Admin]");
     }
 
     public void Dispose()
     {
         DeploymentProfileSettingsService.ResetForTests();
+        OperatingModeSettingsService.ResetForTests();
+        CentralSyncSettingsService.ResetForTests();
         try
         {
             if (Directory.Exists(_root))
@@ -112,6 +118,23 @@ public sealed class FactoryReadinessServiceTests : IDisposable
 
         Assert.True(File.Exists(Path.Combine(result.PackageFolder, "build_test_evidence", "latest_build_test_evidence.json")));
         Assert.True(File.Exists(Path.Combine(result.PackageFolder, "build_test_evidence", "latest_build_test_evidence_summary.json")));
+    }
+
+    [Fact]
+    public void ExportedFactoryReadinessPackagesContainExpectedEvidenceFilesAndChecksums()
+    {
+        BuildTestEvidenceService.CreateLocalEvidence(testResultPath: Path.Combine(_root, "TestResults", "test-results.trx"), operatorId: "TestAdmin [Admin]");
+        RecordStage1Package("PASS");
+        RecordOkExportVerification();
+
+        foreach (var profile in new[] { DeploymentProfile.Stage1ImageValidation, DeploymentProfile.Stage2CameraPilot, DeploymentProfile.FullFactoryAutomation })
+        {
+            var result = FactoryReadinessService.ExportGoNoGoPackage(
+                FactoryReadinessService.CriteriaForProfile(profile),
+                Path.Combine(_root, "readiness_packages", profile.ToString()));
+
+            AssertReadinessPackageFiles(result.PackageFolder);
+        }
     }
 
     [Fact]
@@ -332,7 +355,9 @@ public sealed class FactoryReadinessServiceTests : IDisposable
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         Assert.True(File.Exists(Path.Combine(result.PackageFolder, "package_manifest.json")));
-        Assert.Equal(19, categories.Length);
+        Assert.Equal(21, categories.Length);
+        Assert.Contains("Operating mode", names);
+        Assert.Contains("Pilot issue status", names);
         Assert.Contains("Build/Test status", names);
         Assert.Contains("Inspection latency trace", names);
         Assert.Contains("3D profile acceptance status", names);
@@ -419,6 +444,20 @@ public sealed class FactoryReadinessServiceTests : IDisposable
     }
 
     [Fact]
+    public void Stage2CameraPilotIsNoGoWithoutCameraLightingAnd3DEvidence()
+    {
+        RecordStage1Package("PASS");
+        RecordOkExportVerification();
+
+        var report = FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(DeploymentProfile.Stage2CameraPilot));
+
+        Assert.Equal("NoGo", report.OverallStatus);
+        Assert.Contains(report.Categories, category => category.Name == "Camera acceptance status" && category.Status == "No-Go");
+        Assert.Contains(report.Categories, category => category.Name == "Lighting sync status" && category.Status == "No-Go");
+        Assert.Contains(report.Categories, category => category.Name == "3D profile acceptance status" && category.Status == "No-Go");
+    }
+
+    [Fact]
     public void Stage1CanPassWithoutRealRobotOrMes()
     {
         RecordStage1Package("PASS");
@@ -430,6 +469,21 @@ public sealed class FactoryReadinessServiceTests : IDisposable
         Assert.NotEqual("NoGo", report.OverallStatus);
         Assert.Contains(report.Categories, category => category.Name == "Robot acceptance status" && category.Status == "Conditional");
         Assert.Contains(report.Categories, category => category.Name == "MES/spool status" && category.Status == "Conditional");
+    }
+
+    [Fact]
+    public void Stage1PackageCanBeConditionalOrGoWithoutRealHardware()
+    {
+        RecordStage1Package("PASS");
+        RecordOkExportVerification();
+
+        var report = FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(DeploymentProfile.Stage1ImageValidation));
+
+        Assert.Contains(report.OverallStatus, new[] { "Conditional", "Go" });
+        Assert.DoesNotContain(report.BlockingIssues, issue => issue.Contains("Camera acceptance", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(report.BlockingIssues, issue => issue.Contains("Lighting sync", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(report.BlockingIssues, issue => issue.Contains("3D profile", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(report.Categories, category => category.Name == "Known limitations" && category.Evidence.Contains("Stage 1 package does not validate production camera", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -476,6 +530,53 @@ public sealed class FactoryReadinessServiceTests : IDisposable
         Assert.Contains(report.Categories, category => category.Name == "Camera acceptance status" && category.Status == "No-Go");
         Assert.Contains(report.Categories, category => category.Name == "Lighting sync status" && category.Status == "No-Go");
         Assert.Contains(report.Categories, category => category.Name == "Robot acceptance status" && category.Status == "No-Go");
+    }
+
+    [Fact]
+    public void FullFactoryAutomationIsNoGoWithoutProductionModelHardwareMesCentralSyncAndEightHourSoak()
+    {
+        RecordStage1Package("PASS");
+        RecordOkExportVerification();
+
+        var report = FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(DeploymentProfile.FullFactoryAutomation));
+
+        Assert.Equal("NoGo", report.OverallStatus);
+        Assert.Contains(report.Categories, category => category.Name == "Active model readiness" && category.Status == "No-Go");
+        Assert.Contains(report.Categories, category => category.Name == "Camera acceptance status" && category.Status == "No-Go");
+        Assert.Contains(report.Categories, category => category.Name == "Lighting sync status" && category.Status == "No-Go");
+        Assert.Contains(report.Categories, category => category.Name == "3D profile acceptance status" && category.Status == "No-Go");
+        Assert.Contains(report.Categories, category => category.Name == "MES/spool status" && category.Status == "No-Go");
+        var centralSync = Assert.Single(report.Categories, category => category.Name == "Central sync status");
+        Assert.Equal("No-Go", centralSync.Status);
+        Assert.Contains(report.Categories, category => category.Name == "Soak test status" && category.Status == "No-Go");
+    }
+
+    private static void AssertReadinessPackageFiles(string packageFolder)
+    {
+        foreach (var fileName in new[]
+        {
+            "factory_readiness_summary.json",
+            "factory_readiness_summary.html",
+            "factory_readiness_summary.pdf",
+            "factory_acceptance_checklist.json",
+            "factory_acceptance_checklist.html",
+            "factory_acceptance_checklist.pdf",
+            "latest_validation_manifest.json",
+            "latest_export_verification_report.json",
+            "package_manifest.json",
+        })
+        {
+            Assert.True(File.Exists(Path.Combine(packageFolder, fileName)), $"{fileName} missing from {packageFolder}.");
+        }
+
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(packageFolder, "package_manifest.json")));
+        var includedFiles = document.RootElement.GetProperty("includedFiles").EnumerateArray().ToArray();
+        Assert.NotEmpty(includedFiles);
+        Assert.All(includedFiles, file =>
+        {
+            Assert.True(file.GetProperty("bytes").GetInt64() > 0);
+            Assert.Matches("^[0-9a-f]{64}$", file.GetProperty("sha256").GetString() ?? string.Empty);
+        });
     }
 
     private void RecordStage1Package(string status)

@@ -25,7 +25,7 @@ public static class RoleAuthorization
             "recipe" => CanEditRecipes(role),
             "calibration" => CanEditCalibration(role),
             "modeltest" => CanRunModelTests(role),
-            "reports" or "spc" => CanExportLogs(role),
+            "reports" or "spc" or "pilot" => CanExportLogs(role),
             "settings" => role >= UserRole.Engineer,
             "install" => CanManageSettings(role),
             _ => true,

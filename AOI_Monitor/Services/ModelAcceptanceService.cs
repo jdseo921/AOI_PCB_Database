@@ -26,9 +26,13 @@ public static class ModelAcceptanceService
         string groundTruthCsvPath,
         ModelAcceptanceCriteria? criteria = null,
         string? operatorId = null,
+        UserRole? role = null,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        if (role is { } requestedRole && !RoleAuthorization.CanTestModelConfiguration(requestedRole))
+            throw new UnauthorizedAccessException(RoleAuthorization.DeniedMessage(requestedRole, "running model acceptance"));
+
         AoiDatabase.Initialize();
         criteria ??= new ModelAcceptanceCriteria();
         cancellationToken.ThrowIfCancellationRequested();
@@ -99,6 +103,9 @@ public static class ModelAcceptanceService
             var falseCallSummary = FalseCallReductionService.ToSummary(falseCallRun);
             var breakdown = ClassMetricsService.Calculate(rows);
             var messages = Evaluate(criteria, metrics, performance, datasetQuality, falseCallSummary, manifest, rows).ToList();
+            var labelTaxonomy = DefectTaxonomyService.ValidateModelLabels(
+                activeModel.Labels.Select((label, index) => new KeyValuePair<int, string>(index, label)).ToDictionary(pair => pair.Key, pair => pair.Value));
+            messages.AddRange(labelTaxonomy.Messages);
             var status = messages.Any(message => message.StartsWith("FAIL:", StringComparison.OrdinalIgnoreCase))
                 ? "FAIL"
                 : messages.Any(message => message.StartsWith("CONDITIONAL:", StringComparison.OrdinalIgnoreCase))

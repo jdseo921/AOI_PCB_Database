@@ -4,4 +4,5 @@
   <Project Path="Templates/CameraAdapterTemplate/CameraAdapterTemplate.csproj" />
   <Project Path="Templates/LightingAdapterTemplate/LightingAdapterTemplate.csproj" />
   <Project Path="Templates/RobotControllerTemplate/RobotControllerTemplate.csproj" />
+  <Project Path="Templates/RobotPlcAdapterTemplate/RobotPlcAdapterTemplate.csproj" />
 </Solution>

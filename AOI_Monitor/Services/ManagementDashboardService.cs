@@ -35,6 +35,10 @@ public sealed class ManagementDashboardReport
     public string MesSyncStatus { get; set; } = string.Empty;
     public string CentralSyncStatus { get; set; } = string.Empty;
     public string AcceptanceReadinessStatus { get; set; } = string.Empty;
+    public int OpenPilotIssueCount { get; set; }
+    public int CriticalOpenPilotIssueCount { get; set; }
+    public Dictionary<string, int> PilotIssuesByCategory { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> PilotIssuesByStatus { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<ManagementDashboardContributor> TopDefectClasses { get; set; } = new();
     public List<ManagementDashboardContributor> TopRoiRefdesContributors { get; set; } = new();
     public List<ManagementDashboardTrendPoint> ModelVersionTrend { get; set; } = new();
@@ -136,12 +140,21 @@ public static class ManagementDashboardService
 
         var mes = MesSpoolService.EvaluateReadiness();
         var central = CentralSyncService.EvaluateReadiness();
+        var issueSummary = PilotIssueService.Summarize(new PilotIssueFilter
+        {
+            BoardModel = filter.BoardModel,
+            LotId = filter.LotId,
+        });
         var readiness = filter.DeploymentProfile is { } profile
             ? FactoryReadinessService.Evaluate(FactoryReadinessService.CriteriaForProfile(profile))
             : FactoryReadinessService.Evaluate();
         report.MesSyncStatus = $"{mes.Status}; mode={mes.Mode}; pending={mes.PendingCount}; failed={mes.FailedCount}; sent={mes.SentCount}; abandoned={mes.AbandonedCount}.";
         report.CentralSyncStatus = $"{central.Status}; mode={central.Mode}; pending={central.PendingCount}; failed={central.FailedCount}; sent={central.SentCount}; skipped={central.SkippedCount}.";
         report.AcceptanceReadinessStatus = $"{readiness.OverallStatus}; profile={readiness.DeploymentProfile}; warnings={readiness.Warnings.Count}; blocking={readiness.BlockingIssues.Count}.";
+        report.OpenPilotIssueCount = issueSummary.Open;
+        report.CriticalOpenPilotIssueCount = issueSummary.CriticalOpen;
+        report.PilotIssuesByCategory = issueSummary.ByCategory;
+        report.PilotIssuesByStatus = issueSummary.ByStatus;
 
         if (latestRun is null)
             report.Notes.Add("False-call, possible-escape, lot, ROI, and refdes analytics require a validation batch run with ground truth.");
@@ -187,6 +200,7 @@ public static class ManagementDashboardService
         AddMetric(sb, "Possible escapes", report.PossibleEscapeCount.ToString("N0", CultureInfo.InvariantCulture));
         AddMetric(sb, "Review burden", $"{report.ManualReviewBurdenMinutes:F1} min");
         AddMetric(sb, "Avg / p95 time", $"{report.AverageInspectionTimeMs:F0} / {report.P95InspectionTimeMs:F0} ms");
+        AddMetric(sb, "Pilot issues", $"open {report.OpenPilotIssueCount:N0}; critical {report.CriticalOpenPilotIssueCount:N0}");
         AddContributors(sb, "Top Defect Classes", report.TopDefectClasses);
         AddContributors(sb, "Top ROI / RefDes Contributors", report.TopRoiRefdesContributors);
         sb.AppendLine("<h2>Model Version Trend</h2><table><tr><th>Model</th><th>Total</th><th>OK</th><th>NG</th><th>Review</th><th>Avg ms</th></tr>");
@@ -220,6 +234,12 @@ public static class ManagementDashboardService
         Csv(sb, "summary", "mes_sync_status", report.MesSyncStatus);
         Csv(sb, "summary", "central_sync_status", report.CentralSyncStatus);
         Csv(sb, "summary", "acceptance_readiness_status", report.AcceptanceReadinessStatus);
+        Csv(sb, "summary", "open_pilot_issue_count", report.OpenPilotIssueCount);
+        Csv(sb, "summary", "critical_open_pilot_issue_count", report.CriticalOpenPilotIssueCount);
+        foreach (var item in report.PilotIssuesByCategory)
+            Csv(sb, "pilot_issues_by_category", item.Key, item.Value);
+        foreach (var item in report.PilotIssuesByStatus)
+            Csv(sb, "pilot_issues_by_status", item.Key, item.Value);
         foreach (var row in report.TopDefectClasses)
             Csv(sb, "top_defect_class", row.Name, $"count={row.Count}; falseCalls={row.FalseCalls}; escapes={row.PossibleEscapes}; reviews={row.Reviews}");
         foreach (var row in report.TopRoiRefdesContributors)

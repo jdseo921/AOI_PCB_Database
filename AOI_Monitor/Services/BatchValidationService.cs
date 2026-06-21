@@ -142,19 +142,7 @@ public static class BatchValidationService
 
     public static string NormalizeDefectClass(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            return "UNASSIGNED";
-
-        var normalized = value.Trim().ToUpperInvariant()
-            .Replace("-", "_", StringComparison.Ordinal)
-            .Replace(" ", "_", StringComparison.Ordinal);
-        return normalized switch
-        {
-            "OK" or "PASS" or "GOOD" => "OK",
-            "NG" or "FAIL" or "FAILED" or "DEFECT" or "DEFECTIVE" or "BAD" => "DEFECT",
-            "UNKNOWN" or "N/A" or "NA" => "UNASSIGNED",
-            _ => normalized,
-        };
+        return DefectTaxonomyService.NormalizeForBatch(value);
     }
 
     public static string NormalizeSide(string? value)
@@ -289,7 +277,7 @@ public static class BatchValidationService
         if (imageIndex < 0 || truthIndex < 0)
             throw new InvalidDataException("Ground-truth CSV must include image and ground_truth/label columns.");
 
-        var warnings = BuildManifestWarnings(headers);
+        var warnings = BuildManifestWarnings(headers).ToList();
 
         var csvDir = Path.GetDirectoryName(csvPath) ?? imageFolder;
         foreach (var line in lines.Skip(1))
@@ -322,6 +310,13 @@ public static class BatchValidationService
 
             if (!string.IsNullOrWhiteSpace(imageName))
             {
+                if (!string.IsNullOrWhiteSpace(entry.DefectType))
+                {
+                    var taxonomy = DefectTaxonomyService.Normalize(entry.DefectType);
+                    if (!taxonomy.IsKnown)
+                        warnings.Add(taxonomy.Warning);
+                }
+
                 entries[imageName] = entry;
                 ordered.Add(entry);
             }

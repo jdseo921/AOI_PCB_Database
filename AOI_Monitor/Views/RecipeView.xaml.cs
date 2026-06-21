@@ -34,6 +34,7 @@ public partial class RecipeView : UserControl
     public RecipeView()
     {
         InitializeComponent();
+        PopulateRoiTypeCombo();
         RoiGrid.ItemsSource = _rois;
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         Unloaded += (_, _) => WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
@@ -513,6 +514,18 @@ public partial class RecipeView : UserControl
 
     private string SelectedRoiType()
         => (RoiTypeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Presence";
+
+    private void PopulateRoiTypeCombo()
+    {
+        var selected = SelectedRoiType();
+        RoiTypeCombo.Items.Clear();
+        foreach (var roiType in new[] { "Presence", "Polarity" }.Concat(DefectTaxonomyService.ActiveCanonicalClasses()).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            RoiTypeCombo.Items.Add(new ComboBoxItem { Content = roiType });
+        }
+
+        SetComboText(string.IsNullOrWhiteSpace(selected) ? "Presence" : selected);
+    }
 
     private void SetComboText(string value)
     {

@@ -113,6 +113,7 @@ public sealed class ModelRegistryEntry
     public DateTime? WaiverExpiresAtUtc { get; set; }
     public string DeploymentWaivedBy { get; set; } = string.Empty;
     public DateTime? DeploymentWaivedAtUtc { get; set; }
+    public string DeploymentWaiverRiskClassification { get; set; } = string.Empty;
     public DateTime? DeployedAtUtc { get; set; }
     public string RetiredReason { get; set; } = string.Empty;
     public DateTime? RetiredAtUtc { get; set; }
@@ -163,6 +164,7 @@ public record ModelRegistryRecord(
     DateTime? WaiverExpiresAtUtc,
     string DeploymentWaivedBy,
     DateTime? DeploymentWaivedAtUtc,
+    string DeploymentWaiverRiskClassification,
     DateTime? DeployedAtUtc,
     string RetiredReason,
     DateTime? RetiredAtUtc);

@@ -1,0 +1,81 @@
+<UserControl x:Class="AOI_Monitor.Views.PilotWizardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0B0E10">
+  <Grid Margin="8">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="8"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <Border Grid.Row="0" Style="{StaticResource Panel}">
+      <Grid Margin="10">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="240"/>
+          <ColumnDefinition Width="8"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock Text="Deployment Profile" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+          <ComboBox x:Name="ProfileCombo" MinHeight="30"/>
+        </StackPanel>
+        <TextBlock Grid.Column="2" x:Name="SessionSummaryText" Text="No pilot session loaded."
+                   Foreground="#DCE5EB" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
+        <WrapPanel Grid.Column="3" VerticalAlignment="Center">
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Start New Pilot" Margin="0,0,6,0" MinWidth="132" Click="OnStartNewClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Resume Latest" Margin="0,0,6,0" MinWidth="116" Click="OnResumeClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="Export Bundle" MinWidth="118" Click="OnExportBundleClick"/>
+        </WrapPanel>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="2" Style="{StaticResource Panel}">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="28"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,5">
+          <TextBlock Text="Customer Pilot Evidence Steps" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+        </Border>
+        <WrapPanel Grid.Row="1" Margin="8">
+          <Button Style="{StaticResource ActionBtnGreen}" Content="1 Confirm Profile" Margin="0,0,6,6" MinWidth="142" Click="OnConfirmProfileClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="2 Diagnostics" Margin="0,0,6,6" MinWidth="120" Click="OnDiagnosticsClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="3 Select Dataset" Margin="0,0,6,6" MinWidth="130" Click="OnSelectDatasetClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="4 Preflight" Margin="0,0,6,6" MinWidth="112" Click="OnPreflightClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="5 Batch" Margin="0,0,6,6" MinWidth="96" Click="OnBatchClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="6 False Calls" Margin="0,0,6,6" MinWidth="118" Click="OnFalseCallClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="7 Model" Margin="0,0,6,6" MinWidth="96" Click="OnModelClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="8 Customer Package" Margin="0,0,6,6" MinWidth="150" Click="OnCustomerPackageClick"/>
+          <Button Style="{StaticResource ActionBtn}" Content="9 Stage 2 Accept" Margin="0,0,6,6" MinWidth="136" Click="OnStage2Click"/>
+          <Button Style="{StaticResource ActionBtnGreen}" Content="10 Readiness Export" Margin="0,0,6,6" MinWidth="154" Click="OnReadinessClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Waive Selected" Margin="0,0,6,6" MinWidth="126" Click="OnWaiveSelectedClick"/>
+        </WrapPanel>
+        <DataGrid Grid.Row="2" x:Name="StepsGrid" CanUserSortColumns="False" AutoGenerateColumns="False" Margin="8,0,8,8">
+          <DataGrid.RowStyle>
+            <Style TargetType="DataGridRow">
+              <Setter Property="Background" Value="{Binding StatusBrush}"/>
+              <Setter Property="Foreground" Value="#F5F9FB"/>
+            </Style>
+          </DataGrid.RowStyle>
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="#" Binding="{Binding StepOrder}" Width="46"/>
+            <DataGridTextColumn Header="Step" Binding="{Binding StepName}" Width="220"/>
+            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="105"/>
+            <DataGridTextColumn Header="Evidence" Binding="{Binding EvidencePath}" Width="260"/>
+            <DataGridTextColumn Header="Messages" Binding="{Binding MessagesDisplay}" Width="*"/>
+            <DataGridCheckBoxColumn Header="Waived" Binding="{Binding Waived}" Width="70"/>
+          </DataGrid.Columns>
+        </DataGrid>
+      </Grid>
+    </Border>
+
+    <TextBlock Grid.Row="4" x:Name="StatusText" Text="Pilot wizard ready."
+               Foreground="#9AA6AF" FontSize="11.5" TextWrapping="Wrap"/>
+  </Grid>
+</UserControl>

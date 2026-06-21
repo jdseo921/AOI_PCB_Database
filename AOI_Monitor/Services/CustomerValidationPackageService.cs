@@ -183,6 +183,7 @@ public static class CustomerValidationPackageService
         var readmePath = Path.Combine(packageFolder, "README.txt");
         var manifestPath = Path.Combine(packageFolder, "validation_manifest.json");
         var preflightPath = Path.Combine(packageFolder, "dataset_preflight_summary.json");
+        var issueSummaryPath = Path.Combine(packageFolder, "pilot_issue_summary.json");
         var annotatedFolder = Path.Combine(packageFolder, "annotated_images");
 
         File.WriteAllText(csvPath, BatchValidationService.BuildResultsCsv(rows), Encoding.UTF8);
@@ -194,8 +195,35 @@ public static class CustomerValidationPackageService
         var thresholdProfileEvidence = ThresholdProfileService.GetActiveEvidenceSummary(request.BoardModel, request.BoardModel, "ANY");
         var preflight = request.DatasetPreflightResult ?? BuildPreflight(request);
         var latencySummary = request.LatencySummary ?? InspectionLatencyService.SummarizeBatchRows(rows);
+        var pilotIssueSummary = new
+        {
+            summary = PilotIssueService.Summarize(new PilotIssueFilter
+            {
+                BoardModel = request.BoardModel,
+                LotId = request.LotId,
+            }),
+            openIssues = PilotIssueService.Search(new PilotIssueFilter
+            {
+                BoardModel = request.BoardModel,
+                LotId = request.LotId,
+                OpenOnly = true,
+            }).Select(issue => new
+            {
+                issue.IssueId,
+                category = issue.Category.ToString(),
+                issue.Severity,
+                status = issue.Status.ToString(),
+                issue.BoardModel,
+                issue.LotId,
+                issue.RelatedInspectionId,
+                issue.RelatedAcceptanceRunId,
+                issue.Owner,
+                issue.Notes,
+            }).ToArray(),
+        };
         File.WriteAllText(breakdownCsvPath, ClassMetricsService.BuildCsv(breakdownSummary), Encoding.UTF8);
         File.WriteAllText(preflightPath, JsonSerializer.Serialize(preflight, JsonOptions), Encoding.UTF8);
+        File.WriteAllText(issueSummaryPath, JsonSerializer.Serialize(pilotIssueSummary, JsonOptions), Encoding.UTF8);
         cancellationToken.ThrowIfCancellationRequested();
 
         var assetResult = ValidationReportAssetService.ExportSampleAnnotatedImages(
@@ -449,6 +477,7 @@ public static class CustomerValidationPackageService
         - validation_manifest.json: versioned manifest and acceptance summary.
         - validation_results.csv: per-image validation results exported from the batch run.
         - validation_breakdown.csv: per-class, per-side, and per-ROI validation breakdown.
+        - pilot_issue_summary.json: open customer pilot issue counts and non-image issue details for this board/lot.
         - customer_validation_report.html: browser-readable customer validation report.
         - customer_validation_report.pdf: native PDF rendering of the customer validation report.
         - print_to_pdf_instructions.txt: browser print-to-PDF workflow.

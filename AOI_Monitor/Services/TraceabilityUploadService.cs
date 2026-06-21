@@ -135,13 +135,22 @@ public static class TraceabilityUploadService
 
     private static TraceabilityPayload BuildPayloadFromInspectionResult(AnalysisResult result)
     {
+        var defectCodes = result.Defects
+            .Select(defect => DefectTaxonomyService.MesCodeFor(defect.DefectType))
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         var defectSummary = result.Defects.Count == 0
             ? "No defects reported"
             : string.Join(
                 "; ",
                 result.Defects
-                    .GroupBy(defect => string.IsNullOrWhiteSpace(defect.DefectType) ? "Unknown" : defect.DefectType)
-                    .Select(group => $"{group.Key}={group.Count()}"));
+                    .GroupBy(defect => DefectTaxonomyService.Normalize(defect.DefectType).CanonicalClass)
+                    .Select(group =>
+                    {
+                        var code = DefectTaxonomyService.MesCodeFor(group.Key);
+                        return $"{group.Key}({code})={group.Count()}";
+                    }));
 
         return new TraceabilityPayload
         {
@@ -154,6 +163,7 @@ public static class TraceabilityUploadService
             Result = result.Verdict,
             TimestampUtc = result.Timestamp.ToUniversalTime(),
             DefectSummary = $"{defectSummary}; score={result.DifferenceScore:F1}; confidence={result.Confidence:P0}; inspectionId={result.InspectionId}",
+            DefectCodes = defectCodes,
             ImagePath = result.SamplePath,
             OverlayPath = string.Empty,
             InspectionEngine = result.InspectionEngine,

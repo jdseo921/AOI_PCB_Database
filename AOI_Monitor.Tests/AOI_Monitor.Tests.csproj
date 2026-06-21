@@ -18,5 +18,6 @@
     <ProjectReference Include="..\Templates\CameraAdapterTemplate\CameraAdapterTemplate.csproj" />
     <ProjectReference Include="..\Templates\LightingAdapterTemplate\LightingAdapterTemplate.csproj" />
     <ProjectReference Include="..\Templates\RobotControllerTemplate\RobotControllerTemplate.csproj" />
+    <ProjectReference Include="..\Templates\RobotPlcAdapterTemplate\RobotPlcAdapterTemplate.csproj" />
   </ItemGroup>
 </Project>

@@ -17,8 +17,10 @@ public sealed class CompletionAssessmentServiceTests : IDisposable
         AoiDatabase.Initialize();
         AuthenticationSettingsService.ResetForTests();
         DeploymentProfileSettingsService.ResetForTests();
+        CentralSyncSettingsService.ResetForTests();
         FirstRunSettingsService.ResetForTests();
         MesIntegrationSettingsService.Save(new MesIntegrationSettings());
+        CentralSyncSettingsService.Save(new CentralSyncSettings());
         InspectionModelConfigurationService.Save(new InspectionModelConfiguration());
     }
 
@@ -26,6 +28,7 @@ public sealed class CompletionAssessmentServiceTests : IDisposable
     {
         AuthenticationSettingsService.ResetForTests();
         DeploymentProfileSettingsService.ResetForTests();
+        CentralSyncSettingsService.ResetForTests();
         FirstRunSettingsService.ResetForTests();
         try
         {
@@ -45,7 +48,7 @@ public sealed class CompletionAssessmentServiceTests : IDisposable
     {
         var report = CompletionAssessmentService.Assess();
 
-        Assert.Equal(7, report.Categories.Count);
+        Assert.Equal(10, report.Categories.Count);
         Assert.True(report.OverallPercent < 30, $"Expected low empty evidence score, got {report.OverallPercent:F1}%.");
         Assert.All(report.Categories, category => Assert.True(category.PercentComplete < 50, $"{category.Stage} was unexpectedly high at {category.PercentComplete:F1}%."));
     }
@@ -99,6 +102,26 @@ public sealed class CompletionAssessmentServiceTests : IDisposable
         Assert.True(realStage3.PercentComplete > simulatedStage3);
         Assert.Equal(100, realStage3.PercentComplete);
         Assert.DoesNotContain(realStage2.MissingEvidence, item => item.Contains("Real camera acceptance PASS", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void FullFactoryAutomationRequiresModelHardwareMesCentralSyncAndSoakEvidence()
+    {
+        RecordStage1Package("PASS");
+
+        var report = CompletionAssessmentService.Assess();
+
+        Assert.True(Find(report, "Production model readiness").PercentComplete < 100);
+        Assert.True(Find(report, "Stage 2 camera/lighting/3D").PercentComplete < 100);
+        Assert.True(Find(report, "Stage 3 robot/safety").PercentComplete < 100);
+        Assert.True(Find(report, "Stage 4 MES/ERP").PercentComplete < 100);
+        Assert.True(Find(report, "Central sync/management").PercentComplete < 100);
+        Assert.True(Find(report, "Reliability/soak").PercentComplete < 100);
+        Assert.Contains(Find(report, "Production model readiness").NextActions, action => action.Contains("model acceptance", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(Find(report, "Stage 2 camera/lighting/3D").NextActions, action => action.Contains("real hardware", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(Find(report, "Stage 4 MES/ERP").NextActions, action => action.Contains("MES REST", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(Find(report, "Central sync/management").NextActions, action => action.Contains("central sync", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(Find(report, "Reliability/soak").NextActions, action => action.Contains("soak", StringComparison.OrdinalIgnoreCase));
     }
 
     private void RecordStage1Package(string status)

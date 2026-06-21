@@ -56,6 +56,7 @@ public sealed class TraceabilityPayload
     public string Result { get; set; } = "REVIEW";
     public DateTime TimestampUtc { get; set; } = DateTime.UtcNow;
     public string DefectSummary { get; set; } = string.Empty;
+    public List<string> DefectCodes { get; set; } = new();
     public string ImagePath { get; set; } = string.Empty;
     public string OverlayPath { get; set; } = string.Empty;
     public string InspectionEngine { get; set; } = string.Empty;

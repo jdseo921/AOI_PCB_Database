@@ -145,6 +145,27 @@
               <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Full Factory Automation"/>
             </ComboBox>
           </Grid>
+          <Grid Margin="0,10,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Operating Mode" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
+            <ComboBox x:Name="OperatingModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Demo"/>
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pilot"/>
+              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Production"/>
+            </ComboBox>
+          </Grid>
+          <TextBlock x:Name="OperatingModePolicyText" Text="Demo Mode allows sample data, demo role selection, and simulated sources." Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="140,4,0,0"/>
+          <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
+            <StackPanel>
+              <TextBlock Text="Defect Taxonomy" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,6"/>
+              <TextBlock x:Name="TaxonomySummaryText" Text="Active taxonomy not loaded." Foreground="#DCE5EB" FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,8"/>
+              <WrapPanel>
+                <Button x:Name="ImportTaxonomyBtn" Style="{StaticResource MiniBtn}" Content="Import CSV" Margin="0,0,6,0" Click="OnImportTaxonomyClick"/>
+                <Button x:Name="ExportTaxonomyBtn" Style="{StaticResource MiniBtn}" Content="Export CSV" Click="OnExportTaxonomyClick"/>
+              </WrapPanel>
+              <TextBlock Text="Engineer/Admin only. Label aliases, customer display names, model label IDs, and MES defect codes are audited through the active taxonomy." Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            </StackPanel>
+          </Border>
           <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
             <StackPanel>
               <TextBlock Text="Inspection Engine Configuration" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
@@ -213,7 +234,9 @@
                   <DataGridTextColumn Header="Lifecycle" Binding="{Binding LifecycleState}" Width="128"/>
                   <DataGridTextColumn Header="Runtime" Binding="{Binding ValidationStatus}" Width="90"/>
                   <DataGridTextColumn Header="Acceptance" Binding="{Binding LatestAcceptanceStatus}" Width="92"/>
+                  <DataGridTextColumn Header="Run" Binding="{Binding LatestAcceptanceRunDisplay}" Width="58"/>
                   <DataGridTextColumn Header="Release" Binding="{Binding ReleasePackageDisplay}" Width="92"/>
+                  <DataGridTextColumn Header="Waiver" Binding="{Binding WaiverDisplay}" Width="120"/>
                   <DataGridTextColumn Header="Threshold" Binding="{Binding ThresholdDisplay}" Width="78"/>
                   <DataGridTextColumn Header="Active" Binding="{Binding ActiveDisplay}" Width="58"/>
                 </DataGrid.Columns>
@@ -254,7 +277,11 @@
             <Button x:Name="ExportDiagnosticsBtn" Style="{StaticResource ActionBtn}" Content="Export Diagnostics Report" Click="OnExportDiagnosticsClick" Margin="0,0,8,0"/>
             <Button x:Name="BackupConfigurationBtn" Style="{StaticResource ActionBtnGreen}" Content="Backup Configuration" Click="OnBackupConfigurationClick" Margin="0,0,8,0"/>
             <Button x:Name="RestoreConfigurationPreviewBtn" Style="{StaticResource ActionBtnAmber}" Content="Restore Configuration Preview" Click="OnRestoreConfigurationPreviewClick" Margin="0,0,8,0"/>
-            <Button x:Name="ApplyRestoreBtn" Style="{StaticResource ActionBtnGreen}" Content="Apply Restore" Click="OnApplyRestoreClick" IsEnabled="False"/>
+            <Button x:Name="ApplyRestoreBtn" Style="{StaticResource ActionBtnGreen}" Content="Apply Restore" Click="OnApplyRestoreClick" Margin="0,0,8,0" IsEnabled="False"/>
+            <Button x:Name="RollbackRestoreBtn" Style="{StaticResource ActionBtnAmber}" Content="Rollback Last Restore" Click="OnRollbackRestoreClick" Margin="0,0,8,0"/>
+            <CheckBox x:Name="SupportBundleRedactPathsCheck" Content="Redact image/storage paths" IsChecked="True" Foreground="#DCE5EB" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <CheckBox x:Name="SupportBundleIncludeModelsCheck" Content="Include model files" Foreground="#DCE5EB" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <Button x:Name="ExportSupportBundleBtn" Style="{StaticResource ActionBtn}" Content="Export Support Bundle" Click="OnExportSupportBundleClick"/>
           </StackPanel>
         </StackPanel>
       </Grid>

@@ -257,6 +257,7 @@ public static class ModelRegistryService
             entry.WaiverExpiresAtUtc,
             entry.DeploymentWaivedBy,
             entry.DeploymentWaivedAtUtc,
+            entry.DeploymentWaiverRiskClassification,
             entry.DeployedAtUtc,
             entry.RetiredReason,
             entry.RetiredAtUtc);
@@ -294,6 +295,7 @@ public static class ModelRegistryService
             WaiverExpiresAtUtc = record.WaiverExpiresAtUtc,
             DeploymentWaivedBy = record.DeploymentWaivedBy,
             DeploymentWaivedAtUtc = record.DeploymentWaivedAtUtc,
+            DeploymentWaiverRiskClassification = record.DeploymentWaiverRiskClassification,
             DeployedAtUtc = record.DeployedAtUtc,
             RetiredReason = record.RetiredReason,
             RetiredAtUtc = record.RetiredAtUtc,

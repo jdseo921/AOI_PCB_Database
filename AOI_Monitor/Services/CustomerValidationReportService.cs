@@ -732,7 +732,10 @@ public static class CustomerValidationReportService
         {
             foreach (var metric in metrics.Take(12))
             {
-                sb.AppendLine($"  <tr><td>{Html(metric.DisplayName)}</td><td>{metric.Total}</td><td>{metric.TruePositive}</td><td>{metric.TrueNegative}</td><td>{metric.FalsePositive}</td><td>{metric.FalseNegative}</td><td>{metric.WrongDefectClass}</td><td>{metric.WrongSide}</td><td>{FormatPercent(metric.Precision)}</td><td>{FormatPercent(metric.Recall)}</td><td>{FormatPercent(metric.FalseCallRate)}</td></tr>");
+                var display = string.Equals(title, "Defect Class", StringComparison.OrdinalIgnoreCase)
+                    ? TaxonomyDisplay(metric.DisplayName)
+                    : metric.DisplayName;
+                sb.AppendLine($"  <tr><td>{Html(display)}</td><td>{metric.Total}</td><td>{metric.TruePositive}</td><td>{metric.TrueNegative}</td><td>{metric.FalsePositive}</td><td>{metric.FalseNegative}</td><td>{metric.WrongDefectClass}</td><td>{metric.WrongSide}</td><td>{FormatPercent(metric.Precision)}</td><td>{FormatPercent(metric.Recall)}</td><td>{FormatPercent(metric.FalseCallRate)}</td></tr>");
             }
         }
 
@@ -759,8 +762,21 @@ public static class CustomerValidationReportService
         sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         foreach (var metric in metrics.Take(12))
         {
-            sb.AppendLine($"| {EscapeMarkdown(metric.DisplayName)} | {metric.Total} | {metric.TruePositive} | {metric.TrueNegative} | {metric.FalsePositive} | {metric.FalseNegative} | {metric.WrongDefectClass} | {metric.WrongSide} | {FormatPercent(metric.Precision)} | {FormatPercent(metric.Recall)} | {FormatPercent(metric.FalseCallRate)} |");
+            var display = string.Equals(title, "Defect Class", StringComparison.OrdinalIgnoreCase)
+                ? TaxonomyDisplay(metric.DisplayName)
+                : metric.DisplayName;
+            sb.AppendLine($"| {EscapeMarkdown(display)} | {metric.Total} | {metric.TruePositive} | {metric.TrueNegative} | {metric.FalsePositive} | {metric.FalseNegative} | {metric.WrongDefectClass} | {metric.WrongSide} | {FormatPercent(metric.Precision)} | {FormatPercent(metric.Recall)} | {FormatPercent(metric.FalseCallRate)} |");
         }
+    }
+
+    private static string TaxonomyDisplay(string value)
+    {
+        var normalized = DefectTaxonomyService.Normalize(value);
+        if (!normalized.IsKnown)
+            return value;
+        return string.Equals(normalized.CanonicalClass, normalized.CustomerLabel, StringComparison.OrdinalIgnoreCase)
+            ? normalized.CanonicalClass
+            : $"{normalized.CanonicalClass} / {normalized.CustomerLabel}";
     }
 
     private static string FormatThreshold(double value)

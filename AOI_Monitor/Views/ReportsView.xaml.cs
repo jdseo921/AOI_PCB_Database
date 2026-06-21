@@ -30,6 +30,7 @@ public partial class ReportsView : UserControl
     private readonly ObservableCollection<AuditLogRow> _auditRows = new();
     private readonly ObservableCollection<MesSpoolQueueRow> _mesSpoolRows = new();
     private readonly ObservableCollection<CentralSyncQueueRow> _centralSyncRows = new();
+    private readonly ObservableCollection<PilotIssueRow> _pilotIssueRows = new();
     private readonly ObservableCollection<FactoryReadinessRow> _factoryReadinessRows = new();
     private readonly ObservableCollection<CompletionMatrixRow> _completionMatrixRows = new();
     private readonly ObservableCollection<FactoryAcceptanceChecklistItem> _factoryAcceptanceRows = new();
@@ -49,6 +50,7 @@ public partial class ReportsView : UserControl
         AuditGrid.ItemsSource = _auditRows;
         MesSpoolGrid.ItemsSource = _mesSpoolRows;
         CentralSyncGrid.ItemsSource = _centralSyncRows;
+        PilotIssuesGrid.ItemsSource = _pilotIssueRows;
         FactoryReadinessGrid.ItemsSource = _factoryReadinessRows;
         CompletionMatrixGrid.ItemsSource = _completionMatrixRows;
         FactoryAcceptanceGrid.ItemsSource = _factoryAcceptanceRows;
@@ -58,6 +60,7 @@ public partial class ReportsView : UserControl
         ManagementLotModelGrid.ItemsSource = _managementBreakdownRows;
         PopulateFactoryAcceptanceProfiles();
         PopulateManagementProfiles();
+        PopulatePilotIssueFilters();
         FromDatePicker.SelectedDate = DateTime.Today.AddDays(-30);
         ToDatePicker.SelectedDate = DateTime.Today;
         LoadLogs();
@@ -116,6 +119,33 @@ public partial class ReportsView : UserControl
             ? profile
             : null;
 
+    private void PopulatePilotIssueFilters()
+    {
+        PilotIssueCategoryFilterCombo.Items.Clear();
+        PilotIssueCategoryFilterCombo.Items.Add(new ComboBoxItem { Content = "All", Tag = null });
+        foreach (PilotIssueCategory category in Enum.GetValues<PilotIssueCategory>())
+            PilotIssueCategoryFilterCombo.Items.Add(new ComboBoxItem { Content = category.ToString(), Tag = category });
+        PilotIssueCategoryFilterCombo.SelectedIndex = 0;
+
+        PilotIssueStatusFilterCombo.Items.Clear();
+        PilotIssueStatusFilterCombo.Items.Add(new ComboBoxItem { Content = "All", Tag = null });
+        foreach (PilotIssueStatus status in Enum.GetValues<PilotIssueStatus>())
+            PilotIssueStatusFilterCombo.Items.Add(new ComboBoxItem { Content = status.ToString(), Tag = status });
+        PilotIssueStatusFilterCombo.SelectedIndex = 0;
+    }
+
+    private PilotIssueFilter BuildPilotIssueFilter()
+        => new()
+        {
+            Category = (PilotIssueCategoryFilterCombo?.SelectedItem as ComboBoxItem)?.Tag is PilotIssueCategory category ? category : null,
+            Status = (PilotIssueStatusFilterCombo?.SelectedItem as ComboBoxItem)?.Tag is PilotIssueStatus status ? status : null,
+            Severity = (PilotIssueSeverityFilterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString() == "All"
+                ? string.Empty
+                : (PilotIssueSeverityFilterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? string.Empty,
+            BoardModel = BoardFilterText.Text.Trim(),
+            LotId = ManagementLotFilterText?.Text.Trim() ?? string.Empty,
+        };
+
     private void OnGenerateFactoryAcceptanceChecklistClick(object sender, RoutedEventArgs e)
     {
         var checklist = FactoryAcceptanceChecklistService.Generate(SelectedFactoryAcceptanceProfile());
@@ -146,6 +176,7 @@ public partial class ReportsView : UserControl
         var audits = AoiDatabase.GetAuditEvents(filter).Select(AuditLogRow.FromRecord).ToArray();
         var mesSpool = ApplyMesQueueFilter(AoiDatabase.GetMesSpoolQueue().Select(MesSpoolQueueRow.FromRecord)).ToArray();
         var centralSync = AoiDatabase.GetCentralSyncQueue().Select(CentralSyncQueueRow.FromRecord).ToArray();
+        var pilotIssues = AoiDatabase.GetPilotIssues(BuildPilotIssueFilter()).Select(PilotIssueRow.FromIssue).ToArray();
         var readinessReport = FactoryReadinessService.Evaluate();
         var readiness = readinessReport.Categories.Select(FactoryReadinessRow.FromCategory).ToArray();
         var completionReport = CompletionAssessmentService.Assess();
@@ -158,12 +189,15 @@ public partial class ReportsView : UserControl
         ReplaceRows(_auditRows, audits);
         ReplaceRows(_mesSpoolRows, mesSpool);
         ReplaceRows(_centralSyncRows, centralSync);
+        ReplaceRows(_pilotIssueRows, pilotIssues);
         ReplaceRows(_factoryReadinessRows, readiness);
         ReplaceRows(_completionMatrixRows, completionRows);
         if (_factoryAcceptanceRows.Count == 0)
             ReplaceRows(_factoryAcceptanceRows, FactoryAcceptanceChecklistService.Generate(SelectedFactoryAcceptanceProfile()).Items);
 
-        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows / {mesSpool.Length} MES spool / {centralSync.Length} central sync / readiness {readinessReport.OverallStatus}";
+        var issueSummary = PilotIssueService.Summarize();
+        PilotIssueSummaryText.Text = $"Issues total={issueSummary.Total}; open={issueSummary.Open}; critical open={issueSummary.CriticalOpen}.";
+        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows / {mesSpool.Length} MES spool / {centralSync.Length} central sync / {pilotIssues.Length} pilot issues / readiness {readinessReport.OverallStatus}";
         CompletionMatrixSummaryText.Text = $"Overall evidence completion {completionReport.OverallPercent:F1}% across {completionRows.Length} readiness areas.";
         BuildEvidenceSummaryText.Text = BuildEvidenceSummaryTextFor(buildEvidence);
         StatusText.Text = "Loaded real SQLite log records.";
@@ -211,6 +245,105 @@ public partial class ReportsView : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             HandleWorkError("Management dashboard export failed", ex, "EXPORT_ERROR");
+        }
+    }
+
+    private void OnPilotIssueFilterChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+        LoadLogs();
+    }
+
+    private void OnRefreshPilotIssuesClick(object sender, RoutedEventArgs e)
+    {
+        LoadLogs();
+        StatusText.Text = "Pilot issues refreshed.";
+    }
+
+    private void OnCreateFalseCallIssueClick(object sender, RoutedEventArgs e)
+        => CreateIssueFromSelectedInspection(PilotIssueCategory.FalseCall, "High", "False call captured from selected inspection row.");
+
+    private void OnCreatePossibleEscapeIssueClick(object sender, RoutedEventArgs e)
+        => CreateIssueFromSelectedInspection(PilotIssueCategory.PossibleEscape, "Critical", "Possible escape captured from selected inspection row.");
+
+    private void CreateIssueFromSelectedInspection(PilotIssueCategory category, string severity, string notes)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Creating pilot issue", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (InspectionGrid.SelectedItem is not InspectionLogRow row)
+        {
+            MessageBox.Show("Select an inspection history row first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var issue = PilotIssueService.Create(new PilotIssue
+        {
+            Category = category,
+            Severity = severity,
+            BoardModel = row.BoardProgram,
+            LotId = string.Empty,
+            ImagePath = row.SampleImagePath,
+            RelatedInspectionId = row.Id.ToString(CultureInfo.InvariantCulture),
+            Owner = WorkflowState.Instance.OperatorWithRole,
+            Notes = $"{notes} Verdict={row.Verdict}; defect={row.SuggestedDefect}; score={row.ScoreDisplay}.",
+        }, WorkflowState.Instance.OperatorWithRole);
+        LoadLogs();
+        StatusText.Text = $"Pilot issue created: {issue.IssueId}.";
+    }
+
+    private void OnClosePilotIssueClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Closing pilot issue", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (PilotIssuesGrid.SelectedItem is not PilotIssueRow row)
+        {
+            MessageBox.Show("Select a pilot issue first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        PilotIssueService.Close(row.IssueId, "Closed from Log & Export after engineering review.", WorkflowState.Instance.OperatorWithRole);
+        LoadLogs();
+        StatusText.Text = $"Pilot issue closed: {row.IssueId}.";
+    }
+
+    private void OnExportPilotIssueReportClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting pilot issue report", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Select pilot issue report export folder",
+            Multiselect = false,
+        };
+        if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.FolderName))
+            return;
+
+        try
+        {
+            var result = PilotIssueService.Export(new PilotIssueExportOptions
+            {
+                OutputRoot = dialog.FolderName,
+                RedactImagePaths = true,
+                Filter = BuildPilotIssueFilter(),
+            }, WorkflowState.Instance.OperatorWithRole);
+            RefreshAfterExport($"Pilot issue report exported. HTML: {result.HtmlPath}; JSON: {result.JsonPath}; CSV: {result.CsvPath}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Pilot issue report export failed", ex, "PILOT_ISSUE_EXPORT_ERROR");
         }
     }
 
@@ -872,6 +1005,44 @@ public partial class ReportsView : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             HandleWorkError("Soak test failed", ex, "SOAK_TEST_ERROR");
+        }
+        finally
+        {
+            EndWork();
+        }
+    }
+
+    private async void OnRunPerformanceBenchmarkClick(object sender, RoutedEventArgs e)
+    {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new BenchmarkOptionsDialog
+        {
+            Owner = Window.GetWindow(this),
+        };
+        if (dialog.ShowDialog() != true || dialog.Options is null)
+            return;
+
+        var cts = BeginWork("Running inspection performance benchmark...");
+        var progress = new Progress<string>(message => UpdateProgress(new WorkProgress(0, 0, message)));
+        try
+        {
+            var result = await Task.Run(() => BenchmarkInspectionService.Run(dialog.Options, progress, cts.Token), cts.Token);
+            WorkflowState.Instance.AddEvent("PERFORMANCE_BENCHMARK", $"Benchmark {result.Status}: count={result.CompletedCount}; p95={result.P95FrameToOverlayMs:F0} ms; realCamera={result.IsRealCameraSource}.", relatedPath: result.ReportFolder);
+            RefreshAfterExport($"Performance benchmark {result.Status}. Count={result.CompletedCount}; p95={result.P95FrameToOverlayMs:F0} ms; p99={result.P99FrameToOverlayMs:F0} ms; over1s={result.OverOneSecondCount}; throughput={result.ThroughputImagesPerMinute:F1}/min. HTML: {result.HtmlPath}. JSON: {result.JsonPath}. CSV: {result.CsvPath}. PDF: {result.PdfPath}.");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "Performance benchmark canceled.";
+            WorkflowState.Instance.AddEvent("PERFORMANCE_BENCHMARK", "Performance benchmark canceled by user.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or DirectoryNotFoundException)
+        {
+            HandleWorkError("Performance benchmark failed", ex, "PERFORMANCE_BENCHMARK_ERROR");
         }
         finally
         {
@@ -2182,6 +2353,201 @@ public partial class ReportsView : UserControl
         }
     }
 
+    private sealed class BenchmarkOptionsDialog : Window
+    {
+        private readonly ComboBox _sourceCombo = new();
+        private readonly TextBox _imageFolderText = new();
+        private readonly TextBox _runCountText = new() { Text = "25" };
+        private readonly TextBox _durationSecondsText = new();
+        private readonly TextBox _outputFolderText = new();
+
+        public BenchmarkInspectionOptions? Options { get; private set; }
+
+        public BenchmarkOptionsDialog()
+        {
+            Title = "Performance Benchmark";
+            Width = 640;
+            Height = 360;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            ResizeMode = ResizeMode.NoResize;
+            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#11161A"));
+            Foreground = Brushes.White;
+            _outputFolderText.Text = BenchmarkInspectionService.BenchmarkRoot;
+            ConfigureSourceOptions();
+            Content = BuildContent();
+        }
+
+        private Grid BuildContent()
+        {
+            var root = new Grid { Margin = new Thickness(16) };
+            for (var i = 0; i < 8; i++)
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(165) });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
+
+            AddText(root, "Runs the current inspection engine and records latency traces for every benchmarked image/frame.", 0, 0, 3, "#DCE5EB", bold: true);
+            AddLabeledControl(root, "Source", _sourceCombo, 1);
+            AddLabeledFolder(root, "Image folder", _imageFolderText, 2, "Select", OnSelectImageFolder);
+            AddLabeledText(root, "Run count", _runCountText, 3);
+            AddLabeledText(root, "Duration seconds (optional)", _durationSecondsText, 4);
+            AddLabeledFolder(root, "Output folder", _outputFolderText, 5, "Select", OnSelectOutputFolder);
+            AddText(root, "Stage 2 and Full Factory readiness require Active Camera Source with real, non-simulated camera frames. Folder simulation is labeled simulation-only.", 6, 0, 3, "#E1A334");
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 16, 0, 0),
+            };
+            var cancel = new Button { Content = "Cancel", Width = 92, Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
+            var run = new Button { Content = "Run", Width = 92, IsDefault = true };
+            run.Click += OnRunClick;
+            buttons.Children.Add(cancel);
+            buttons.Children.Add(run);
+            Grid.SetRow(buttons, 7);
+            Grid.SetColumnSpan(buttons, 3);
+            root.Children.Add(buttons);
+
+            return root;
+        }
+
+        private void ConfigureSourceOptions()
+        {
+            _sourceCombo.Items.Add(new ComboBoxItem { Content = "Image folder", Tag = BenchmarkInspectionSourceKind.ImageFolder });
+            _sourceCombo.Items.Add(new ComboBoxItem { Content = "Folder camera simulation", Tag = BenchmarkInspectionSourceKind.FolderCameraSimulation });
+            _sourceCombo.Items.Add(new ComboBoxItem { Content = "Active camera source", Tag = BenchmarkInspectionSourceKind.ActiveCameraSource });
+            _sourceCombo.SelectedIndex = 0;
+            _sourceCombo.SelectionChanged += (_, _) =>
+            {
+                var needsFolder = SelectedSource() is BenchmarkInspectionSourceKind.ImageFolder or BenchmarkInspectionSourceKind.FolderCameraSimulation;
+                _imageFolderText.IsEnabled = needsFolder;
+            };
+        }
+
+        private void OnSelectImageFolder(object sender, RoutedEventArgs e)
+        {
+            if (SelectFolder("Select benchmark image folder") is { } folder)
+                _imageFolderText.Text = folder;
+        }
+
+        private void OnSelectOutputFolder(object sender, RoutedEventArgs e)
+        {
+            if (SelectFolder("Select benchmark report output folder") is { } folder)
+                _outputFolderText.Text = folder;
+        }
+
+        private void OnRunClick(object sender, RoutedEventArgs e)
+        {
+            var source = SelectedSource();
+            if (source is BenchmarkInspectionSourceKind.ImageFolder or BenchmarkInspectionSourceKind.FolderCameraSimulation &&
+                !Directory.Exists(_imageFolderText.Text))
+            {
+                MessageBox.Show("Select a valid image folder.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!int.TryParse(_runCountText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var runCount) || runCount <= 0)
+            {
+                MessageBox.Show("Enter a run count greater than 0.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            TimeSpan? duration = null;
+            if (!string.IsNullOrWhiteSpace(_durationSecondsText.Text))
+            {
+                if (!double.TryParse(_durationSecondsText.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) || seconds <= 0)
+                {
+                    MessageBox.Show("Duration must be blank or greater than 0 seconds.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                duration = TimeSpan.FromSeconds(seconds);
+            }
+
+            Options = new BenchmarkInspectionOptions
+            {
+                SourceKind = source,
+                ImageFolder = _imageFolderText.Text.Trim(),
+                RunCount = runCount,
+                Duration = duration,
+                OutputRoot = string.IsNullOrWhiteSpace(_outputFolderText.Text) ? BenchmarkInspectionService.BenchmarkRoot : _outputFolderText.Text.Trim(),
+                AcceptanceThresholdMs = 1000,
+            };
+            DialogResult = true;
+        }
+
+        private BenchmarkInspectionSourceKind SelectedSource()
+            => (_sourceCombo.SelectedItem as ComboBoxItem)?.Tag is BenchmarkInspectionSourceKind source
+                ? source
+                : BenchmarkInspectionSourceKind.ImageFolder;
+
+        private static string? SelectFolder(string title)
+        {
+            var dialog = new OpenFolderDialog
+            {
+                Title = title,
+                Multiselect = false,
+            };
+
+            return dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName)
+                ? dialog.FolderName
+                : null;
+        }
+
+        private static void AddLabeledFolder(Grid root, string label, TextBox box, int row, string buttonText, RoutedEventHandler handler)
+        {
+            AddLabeledText(root, label, box, row);
+            var button = new Button { Content = buttonText, Margin = new Thickness(6, 4, 0, 4), MinHeight = 28 };
+            button.Click += handler;
+            Grid.SetRow(button, row);
+            Grid.SetColumn(button, 2);
+            root.Children.Add(button);
+        }
+
+        private static void AddLabeledText(Grid root, string label, TextBox box, int row)
+        {
+            box.Margin = new Thickness(0, 4, 0, 4);
+            box.MinHeight = 28;
+            AddLabeledControl(root, label, box, row);
+        }
+
+        private static void AddLabeledControl(Grid root, string label, Control control, int row)
+        {
+            var labelBlock = new TextBlock
+            {
+                Text = label,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9AA6AF")),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 4, 8, 4),
+            };
+            control.Margin = new Thickness(0, 4, 0, 4);
+            control.MinHeight = 28;
+            Grid.SetRow(labelBlock, row);
+            Grid.SetColumn(labelBlock, 0);
+            Grid.SetRow(control, row);
+            Grid.SetColumn(control, 1);
+            root.Children.Add(labelBlock);
+            root.Children.Add(control);
+        }
+
+        private static void AddText(Grid root, string text, int row, int column, int columnSpan, string color, bool bold = false)
+        {
+            var block = new TextBlock
+            {
+                Text = text,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color)),
+                FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
+                Margin = new Thickness(0, 0, 0, 12),
+            };
+            Grid.SetRow(block, row);
+            Grid.SetColumn(block, column);
+            Grid.SetColumnSpan(block, columnSpan);
+            root.Children.Add(block);
+        }
+    }
+
     private sealed class SoakTestDialog : Window
     {
         private readonly TextBox _imageFolderText = new();
@@ -2607,6 +2973,38 @@ public partial class ReportsView : UserControl
         }
     }
 
+    public sealed class PilotIssueRow
+    {
+        public string IssueId { get; init; } = string.Empty;
+        public DateTime CreatedAtUtc { get; init; }
+        public string CreatedLocal => CreatedAtUtc == DateTime.MinValue ? "--" : CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm");
+        public string Category { get; init; } = string.Empty;
+        public string Severity { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public string BoardModel { get; init; } = string.Empty;
+        public string LotId { get; init; } = string.Empty;
+        public string RelatedInspectionId { get; init; } = string.Empty;
+        public string RelatedAcceptanceRunId { get; init; } = string.Empty;
+        public string Owner { get; init; } = string.Empty;
+        public string Notes { get; init; } = string.Empty;
+
+        public static PilotIssueRow FromIssue(PilotIssue issue)
+            => new()
+            {
+                IssueId = issue.IssueId,
+                CreatedAtUtc = issue.CreatedAtUtc,
+                Category = issue.Category.ToString(),
+                Severity = issue.Severity,
+                Status = issue.Status.ToString(),
+                BoardModel = issue.BoardModel,
+                LotId = issue.LotId,
+                RelatedInspectionId = issue.RelatedInspectionId,
+                RelatedAcceptanceRunId = issue.RelatedAcceptanceRunId,
+                Owner = issue.Owner,
+                Notes = issue.Notes,
+            };
+    }
+
     public sealed class FactoryReadinessRow
     {
         public string Name { get; init; } = string.Empty;
@@ -2631,6 +3029,7 @@ public partial class ReportsView : UserControl
         public string PercentDisplay => PercentComplete.ToString("F1", CultureInfo.InvariantCulture) + "%";
         public string EvidenceSummary { get; init; } = string.Empty;
         public string MissingEvidenceDisplay { get; init; } = string.Empty;
+        public string NextActionsDisplay { get; init; } = string.Empty;
 
         public static CompletionMatrixRow FromCategory(CompletionAssessmentCategory category)
             => new()
@@ -2641,6 +3040,9 @@ public partial class ReportsView : UserControl
                 MissingEvidenceDisplay = category.MissingEvidence.Count == 0
                     ? "None"
                     : string.Join(" | ", category.MissingEvidence),
+                NextActionsDisplay = category.NextActions.Count == 0
+                    ? "No action required."
+                    : string.Join(" | ", category.NextActions),
             };
     }
 

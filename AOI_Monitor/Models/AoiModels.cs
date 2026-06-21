@@ -60,6 +60,65 @@ public class StationInfo
 public record SpcStat(string Label, string Value, bool IsAlert);
 public record DbHealthRow(string Table, string Count, string Status);
 
+public sealed class DefectTaxonomyRecord
+{
+    public string TaxonomyId { get; set; } = "default";
+    public string Name { get; set; } = "Default AOI Defect Taxonomy";
+    public string CustomerName { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class DefectTaxonomyEntry
+{
+    public string TaxonomyId { get; set; } = "default";
+    public string CanonicalClass { get; set; } = string.Empty;
+    public string CustomerLabel { get; set; } = string.Empty;
+    public int? ModelLabelId { get; set; }
+    public bool IsRequired { get; set; } = true;
+    public int SortOrder { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class DefectClassAliasRecord
+{
+    public string TaxonomyId { get; set; } = "default";
+    public string Alias { get; set; } = string.Empty;
+    public string CanonicalClass { get; set; } = string.Empty;
+}
+
+public sealed class MesDefectCodeMappingRecord
+{
+    public string TaxonomyId { get; set; } = "default";
+    public string CanonicalClass { get; set; } = string.Empty;
+    public string MesCode { get; set; } = string.Empty;
+}
+
+public sealed class DefectTaxonomySnapshot
+{
+    public DefectTaxonomyRecord Taxonomy { get; set; } = new();
+    public List<DefectTaxonomyEntry> Entries { get; set; } = new();
+    public List<DefectClassAliasRecord> Aliases { get; set; } = new();
+    public List<MesDefectCodeMappingRecord> MesMappings { get; set; } = new();
+}
+
+public sealed record DefectTaxonomyNormalization(
+    string Input,
+    string CanonicalClass,
+    string CustomerLabel,
+    string MesCode,
+    bool IsKnown,
+    string Warning);
+
+public sealed class ModelLabelTaxonomyValidation
+{
+    public string Status { get; set; } = "PASS";
+    public List<string> MissingRequiredClasses { get; set; } = new();
+    public List<string> UnknownLabels { get; set; } = new();
+    public List<string> Messages { get; set; } = new();
+}
+
 public record BatchTestRunRecord(
     long Id,
     string ImageFolder,
@@ -124,6 +183,80 @@ public sealed class InspectionLatencySummary
         : OverOneSecondCount > 0
             ? "WARN"
             : "PASS";
+}
+
+public enum BenchmarkInspectionSourceKind
+{
+    ImageFolder,
+    FolderCameraSimulation,
+    ActiveCameraSource,
+}
+
+public sealed class BenchmarkInspectionOptions
+{
+    public BenchmarkInspectionSourceKind SourceKind { get; set; } = BenchmarkInspectionSourceKind.ImageFolder;
+    public string ImageFolder { get; set; } = string.Empty;
+    public int RunCount { get; set; } = 10;
+    public TimeSpan? Duration { get; set; }
+    public double AcceptanceThresholdMs { get; set; } = 1000;
+    public string OutputRoot { get; set; } = string.Empty;
+    public DetectionPriority DetectionPriority { get; set; } = DetectionPriority.Balanced;
+}
+
+public sealed class BenchmarkInspectionResult
+{
+    public string RunId { get; set; } = Guid.NewGuid().ToString("N");
+    public DateTime StartedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime EndedAtUtc { get; set; } = DateTime.UtcNow;
+    public BenchmarkInspectionSourceKind SourceKind { get; set; } = BenchmarkInspectionSourceKind.ImageFolder;
+    public string SourceDescription { get; set; } = string.Empty;
+    public bool IsRealCameraSource { get; set; }
+    public string EngineName { get; set; } = string.Empty;
+    public string EngineVersion { get; set; } = string.Empty;
+    public string ModelId { get; set; } = string.Empty;
+    public double AcceptanceThresholdMs { get; set; } = 1000;
+    public int RequestedCount { get; set; }
+    public int CompletedCount { get; set; }
+    public double DurationSeconds { get; set; }
+    public double ThroughputImagesPerMinute { get; set; }
+    public double P50FrameToOverlayMs { get; set; }
+    public double P90FrameToOverlayMs { get; set; }
+    public double P95FrameToOverlayMs { get; set; }
+    public double P99FrameToOverlayMs { get; set; }
+    public double MaxFrameToOverlayMs { get; set; }
+    public int OverOneSecondCount { get; set; }
+    public double P95LoadMs { get; set; }
+    public double P95PreprocessingMs { get; set; }
+    public double P95InferenceMs { get; set; }
+    public double P95OverlayMs { get; set; }
+    public double P95PersistenceMs { get; set; }
+    public string Status { get; set; } = "NOT RUN";
+    public string ReportFolder { get; set; } = string.Empty;
+    public string JsonPath { get; set; } = string.Empty;
+    public string HtmlPath { get; set; } = string.Empty;
+    public string PdfPath { get; set; } = string.Empty;
+    public string CsvPath { get; set; } = string.Empty;
+    public List<string> Messages { get; set; } = new();
+    public List<BenchmarkInspectionSample> Samples { get; set; } = new();
+}
+
+public sealed class BenchmarkInspectionSample
+{
+    public int Sequence { get; set; }
+    public string SourcePath { get; set; } = string.Empty;
+    public string FrameId { get; set; } = string.Empty;
+    public bool IsSimulated { get; set; }
+    public string SourceKind { get; set; } = string.Empty;
+    public string Verdict { get; set; } = string.Empty;
+    public double LoadMs { get; set; }
+    public double PreprocessingMs { get; set; }
+    public double InferenceMs { get; set; }
+    public double OverlayMs { get; set; }
+    public double PersistenceMs { get; set; }
+    public double FrameToOverlayMs { get; set; }
+    public double FrameToSavedResultMs { get; set; }
+    public string TraceId { get; set; } = string.Empty;
+    public List<string> Warnings { get; set; } = new();
 }
 
 public record BatchTestResultRecord(
@@ -948,6 +1081,7 @@ public sealed class ValidationIncludedFile
     public string RelativePath { get; set; } = string.Empty;
     public string FileType { get; set; } = string.Empty;
     public long Bytes { get; set; }
+    public string Sha256 { get; set; } = string.Empty;
 }
 
 public enum FactoryReadinessOverallStatus
@@ -964,6 +1098,140 @@ public enum DeploymentProfile
     Stage3RobotPilot,
     Stage4MesPilot,
     FullFactoryAutomation,
+}
+
+public enum OperatingMode
+{
+    Demo,
+    Pilot,
+    Production,
+}
+
+public enum PilotIssueCategory
+{
+    FalseCall,
+    PossibleEscape,
+    Model,
+    Camera,
+    Lighting,
+    Robot,
+    MES,
+    UI,
+    Data,
+    Performance,
+    Other,
+}
+
+public enum PilotIssueStatus
+{
+    Open,
+    Investigating,
+    Fixed,
+    Waived,
+    Closed,
+}
+
+public sealed class PilotIssue
+{
+    public string IssueId { get; set; } = string.Empty;
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public PilotIssueCategory Category { get; set; } = PilotIssueCategory.Other;
+    public string Severity { get; set; } = "Medium";
+    public string BoardModel { get; set; } = string.Empty;
+    public string LotId { get; set; } = string.Empty;
+    public string ImagePath { get; set; } = string.Empty;
+    public string RelatedInspectionId { get; set; } = string.Empty;
+    public string RelatedAcceptanceRunId { get; set; } = string.Empty;
+    public PilotIssueStatus Status { get; set; } = PilotIssueStatus.Open;
+    public string Owner { get; set; } = string.Empty;
+    public string Notes { get; set; } = string.Empty;
+    public string Resolution { get; set; } = string.Empty;
+    public DateTime? ClosedAtUtc { get; set; }
+}
+
+public sealed class PilotIssueEvent
+{
+    public long Id { get; set; }
+    public string IssueId { get; set; } = string.Empty;
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public string EventType { get; set; } = string.Empty;
+    public string OperatorId { get; set; } = "UNKNOWN";
+    public string Message { get; set; } = string.Empty;
+    public string PreviousStatus { get; set; } = string.Empty;
+    public string NewStatus { get; set; } = string.Empty;
+}
+
+public sealed class PilotIssueFilter
+{
+    public PilotIssueCategory? Category { get; set; }
+    public PilotIssueStatus? Status { get; set; }
+    public string Severity { get; set; } = string.Empty;
+    public string BoardModel { get; set; } = string.Empty;
+    public string LotId { get; set; } = string.Empty;
+    public bool OpenOnly { get; set; }
+}
+
+public sealed class PilotIssueSummary
+{
+    public int Total { get; set; }
+    public int Open { get; set; }
+    public int CriticalOpen { get; set; }
+    public Dictionary<string, int> ByCategory { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> ByStatus { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+public enum CustomerPilotStepStatus
+{
+    NotStarted,
+    Running,
+    Passed,
+    Conditional,
+    Failed,
+    Skipped,
+}
+
+public enum CustomerPilotStepKind
+{
+    ConfirmDeploymentProfile,
+    RunSystemDiagnostics,
+    SelectCustomerDataset,
+    RunDatasetPreflight,
+    RunBatchValidation,
+    RunFalseCallReduction,
+    RunModelAcceptance,
+    ExportCustomerValidationPackage,
+    RunStage2Acceptance,
+    ExportReadinessAndChecklist,
+}
+
+public sealed class CustomerPilotSessionRecord
+{
+    public long Id { get; set; }
+    public string SessionId { get; set; } = string.Empty;
+    public DeploymentProfile DeploymentProfile { get; set; } = DeploymentProfile.Stage1ImageValidation;
+    public string Status { get; set; } = "InProgress";
+    public string DatasetFolder { get; set; } = string.Empty;
+    public string ManifestPath { get; set; } = string.Empty;
+    public string OperatorId { get; set; } = "UNKNOWN";
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAtUtc { get; set; }
+}
+
+public sealed class CustomerPilotStepRecord
+{
+    public long Id { get; set; }
+    public long SessionId { get; set; }
+    public CustomerPilotStepKind StepKey { get; set; }
+    public int StepOrder { get; set; }
+    public CustomerPilotStepStatus Status { get; set; } = CustomerPilotStepStatus.NotStarted;
+    public string EvidencePath { get; set; } = string.Empty;
+    public List<string> Messages { get; set; } = new();
+    public bool Waived { get; set; }
+    public string WaiverReason { get; set; } = string.Empty;
+    public string WaivedBy { get; set; } = string.Empty;
+    public DateTime? WaivedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }
 
 public sealed class FactoryReadinessCriteria
@@ -984,6 +1252,7 @@ public sealed class FactoryReadinessCriteria
     public bool RequireRealHardwareAcceptance { get; set; }
     public bool RequireSoakTestEvidenceForFactoryPilot { get; set; }
     public bool RequirePassingTraceabilityTest { get; set; }
+    public bool RequireCentralSyncEvidence { get; set; }
     public bool WarnWhenCentralSyncDisabled { get; set; }
 }
 

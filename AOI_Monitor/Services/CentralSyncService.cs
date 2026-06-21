@@ -45,6 +45,11 @@ public static class CentralSyncSettingsService
     public static void Save(CentralSyncSettings settings)
         => Save(settings, notify: true);
 
+    public static void ResetForTests()
+    {
+        _cached = null;
+    }
+
     public static IReadOnlyList<string> Validate(CentralSyncSettings settings)
     {
         Normalize(settings);

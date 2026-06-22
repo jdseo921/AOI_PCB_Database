@@ -1,6 +1,5 @@
-﻿using System.Windows;
-
 using System.Security.Cryptography;
+using System.Windows;
 
 namespace AOI_Monitor.Models;
 

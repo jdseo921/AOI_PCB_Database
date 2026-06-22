@@ -118,8 +118,9 @@ public sealed class FolderCameraSource : ICameraSource
             var frame = BitmapFrame.Create(new Uri(path, UriKind.Absolute), BitmapCreateOptions.DelayCreation, BitmapCacheOption.OnLoad);
             return (frame.PixelWidth, frame.PixelHeight, frame.Format.ToString());
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Folder camera image metadata read failed for '{path}': {ex.Message}");
             return (0, 0, string.Empty);
         }
     }

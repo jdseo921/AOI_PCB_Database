@@ -1,0 +1,233 @@
+{
+  "schemaVersion": "industrial-quality-gates/v1",
+  "baseline": "Docs/Industrial_HMI_and_Software_Quality_Baseline.md",
+  "checklist": "Docs/Industrial_Quality_Checklist.md",
+  "certificationNotice": "Standards-aligned baseline only; this is not formal ISO, IEC, ISA, safety, cybersecurity, or regulatory certification.",
+  "minimums": {
+    "resolution": {
+      "width": 1920,
+      "height": 1080
+    },
+    "minimumFontPt": 14,
+    "minimumPrimaryButtonWidthPx": 120,
+    "minimumPrimaryButtonHeightPx": 40,
+    "visualizationTargetMs": 1000,
+    "stablePocHours": 8
+  },
+  "profiles": {
+    "Stage1ImageValidation": {
+      "description": "PoC image validation and client demo evidence. Simulated hardware may be disclosed but cannot satisfy real hardware gates.",
+      "missingBuildTestEvidence": "WARN",
+      "requireRealHardware": false,
+      "requireMesEvidence": false,
+      "requireReleasePackaging": false
+    },
+    "Stage2CameraPilot": {
+      "description": "Camera and lighting pilot.",
+      "missingBuildTestEvidence": "FAIL",
+      "requireRealHardware": true,
+      "requireMesEvidence": false,
+      "requireReleasePackaging": true
+    },
+    "Stage3RobotPilot": {
+      "description": "Robot and safety pilot.",
+      "missingBuildTestEvidence": "FAIL",
+      "requireRealHardware": true,
+      "requireMesEvidence": false,
+      "requireReleasePackaging": true
+    },
+    "Stage4MesPilot": {
+      "description": "MES or central sync pilot.",
+      "missingBuildTestEvidence": "FAIL",
+      "requireRealHardware": true,
+      "requireMesEvidence": true,
+      "requireReleasePackaging": true
+    },
+    "FullFactoryAutomation": {
+      "description": "Full factory automation and production-like release.",
+      "missingBuildTestEvidence": "FAIL",
+      "requireRealHardware": true,
+      "requireMesEvidence": true,
+      "requireReleasePackaging": true
+    }
+  },
+  "categories": [
+    "HMI layout",
+    "Performance",
+    "Crash/reliability",
+    "Security/accountability",
+    "Export/report verification",
+    "Hardware-readiness evidence",
+    "MES/central-sync evidence",
+    "Release packaging"
+  ],
+  "gates": [
+    {
+      "id": "HMI-001",
+      "category": "HMI layout",
+      "requirement": "Operator screens support 1920x1080 minimum layout, 14 pt readable text, 120x40 px primary buttons, high contrast, no clipped critical status, and DPI/resize tolerance.",
+      "evidenceRequired": "Layout stress report, UI smoke evidence, screenshots, or manual signoff covering resolution, font, button, scroll, resize, and DPI rules.",
+      "evidenceKey": "hmiLayoutEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "HMI-002",
+      "category": "HMI layout",
+      "requirement": "Dense pages use ScrollViewer or adaptive layout so reports, settings, queues, and dashboards remain reachable at 1920x1080 and 100/125/150% DPI.",
+      "evidenceRequired": "Automated HMI layout audit covering major WPF pages and required controls, including dense-page ScrollViewer checks.",
+      "evidenceKey": "hmiLayoutEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "ALARM-001",
+      "category": "HMI layout",
+      "requirement": "Alarms and warnings are readable, prioritized, timestamped, recoverable, and not hidden or clipped.",
+      "evidenceRequired": "Alarm/event UI evidence and audit/event export evidence.",
+      "evidenceKey": "alarmEventEvidence",
+      "automatedCheck": false,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "ALARM-002",
+      "category": "Crash/reliability",
+      "requirement": "No active Critical alarm may remain unresolved for client-demo, pilot, release, or factory-readiness packaging.",
+      "evidenceRequired": "Alarm/event service evidence showing zero active Critical alarms and auditability for acknowledgements.",
+      "evidenceKey": "alarmEventEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "PERF-001",
+      "category": "Performance",
+      "requirement": "Inspection visualization targets 1 second or less and records timing evidence.",
+      "evidenceRequired": "Benchmark or latency report with p95 timing and over-1-second count.",
+      "evidenceKey": "performanceEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "PERF-002",
+      "category": "Performance",
+      "requirement": "Menu/page navigation uses cached construction and async refresh so major page switching does not freeze the UI thread or crash constructors.",
+      "evidenceRequired": "Navigation smoke/performance report with page switch timings, constructor crash coverage, and slow-load warnings.",
+      "evidenceKey": "performanceEvidence",
+      "automatedCheck": true,
+      "manualCheck": false,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "REL-001",
+      "category": "Crash/reliability",
+      "requirement": "No current uninvestigated crash report and stability evidence appropriate to deployment stage.",
+      "evidenceRequired": "Crash summary plus UI stability or soak report.",
+      "evidenceKey": "reliabilityEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "REL-002",
+      "category": "Crash/reliability",
+      "requirement": "Global WPF, AppDomain, and unobserved-task exception containment writes crash reports and shows recoverable operator-safe errors instead of raw stack traces.",
+      "evidenceRequired": "Crash containment tests plus CrashReportService evidence for dispatcher, domain, and unobserved task paths.",
+      "evidenceKey": "reliabilityEvidence",
+      "automatedCheck": true,
+      "manualCheck": false,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "SEC-001",
+      "category": "Security/accountability",
+      "requirement": "Production-relevant actions are auditable and secrets are redacted from evidence.",
+      "evidenceRequired": "Authentication, role authorization, secret redaction, and audit export evidence.",
+      "evidenceKey": "securityAccountabilityEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "SEC-002",
+      "category": "Security/accountability",
+      "requirement": "Code quality scripts block empty catches, non-event async void, UI-thread blocking, heavy UI file IO, raw exception stack traces, hard-coded secrets, and simulated-hardware overclaims.",
+      "evidenceRequired": "Passing code-quality report and PR quality report artifacts.",
+      "evidenceKey": "securityAccountabilityEvidence",
+      "automatedCheck": true,
+      "manualCheck": false,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "EXPORT-001",
+      "category": "Export/report verification",
+      "requirement": "CSV, PNG, PDF, JSON, HTML, TXT, and package exports used as evidence are verified for existence, parseability/signature where practical, checksum, and required fields.",
+      "evidenceRequired": "Export verification records with OK status and checksums.",
+      "evidenceKey": "exportReportEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker"
+    },
+    {
+      "id": "HW-001",
+      "category": "Hardware-readiness evidence",
+      "requirement": "Real camera, lighting, 3D profile, robot, and safety evidence is present when the deployment profile requires real hardware.",
+      "evidenceRequired": "Real hardware acceptance runs. Simulation evidence must be labeled and cannot satisfy this gate.",
+      "evidenceKey": "realHardwareEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker",
+      "allowsSimulation": false,
+      "profileRequirement": "requireRealHardware"
+    },
+    {
+      "id": "HW-002",
+      "category": "Hardware-readiness evidence",
+      "requirement": "Simulated, mock, null, or boundary-only camera/robot/lighting/MES evidence must never be presented as production-ready or real-hardware-ready evidence.",
+      "evidenceRequired": "Code-quality/PR quality evidence plus runtime readiness labels showing simulation and real-hardware boundaries.",
+      "evidenceKey": "realHardwareEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker",
+      "allowsSimulation": false,
+      "profileRequirement": "requireRealHardware"
+    },
+    {
+      "id": "MES-001",
+      "category": "MES/central-sync evidence",
+      "requirement": "MES or central sync evidence includes payload mapping, queue/retry behavior, endpoint mode, redaction, and signoff status when the profile requires MES evidence.",
+      "evidenceRequired": "Traceability signoff, MES queue/export report, or central sync queue/readiness report.",
+      "evidenceKey": "mesCentralSyncEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker",
+      "profileRequirement": "requireMesEvidence"
+    },
+    {
+      "id": "PKG-001",
+      "category": "Release packaging",
+      "requirement": "Release package includes build, test, publish validation, gate report, and verified package evidence.",
+      "evidenceRequired": "Build/test evidence and package manifest/export verification.",
+      "evidenceKey": "releasePackagingEvidence",
+      "automatedCheck": true,
+      "manualCheck": true,
+      "blockingLevel": "Release Blocker",
+      "profileRequirement": "requireReleasePackaging"
+    },
+    {
+      "id": "PKG-002",
+      "category": "Release packaging",
+      "requirement": "Build/test evidence is present; missing evidence is WARN for Stage 1 and FAIL for factory/production profiles.",
+      "evidenceRequired": "Release build/test evidence with restore, build, test, and publish validation status.",
+      "evidenceKey": "buildTestEvidence",
+      "automatedCheck": true,
+      "manualCheck": false,
+      "blockingLevel": "Release Blocker",
+      "profileMissingEvidencePolicy": "missingBuildTestEvidence"
+    }
+  ]
+}

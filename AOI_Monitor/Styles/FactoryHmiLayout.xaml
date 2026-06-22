@@ -1,0 +1,235 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Industrial HMI design tokens. Keep these self-contained: this dictionary is
+       merged before App.xaml's legacy styles. -->
+  <Color x:Key="HmiBgColor">#0B0E10</Color>
+  <Color x:Key="HmiSurfaceColor">#151A1E</Color>
+  <Color x:Key="HmiSurfaceAltColor">#1B2024</Color>
+  <Color x:Key="HmiBorderColor">#3E474E</Color>
+  <Color x:Key="HmiTextColor">#E8EEF2</Color>
+  <Color x:Key="HmiMutedTextColor">#A8B2B9</Color>
+  <Color x:Key="HmiOkColor">#50F56E</Color>
+  <Color x:Key="HmiNgColor">#F27777</Color>
+  <Color x:Key="HmiWarnColor">#E1A334</Color>
+  <Color x:Key="HmiInfoColor">#5CA0D3</Color>
+  <Color x:Key="HmiOfflineColor">#8B969E</Color>
+  <Color x:Key="HmiSimulatedColor">#C084FC</Color>
+
+  <SolidColorBrush x:Key="HmiBgBrush" Color="{StaticResource HmiBgColor}"/>
+  <SolidColorBrush x:Key="HmiSurfaceBrush" Color="{StaticResource HmiSurfaceColor}"/>
+  <SolidColorBrush x:Key="HmiSurfaceAltBrush" Color="{StaticResource HmiSurfaceAltColor}"/>
+  <SolidColorBrush x:Key="HmiBorderBrush" Color="{StaticResource HmiBorderColor}"/>
+  <SolidColorBrush x:Key="HmiTextBrush" Color="{StaticResource HmiTextColor}"/>
+  <SolidColorBrush x:Key="HmiMutedTextBrush" Color="{StaticResource HmiMutedTextColor}"/>
+  <SolidColorBrush x:Key="HmiOkBrush" Color="{StaticResource HmiOkColor}"/>
+  <SolidColorBrush x:Key="HmiNgBrush" Color="{StaticResource HmiNgColor}"/>
+  <SolidColorBrush x:Key="HmiWarnBrush" Color="{StaticResource HmiWarnColor}"/>
+  <SolidColorBrush x:Key="HmiInfoBrush" Color="{StaticResource HmiInfoColor}"/>
+  <SolidColorBrush x:Key="HmiOfflineBrush" Color="{StaticResource HmiOfflineColor}"/>
+  <SolidColorBrush x:Key="HmiSimulatedBrush" Color="{StaticResource HmiSimulatedColor}"/>
+
+  <sys:Double x:Key="HmiFontSizeBody" xmlns:sys="clr-namespace:System;assembly=mscorlib">14</sys:Double>
+  <sys:Double x:Key="HmiFontSizeLabel" xmlns:sys="clr-namespace:System;assembly=mscorlib">14</sys:Double>
+  <sys:Double x:Key="HmiFontSizeSmall" xmlns:sys="clr-namespace:System;assembly=mscorlib">14</sys:Double>
+  <sys:Double x:Key="HmiFontSizeSection" xmlns:sys="clr-namespace:System;assembly=mscorlib">16</sys:Double>
+  <sys:Double x:Key="HmiFontSizePageTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">20</sys:Double>
+  <sys:Double x:Key="HmiButtonMinHeight" xmlns:sys="clr-namespace:System;assembly=mscorlib">40</sys:Double>
+  <sys:Double x:Key="HmiButtonMinWidth" xmlns:sys="clr-namespace:System;assembly=mscorlib">120</sys:Double>
+  <Thickness x:Key="HmiCardPadding">12</Thickness>
+  <Thickness x:Key="HmiPanelGap">8</Thickness>
+
+  <Style x:Key="FactoryPageContainer" TargetType="Grid">
+    <Setter Property="Margin" Value="10"/>
+    <Setter Property="MinWidth" Value="0"/>
+    <Setter Property="MinHeight" Value="0"/>
+  </Style>
+
+  <Style x:Key="FactoryScrollablePage" TargetType="ScrollViewer">
+    <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+    <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+    <Setter Property="CanContentScroll" Value="False"/>
+    <Setter Property="Padding" Value="0"/>
+  </Style>
+
+  <Style x:Key="FactoryCard" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding" Value="10"/>
+    <Setter Property="MinHeight" Value="48"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+  </Style>
+
+  <Style x:Key="FactoryFormFieldLabel" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource HmiMutedTextBrush}"/>
+    <Setter Property="FontSize" Value="{StaticResource HmiFontSizeLabel}"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <Style x:Key="FactoryWrappedText" TargetType="TextBlock">
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="TextTrimming" Value="None"/>
+    <Setter Property="LineHeight" Value="20"/>
+  </Style>
+
+  <Style x:Key="FactoryTrimmedTextWithTooltip" TargetType="TextBlock">
+    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    <Setter Property="TextWrapping" Value="NoWrap"/>
+    <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+  </Style>
+
+  <Style x:Key="FactoryTable" TargetType="DataGrid">
+    <Setter Property="MinHeight" Value="120"/>
+    <Setter Property="MinColumnWidth" Value="54"/>
+    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="RowBackground" Value="#151A1E"/>
+    <Setter Property="AlternatingRowBackground" Value="#171D21"/>
+    <Setter Property="GridLinesVisibility" Value="All"/>
+    <Setter Property="HorizontalGridLinesBrush" Value="#343D44"/>
+    <Setter Property="VerticalGridLinesBrush" Value="#343D44"/>
+    <Setter Property="HeadersVisibility" Value="Column"/>
+    <Setter Property="CanUserAddRows" Value="False"/>
+    <Setter Property="CanUserDeleteRows" Value="False"/>
+    <Setter Property="CanUserReorderColumns" Value="False"/>
+    <Setter Property="IsReadOnly" Value="True"/>
+    <Setter Property="EnableRowVirtualization" Value="True"/>
+    <Setter Property="EnableColumnVirtualization" Value="True"/>
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
+    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+    <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+    <Setter Property="ColumnHeaderHeight" Value="52"/>
+    <Setter Property="RowHeight" Value="40"/>
+  </Style>
+
+  <Style x:Key="FactoryButton" TargetType="Button">
+    <Setter Property="MinHeight" Value="{StaticResource HmiButtonMinHeight}"/>
+    <Setter Property="MinWidth" Value="{StaticResource HmiButtonMinWidth}"/>
+    <Setter Property="Padding" Value="14,7"/>
+    <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
+  </Style>
+
+  <Style x:Key="FactoryStatusBadge" TargetType="Border">
+    <Setter Property="Background" Value="#20282E"/>
+    <Setter Property="BorderBrush" Value="#51606B"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="MinHeight" Value="34"/>
+    <Setter Property="Padding" Value="8,4"/>
+  </Style>
+
+  <Style x:Key="HmiPageTitleText" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="FontSize" Value="{StaticResource HmiFontSizePageTitle}"/>
+    <Setter Property="FontWeight" Value="ExtraBold"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+
+  <Style x:Key="HmiPageSubtitleText" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource HmiMutedTextBrush}"/>
+    <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="LineHeight" Value="20"/>
+  </Style>
+
+  <Style x:Key="HmiSectionHeaderText" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="FontSize" Value="{StaticResource HmiFontSizeSection}"/>
+    <Setter Property="FontWeight" Value="ExtraBold"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+
+  <Style x:Key="HmiTechnicalHintText" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource HmiMutedTextBrush}"/>
+    <Setter Property="FontSize" Value="{StaticResource HmiFontSizeSmall}"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+
+  <Style x:Key="HmiKpiCard" TargetType="Border" BasedOn="{StaticResource FactoryCard}">
+    <Setter Property="Padding" Value="10"/>
+    <Setter Property="MinHeight" Value="58"/>
+  </Style>
+
+  <Style x:Key="HmiPersistentBanner" TargetType="Border" BasedOn="{StaticResource FactoryStatusBadge}">
+    <Setter Property="MinHeight" Value="34"/>
+    <Setter Property="Padding" Value="10,4"/>
+    <Setter Property="Margin" Value="8,0,0,0"/>
+  </Style>
+
+  <Style x:Key="HmiStatusBadge" TargetType="Border" BasedOn="{StaticResource FactoryStatusBadge}">
+    <Setter Property="MinWidth" Value="72"/>
+    <Setter Property="HorizontalAlignment" Value="Left"/>
+  </Style>
+  <Style x:Key="HmiStatusOk" TargetType="Border" BasedOn="{StaticResource HmiStatusBadge}">
+    <Setter Property="Background" Value="#14311D"/>
+    <Setter Property="BorderBrush" Value="#3C8D50"/>
+  </Style>
+  <Style x:Key="HmiStatusNg" TargetType="Border" BasedOn="{StaticResource HmiStatusBadge}">
+    <Setter Property="Background" Value="#35191B"/>
+    <Setter Property="BorderBrush" Value="#A13A3F"/>
+  </Style>
+  <Style x:Key="HmiStatusWarning" TargetType="Border" BasedOn="{StaticResource HmiStatusBadge}">
+    <Setter Property="Background" Value="#372914"/>
+    <Setter Property="BorderBrush" Value="#987538"/>
+  </Style>
+  <Style x:Key="HmiStatusInfo" TargetType="Border" BasedOn="{StaticResource HmiStatusBadge}">
+    <Setter Property="Background" Value="#172A39"/>
+    <Setter Property="BorderBrush" Value="#477CA5"/>
+  </Style>
+  <Style x:Key="HmiStatusSimulated" TargetType="Border" BasedOn="{StaticResource HmiStatusBadge}">
+    <Setter Property="Background" Value="#2A1740"/>
+    <Setter Property="BorderBrush" Value="#8F5FD1"/>
+  </Style>
+
+  <Style x:Key="HmiAlarmPanel" TargetType="Border" BasedOn="{StaticResource FactoryCard}">
+    <Setter Property="Background" Value="#35191B"/>
+    <Setter Property="BorderBrush" Value="#A13A3F"/>
+    <Setter Property="BorderThickness" Value="2"/>
+  </Style>
+
+  <Style x:Key="HmiPlainLanguageNote" TargetType="Border" BasedOn="{StaticResource FactoryCard}">
+    <Setter Property="Background" Value="#172A39"/>
+    <Setter Property="BorderBrush" Value="#477CA5"/>
+  </Style>
+
+  <Style x:Key="HmiTable" TargetType="DataGrid" BasedOn="{StaticResource FactoryTable}">
+    <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
+    <Setter Property="MinHeight" Value="150"/>
+  </Style>
+
+  <Style x:Key="HmiOperatorActionButton" TargetType="Button" BasedOn="{StaticResource FactoryButton}">
+    <Setter Property="FontWeight" Value="ExtraBold"/>
+  </Style>
+  <Style x:Key="HmiSecondaryActionButton" TargetType="Button" BasedOn="{StaticResource FactoryButton}">
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style x:Key="HmiDangerActionButton" TargetType="Button" BasedOn="{StaticResource FactoryButton}">
+    <Setter Property="FontWeight" Value="ExtraBold"/>
+    <Setter Property="Background" Value="#4A171A"/>
+    <Setter Property="BorderBrush" Value="#A13A3F"/>
+    <Setter Property="Foreground" Value="#FFD0D2"/>
+  </Style>
+
+  <Style TargetType="TabControl">
+    <Setter Property="MinHeight" Value="160"/>
+  </Style>
+
+  <Style TargetType="TabItem">
+    <Setter Property="MinHeight" Value="38"/>
+    <Setter Property="Padding" Value="12,7"/>
+  </Style>
+
+  <Style TargetType="CheckBox">
+    <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
+    <Setter Property="MinHeight" Value="34"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+  </Style>
+
+  <Style TargetType="DatePicker">
+    <Setter Property="MinHeight" Value="34"/>
+    <Setter Property="MinWidth" Value="128"/>
+  </Style>
+</ResourceDictionary>

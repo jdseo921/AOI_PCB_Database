@@ -1,12 +1,12 @@
-﻿using System.Windows;
+using System.IO;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.IO;
-using Microsoft.Win32;
 using AOI_Monitor.Data;
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
+using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
@@ -38,7 +38,7 @@ public partial class ReviewView : UserControl
         QueueGrid.Items.Refresh();
     }
 
-    private void OnStateChanged() => Dispatcher.Invoke(RefreshFromState);
+    private void OnStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshFromState);
 
     private void OnOverlayClick(object sender, RoutedEventArgs e)
     {

@@ -29,8 +29,9 @@ public static class StorageRootSettingsService
                     return Path.GetFullPath(settings.StorageRoot.Trim());
             }
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Storage root settings load fallback used: {ex.Message}");
         }
 
         return AoiDatabase.DefaultStorageRoot;

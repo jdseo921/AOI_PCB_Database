@@ -133,6 +133,34 @@ public sealed class UiServiceCoverageTests
         Assert.Contains("real hardware readiness", combined, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void OverflowProneDocumentationAndSettingsPagesHaveVerticalScrollRegions()
+    {
+        foreach (var file in new[]
+        {
+            ReadRepoFile("AOI_Monitor", "Views", "SettingsView.xaml"),
+            ReadRepoFile("AOI_Monitor", "Views", "GuideView.xaml"),
+            ReadRepoFile("AOI_Monitor", "Views", "InstallView.xaml"),
+            ReadRepoFile("AOI_Monitor", "Views", "FirstRunWizardView.xaml"),
+        })
+        {
+            Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", file);
+            Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", file);
+        }
+    }
+
+    [Fact]
+    public void NavigationShellHasBilingualPreferenceWiring()
+    {
+        var mainWindowCode = ReadRepoFile("AOI_Monitor", "MainWindow.xaml.cs");
+        var viewModelCode = ReadRepoFile("AOI_Monitor", "ViewModels", "MainViewModel.cs");
+        var settingsCode = ReadRepoFile("AOI_Monitor", "Views", "SettingsView.xaml.cs");
+
+        Assert.Contains("UiPreferencesService.PreferencesChanged", mainWindowCode);
+        Assert.Contains("RefreshLanguage(UiLanguage language)", viewModelCode);
+        Assert.Contains("SaveUiPreferenceSelection", settingsCode);
+    }
+
     private static string ReadRepoFile(params string[] parts)
         => File.ReadAllText(Path.Combine(FindRepoRoot(), Path.Combine(parts)));
 

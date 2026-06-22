@@ -33,8 +33,9 @@ public static class InspectionModelConfigurationService
             var json = File.ReadAllText(ConfigurationPath);
             _cached = JsonSerializer.Deserialize<InspectionModelConfiguration>(json) ?? new InspectionModelConfiguration();
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Inspection model configuration load fallback used: {ex.Message}");
             _cached = new InspectionModelConfiguration();
         }
 

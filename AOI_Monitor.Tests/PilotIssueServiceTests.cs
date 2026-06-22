@@ -51,6 +51,11 @@ public sealed class PilotIssueServiceTests : IDisposable
             BoardModel = "BOARD-A",
             LotId = "LOT-1",
             ImagePath = @"C:\customer\images\board-a.png",
+            PageName = "AI Model Test",
+            ReproductionSteps = "Open AI Model Test, load pilot image, switch tabs twice.",
+            ExpectedBehavior = "The tab switch remains responsive and labels stay visible.",
+            ActualBehavior = "The status card clips the message after switching tabs.",
+            ScreenshotPath = @"C:\customer\screenshots\clip-a.png",
             RelatedInspectionId = "42",
             Owner = "Engineer01 [Engineer]",
             Notes = "False call under customer lighting.",
@@ -58,6 +63,11 @@ public sealed class PilotIssueServiceTests : IDisposable
 
         Assert.StartsWith("ISSUE-", created.IssueId, StringComparison.Ordinal);
         Assert.Equal(PilotIssueStatus.Open, created.Status);
+        Assert.Equal("AI Model Test", created.PageName);
+        Assert.Equal("Open AI Model Test, load pilot image, switch tabs twice.", created.ReproductionSteps);
+        Assert.Equal("The tab switch remains responsive and labels stay visible.", created.ExpectedBehavior);
+        Assert.Equal("The status card clips the message after switching tabs.", created.ActualBehavior);
+        Assert.Equal(@"C:\customer\screenshots\clip-a.png", created.ScreenshotPath);
 
         created.Status = PilotIssueStatus.Investigating;
         created.Owner = "Admin01 [Admin]";
@@ -65,6 +75,7 @@ public sealed class PilotIssueServiceTests : IDisposable
 
         Assert.Equal(PilotIssueStatus.Investigating, updated.Status);
         Assert.Equal("Admin01 [Admin]", updated.Owner);
+        Assert.Equal("AI Model Test", updated.PageName);
 
         var closed = PilotIssueService.Close(updated.IssueId, "Threshold profile updated and verified.", "Admin01 [Admin]");
         var events = AoiDatabase.GetPilotIssueEvents(updated.IssueId);
@@ -109,6 +120,7 @@ public sealed class PilotIssueServiceTests : IDisposable
     public void ExportRedactsImagePathsWhenConfigured()
     {
         var imagePath = Path.Combine(_root, "customer", "images", "board-a.png");
+        var screenshotPath = Path.Combine(_root, "customer", "screenshots", "clip-a.png");
         PilotIssueService.Create(new PilotIssue
         {
             Category = PilotIssueCategory.Camera,
@@ -116,6 +128,11 @@ public sealed class PilotIssueServiceTests : IDisposable
             BoardModel = "BOARD-A",
             LotId = "LOT-1",
             ImagePath = imagePath,
+            PageName = "Main Inspection",
+            ReproductionSteps = "Open the lot, select the failed panel, export the finding.",
+            ExpectedBehavior = "Export keeps evidence available without exposing raw customer paths.",
+            ActualBehavior = "Pilot evidence references a customer screenshot path.",
+            ScreenshotPath = screenshotPath,
             Notes = "Camera exposure issue references customer image path.",
         }, "Engineer01 [Engineer]");
 
@@ -132,6 +149,11 @@ public sealed class PilotIssueServiceTests : IDisposable
         Assert.DoesNotContain(imagePath, json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(imagePath, csv, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(imagePath, html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(screenshotPath, json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(screenshotPath, csv, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(screenshotPath, html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Main Inspection", json, StringComparison.Ordinal);
+        Assert.Contains("reproductionSteps", json, StringComparison.Ordinal);
         Assert.Contains("[REDACTED_IMAGE_PATH]", json, StringComparison.Ordinal);
         Assert.Contains("[REDACTED_IMAGE_PATH]", csv, StringComparison.Ordinal);
         Assert.Contains("[REDACTED_IMAGE_PATH]", html, StringComparison.Ordinal);

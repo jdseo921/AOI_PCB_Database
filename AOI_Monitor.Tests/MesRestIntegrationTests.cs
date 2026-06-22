@@ -12,6 +12,7 @@ public sealed class MesRestIntegrationTests : IDisposable
     private readonly string _root;
     private readonly IMesClient _previousMesClient;
     private readonly ITraceabilityUploader _previousTraceabilityUploader;
+    private readonly List<IDisposable> _disposables = new();
 
     public MesRestIntegrationTests()
     {
@@ -28,6 +29,11 @@ public sealed class MesRestIntegrationTests : IDisposable
         MesIntegrationSettingsService.RestClientFactory = null;
         IntegrationBoundaryRegistry.MesClient = _previousMesClient;
         IntegrationBoundaryRegistry.TraceabilityUploader = _previousTraceabilityUploader;
+        foreach (var disposable in _disposables.AsEnumerable().Reverse())
+        {
+            disposable.Dispose();
+        }
+
         try
         {
             if (Directory.Exists(_root))
@@ -41,16 +47,23 @@ public sealed class MesRestIntegrationTests : IDisposable
         }
     }
 
+    private T Track<T>(T disposable)
+        where T : IDisposable
+    {
+        _disposables.Add(disposable);
+        return disposable;
+    }
+
     [Fact]
     public async Task MesRestClientSendsExpectedJsonAndAuthenticationHeader()
     {
-        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" });
+        var handler = Track(new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" }));
         var settings = RestSettings();
         settings.AuthMode = MesRestAuthMode.ApiKey;
         settings.ApiKeyHeaderName = "X-Test-Key";
         settings.ApiKey = "secret-api-key";
         settings.MaxRetryCount = 0;
-        var client = new MesRestClient(settings, handler);
+        var client = Track(new MesRestClient(settings, handler));
 
         var result = await client.UploadTraceabilityAsync(new TraceabilityPayload
         {
@@ -73,8 +86,8 @@ public sealed class MesRestIntegrationTests : IDisposable
     [Fact]
     public async Task Http500RecordsFailedAttemptAndCreatesSpoolItem()
     {
-        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError) { ReasonPhrase = "Server Error" });
-        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        var handler = Track(new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError) { ReasonPhrase = "Server Error" }));
+        MesIntegrationSettingsService.RestClientFactory = settings => Track(new MesRestClient(settings, handler));
         MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
 
         var outcome = await TraceabilityUploadService.UploadAsync(new TraceabilityPayload
@@ -132,8 +145,8 @@ public sealed class MesRestIntegrationTests : IDisposable
     [Fact]
     public async Task TraceabilitySignoffPersistsPassingReport()
     {
-        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" });
-        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        var handler = Track(new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" }));
+        MesIntegrationSettingsService.RestClientFactory = settings => Track(new MesRestClient(settings, handler));
         MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
 
         var report = await TraceabilityAcceptanceTestService.RunAsync(operatorId: "Engineer01 [Engineer]");
@@ -149,12 +162,12 @@ public sealed class MesRestIntegrationTests : IDisposable
     [Fact]
     public async Task TraceabilitySignoffValidatesRestResponseSchema()
     {
-        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        var handler = Track(new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             ReasonPhrase = "OK",
             Content = new StringContent("{\"accepted\":true,\"message\":\"accepted\",\"externalInspectionId\":\"MES-123\",\"timestampUtc\":\"2026-06-21T10:15:30Z\",\"resultCode\":\"OK\"}", Encoding.UTF8, "application/json"),
-        });
-        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        }));
+        MesIntegrationSettingsService.RestClientFactory = settings => Track(new MesRestClient(settings, handler));
         MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
 
         var report = await TraceabilityAcceptanceTestService.RunResultOnlyAsync("Engineer01 [Engineer]");
@@ -167,12 +180,12 @@ public sealed class MesRestIntegrationTests : IDisposable
     [Fact]
     public async Task InvalidRestResponseSchemaFailsAndEnqueuesSpoolItem()
     {
-        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        var handler = Track(new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             ReasonPhrase = "OK",
             Content = new StringContent("{\"message\":\"accepted without required fields\"}", Encoding.UTF8, "application/json"),
-        });
-        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        }));
+        MesIntegrationSettingsService.RestClientFactory = settings => Track(new MesRestClient(settings, handler));
         MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
 
         var report = await TraceabilityAcceptanceTestService.RunResultOnlyAsync("Engineer01 [Engineer]");
@@ -187,8 +200,8 @@ public sealed class MesRestIntegrationTests : IDisposable
     [Fact]
     public async Task TraceabilitySignoffReportRedactsSecrets()
     {
-        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" });
-        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        var handler = Track(new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" }));
+        MesIntegrationSettingsService.RestClientFactory = settings => Track(new MesRestClient(settings, handler));
         var settings = RestSettings(maxRetryCount: 0);
         settings.AuthMode = MesRestAuthMode.Bearer;
         settings.BearerToken = "bearer-secret-for-test";
@@ -209,13 +222,14 @@ public sealed class MesRestIntegrationTests : IDisposable
         var settings = RestSettings(maxRetryCount: 0);
         settings.AuthMode = MesRestAuthMode.ApiKey;
         settings.ApiKey = "secret-api-key";
-        MesIntegrationSettingsService.RestClientFactory = configured => new MesRestClient(
+        var unauthorizedHandler = Track(new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized)
+        {
+            ReasonPhrase = "Unauthorized",
+            Content = new StringContent("rejected token secret-api-key"),
+        }));
+        MesIntegrationSettingsService.RestClientFactory = configured => Track(new MesRestClient(
             configured,
-            new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized)
-            {
-                ReasonPhrase = "Unauthorized",
-                Content = new StringContent("rejected token secret-api-key"),
-            }));
+            unauthorizedHandler));
         MesIntegrationSettingsService.Save(settings);
 
         var report = await TraceabilityAcceptanceTestService.RunResultOnlyAsync("Engineer01 [Engineer]");
@@ -272,8 +286,8 @@ public sealed class MesRestIntegrationTests : IDisposable
     [Fact]
     public async Task SpoolRetryMarksSuccessfulItemSent()
     {
-        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" });
-        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        var handler = Track(new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { ReasonPhrase = "OK" }));
+        MesIntegrationSettingsService.RestClientFactory = settings => Track(new MesRestClient(settings, handler));
         MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0));
         EnqueueTraceabilitySpool("LOT-RETRY", maxRetryCount: 3);
 
@@ -290,8 +304,8 @@ public sealed class MesRestIntegrationTests : IDisposable
     [Fact]
     public async Task SpoolRetryIncrementsRetryCountOnFailure()
     {
-        var handler = new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { ReasonPhrase = "Unavailable" });
-        MesIntegrationSettingsService.RestClientFactory = settings => new MesRestClient(settings, handler);
+        var handler = Track(new CapturingHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { ReasonPhrase = "Unavailable" }));
+        MesIntegrationSettingsService.RestClientFactory = settings => Track(new MesRestClient(settings, handler));
         MesIntegrationSettingsService.Save(RestSettings(maxRetryCount: 0, retryBackoffMs: 0));
         EnqueueTraceabilitySpool("LOT-FAIL", maxRetryCount: 3);
 

@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 

@@ -66,8 +66,9 @@ public static class AuthenticationSettingsService
         {
             _cachedSettings = JsonSerializer.Deserialize<AuthenticationSettings>(File.ReadAllText(SettingsPath), JsonOptions) ?? new AuthenticationSettings();
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Authentication settings load fallback used: {ex.Message}");
             _cachedSettings = new AuthenticationSettings();
         }
 
@@ -257,8 +258,9 @@ public static class AuthenticationSettingsService
         {
             _cachedUsers = JsonSerializer.Deserialize<LocalUserStore>(File.ReadAllText(LocalUsersPath), JsonOptions) ?? new LocalUserStore();
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Local user store load fallback used: {ex.Message}");
             _cachedUsers = new LocalUserStore();
         }
 

@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "hmi-layout-approved-exceptions/v1",
+  "policy": "Exceptions must be exact. Wildcards, empty view keys, empty issue types, and empty targets are not allowed.",
+  "exceptions": []
+}

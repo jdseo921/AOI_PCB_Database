@@ -96,7 +96,7 @@ When launched from the Debug build, local export files are commonly written unde
 AOI_Monitor\bin\Debug\net10.0-windows\exports\
 ```
 
-Customer validation packages are written to the output folder chosen by the user in `Log & Export`.
+Customer validation packages are written to the output folder chosen by the user in `Export & Trace`.
 
 Admin users can change selected local paths in Settings. In this PoC, those settings are local only and are not synchronized with MES or a central configuration server.
 
@@ -113,12 +113,12 @@ Admin users can change selected local paths in Settings. In this PoC, those sett
 
 The Stage 2 camera hardware connection is not implemented. For demo use, configure folder simulation:
 
-1. Open `Settings / Guide`.
+1. Open `System Settings`.
 2. Use an Admin role.
 3. Set Camera Source to `Folder Simulation`.
 4. Select folders for Top, Side, and Bottom views.
 5. Save settings.
-6. Return to `Main Inspection` and use Start, Stop, Next Board, and the view selector.
+6. Return to `Run Inspection` and use Start, Stop, Next Board, and the view selector.
 
 ## Troubleshooting
 
@@ -132,7 +132,7 @@ The Stage 2 camera hardware connection is not implemented. For demo use, configu
 
 - Confirm the user account can write to `%LOCALAPPDATA%`.
 - If a custom storage root was selected, confirm that folder exists and is writable.
-- Use `Log & Export > DB Integrity` to generate a local health report.
+- Use `Export & Trace > DB Integrity` to generate a local health report.
 
 ### Imported images do not appear
 

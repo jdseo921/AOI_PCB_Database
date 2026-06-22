@@ -31,8 +31,9 @@ public static class DeploymentProfileSettingsService
             var settings = JsonSerializer.Deserialize<DeploymentProfileSettings>(File.ReadAllText(SettingsPath));
             _cached = settings?.Profile ?? DeploymentProfile.Stage1ImageValidation;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Deployment profile settings load fallback used: {ex.Message}");
             _cached = DeploymentProfile.Stage1ImageValidation;
         }
 

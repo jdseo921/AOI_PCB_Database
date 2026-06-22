@@ -111,6 +111,7 @@ public static class SupportBundleService
         var exportVerifications = AoiDatabase.GetExportVerifications(50);
         var mesSettings = MesIntegrationSettingsService.Load();
         var centralSettings = CentralSyncSettingsService.Load();
+        var memoryDiagnostics = MemoryDiagnosticsService.Capture();
 
         return new SupportBundleContext
         {
@@ -128,6 +129,7 @@ public static class SupportBundleService
             DatabaseIntegrity = AoiDatabase.RunIntegrityCheck(),
             DatabaseHealth = AoiDatabase.GetDatabaseHealthRows(),
             Diagnostics = diagnostics,
+            MemoryDiagnostics = memoryDiagnostics,
             Readiness = readiness,
             BuildTestEvidence = BuildTestEvidenceService.GetSummary(),
             ModelAcceptanceSummary = SummarizeModelAcceptance(AoiDatabase.GetLatestModelAcceptanceRun()),
@@ -339,6 +341,9 @@ public static class SupportBundleService
         sb.AppendLine("<h1>AOI Monitor Support Bundle</h1>");
         sb.AppendLine("<div class=\"notice\">Raw customer images, image vault contents, model files by default, and secrets are excluded or redacted.</div>");
         sb.AppendLine($"<p><strong>App:</strong> {Html(context.AppVersion)}<br><strong>OS:</strong> {Html(context.OsInfo)}<br><strong>Schema:</strong> {context.SchemaVersion}<br><strong>DB integrity:</strong> {Html(context.DatabaseIntegrity)}</p>");
+        sb.AppendLine($"<h2>Memory</h2><p><strong>Working set:</strong> {context.MemoryDiagnostics.WorkingSetBytes / 1024d / 1024d:F0} MB<br><strong>Managed GC:</strong> {context.MemoryDiagnostics.ManagedBytes / 1024d / 1024d:F0} MB<br><strong>Image cache:</strong> {context.MemoryDiagnostics.ImageCacheCount} full / {context.MemoryDiagnostics.ThumbnailCacheCount} thumbnails; {context.MemoryDiagnostics.ImageCacheBytes / 1024d / 1024d:F0} MB; large bitmaps={context.MemoryDiagnostics.LargeBitmapCount}; active pages={context.MemoryDiagnostics.ActivePageCount}<br><strong>Latest export peak:</strong> {context.MemoryDiagnostics.LatestExportOperation}: working set {context.MemoryDiagnostics.LatestExportWorkingSetPeakBytes / 1024d / 1024d:F0} MB; managed {context.MemoryDiagnostics.LatestExportManagedPeakBytes / 1024d / 1024d:F0} MB; processed={context.MemoryDiagnostics.LatestExportProcessedCount}</p>");
+        if (context.MemoryDiagnostics.ExportMemoryWarnings.Count > 0)
+            sb.AppendLine($"<p><strong>Export memory warnings:</strong> {Html(string.Join(" | ", context.MemoryDiagnostics.ExportMemoryWarnings.TakeLast(10)))}</p>");
         sb.AppendLine($"<h2>Readiness</h2><p><strong>{Html(readiness.OverallStatus)}</strong> for {Html(readiness.DeploymentProfile)}. Blocking={readiness.BlockingIssues.Count}; warnings={readiness.Warnings.Count}.</p>");
         sb.AppendLine("<table><tr><th>Category</th><th>Status</th><th>Evidence</th></tr>");
         foreach (var category in readiness.Categories.Take(16))
@@ -451,6 +456,7 @@ public static class SupportBundleService
         public string DatabaseIntegrity { get; set; } = string.Empty;
         public IReadOnlyList<DbHealthRow> DatabaseHealth { get; set; } = Array.Empty<DbHealthRow>();
         public SystemDiagnosticReport Diagnostics { get; set; } = new();
+        public MemoryDiagnosticsSnapshot MemoryDiagnostics { get; set; } = new();
         public FactoryReadinessReport Readiness { get; set; } = new();
         public BuildTestEvidenceSummary BuildTestEvidence { get; set; } = new();
         public object ModelAcceptanceSummary { get; set; } = new();

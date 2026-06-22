@@ -355,7 +355,7 @@ public sealed class FactoryReadinessServiceTests : IDisposable
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         Assert.True(File.Exists(Path.Combine(result.PackageFolder, "package_manifest.json")));
-        Assert.Equal(21, categories.Length);
+        Assert.Equal(22, categories.Length);
         Assert.Contains("Operating mode", names);
         Assert.Contains("Pilot issue status", names);
         Assert.Contains("Build/Test status", names);
@@ -363,6 +363,7 @@ public sealed class FactoryReadinessServiceTests : IDisposable
         Assert.Contains("3D profile acceptance status", names);
         Assert.Contains("MES/spool status", names);
         Assert.Contains("Central sync status", names);
+        Assert.Contains("Alarm/event status", names);
         Assert.Contains("Authentication mode", names);
         Assert.Contains("Known limitations", names);
         Assert.Equal("Stage1ImageValidation", document.RootElement.GetProperty("deploymentProfile").GetString());
@@ -558,6 +559,9 @@ public sealed class FactoryReadinessServiceTests : IDisposable
             "factory_readiness_summary.json",
             "factory_readiness_summary.html",
             "factory_readiness_summary.pdf",
+            "standards_traceability_matrix.json",
+            "standards_traceability_matrix.html",
+            "standards_traceability_matrix.pdf",
             "factory_acceptance_checklist.json",
             "factory_acceptance_checklist.html",
             "factory_acceptance_checklist.pdf",

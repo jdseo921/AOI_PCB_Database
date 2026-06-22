@@ -1,5 +1,5 @@
-using System.Reflection;
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AOI_Monitor.Data;
@@ -429,8 +429,9 @@ public static class ConfigurationBackupService
         {
             return SecretProtectionService.Unprotect(value);
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Protected restore value could not be unprotected: {ex.Message}");
             return string.Empty;
         }
     }

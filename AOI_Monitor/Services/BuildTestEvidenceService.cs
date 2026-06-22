@@ -171,8 +171,9 @@ public static class BuildTestEvidenceService
             process.WaitForExit(2000);
             return process.ExitCode == 0 ? output : string.Empty;
         }
-        catch
+        catch (Exception ex)
         {
+            Trace.WriteLine($"Git commit evidence lookup failed: {ex.Message}");
             return string.Empty;
         }
     }

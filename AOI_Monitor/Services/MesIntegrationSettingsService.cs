@@ -34,8 +34,9 @@ public static class MesIntegrationSettingsService
             _cached = JsonSerializer.Deserialize<MesIntegrationSettings>(json) ?? new MesIntegrationSettings();
             UnprotectSecrets(_cached);
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"MES integration settings load fallback used: {ex.Message}");
             _cached = new MesIntegrationSettings();
         }
 
@@ -59,7 +60,10 @@ public static class MesIntegrationSettingsService
 
         if (settings.Mode == MesIntegrationMode.Rest)
         {
+#pragma warning disable CA2000
+            // Ownership is transferred to IntegrationBoundaryRegistry for the app lifetime/integration profile.
             var client = RestClientFactory?.Invoke(settings) ?? new MesRestClient(settings);
+#pragma warning restore CA2000
             IntegrationBoundaryRegistry.MesClient = client;
             IntegrationBoundaryRegistry.TraceabilityUploader = client;
             return;

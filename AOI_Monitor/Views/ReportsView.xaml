@@ -1,6 +1,7 @@
 <UserControl x:Class="AOI_Monitor.Views.ReportsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:AOI_Monitor.Services"
              Background="#0B0E10">
   <Grid Margin="8">
     <Grid.RowDefinitions>
@@ -15,44 +16,28 @@
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Log Filters" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <TextBlock Text="Log Filters" Style="{StaticResource HmiSectionHeaderText}"/>
         </Border>
-        <Grid Grid.Row="1" Margin="8">
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-          </Grid.RowDefinitions>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="120"/>
-            <ColumnDefinition Width="6"/>
-            <ColumnDefinition Width="120"/>
-            <ColumnDefinition Width="6"/>
-            <ColumnDefinition Width="150"/>
-            <ColumnDefinition Width="6"/>
-            <ColumnDefinition Width="130"/>
-            <ColumnDefinition Width="6"/>
-            <ColumnDefinition Width="115"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="260"/>
-          </Grid.ColumnDefinitions>
-          <StackPanel Grid.Column="0">
-            <TextBlock Text="From" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+        <ScrollViewer Grid.Row="1" Margin="8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="128">
+          <WrapPanel>
+          <StackPanel Width="132" Margin="0,0,8,8">
+            <TextBlock Text="From" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <DatePicker x:Name="FromDatePicker"/>
           </StackPanel>
-          <StackPanel Grid.Column="2">
-            <TextBlock Text="To" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+          <StackPanel Width="132" Margin="0,0,8,8">
+            <TextBlock Text="To" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <DatePicker x:Name="ToDatePicker"/>
           </StackPanel>
-          <StackPanel Grid.Column="4">
-            <TextBlock Text="Model / Board" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+          <StackPanel Width="170" Margin="0,0,8,8">
+            <TextBlock Text="Model / Board" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <TextBox x:Name="BoardFilterText" Text=""/>
           </StackPanel>
-          <StackPanel Grid.Column="6">
-            <TextBlock Text="Operator" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+          <StackPanel Width="150" Margin="0,0,8,8">
+            <TextBlock Text="Operator" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <TextBox x:Name="OperatorFilterText" Text=""/>
           </StackPanel>
-          <StackPanel Grid.Column="8">
-            <TextBlock Text="Result" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+          <StackPanel Width="132" Margin="0,0,8,8">
+            <TextBlock Text="Result" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <ComboBox x:Name="ResultFilterCombo" SelectedIndex="0">
               <ComboBoxItem Content="ALL"/>
               <ComboBoxItem Content="OK"/>
@@ -60,12 +45,8 @@
               <ComboBoxItem Content="NG"/>
             </ComboBox>
           </StackPanel>
-          <WrapPanel Grid.Column="10" HorizontalAlignment="Right" VerticalAlignment="Bottom">
-            <Button Style="{StaticResource ActionBtnGreen}" Content="Apply Filters" Margin="0,0,6,0" Click="OnApplyFiltersClick"/>
-            <Button Style="{StaticResource ActionBtn}" Content="Clear" Click="OnClearFiltersClick"/>
-          </WrapPanel>
-          <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,0,0">
-            <TextBlock Text="User Role" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+          <StackPanel Width="140" Margin="0,0,8,8">
+            <TextBlock Text="User Role" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <ComboBox x:Name="RoleFilterCombo" SelectedIndex="0">
               <ComboBoxItem Content="ALL"/>
               <ComboBoxItem Content="Operator"/>
@@ -73,13 +54,21 @@
               <ComboBoxItem Content="Admin"/>
             </ComboBox>
           </StackPanel>
-          <StackPanel Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="3" Margin="0,8,0,0">
-            <TextBlock Text="Audit Action Type" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+          <StackPanel Width="270" Margin="0,0,8,8">
+            <TextBlock Text="Audit Action Type" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <TextBox x:Name="ActionTypeFilterText" Text="" ToolTip="Examples: LOGIN, EXPORT, MAIN_INSPECTION, ENGINE_CONFIG, CALIBRATION"/>
           </StackPanel>
-          <TextBlock Grid.Row="1" Grid.Column="6" Grid.ColumnSpan="5" Text="Audit Trail filters apply user, role, date, and action type for QC documentation."
-                     Foreground="#8B969E" FontSize="10.5" TextWrapping="Wrap" VerticalAlignment="Bottom" Margin="0,8,0,3"/>
-        </Grid>
+          <WrapPanel Width="282" VerticalAlignment="Bottom" Margin="0,18,8,8">
+            <Button Style="{StaticResource ActionBtnGreen}" Content="Apply Filters" Margin="0,0,6,0" Click="OnApplyFiltersClick"/>
+            <Button Style="{StaticResource ActionBtn}" Content="Clear" Click="OnClearFiltersClick"/>
+          </WrapPanel>
+          <TextBlock Width="520"
+                     Text="Filter production evidence, operator decisions, exports, and queue activity. Long paths are available through hover tooltips."
+                     Style="{StaticResource HmiPageSubtitleText}"
+                     VerticalAlignment="Bottom"
+                     Margin="0,18,0,8"/>
+          </WrapPanel>
+        </ScrollViewer>
       </Grid>
     </Border>
 
@@ -88,13 +77,13 @@
         <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
-            <TextBlock x:Name="LogSummaryText" DockPanel.Dock="Right" Text="No records loaded" Foreground="#9AA6AF" FontSize="11"/>
-            <TextBlock Text="SQLite Logs" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            <TextBlock x:Name="LogSummaryText" DockPanel.Dock="Right" Text="No records loaded" Foreground="#9AA6AF" FontSize="14"/>
+            <TextBlock Text="SQLite Logs" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </DockPanel>
         </Border>
         <TabControl Grid.Row="1" Background="#151A1E" BorderBrush="#343D44">
           <TabItem Header="Inspection History">
-            <DataGrid x:Name="InspectionGrid" CanUserSortColumns="True">
+            <DataGrid x:Name="InspectionGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
                 <DataGridTextColumn Header="Board" Binding="{Binding BoardProgram}" Width="110"/>
@@ -109,7 +98,7 @@
             </DataGrid>
           </TabItem>
           <TabItem Header="Review / Disposition Events">
-            <DataGrid x:Name="ReviewGrid" CanUserSortColumns="True">
+            <DataGrid x:Name="ReviewGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="EventTimeUtc" Width="125"/>
                 <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="105"/>
@@ -120,7 +109,7 @@
             </DataGrid>
           </TabItem>
           <TabItem Header="Export History">
-            <DataGrid x:Name="ExportGrid" CanUserSortColumns="True">
+            <DataGrid x:Name="ExportGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="Export file paths are available through row/cell hover when truncated.">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
                 <DataGridTextColumn Header="Type" Binding="{Binding ExportType}" Width="160"/>
@@ -134,7 +123,7 @@
             </DataGrid>
           </TabItem>
           <TabItem Header="Audit Trail">
-            <DataGrid x:Name="AuditGrid" CanUserSortColumns="True">
+            <DataGrid x:Name="AuditGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="Traceability means the audit path from user, board, result, export, and upload event.">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="UTC Time" Binding="{Binding TimestampUtcDisplay}" SortMemberPath="TimestampUtc" Width="140"/>
                 <DataGridTextColumn Header="Local Time" Binding="{Binding LocalTimestampDisplay}" Width="140"/>
@@ -147,7 +136,7 @@
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
-          <TabItem Header="MES Queue">
+          <TabItem Header="MES Upload Queue" ToolTip="MES means factory traceability system. This queue shows results waiting to upload, failed uploads, and sent records.">
             <DockPanel>
               <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                 <TextBlock Text="Status" Foreground="#8B969E" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -159,7 +148,7 @@
                   <ComboBoxItem Content="Abandoned"/>
                 </ComboBox>
               </StackPanel>
-              <DataGrid x:Name="MesSpoolGrid" CanUserSortColumns="True" SelectionMode="Extended">
+              <DataGrid x:Name="MesSpoolGrid" CanUserSortColumns="True" SelectionMode="Extended" Style="{StaticResource HmiTable}" ToolTip="Endpoint and last-error text may be long; hover the row/cell to inspect the full value.">
                 <DataGrid.Columns>
                   <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
                   <DataGridTextColumn Header="Type" Binding="{Binding PayloadType}" Width="135"/>
@@ -174,8 +163,8 @@
               </DataGrid>
             </DockPanel>
           </TabItem>
-          <TabItem Header="Central Sync Queue">
-            <DataGrid x:Name="CentralSyncGrid" CanUserSortColumns="True" SelectionMode="Extended">
+          <TabItem Header="Central Evidence Sync" ToolTip="Central Sync copies selected evidence to a configured folder or service. It does not approve factory readiness by itself.">
+            <DataGrid x:Name="CentralSyncGrid" CanUserSortColumns="True" SelectionMode="Extended" Style="{StaticResource HmiTable}" ToolTip="Endpoint/folder summaries are intentionally compact; hover to inspect the full path or endpoint.">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
                 <DataGridTextColumn Header="Item Type" Binding="{Binding ItemType}" Width="145"/>
@@ -207,20 +196,25 @@
                   <ComboBoxItem Content="Medium"/>
                   <ComboBoxItem Content="Low"/>
                 </ComboBox>
-                <Button Style="{StaticResource ActionBtnGreen}" Content="False Call from Inspection" Margin="0,0,6,0" Click="OnCreateFalseCallIssueClick"/>
-                <Button Style="{StaticResource ActionBtnAmber}" Content="Possible Escape from Inspection" Margin="0,0,6,0" Click="OnCreatePossibleEscapeIssueClick"/>
+                <Button Style="{StaticResource ActionBtnGreen}" Content="Good Board Marked Defect" Margin="0,0,6,0" Click="OnCreateFalseCallIssueClick" ToolTip="False Call: the system marked a good board as a defect."/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Possible Missed Defect" Margin="0,0,6,0" Click="OnCreatePossibleEscapeIssueClick" ToolTip="Possible Escape: the system may have missed a real defect."/>
                 <Button Style="{StaticResource ActionBtnBlue}" Content="Refresh Issues" Margin="0,0,6,0" Click="OnRefreshPilotIssuesClick"/>
                 <Button Style="{StaticResource ActionBtn}" Content="Close Selected" Margin="0,0,6,0" Click="OnClosePilotIssueClick"/>
                 <Button Style="{StaticResource ActionBtn}" Content="Export Issue Report" Click="OnExportPilotIssueReportClick"/>
                 <TextBlock x:Name="PilotIssueSummaryText" Text="Pilot issues not loaded." Foreground="#DCE5EB" VerticalAlignment="Center" Margin="12,0,0,0"/>
               </WrapPanel>
-              <DataGrid x:Name="PilotIssuesGrid" Grid.Row="1" CanUserSortColumns="True" SelectionMode="Single">
+              <DataGrid x:Name="PilotIssuesGrid" Grid.Row="1" CanUserSortColumns="True" SelectionMode="Single" Style="{StaticResource HmiTable}" ToolTip="Use this list to close manual test findings before a client demo. False Call means a good board was marked defect. Possible Escape means a real defect may have been missed.">
                 <DataGrid.Columns>
                   <DataGridTextColumn Header="ID" Binding="{Binding IssueId}" Width="135"/>
                   <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
                   <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="115"/>
                   <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="80"/>
                   <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
+                  <DataGridTextColumn Header="Page" Binding="{Binding PageName}" Width="135"/>
+                  <DataGridTextColumn Header="Steps" Binding="{Binding ReproductionSteps}" Width="190"/>
+                  <DataGridTextColumn Header="Expected" Binding="{Binding ExpectedBehavior}" Width="180"/>
+                  <DataGridTextColumn Header="Actual" Binding="{Binding ActualBehavior}" Width="180"/>
+                  <DataGridTextColumn Header="Evidence" Binding="{Binding ScreenshotPath}" Width="160"/>
                   <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
                   <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="95"/>
                   <DataGridTextColumn Header="Inspection" Binding="{Binding RelatedInspectionId}" Width="90"/>
@@ -230,7 +224,42 @@
               </DataGrid>
             </Grid>
           </TabItem>
-          <TabItem Header="Management Dashboard">
+          <TabItem Header="UI Stability Test" ToolTip="Cycles through major screens to catch slow navigation, memory growth, and recoverable crashes.">
+            <Grid Margin="8">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <WrapPanel Margin="0,0,0,8">
+                <TextBlock Text="Profile" Foreground="#9AA6AF" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <ComboBox x:Name="UiStabilityProfileCombo" Width="235" SelectedIndex="1" Margin="0,0,8,0">
+                  <ComboBoxItem Content="5-minute smoke" Tag="{x:Static services:UiNavigationSoakProfile.FiveMinuteSmoke}"/>
+                  <ComboBoxItem Content="30-minute local stability" Tag="{x:Static services:UiNavigationSoakProfile.ThirtyMinuteLocalStability}"/>
+                  <ComboBoxItem Content="4-hour client demo readiness" Tag="{x:Static services:UiNavigationSoakProfile.FourHourClientDemoReadiness}"/>
+                  <ComboBoxItem Content="8-hour factory PoC" Tag="{x:Static services:UiNavigationSoakProfile.EightHourFactoryPoC}"/>
+                </ComboBox>
+                <CheckBox x:Name="UiStabilityHeavyLoadsCheck" Content="Exercise heavy page loads" Foreground="#DCE5EB" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Run UI Stability Test" Margin="0,0,6,0" Click="OnRunUiStabilityTestClick"/>
+              </WrapPanel>
+              <TextBlock Grid.Row="1" x:Name="UiStabilityStatsText"
+                         Text="UI stability not run. Use 30-minute or better PASS evidence before client demo export."
+                         Foreground="#DCE5EB" FontSize="14" TextWrapping="Wrap" Margin="0,0,0,8"/>
+              <DataGrid Grid.Row="2" x:Name="UiStabilityEventsGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="UTC" Binding="{Binding TimestampUtc}" Width="145"/>
+                  <DataGridTextColumn Header="Cycle" Binding="{Binding Cycle}" Width="65"/>
+                  <DataGridTextColumn Header="Page" Binding="{Binding PageName}" Width="170"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="75"/>
+                  <DataGridTextColumn Header="Load ms" Binding="{Binding PageLoadMilliseconds}" Width="85"/>
+                  <DataGridTextColumn Header="Heartbeat ms" Binding="{Binding HeartbeatMilliseconds}" Width="105"/>
+                  <DataGridTextColumn Header="Memory MB" Binding="{Binding WorkingSetMegabytes}" Width="95"/>
+                  <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
+          </TabItem>
+          <TabItem Header="Management Dashboard" ToolTip="Engineer/Admin view for trend review. Operators use Main Inspection for normal work.">
             <Grid Margin="8">
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -250,19 +279,19 @@
                   <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
-                  <TextBlock Text="Lot" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+                  <TextBlock Text="Lot" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
                   <TextBox x:Name="ManagementLotFilterText"/>
                 </StackPanel>
                 <StackPanel Grid.Column="2">
-                  <TextBlock Text="Model Version" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+                  <TextBlock Text="Model Version" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
                   <TextBox x:Name="ManagementModelFilterText"/>
                 </StackPanel>
                 <StackPanel Grid.Column="4">
-                  <TextBlock Text="Board / Operator" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
-                  <TextBlock Text="Uses top filters" Foreground="#DCE5EB" FontSize="11.5" VerticalAlignment="Center" Margin="0,5,0,0"/>
+                  <TextBlock Text="Board / Operator" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
+                  <TextBlock Text="Uses top filters" Foreground="#DCE5EB" FontSize="14" VerticalAlignment="Center" Margin="0,5,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="6">
-                  <TextBlock Text="Deployment Profile" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+                  <TextBlock Text="Deployment Profile" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
                   <ComboBox x:Name="ManagementDeploymentProfileCombo" SelectedIndex="0" Style="{StaticResource FilterCombo}"/>
                 </StackPanel>
                 <WrapPanel Grid.Column="8" VerticalAlignment="Bottom">
@@ -270,7 +299,7 @@
                   <Button Style="{StaticResource ActionBtnAmber}" Content="Export Dashboard HTML/CSV/PDF" Click="OnExportManagementDashboardClick"/>
                 </WrapPanel>
               </Grid>
-              <TextBlock Grid.Row="1" x:Name="ManagementDashboardSummaryText" Text="Dashboard not loaded." Foreground="#DCE5EB" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,8"/>
+              <TextBlock Grid.Row="1" x:Name="ManagementDashboardSummaryText" Text="Dashboard not loaded." Foreground="#DCE5EB" FontSize="14" TextWrapping="Wrap" Margin="0,8,0,8"/>
               <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*"/>
@@ -282,7 +311,7 @@
                   <RowDefinition Height="8"/>
                   <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <DataGrid x:Name="ManagementDefectGrid" Grid.Row="0" Grid.Column="0" CanUserSortColumns="True">
+                <DataGrid x:Name="ManagementDefectGrid" Grid.Row="0" Grid.Column="0" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="False calls are OK boards flagged for review or NG. Escapes are known NG boards that may be missed.">
                   <DataGrid.Columns>
                     <DataGridTextColumn Header="Defect Class" Binding="{Binding Name}" Width="*"/>
                     <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="70"/>
@@ -291,7 +320,7 @@
                     <DataGridTextColumn Header="Reviews" Binding="{Binding Reviews}" Width="80"/>
                   </DataGrid.Columns>
                 </DataGrid>
-                <DataGrid x:Name="ManagementRoiGrid" Grid.Row="0" Grid.Column="2" CanUserSortColumns="True">
+                <DataGrid x:Name="ManagementRoiGrid" Grid.Row="0" Grid.Column="2" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="ROI means region of interest: the board image area checked for a defect.">
                   <DataGrid.Columns>
                     <DataGridTextColumn Header="ROI / RefDes" Binding="{Binding Name}" Width="*"/>
                     <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="70"/>
@@ -300,7 +329,7 @@
                     <DataGridTextColumn Header="Reviews" Binding="{Binding Reviews}" Width="80"/>
                   </DataGrid.Columns>
                 </DataGrid>
-                <DataGrid x:Name="ManagementModelTrendGrid" Grid.Row="2" Grid.Column="0" CanUserSortColumns="True">
+                <DataGrid x:Name="ManagementModelTrendGrid" Grid.Row="2" Grid.Column="0" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
                   <DataGrid.Columns>
                     <DataGridTextColumn Header="Model Version" Binding="{Binding ModelVersion}" Width="*"/>
                     <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="70"/>
@@ -310,7 +339,7 @@
                     <DataGridTextColumn Header="Avg ms" Binding="{Binding AverageInspectionTimeMs}" Width="80"/>
                   </DataGrid.Columns>
                 </DataGrid>
-                <DataGrid x:Name="ManagementLotModelGrid" Grid.Row="2" Grid.Column="2" CanUserSortColumns="True">
+                <DataGrid x:Name="ManagementLotModelGrid" Grid.Row="2" Grid.Column="2" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="False-call rate and possible escapes are review signals, not automatic production release decisions.">
                   <DataGrid.Columns>
                     <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="95"/>
                     <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
@@ -324,8 +353,8 @@
               </Grid>
             </Grid>
           </TabItem>
-          <TabItem Header="Factory Readiness">
-            <DataGrid x:Name="FactoryReadinessGrid" CanUserSortColumns="True">
+          <TabItem Header="Factory Readiness" ToolTip="Shows what evidence is present, what is missing, and why it matters. Acceptance rows are evidence checks, not final certification.">
+            <DataGrid x:Name="FactoryReadinessGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Category" Binding="{Binding Name}" Width="180"/>
                 <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="95"/>
@@ -334,40 +363,73 @@
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
-          <TabItem Header="Factory Readiness Completion Matrix">
+          <TabItem Header="Standards &amp; Quality Checklist" ToolTip="Maps project HMI/software-quality expectations to concrete evidence. This is standards-aligned evidence, not certification.">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
               </Grid.RowDefinitions>
-              <StackPanel Orientation="Horizontal" Margin="8">
-                <Button Style="{StaticResource ActionBtnBlue}" Content="Refresh Completion Matrix" Click="OnRefreshCompletionMatrixClick"/>
-                <TextBlock x:Name="CompletionMatrixSummaryText" Text="Completion matrix not loaded." Foreground="#DCE5EB" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="12,0,0,0"/>
-              </StackPanel>
-              <DataGrid x:Name="CompletionMatrixGrid" Grid.Row="1" CanUserSortColumns="True">
+              <DockPanel Margin="8">
+                <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+                  <Button Style="{StaticResource ActionBtnBlue}" Content="Refresh Checklist" Margin="0,0,6,0" Click="OnRefreshStandardsTraceabilityClick"/>
+                  <Button Style="{StaticResource ActionBtnAmber}" Content="Export HTML/PDF/JSON" Click="OnExportStandardsTraceabilityClick"/>
+                </WrapPanel>
+                <TextBlock x:Name="StandardsTraceabilitySummaryText"
+                           Text="Standards traceability not loaded."
+                           Foreground="#DCE5EB"
+                           FontSize="14"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"/>
+              </DockPanel>
+              <DataGrid x:Name="StandardsTraceabilityGrid" Grid.Row="1" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="Long evidence paths and notes are available through hover when truncated.">
                 <DataGrid.Columns>
-                  <DataGridTextColumn Header="Stage" Binding="{Binding Stage}" Width="210"/>
-                  <DataGridTextColumn Header="Complete" Binding="{Binding PercentDisplay}" Width="90"/>
-                  <DataGridTextColumn Header="Evidence Score" Binding="{Binding EvidenceSummary}" Width="300"/>
-                  <DataGridTextColumn Header="Missing Evidence" Binding="{Binding MissingEvidenceDisplay}" Width="*"/>
-                  <DataGridTextColumn Header="Next Actions" Binding="{Binding NextActionsDisplay}" Width="320"/>
+                  <DataGridTextColumn Header="Source" Binding="{Binding StandardOrSource}" Width="170"/>
+                  <DataGridTextColumn Header="Requirement / Principle" Binding="{Binding PrincipleOrRequirement}" Width="260"/>
+                  <DataGridTextColumn Header="ID" Binding="{Binding ProjectRequirementId}" Width="95"/>
+                  <DataGridTextColumn Header="Evidence Type" Binding="{Binding EvidenceType}" Width="155"/>
+                  <DataGridTextColumn Header="Evidence Path" Binding="{Binding EvidencePath}" Width="240"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="105"/>
+                  <DataGridTextColumn Header="Blocking" Binding="{Binding BlockingLevel}" Width="115"/>
+                  <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*"/>
                 </DataGrid.Columns>
               </DataGrid>
             </Grid>
           </TabItem>
-          <TabItem Header="Factory Acceptance">
+          <TabItem Header="Evidence Completion" ToolTip="Shows missing evidence by stage. Completion is not the same as production release approval.">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
               </Grid.RowDefinitions>
               <StackPanel Orientation="Horizontal" Margin="8">
-                <TextBlock Text="Deployment Profile" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Refresh Evidence List" Click="OnRefreshCompletionMatrixClick"/>
+                <TextBlock x:Name="CompletionMatrixSummaryText" Text="Evidence list not loaded." Foreground="#DCE5EB" FontSize="14" VerticalAlignment="Center" TextWrapping="Wrap" Margin="12,0,0,0"/>
+              </StackPanel>
+              <DataGrid x:Name="CompletionMatrixGrid" Grid.Row="1" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Stage" Binding="{Binding Stage}" Width="210"/>
+                  <DataGridTextColumn Header="Complete" Binding="{Binding PercentDisplay}" Width="90"/>
+                  <DataGridTextColumn Header="Evidence Score" Binding="{Binding EvidenceSummary}" Width="300"/>
+                  <DataGridTextColumn Header="What Is Missing" Binding="{Binding MissingEvidenceDisplay}" Width="*"/>
+                  <DataGridTextColumn Header="What To Do Next" Binding="{Binding NextActionsDisplay}" Width="320"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
+          </TabItem>
+          <TabItem Header="Factory Acceptance" ToolTip="Factory acceptance checklist for evidence collection and signoff. Do not overclaim production readiness from a single checklist row.">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <StackPanel Orientation="Horizontal" Margin="8">
+                <TextBlock Text="Deployment Profile" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <ComboBox x:Name="FactoryAcceptanceProfileCombo" Width="230" SelectedIndex="0" Style="{StaticResource FilterCombo}"/>
                 <Button Style="{StaticResource ActionBtnBlue}" Content="Generate Checklist" Margin="8,0,0,0" Click="OnGenerateFactoryAcceptanceChecklistClick"/>
                 <Button Style="{StaticResource ActionBtnAmber}" Content="Export FAT Package" Margin="8,0,0,0" Click="OnExportFactoryAcceptanceChecklistClick"/>
               </StackPanel>
-              <DataGrid x:Name="FactoryAcceptanceGrid" Grid.Row="1" CanUserSortColumns="True">
+              <DataGrid x:Name="FactoryAcceptanceGrid" Grid.Row="1" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="Evidence paths and notes may be long; hover cells to inspect full values.">
                 <DataGrid.Columns>
                   <DataGridTextColumn Header="ID" Binding="{Binding RequirementId}" Width="95"/>
                   <DataGridTextColumn Header="Requirement" Binding="{Binding RequirementText}" Width="220"/>
@@ -392,51 +454,93 @@
           <ColumnDefinition Width="420"/>
         </Grid.ColumnDefinitions>
         <StackPanel>
-          <TextBlock Text="Auto-Archive Policy" Foreground="#9AA6AF" FontSize="10" Margin="0,0,0,3"/>
+          <TextBlock Text="Auto-Archive Policy" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,3"/>
           <TextBlock x:Name="ArchivePolicyText"
                      Text="Logs older than 30 days are copied into LogArchive during startup. Source rows remain in place, so the archive is reversible and audit-safe."
-                     TextWrapping="Wrap" FontSize="11.5" Foreground="#DCE5EB"/>
-          <TextBlock x:Name="StatusText" Text="Ready." Foreground="#9AA6AF" FontSize="11" Margin="0,6,0,0"/>
-          <TextBlock x:Name="PackagePathText" Text="Latest customer package: --" Foreground="#DCE5EB" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
-          <TextBlock x:Name="SoakReportPathText" Text="Latest soak-test report: --" Foreground="#DCE5EB" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
-          <TextBlock x:Name="BuildEvidenceSummaryText" Text="Build/test evidence: --" Foreground="#DCE5EB" FontSize="11" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                     TextWrapping="Wrap" FontSize="14" Foreground="#DCE5EB"/>
+          <TextBlock x:Name="StatusText" Text="Ready." Foreground="#9AA6AF" FontSize="14" Margin="0,6,0,0"/>
+          <TextBlock x:Name="PackagePathText" Text="Latest customer package: --" Foreground="#DCE5EB" FontSize="14" Margin="0,3,0,0" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
+          <TextBlock x:Name="SoakReportPathText" Text="Latest soak-test report: --" Foreground="#DCE5EB" FontSize="14" Margin="0,3,0,0" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
+          <TextBlock x:Name="BuildEvidenceSummaryText" Text="Build/test evidence: --" Foreground="#DCE5EB" FontSize="14" Margin="0,3,0,0" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
+          <TextBlock x:Name="ClientDemoGateText" Text="Client demo readiness: not evaluated" Foreground="#E1A334" FontSize="14" Margin="0,3,0,0" TextWrapping="Wrap"/>
           <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
             <ProgressBar x:Name="WorkProgressBar" Width="190" Height="12" Minimum="0" Maximum="100" Value="0" Margin="0,0,8,0" VerticalAlignment="Center"/>
             <Button x:Name="CancelWorkButton" Style="{StaticResource MiniBtn}" Content="Cancel" IsEnabled="False" Click="OnCancelWorkClick"/>
           </StackPanel>
         </StackPanel>
-        <WrapPanel Grid.Column="1" HorizontalAlignment="Right">
-          <Button Style="{StaticResource ActionBtnGreen}" Content="Inspection History CSV" Margin="0,0,6,6" Click="OnExportInspectionHistoryClick"/>
-          <Button Style="{StaticResource ActionBtnGreen}" Content="Review Log CSV" Margin="0,0,6,6" Click="OnExportReviewLogClick"/>
-          <Button Style="{StaticResource ActionBtnGreen}" Content="Audit Trail CSV" Margin="0,0,6,6" Click="OnExportAuditTrailClick"/>
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Annotated Overlays" Margin="0,0,6,6" Click="OnExportAnnotatedOverlaysClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Create Stage 1 Customer Package" Margin="0,0,6,6" Click="OnExportCustomerPackageClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Export Go/No-Go Package" Margin="0,0,6,6" Click="OnExportFactoryReadinessPackageClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Export FAT Checklist" Margin="0,0,6,6" Click="OnExportFactoryAcceptanceChecklistClick"/>
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Import Build/Test Evidence" Margin="0,0,6,6" Click="OnImportBuildTestEvidenceClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Open Build Evidence Folder" Margin="0,0,6,6" Click="OnOpenBuildEvidenceFolderClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="DB Integrity" Margin="0,0,6,0" Click="OnRunDbIntegrityCheckClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Database Health" Margin="0,0,6,0" Click="OnOpenDatabaseHealthClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Verify Paths" Margin="0,0,6,0" Click="OnVerifyImagePathsClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Verify Selected Export" Margin="0,0,6,0" Click="OnVerifySelectedExportClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Rebuild Image Index" Margin="0,0,6,0" Click="OnRebuildImageIndexClick"/>
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Upload Result to MES" Margin="0,0,6,0" Click="OnUploadMesMockClick"/>
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Run Traceability Test" Margin="0,0,6,0" Click="OnRunTraceabilityTestClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Retry Selected MES" Margin="0,0,6,0" Click="OnRetrySelectedMesSpoolClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Retry All Pending MES" Margin="0,0,6,0" Click="OnRetryMesSpoolClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Export Queue Report" Margin="0,0,6,0" Click="OnExportMesQueueReportClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Export MES Contract" Margin="0,0,6,0" Click="OnExportMesContractClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Mark MES Abandoned" Margin="0,0,6,0" Click="OnAbandonMesSpoolClick"/>
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Central Sync" Margin="0,0,6,0" Click="OnQueueCentralSyncClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Retry Selected Central" Margin="0,0,6,0" Click="OnRetrySelectedCentralSyncClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Retry All Central" Margin="0,0,6,0" Click="OnRetryCentralSyncClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Export Central Sync Report" Margin="0,0,6,0" Click="OnExportCentralSyncReportClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Soak Test" Margin="0,0,6,0" Click="OnRunSoakTestClick"/>
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Performance Benchmark" Margin="0,0,6,0" Click="OnRunPerformanceBenchmarkClick"/>
-          <Button Style="{StaticResource ActionBtn}" Content="Export Latest Soak Evidence" Margin="0,0,6,0" Click="OnExportLatestSoakEvidenceClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Recipe" Click="OnLockActiveRecipeClick"/>
-        </WrapPanel>
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="250">
+        <StackPanel>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
+            <StackPanel>
+              <TextBlock Text="Evidence Exports" Style="{StaticResource HmiSectionHeaderText}" Margin="0,0,0,6"/>
+              <WrapPanel>
+                <Button Style="{StaticResource ActionBtnGreen}" Content="Inspection History CSV" Margin="0,0,6,6" Click="OnExportInspectionHistoryClick"/>
+                <Button Style="{StaticResource ActionBtnGreen}" Content="Review Log CSV" Margin="0,0,6,6" Click="OnExportReviewLogClick"/>
+                <Button Style="{StaticResource ActionBtnGreen}" Content="Audit Trail CSV" Margin="0,0,6,6" Click="OnExportAuditTrailClick"/>
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Annotated Overlays" Margin="0,0,6,6" Click="OnExportAnnotatedOverlaysClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Verify Selected Export" Margin="0,0,6,6" Click="OnVerifySelectedExportClick"/>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
+            <StackPanel>
+              <TextBlock Text="Readiness and Quality Gates" Style="{StaticResource HmiSectionHeaderText}" Margin="0,0,0,6"/>
+              <WrapPanel>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Create Stage 1 Customer Package" Margin="0,0,6,6" Click="OnExportCustomerPackageClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Export Readiness Evidence" Margin="0,0,6,6" Click="OnExportFactoryReadinessPackageClick" ToolTip="Exports the readiness evidence package. This is not final production certification."/>
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Client Demo Readiness" Margin="0,0,6,6" Click="OnClientDemoReadinessClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Export Demo Gate" Margin="0,0,6,6" Click="OnExportClientDemoReadinessClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Export Standards Matrix" Margin="0,0,6,6" Click="OnExportStandardsTraceabilityClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Export FAT Checklist" Margin="0,0,6,6" Click="OnExportFactoryAcceptanceChecklistClick"/>
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Import Build/Test Evidence" Margin="0,0,6,6" Click="OnImportBuildTestEvidenceClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Open Build Evidence Folder" Margin="0,0,6,6" Click="OnOpenBuildEvidenceFolderClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Soak Test" Margin="0,0,6,6" Click="OnRunSoakTestClick"/>
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Performance Benchmark" Margin="0,0,6,6" Click="OnRunPerformanceBenchmarkClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Export Latest Soak Evidence" Margin="0,0,6,6" Click="OnExportLatestSoakEvidenceClick"/>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
+            <StackPanel>
+              <TextBlock Text="Database and Image Index" Style="{StaticResource HmiSectionHeaderText}" Margin="0,0,0,6"/>
+              <WrapPanel>
+                <Button Style="{StaticResource ActionBtn}" Content="DB Integrity" Margin="0,0,6,6" Click="OnRunDbIntegrityCheckClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Database Health" Margin="0,0,6,6" Click="OnOpenDatabaseHealthClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Verify Paths" Margin="0,0,6,6" Click="OnVerifyImagePathsClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Rebuild Image Index" Margin="0,0,6,6" Click="OnRebuildImageIndexClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Lock Recipe" Margin="0,0,6,6" Click="OnLockActiveRecipeClick"/>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
+            <StackPanel>
+              <TextBlock Text="MES Traceability Queue" Style="{StaticResource HmiSectionHeaderText}" Margin="0,0,0,6"/>
+              <WrapPanel>
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Send Result to Traceability System" Margin="0,0,6,6" Click="OnUploadMesMockClick" ToolTip="MES means factory traceability system. Mock mode creates local evidence only."/>
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Run Traceability Test" Margin="0,0,6,6" Click="OnRunTraceabilityTestClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Retry Selected Upload" Margin="0,0,6,6" Click="OnRetrySelectedMesSpoolClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Retry All Waiting Uploads" Margin="0,0,6,6" Click="OnRetryMesSpoolClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Export Queue Report" Margin="0,0,6,6" Click="OnExportMesQueueReportClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Export MES Contract" Margin="0,0,6,6" Click="OnExportMesContractClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Mark MES Abandoned" Margin="0,0,6,6" Click="OnAbandonMesSpoolClick"/>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}">
+            <StackPanel>
+              <TextBlock Text="Central Evidence Sync" Style="{StaticResource HmiSectionHeaderText}" Margin="0,0,0,6"/>
+              <WrapPanel>
+                <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Central Sync" Margin="0,0,6,6" Click="OnQueueCentralSyncClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Retry Selected Central" Margin="0,0,6,6" Click="OnRetrySelectedCentralSyncClick"/>
+                <Button Style="{StaticResource ActionBtnAmber}" Content="Retry All Central" Margin="0,0,6,6" Click="OnRetryCentralSyncClick"/>
+                <Button Style="{StaticResource ActionBtn}" Content="Export Central Sync Report" Margin="0,0,6,6" Click="OnExportCentralSyncReportClick"/>
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+        </ScrollViewer>
       </Grid>
     </Border>
   </Grid>
 </UserControl>
+

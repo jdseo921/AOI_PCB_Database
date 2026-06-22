@@ -7,10 +7,12 @@ param(
     [switch]$IncludeTemplates,
     [switch]$IncludeSampleManifestTemplate,
     [switch]$IncludeDocs,
-    [switch]$NoRestore
+    [switch]$NoRestore,
+    [switch]$ClientDemoGate
 )
 
 $ErrorActionPreference = "Stop"
+$publishStartedAt = Get-Date
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptRoot "..")
@@ -62,6 +64,7 @@ Write-Host "Docs:       $(if ($IncludeDocs -or !$ValidationOnly) { 'include' } e
 Write-Host "Templates:  $(if ($IncludeTemplates) { 'include adapter templates' } else { 'skip' })"
 Write-Host "Sample manifest template: $(if ($IncludeSampleManifestTemplate) { 'include' } else { 'skip' })"
 Write-Host "Restore:    $(if ($NoRestore) { 'skip; use existing restore assets' } else { 'allow dotnet commands to restore as needed' })"
+Write-Host "Client demo gate: $(if ($ClientDemoGate) { 'required' } else { 'not required' })"
 
 if (!(Test-Path $projectPath)) {
     throw "Project file was not found: $projectPath"
@@ -69,6 +72,19 @@ if (!(Test-Path $projectPath)) {
 
 if (!(Test-Path $solutionPath)) {
     throw "Solution file was not found: $solutionPath"
+}
+
+if ($ClientDemoGate) {
+    $qualityGateScript = Join-Path $scriptRoot "run-quality-gates.ps1"
+    if (!(Test-Path $qualityGateScript)) {
+        throw "Client demo gate failed: quality gate script was not found: $qualityGateScript"
+    }
+
+    Write-Host "Running client demo quality gate before package generation..."
+    & pwsh $qualityGateScript -Configuration $Configuration -ResultsDirectory (Join-Path $repoRoot "TestResults") -SkipPackageValidation
+    if ($LASTEXITCODE -ne 0) {
+        throw "Client demo gate failed. Package generation is blocked. See TestResults\industrial_quality_gate_report.json."
+    }
 }
 
 New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
@@ -177,6 +193,14 @@ Publish mode: $(if ($SelfContained) { "Self-contained" } else { "Framework-depen
 2. Run AOI_Monitor.exe.
 3. If this is a framework-dependent package, install a .NET Desktop Runtime/SDK that supports the app target framework before launching.
 
+## Client Test Path
+
+1. Read CLIENT_HANDOFF_README.md if present.
+2. Open Docs/Client_Test_Kit_Guide.md.
+3. Use small non-confidential PNG/JPG/JPEG images for evaluation.
+4. Confirm simulated/mock/not-connected readiness states are visible.
+5. Export Factory Readiness, Client Demo Readiness, and Standards Traceability reports after testing.
+
 ## Included
 
 - app/ - Published Windows desktop application files.
@@ -194,6 +218,10 @@ This release intentionally excludes local runtime/customer data:
 - Local %LOCALAPPDATA%\AOI_Monitor data.
 
 The app creates local PoC data on the target machine when it runs.
+
+## Evidence Boundary
+
+This package is standards-aligned project evidence for client evaluation. It is not formal ISO, IEC, ISA, safety, cybersecurity, or production-equipment certification. Simulated camera, robot, lighting, 3D profile, or MES evidence must not be presented as real hardware or production integration validation.
 
 ## Packaging
 

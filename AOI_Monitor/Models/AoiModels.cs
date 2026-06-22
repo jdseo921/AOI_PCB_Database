@@ -27,26 +27,26 @@ public record ImageLibraryRecord(
 
 public class StationInfo
 {
-    public string Name        { get; set; }
-    public string Status      { get; set; }
-    public int    SampleCount { get; set; }
-    public int    ReviewCount { get; set; }
-    public int    WaitCount   { get; set; }
-    public double Yield       { get; set; }
+    public string Name { get; set; }
+    public string Status { get; set; }
+    public int SampleCount { get; set; }
+    public int ReviewCount { get; set; }
+    public int WaitCount { get; set; }
+    public double Yield { get; set; }
     public double DetectedPct { get; set; }
-    public int    FalseCount  { get; set; }
+    public int FalseCount { get; set; }
     public string Description { get; set; }
     public string StatusColor { get; set; } // green / amber / red
 
     // Derived for binding
-    public bool   IsRed       => StatusColor == "red";
-    public bool   IsAmber     => StatusColor == "amber";
-    public string HeadBg      => IsRed ? "#D6131A" : "#191F23";
-    public string HeadFg      => IsRed ? "#FFFFFF"  : "#D9E1E6";
-    public string TagBg       => IsRed ? "#581B1D"  : IsAmber ? "#8A570F" : "#173A21";
-    public string TagBorder   => IsRed ? "#A83A3E"  : IsAmber ? "#CF8D28" : "#3E844A";
-    public string TagFg       => IsRed ? "#FFCECE"  : IsAmber ? "#FFF1C5" : "#CFFFCE";
-    public string GaugeColor  => IsRed ? "#F13B3F"  : IsAmber ? "#E1A334" : "#50F56E";
+    public bool IsRed => StatusColor == "red";
+    public bool IsAmber => StatusColor == "amber";
+    public string HeadBg => IsRed ? "#D6131A" : "#191F23";
+    public string HeadFg => IsRed ? "#FFFFFF" : "#D9E1E6";
+    public string TagBg => IsRed ? "#581B1D" : IsAmber ? "#8A570F" : "#173A21";
+    public string TagBorder => IsRed ? "#A83A3E" : IsAmber ? "#CF8D28" : "#3E844A";
+    public string TagFg => IsRed ? "#FFCECE" : IsAmber ? "#FFF1C5" : "#CFFFCE";
+    public string GaugeColor => IsRed ? "#F13B3F" : IsAmber ? "#E1A334" : "#50F56E";
 
     public StationInfo(string name, string status, int samples, int review, int wait,
                        double yield, double detected, int falseCount, string desc, string color)
@@ -1109,6 +1109,9 @@ public enum OperatingMode
 
 public enum PilotIssueCategory
 {
+    UIClipping,
+    NavigationPerformance,
+    Crash,
     FalseCall,
     PossibleEscape,
     Model,
@@ -1116,6 +1119,7 @@ public enum PilotIssueCategory
     Lighting,
     Robot,
     MES,
+    Export,
     UI,
     Data,
     Performance,
@@ -1127,6 +1131,7 @@ public enum PilotIssueStatus
     Open,
     Investigating,
     Fixed,
+    Verified,
     Waived,
     Closed,
 }
@@ -1140,6 +1145,11 @@ public sealed class PilotIssue
     public string BoardModel { get; set; } = string.Empty;
     public string LotId { get; set; } = string.Empty;
     public string ImagePath { get; set; } = string.Empty;
+    public string PageName { get; set; } = string.Empty;
+    public string ReproductionSteps { get; set; } = string.Empty;
+    public string ExpectedBehavior { get; set; } = string.Empty;
+    public string ActualBehavior { get; set; } = string.Empty;
+    public string ScreenshotPath { get; set; } = string.Empty;
     public string RelatedInspectionId { get; set; } = string.Empty;
     public string RelatedAcceptanceRunId { get; set; } = string.Empty;
     public PilotIssueStatus Status { get; set; } = PilotIssueStatus.Open;
@@ -1168,6 +1178,7 @@ public sealed class PilotIssueFilter
     public string Severity { get; set; } = string.Empty;
     public string BoardModel { get; set; } = string.Empty;
     public string LotId { get; set; } = string.Empty;
+    public string PageName { get; set; } = string.Empty;
     public bool OpenOnly { get; set; }
 }
 

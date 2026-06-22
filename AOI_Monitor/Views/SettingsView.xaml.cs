@@ -1,21 +1,21 @@
-﻿using System.Windows;
-using System.Windows.Controls;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
 using System.Globalization;
+using System.IO;
 using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Markup;
 using System.Windows.Media;
-using Microsoft.Win32;
-using AOI_Monitor.Models;
 using AOI_Monitor.Data;
+using AOI_Monitor.Models;
 using AOI_Monitor.Services;
 using AOI_Monitor.ViewModels;
+using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class SettingsView : UserControl
+public partial class SettingsView : UserControl, IAsyncNavigationPage
 {
     private readonly MainViewModel _vm;
     private readonly ObservableCollection<ModelRegistryRow> _modelRegistryRows = new();
@@ -38,6 +38,7 @@ public partial class SettingsView : UserControl
         ModelRegistryGrid.ItemsSource = _modelRegistryRows;
         ThresholdProfilesGrid.ItemsSource = _thresholdProfileRows;
         ModelAcceptanceRunsGrid.ItemsSource = _modelAcceptanceRows;
+        LoadUiPreferenceSelection();
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -53,10 +54,9 @@ public partial class SettingsView : UserControl
         MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
         CentralSyncSettingsService.SettingsChanged += OnCentralSyncSettingsChanged;
         OperatingModeSettingsService.SettingsChanged += OnOperatingModeSettingsChanged;
-        RefreshWorkflowUi();
-        RefreshThresholdProfilesUi();
         ApplyLanguageVisuals();
         ApplyFontPreset();
+        _ = RefreshAsync(CancellationToken.None);
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -71,20 +71,43 @@ public partial class SettingsView : UserControl
         OperatingModeSettingsService.SettingsChanged -= OnOperatingModeSettingsChanged;
     }
 
-    private void OnWorkflowStateChanged() => Dispatcher.Invoke(RefreshWorkflowUi);
-    private void OnInspectionConfigurationChanged() => Dispatcher.Invoke(RefreshInspectionConfigurationUi);
-    private void OnModelRegistryChanged() => Dispatcher.Invoke(RefreshModelRegistryUi);
-    private void OnCameraSourceSettingsChanged() => Dispatcher.Invoke(RefreshCameraSourceUi);
-    private void OnLightingSettingsChanged() => Dispatcher.Invoke(RefreshLightingUi);
-    private void OnMesIntegrationSettingsChanged() => Dispatcher.Invoke(RefreshMesIntegrationUi);
-    private void OnCentralSyncSettingsChanged() => Dispatcher.Invoke(RefreshCentralSyncUi);
-    private void OnOperatingModeSettingsChanged() => Dispatcher.Invoke(RefreshOperatingModeUi);
+    private void OnWorkflowStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshWorkflowUi);
+    private void OnInspectionConfigurationChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshInspectionConfigurationUi);
+    private void OnModelRegistryChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, () => _ = RefreshModelRegistryUiAsync());
+    private void OnCameraSourceSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshCameraSourceUi);
+    private void OnLightingSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshLightingUi);
+    private void OnMesIntegrationSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshMesIntegrationUi);
+    private void OnCentralSyncSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshCentralSyncUi);
+    private void OnOperatingModeSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshOperatingModeUi);
+
+    public async Task OnNavigatedToAsync(CancellationToken cancellationToken)
+        => await RefreshAsync(cancellationToken);
+
+    public async Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        await Dispatcher.InvokeAsync(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RefreshWorkflowUi();
+            _ = RefreshThresholdProfilesUiAsync();
+        });
+    }
+
+    public void CancelWork()
+    {
+        _modelAcceptanceCancellation?.Cancel();
+        _cameraAcceptanceCancellation?.Cancel();
+        _lightingAcceptanceCancellation?.Cancel();
+        _robotAcceptanceCancellation?.Cancel();
+    }
 
     private void OnApply(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
         var existingConfig = InspectionModelConfigurationService.Load();
         var newConfig = BuildConfigurationFromUi();
+        var existingUiPreferences = UiPreferencesService.Load();
+        var newUiPreferences = BuildUiPreferencesFromUi();
         var existingCamera = CameraSourceSettingsService.Load();
         var newCamera = BuildCameraSourceSettingsFromUi();
         var existingLighting = LightingSettingsService.Load();
@@ -169,18 +192,19 @@ public partial class SettingsView : UserControl
             existingLighting.ResponseTimeoutMs != newLighting.ResponseTimeoutMs;
         var deploymentProfileChanged = existingDeploymentProfile != newDeploymentProfile;
         var operatingModeChanged = existingOperatingMode != newOperatingMode;
+        var uiPreferencesChanged = !UiPreferencesService.AreEquivalent(existingUiPreferences, newUiPreferences);
         var thresholdChanged =
             ComboToPriority(DetectionPriorityCombo.SelectedIndex) != state.DetectionPriority ||
             Math.Abs(existingConfig.ConfidenceThreshold - newConfig.ConfidenceThreshold) > 0.0001;
 
-        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || lightingConfigChanged || mesConfigChanged || centralSyncConfigChanged || deploymentProfileChanged || operatingModeChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, deployment target, operating mode, camera source, lighting sync, MES integration, or central sync settings"))
+        if ((storageRootChanged || modelConfigChanged || cameraConfigChanged || lightingConfigChanged || mesConfigChanged || centralSyncConfigChanged || deploymentProfileChanged || operatingModeChanged || uiPreferencesChanged) && !Authorize(RoleAuthorization.CanManageSettings, "Changing database/vault/model paths, selected model engine, deployment target, operating mode, display assets, camera source, lighting sync, MES integration, or central sync settings"))
             return;
 
         if (thresholdChanged && !Authorize(RoleAuthorization.CanChangeThresholds, "Changing inspection thresholds or detection priority"))
             return;
 
+        UiPreferencesService.Save(newUiPreferences);
         ApplyLanguageVisuals();
-        ApplyFontPreset();
         if (!ApplyStorageRoot(newStorageRoot, storageRootChanged))
             return;
 
@@ -196,13 +220,26 @@ public partial class SettingsView : UserControl
 
         if (!state.TrySetDetectionPriority(ComboToPriority(DetectionPriorityCombo.SelectedIndex), out var message))
         {
-            MessageBox.Show($"Display settings applied.\n{message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(BuildSettingsAppliedMessage(message), "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
             RefreshWorkflowUi();
             return;
         }
 
         RefreshWorkflowUi();
-        MessageBox.Show($"Display settings applied.\n{message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show(BuildSettingsAppliedMessage(message), "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void OnCancel(object sender, RoutedEventArgs e)
+    {
+        LoadUiPreferenceSelection();
+        RefreshWorkflowUi();
+        ApplyLanguageVisuals();
+        ApplyFontPreset();
+        MessageBox.Show(
+            TextFor("Unapplied settings were discarded.", "\uC801\uC6A9\uD558\uC9C0 \uC54A\uC740 \uC124\uC815\uC744 \uCDE8\uC18C\uD588\uC2B5\uB2C8\uB2E4."),
+            "AOI Monitor",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void OnReset(object sender, RoutedEventArgs e)
@@ -212,6 +249,13 @@ public partial class SettingsView : UserControl
 
         LangCombo.SelectedIndex = 0;
         FontCombo.SelectedIndex = 1;
+        ResolutionCombo.SelectedIndex = 0;
+        ThemeCombo.SelectedIndex = 0;
+        ConsoleTitleText.Text = UiPreferenceDefaults.ConsoleTitle;
+        StationNameText.Text = UiPreferenceDefaults.StationDisplayName;
+        StationSubtitleText.Text = UiPreferenceDefaults.StationSubtitle;
+        AccentColorText.Text = UiPreferenceDefaults.AccentColor;
+        BrandLogoPathText.Text = string.Empty;
         DetectionPriorityCombo.SelectedIndex = 0;
         DeploymentProfileCombo.SelectedIndex = 0;
         OperatingModeCombo.SelectedIndex = 0;
@@ -282,8 +326,8 @@ public partial class SettingsView : UserControl
         DeploymentProfileSettingsService.Save(DeploymentProfile.Stage1ImageValidation);
         OperatingModeSettingsService.Save(OperatingMode.Demo, WorkflowState.Instance.OperatorWithRole);
 
+        SaveUiPreferenceSelection();
         ApplyLanguageVisuals();
-        ApplyFontPreset();
 
         var state = WorkflowState.Instance;
         if (!state.TrySetDetectionPriority(Models.DetectionPriority.MinimizeFalsePositives, out var message))
@@ -309,6 +353,17 @@ public partial class SettingsView : UserControl
         wizard.ShowDialog();
         RefreshWorkflowUi();
     }
+
+    private void OnOpenInstallNotesClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Opening installation notes"))
+            return;
+
+        _vm.CurrentPage = "install";
+    }
+
+    private void OnOpenGuideClick(object sender, RoutedEventArgs e)
+        => _vm.CurrentPage = "guide";
 
     private void OnExportDiagnosticsClick(object sender, RoutedEventArgs e)
     {
@@ -430,7 +485,7 @@ public partial class SettingsView : UserControl
             _pendingRestoreBackupPath = null;
             ApplyRestoreBtn.IsEnabled = false;
             RefreshWorkflowUi();
-            RefreshThresholdProfilesUi();
+            _ = RefreshThresholdProfilesUiAsync();
             MessageBox.Show("Configuration restored. Restart the app before production use so all integration boundaries reload cleanly.", "AOI Monitor Restore", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
@@ -471,7 +526,7 @@ public partial class SettingsView : UserControl
             _pendingRestoreBackupPath = null;
             ApplyRestoreBtn.IsEnabled = false;
             RefreshWorkflowUi();
-            RefreshThresholdProfilesUi();
+            _ = RefreshThresholdProfilesUiAsync();
             MessageBox.Show("Configuration restore rolled back. Restart the app before production use so all integration boundaries reload cleanly.", "AOI Monitor Restore Rollback", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
@@ -611,6 +666,21 @@ public partial class SettingsView : UserControl
             StorageRootText.Text = dialog.FolderName;
     }
 
+    private void OnBrowseBrandLogoClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Changing the client-visible logo asset"))
+            return;
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select client logo image",
+            Filter = "Image files|*.png;*.jpg;*.jpeg;*.bmp|All files|*.*",
+        };
+
+        if (dialog.ShowDialog() == true)
+            BrandLogoPathText.Text = dialog.FileName;
+    }
+
     private void OnBrowseLabelMapClick(object sender, RoutedEventArgs e)
     {
         if (!Authorize(RoleAuthorization.CanManageSettings, "Changing label map path"))
@@ -690,7 +760,7 @@ public partial class SettingsView : UserControl
         {
             var request = BuildModelRegistrationRequestFromUi();
             var entry = ModelRegistryService.Register(request);
-            RefreshModelRegistryUi();
+            _ = RefreshModelRegistryUiAsync();
             ModelRegistryGrid.SelectedItem = _modelRegistryRows.FirstOrDefault(row => row.ModelId == entry.ModelId);
             WorkflowState.Instance.AddEvent("MODEL_REGISTRY", $"Registered model {entry.ModelId}; version {entry.Version}; status {entry.ValidationStatus}.");
             MessageBox.Show(
@@ -720,7 +790,7 @@ public partial class SettingsView : UserControl
         {
             var result = ModelLifecycleService.ValidateRuntime(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
             RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
-            RefreshModelRegistryUi();
+            _ = RefreshModelRegistryUiAsync();
             WorkflowState.Instance.AddEvent("MODEL_CHECK", $"Registered model validation: {row.ModelId}; {result.DisplayStatus}. {result.Message}");
             MessageBox.Show(
                 $"{result.DisplayStatus}\n\n{result.Message}",
@@ -760,7 +830,7 @@ public partial class SettingsView : UserControl
         }
 
         RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
-        RefreshModelRegistryUi();
+        _ = RefreshModelRegistryUiAsync();
         WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT", $"Active model set to {row.ModelId}. ONNX inference remains gated by validation status.");
         MessageBox.Show(
             $"Active model set.\n\nModel ID: {row.ModelId}\nRun Validate before using it for accepted ONNX inference.",
@@ -859,7 +929,7 @@ public partial class SettingsView : UserControl
         {
             var package = ModelAcceptanceService.CreateReleasePackage(latest.Id, outputDialog.FolderName, WorkflowState.Instance.OperatorWithRole);
             RefreshModelAcceptanceRunsUi();
-            RefreshModelRegistryUi();
+            _ = RefreshModelRegistryUiAsync();
             WorkflowState.Instance.AddEvent("MODEL_RELEASE_PACKAGE", $"Model release package created: model={package.ModelId}; status={package.Status}.");
             MessageBox.Show($"Model release package created:\n{package.PackagePath}", "Model Release", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -893,7 +963,7 @@ public partial class SettingsView : UserControl
         {
             ModelAcceptanceService.PromoteToProductionCandidate(latest.Id, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
             RefreshModelAcceptanceRunsUi();
-            RefreshModelRegistryUi();
+            _ = RefreshModelRegistryUiAsync();
             WorkflowState.Instance.AddEvent("MODEL_PRODUCTION_CANDIDATE", $"Promoted model acceptance run {latest.Id} for {latest.ModelId}.");
             MessageBox.Show("Model acceptance run promoted to production candidate.", "Model Acceptance", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -937,7 +1007,7 @@ public partial class SettingsView : UserControl
 
             ModelLifecycleService.DeployModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
             RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
-            RefreshModelRegistryUi();
+            _ = RefreshModelRegistryUiAsync();
             WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT", $"Deployed model {row.ModelId} through lifecycle approval.");
             MessageBox.Show("Model deployed. Full automation readiness still depends on PASS acceptance and other factory evidence.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -979,7 +1049,7 @@ public partial class SettingsView : UserControl
         {
             ModelLifecycleService.DeployModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole, reason, waiverExpiresAtUtc, riskClassification);
             RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
-            RefreshModelRegistryUi();
+            _ = RefreshModelRegistryUiAsync();
             WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT_WAIVER", $"Deployed model {row.ModelId} with Admin waiver risk={riskClassification}; expiring {waiverExpiresAtUtc:O}. Full automation remains blocked without real PASS evidence.");
             MessageBox.Show("Model deployed with waiver. Readiness packages will show this waiver and will not claim full production readiness.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
@@ -1008,7 +1078,7 @@ public partial class SettingsView : UserControl
         {
             ModelLifecycleService.RetireModel(row.ModelId, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole, reason);
             RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
-            RefreshModelRegistryUi();
+            _ = RefreshModelRegistryUiAsync();
             WorkflowState.Instance.AddEvent("MODEL_RETIRED", $"Retired model {row.ModelId}.");
             MessageBox.Show("Model retired and removed from active use.", "Model Lifecycle", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -1351,7 +1421,7 @@ public partial class SettingsView : UserControl
 
         RefreshRoleControls();
         RefreshInspectionConfigurationUi();
-        RefreshModelRegistryUi();
+        _ = RefreshModelRegistryUiAsync();
         RefreshModelAcceptanceRunsUi();
         RefreshCameraSourceUi();
         RefreshLightingUi();
@@ -1420,6 +1490,12 @@ public partial class SettingsView : UserControl
         MesRetryBackoffText.IsEnabled = canManageSettings;
         MesAutoUploadCheck.IsEnabled = canManageSettings;
         TestMesRestBtn.IsEnabled = canManageSettings;
+        ConsoleTitleText.IsEnabled = canManageSettings;
+        StationNameText.IsEnabled = canManageSettings;
+        StationSubtitleText.IsEnabled = canManageSettings;
+        AccentColorText.IsEnabled = canManageSettings;
+        BrandLogoPathText.IsEnabled = canManageSettings;
+        BrowseBrandLogoBtn.IsEnabled = canManageSettings;
         CentralSyncModeCombo.IsEnabled = canManageSettings;
         CentralSyncEndpointText.IsEnabled = canManageSettings;
         CentralSyncStationIdText.IsEnabled = canManageSettings;
@@ -1453,6 +1529,8 @@ public partial class SettingsView : UserControl
         RegisterModelBtn.IsEnabled = canManageSettings;
         SetActiveModelBtn.IsEnabled = canManageSettings;
         RunSetupWizardBtn.IsEnabled = canManageSettings;
+        OpenInstallNotesBtn.IsEnabled = canManageSettings;
+        OpenGuideBtn.IsEnabled = true;
         ExportDiagnosticsBtn.IsEnabled = canManageSettings;
         BackupConfigurationBtn.IsEnabled = canManageSettings;
         RestoreConfigurationPreviewBtn.IsEnabled = canManageSettings;
@@ -1510,23 +1588,30 @@ public partial class SettingsView : UserControl
         }
     }
 
-    private void RefreshThresholdProfilesUi()
+    private async Task RefreshThresholdProfilesUiAsync()
     {
         var selected = (ThresholdProfilesGrid.SelectedItem as ThresholdProfileRow)?.ProfileId;
         _thresholdProfileRows.Clear();
         try
         {
-            foreach (var profile in AoiDatabase.GetThresholdProfiles())
-                _thresholdProfileRows.Add(new ThresholdProfileRow(profile));
+            var boardProgram = WorkflowState.Instance.BoardProgram;
+            var snapshot = await Task.Run(() =>
+            {
+                var profiles = AoiDatabase.GetThresholdProfiles().Select(profile => new ThresholdProfileRow(profile)).ToArray();
+                var active = AoiDatabase.GetActiveThresholdProfile("ANY", boardProgram, "ANY")
+                    ?? AoiDatabase.GetActiveThresholdProfile("ANY", "ANY", "ANY");
+                return (Profiles: profiles, Active: active);
+            });
+
+            foreach (var profile in snapshot.Profiles)
+                _thresholdProfileRows.Add(profile);
 
             if (!string.IsNullOrWhiteSpace(selected))
                 ThresholdProfilesGrid.SelectedItem = _thresholdProfileRows.FirstOrDefault(row => row.ProfileId == selected);
 
-            var active = AoiDatabase.GetActiveThresholdProfile("ANY", WorkflowState.Instance.BoardProgram, "ANY")
-                ?? AoiDatabase.GetActiveThresholdProfile("ANY", "ANY", "ANY");
-            ActiveThresholdProfileText.Text = active is null
+            ActiveThresholdProfileText.Text = snapshot.Active is null
                 ? "Active profile: none"
-                : $"Active profile: {active.ProfileId} / {active.Revision} ({active.Status})";
+                : $"Active profile: {snapshot.Active.ProfileId} / {snapshot.Active.Revision} ({snapshot.Active.Status})";
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
         {
@@ -1545,7 +1630,7 @@ public partial class SettingsView : UserControl
         try
         {
             ThresholdProfileService.ApproveProfile(row.ProfileId, row.Revision, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
-            RefreshThresholdProfilesUi();
+            _ = RefreshThresholdProfilesUiAsync();
             MessageBox.Show("Threshold profile approved.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
@@ -1573,7 +1658,7 @@ public partial class SettingsView : UserControl
                 return;
 
             ThresholdProfileService.DeployProfile(row.ProfileId, row.Revision, WorkflowState.Instance.CurrentRole, WorkflowState.Instance.OperatorWithRole);
-            RefreshThresholdProfilesUi();
+            _ = RefreshThresholdProfilesUiAsync();
             MessageBox.Show("Threshold profile deployed.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException)
@@ -1611,15 +1696,16 @@ public partial class SettingsView : UserControl
         ModelCheckMessageText.Text = configuration.LastModelCheckMessage;
     }
 
-    private void RefreshModelRegistryUi()
+    private async Task RefreshModelRegistryUiAsync()
     {
         var selectedModelId = (ModelRegistryGrid.SelectedItem as ModelRegistryRow)?.ModelId;
         _modelRegistryRows.Clear();
 
         try
         {
-            foreach (var model in ModelRegistryService.GetModels())
-                _modelRegistryRows.Add(new ModelRegistryRow(model));
+            var models = await Task.Run(() => ModelRegistryService.GetModels().Select(model => new ModelRegistryRow(model)).ToArray());
+            foreach (var model in models)
+                _modelRegistryRows.Add(model);
 
             if (!string.IsNullOrWhiteSpace(selectedModelId))
             {
@@ -1946,16 +2032,35 @@ public partial class SettingsView : UserControl
             return;
         }
 
-        var controller = LightingControllerFactory.Create(settings);
-        var result = await LightingSynchronizationService.SynchronizeAsync(controller, settings, "Top");
-        LightingDiagnosticsText.Text = $"{result.Message} Status={result.Status}.";
-        LightingSettingsStatusText.Text = $"Lighting: {IntegrationStatusDisplay(result.Status)}";
-        LightingSettingsStatusText.Foreground = IntegrationStatusBrush(result.Status);
-        MessageBox.Show(
-            LightingDiagnosticsText.Text,
-            "Lighting Test",
-            MessageBoxButton.OK,
-            result.Status is IntegrationConnectionStatus.Ready or IntegrationConnectionStatus.Simulated ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        var button = sender as Button;
+        await ErrorBoundaryService.SafeAsyncCommand(
+            "Test lighting synchronization",
+            "Settings",
+            async token =>
+            {
+                var controller = LightingControllerFactory.Create(settings);
+                var result = await LightingSynchronizationService.SynchronizeAsync(controller, settings, "Top", token);
+                LightingDiagnosticsText.Text = $"{result.Message} Status={result.Status}.";
+                LightingSettingsStatusText.Text = $"Lighting: {IntegrationStatusDisplay(result.Status)}";
+                LightingSettingsStatusText.Foreground = IntegrationStatusBrush(result.Status);
+                WorkflowState.Instance.AddEvent("LIGHTING_TEST", LightingDiagnosticsText.Text);
+                MessageBox.Show(
+                    LightingDiagnosticsText.Text,
+                    "Lighting Test",
+                    MessageBoxButton.OK,
+                    result.Status is IntegrationConnectionStatus.Ready or IntegrationConnectionStatus.Simulated ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            },
+            running =>
+            {
+                if (button is not null)
+                    button.IsEnabled = !running;
+            },
+            message =>
+            {
+                LightingDiagnosticsText.Text = message;
+                LightingSettingsStatusText.Text = "Lighting: Error";
+                LightingSettingsStatusText.Foreground = Brushes.IndianRed;
+            });
     }
 
     private async void OnRunLightingAcceptanceClick(object sender, RoutedEventArgs e)
@@ -2315,7 +2420,6 @@ public partial class SettingsView : UserControl
             return;
         }
 
-        MesIntegrationSettingsService.Save(settings);
         var payload = new TraceabilityPayload
         {
             IntegrationMode = TraceabilityUploadService.ToDisplay(settings.Mode),
@@ -2330,21 +2434,28 @@ public partial class SettingsView : UserControl
             SourceNotice = "Settings test payload generated by AOI Monitor. No production inspection result.",
         };
 
-        try
-        {
-            var outcome = await TraceabilityUploadService.UploadAsync(payload);
-            MesDiagnosticsText.Text = $"{outcome.Result.Message} Payload={outcome.PayloadPath}";
-            MessageBox.Show(
-                MesDiagnosticsText.Text,
-                "MES Integration Test",
-                MessageBoxButton.OK,
-                outcome.Result.Accepted ? MessageBoxImage.Information : MessageBoxImage.Warning);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
-        {
-            MesDiagnosticsText.Text = $"MES test failed safely: {ex.Message}";
-            MessageBox.Show(MesDiagnosticsText.Text, "MES Integration Test", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
+        var button = sender as Button;
+        await ErrorBoundaryService.SafeAsyncCommand(
+            "Test MES integration",
+            "Settings",
+            async token =>
+            {
+                MesIntegrationSettingsService.Save(settings);
+                var outcome = await TraceabilityUploadService.UploadAsync(payload, token);
+                MesDiagnosticsText.Text = $"{outcome.Result.Message} Payload={outcome.PayloadPath}";
+                WorkflowState.Instance.AddEvent("MES_TEST", MesDiagnosticsText.Text);
+                MessageBox.Show(
+                    MesDiagnosticsText.Text,
+                    "MES Integration Test",
+                    MessageBoxButton.OK,
+                    outcome.Result.Accepted ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            },
+            running =>
+            {
+                if (button is not null)
+                    button.IsEnabled = !running;
+            },
+            message => MesDiagnosticsText.Text = message);
     }
 
     private MesIntegrationSettings BuildMesIntegrationSettingsFromUi()
@@ -2632,27 +2743,61 @@ public partial class SettingsView : UserControl
         var languageFont = _isKorean ? new FontFamily("Malgun Gothic, Segoe UI") : new FontFamily("Segoe UI");
         LangCombo.FontFamily = languageFont;
         FontCombo.FontFamily = languageFont;
+        ResolutionCombo.FontFamily = languageFont;
+        ThemeCombo.FontFamily = languageFont;
         DetectionPriorityCombo.FontFamily = languageFont;
         InspectionEngineCombo.FontFamily = languageFont;
         MesModeCombo.FontFamily = languageFont;
 
         DisplayLanguageHeaderText.Text = TextFor("Display / Language", "\uD654\uBA74 / \uC5B8\uC5B4");
         LanguageLabelText.Text = TextFor("Language", "\uC5B8\uC5B4");
+        ResolutionLabelText.Text = TextFor("Resolution", "\uD574\uC0C1\uB3C4");
+        ThemeLabelText.Text = TextFor("Theme", "\uD14C\uB9C8");
         FontSizeLabelText.Text = TextFor("Font Size", "\uAE00\uC790 \uD06C\uAE30");
+        ProgramAssetsHeaderText.Text = TextFor("Program Assets", "\uD504\uB85C\uADF8\uB7A8 \uC790\uC0B0");
+        ConsoleTitleLabelText.Text = TextFor("Console Title", "\uCF58\uC194 \uC81C\uBAA9");
+        StationLabelText.Text = TextFor("Station Label", "\uC2A4\uD14C\uC774\uC158 \uB77C\uBCA8");
+        StationSubtitleLabelText.Text = TextFor("Station Subtitle", "\uC2A4\uD14C\uC774\uC158 \uC124\uBA85");
+        AccentColorLabelText.Text = TextFor("Accent Color", "\uAC15\uC870 \uC0C9\uC0C1");
+        LogoImageLabelText.Text = TextFor("Logo Image", "\uB85C\uACE0 \uC774\uBBF8\uC9C0");
+        BrowseBrandLogoBtn.Content = TextFor("Browse", "\uCC3E\uC544\uBCF4\uAE30");
+        ProgramAssetsPolicyText.Text = TextFor(
+            "Changes are staged until Apply. Cancel discards edits and restores the last saved asset settings.",
+            "\uBCC0\uACBD\uC0AC\uD56D\uC740 \uC801\uC6A9\uC744 \uB204\uB974\uAE30 \uC804\uAE4C\uC9C0 \uB300\uAE30\uB429\uB2C8\uB2E4. \uCDE8\uC18C\uB294 \uD3B8\uC9D1\uC744 \uBC84\uB9AC\uACE0 \uB9C8\uC9C0\uB9C9\uC73C\uB85C \uC800\uC7A5\uB41C \uC790\uC0B0 \uC124\uC815\uC744 \uBCF5\uC6D0\uD569\uB2C8\uB2E4.");
         StoragePathLabelText.Text = TextFor("Storage Path", "\uC800\uC7A5 \uACBD\uB85C");
         ReviewDefaultLabelText.Text = TextFor("Review Default", "\uAC80\uD1A0 \uAE30\uBCF8\uAC12");
         DetectionPriorityLabelText.Text = TextFor("Detection Priority", "\uAC80\uCD9C \uC6B0\uC120\uC21C\uC704");
+        RunSetupWizardBtn.Content = TextFor("Run Setup Wizard Again", "\uC124\uCE58 \uB9C8\uBC95\uC0AC \uB2E4\uC2DC \uC2E4\uD589");
+        OpenInstallNotesBtn.Content = TextFor("Installation Notes", "\uC124\uCE58 \uB178\uD2B8");
+        OpenGuideBtn.Content = TextFor("Open Guide", "\uAC00\uC774\uB4DC \uC5F4\uAE30");
+        ExportDiagnosticsBtn.Content = TextFor("Export Diagnostics Report", "\uC9C4\uB2E8 \uBCF4\uACE0\uC11C \uB0B4\uBCF4\uB0B4\uAE30");
+        BackupConfigurationBtn.Content = TextFor("Backup Configuration", "\uAD6C\uC131 \uBC31\uC5C5");
+        RestoreConfigurationPreviewBtn.Content = TextFor("Restore Configuration Preview", "\uAD6C\uC131 \uBCF5\uC6D0 \uBBF8\uB9AC\uBCF4\uAE30");
+        ApplyRestoreBtn.Content = TextFor("Apply Restore", "\uBCF5\uC6D0 \uC801\uC6A9");
+        RollbackRestoreBtn.Content = TextFor("Rollback Last Restore", "\uB9C8\uC9C0\uB9C9 \uBCF5\uC6D0 \uB864\uBC31");
+        ExportSupportBundleBtn.Content = TextFor("Export Support Bundle", "\uC9C0\uC6D0 \uBC88\uB4E4 \uB0B4\uBCF4\uB0B4\uAE30");
         ApplyBtn.Content = TextFor("Apply", "\uC801\uC6A9");
+        CancelBtn.Content = TextFor("Cancel", "\uCDE8\uC18C");
         ResetBtn.Content = TextFor("Reset", "\uCD08\uAE30\uD654");
+        var localizationScope = TextFor(
+            "Language/font changes are applied after pressing Apply. Supported shell, page, table, and Settings labels update immediately; technical codes and evidence IDs remain English for traceability.",
+            "\uC5B8\uC5B4/\uAE00\uAF34 \uC124\uC815\uC740 \uC801\uC6A9\uC744 \uB204\uB978 \uB4A4 \uBC18\uC601\uB429\uB2C8\uB2E4. \uC9C0\uC6D0\uB418\uB294 \uC178, \uD398\uC774\uC9C0, \uD45C, \uC124\uC815 \uB77C\uBCA8\uC740 \uC989\uC2DC \uBC14\uB00C\uBA70, \uAE30\uC220 \uCF54\uB4DC\uC640 \uC99D\uBE59 ID\uB294 \uCD94\uC801\uC131\uC744 \uC704\uD574 \uC601\uC5B4\uB85C \uC720\uC9C0\uB429\uB2C8\uB2E4.");
+        LocalizationStatusText.Text = localizationScope;
+        LocalizationScopeText.Text = localizationScope;
 
         SetComboItemText(LangCombo, 0, "English");
         SetComboItemText(LangCombo, 1, TextFor("Korean", "\uD55C\uAD6D\uC5B4"));
 
         if (_isKorean)
         {
-            SetComboItemText(FontCombo, 0, "\uC791\uAC8C");
-            SetComboItemText(FontCombo, 1, "\uAE30\uBCF8");
-            SetComboItemText(FontCombo, 2, "\uD06C\uAC8C");
+            SetComboItemText(FontCombo, 0, "\uCD5C\uC18C 14pt");
+            SetComboItemText(FontCombo, 1, "\uD45C\uC900 15pt");
+            SetComboItemText(FontCombo, 2, "\uD06C\uAC8C 17pt");
+            SetComboItemText(ResolutionCombo, 0, "1920 x 1080 \uCD5C\uC18C HMI");
+            SetComboItemText(ResolutionCombo, 1, "2560 x 1440 \uC5D4\uC9C0\uB2C8\uC5B4\uB9C1 \uBAA8\uB2C8\uD130");
+            SetComboItemText(ResolutionCombo, 2, "3840 x 2160 \uBCBD\uBA74 \uD45C\uC2DC");
+            SetComboItemText(ThemeCombo, 0, "\uC0B0\uC5C5\uC6A9 \uB2E4\uD06C");
+            SetComboItemText(ThemeCombo, 1, "\uC0B0\uC5C5\uC6A9 \uB77C\uC774\uD2B8");
 
             SetComboItemText(DetectionPriorityCombo, 0, DetectionPriorityDisplay(Models.DetectionPriority.MinimizeFalsePositives, true));
             SetComboItemText(DetectionPriorityCombo, 1, DetectionPriorityDisplay(Models.DetectionPriority.Balanced, true));
@@ -2660,9 +2805,14 @@ public partial class SettingsView : UserControl
         }
         else
         {
-            SetComboItemText(FontCombo, 0, "Compact");
-            SetComboItemText(FontCombo, 1, "Standard");
-            SetComboItemText(FontCombo, 2, "Large");
+            SetComboItemText(FontCombo, 0, "Minimum 14 pt");
+            SetComboItemText(FontCombo, 1, "Standard 15 pt");
+            SetComboItemText(FontCombo, 2, "Large 17 pt");
+            SetComboItemText(ResolutionCombo, 0, "1920 x 1080 minimum HMI");
+            SetComboItemText(ResolutionCombo, 1, "2560 x 1440 engineering monitor");
+            SetComboItemText(ResolutionCombo, 2, "3840 x 2160 wall display");
+            SetComboItemText(ThemeCombo, 0, "Industrial Dark");
+            SetComboItemText(ThemeCombo, 1, "Industrial Light");
 
             SetComboItemText(DetectionPriorityCombo, 0, "Minimize False Positives");
             SetComboItemText(DetectionPriorityCombo, 1, "Balanced");
@@ -2672,28 +2822,70 @@ public partial class SettingsView : UserControl
         ReviewDefaultText.Text = DetectionPriorityDisplay(ComboToPriority(DetectionPriorityCombo.SelectedIndex), _isKorean);
     }
 
+    private string BuildSettingsAppliedMessage(string workflowMessage)
+    {
+        var languageMessage = TextFor(
+            "Language/font settings applied. Settings and supported runtime text update immediately; some workstation labels and technical codes remain English for traceability.",
+            "\uC5B8\uC5B4/\uAE00\uAF34 \uC124\uC815\uC774 \uC801\uC6A9\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC124\uC815 \uD654\uBA74\uACFC \uC9C0\uC6D0\uB418\uB294 \uC2E4\uD589 \uD14D\uC2A4\uD2B8\uB294 \uC989\uC2DC \uBC18\uC601\uB418\uBA70, \uC77C\uBD80 \uC791\uC5C5\uC790 \uD654\uBA74 \uB77C\uBCA8\uACFC \uAE30\uC220 \uCF54\uB4DC\uB294 \uCD94\uC801\uC131\uC744 \uC704\uD574 \uC601\uC5B4\uB85C \uC720\uC9C0\uB429\uB2C8\uB2E4.");
+        var title = TextFor("Display settings applied.", "\uD654\uBA74 \uC124\uC815\uC774 \uC801\uC6A9\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+        return $"{title}\n{workflowMessage}\n\n{languageMessage}";
+    }
+
     private void ApplyFontPreset()
     {
-        if (Application.Current.MainWindow is not Window mainWindow)
-            return;
-
-        var scale = FontCombo.SelectedIndex switch
-        {
-            0 => 0.92,
-            2 => 1.08,
-            _ => 1.0,
-        };
-
-        if (mainWindow.Content is FrameworkElement root)
-            root.LayoutTransform = new ScaleTransform(scale, scale);
-
-        mainWindow.FontSize = FontCombo.SelectedIndex switch
-        {
-            0 => 12,
-            2 => 14,
-            _ => 13,
-        };
+        UiPreferencesService.ApplyToApplication(BuildUiPreferencesFromUi());
     }
+
+    private void LoadUiPreferenceSelection()
+    {
+        var preferences = UiPreferencesService.Load();
+        LangCombo.SelectedIndex = preferences.Language == UiLanguage.Korean ? 1 : 0;
+        FontCombo.SelectedIndex = preferences.FontPreset switch
+        {
+            UiFontPreset.Compact => 0,
+            UiFontPreset.Large => 2,
+            _ => 1,
+        };
+        ResolutionCombo.SelectedIndex = preferences.ResolutionPreset switch
+        {
+            UiResolutionPreset.Qhd2560x1440 => 1,
+            UiResolutionPreset.Uhd3840x2160 => 2,
+            _ => 0,
+        };
+        ThemeCombo.SelectedIndex = preferences.Theme == UiTheme.IndustrialLight ? 1 : 0;
+        ConsoleTitleText.Text = preferences.ConsoleTitle;
+        StationNameText.Text = preferences.StationDisplayName;
+        StationSubtitleText.Text = preferences.StationSubtitle;
+        AccentColorText.Text = preferences.AccentColor;
+        BrandLogoPathText.Text = preferences.BrandLogoPath;
+    }
+
+    private void SaveUiPreferenceSelection()
+        => UiPreferencesService.Save(BuildUiPreferencesFromUi());
+
+    private UiPreferences BuildUiPreferencesFromUi()
+        => new()
+        {
+            Language = LangCombo.SelectedIndex == 1 ? UiLanguage.Korean : UiLanguage.English,
+            FontPreset = FontCombo.SelectedIndex switch
+            {
+                0 => UiFontPreset.Compact,
+                2 => UiFontPreset.Large,
+                _ => UiFontPreset.Standard,
+            },
+            ResolutionPreset = ResolutionCombo.SelectedIndex switch
+            {
+                1 => UiResolutionPreset.Qhd2560x1440,
+                2 => UiResolutionPreset.Uhd3840x2160,
+                _ => UiResolutionPreset.FullHd1920x1080,
+            },
+            Theme = ThemeCombo.SelectedIndex == 1 ? UiTheme.IndustrialLight : UiTheme.IndustrialDark,
+            ConsoleTitle = ConsoleTitleText.Text,
+            StationDisplayName = StationNameText.Text,
+            StationSubtitle = StationSubtitleText.Text,
+            AccentColor = AccentColorText.Text,
+            BrandLogoPath = BrandLogoPathText.Text,
+        };
 
     private static void SetComboItemText(ComboBox comboBox, int index, string text)
     {

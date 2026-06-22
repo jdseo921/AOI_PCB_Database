@@ -401,6 +401,10 @@ public static class ExportVerificationService
             fileName.Contains("image_index", StringComparison.OrdinalIgnoreCase))
             return new[] { "Path", "Bytes", "LastWriteUtc" };
 
+        if (exportType.Contains("UiStability", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Contains("ui_stability_events", StringComparison.OrdinalIgnoreCase))
+            return new[] { "TimestampUtc", "Cycle", "PageName", "EventType", "PageLoadMilliseconds", "Status" };
+
         return new[] { "Image", "Ground Truth", "AI/Engine Result", "Inspection Engine", "Score", "Pass/Fail" };
     }
 
@@ -411,6 +415,9 @@ public static class ExportVerificationService
             return new[] { "schemaVersion", "packageId", "generatedAtUtc", "acceptanceStatus", "includedFiles" };
         if (fileName.Equals("package_manifest.json", StringComparison.OrdinalIgnoreCase))
             return new[] { "schemaVersion", "packageId", "generatedAtUtc", "includedFiles" };
+        if (exportType.Contains("StandardsTraceability", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Contains("standards_traceability_matrix", StringComparison.OrdinalIgnoreCase))
+            return new[] { "schemaVersion", "generatedAtUtc", "certificationStatement", "overallStatus", "items" };
 
         if (fileName.Contains("disposition", StringComparison.OrdinalIgnoreCase))
             return new[] { "schemaVersion", "timestampUtc", "eventType", "action" };
@@ -514,8 +521,9 @@ public static class ExportVerificationService
         {
             return JsonSerializer.Deserialize<T>(json);
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Export verification JSON deserialize fallback used for {typeof(T).Name}: {ex.Message}");
             return default;
         }
     }

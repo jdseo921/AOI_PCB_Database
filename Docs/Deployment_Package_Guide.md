@@ -14,9 +14,10 @@ This guide describes how to prepare, install, back up, restore, and roll back AO
 
 ## Package Contents
 
-Customer packages are generated with `Scripts/publish.ps1`.
+Client/evaluator handoff packages should be generated with `Scripts/prepare-client-test-package.ps1`, which wraps `Scripts/publish.ps1` with the correct client-facing docs, sample manifest template, handoff README, and optional zip output.
 
 - `app/` contains the published WPF application.
+- `CLIENT_HANDOFF_README.md` gives the shortest launch-and-test path.
 - `Docs/` is included when documentation is packaged.
 - `Templates/` is included only when adapter templates are requested for developer handoff.
 - `SampleData/customer_validation_manifest_template.csv` is included only when `-IncludeSampleManifestTemplate` is requested.
@@ -24,7 +25,15 @@ Customer packages are generated with `Scripts/publish.ps1`.
 
 Runtime data is intentionally excluded from release packages: local SQLite databases, image vaults, training images, customer images, generated exports, overlays, and machine-interface JSON.
 
-Common package commands:
+Recommended client package command:
+
+```powershell
+pwsh Scripts/prepare-client-test-package.ps1 -Zip
+```
+
+This defaults to a self-contained Windows x64 package and runs the client-demo quality gate before packaging. Use `-FrameworkDependent` only when the client PC already has the matching .NET Desktop Runtime/SDK. Use `-SkipClientDemoGate` only for internal smoke packages that will not be sent to a client.
+
+Lower-level package commands:
 
 ```powershell
 pwsh Scripts/publish.ps1 -Configuration Release

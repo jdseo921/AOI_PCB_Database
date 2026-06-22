@@ -1,6 +1,6 @@
 # AOI Monitor
 
-AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspection review workflows. It gives operators a simplified local console organized around Main Inspection, Recipe Editor, AI Model Test, Log & Export, Calibration, a 3D Profile Viewer in Sample Data Mode, and Settings / Guide.
+AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspection review workflows. It gives operators a simplified local console organized around focused workflow windows: Home, Board & Images, Run Inspection, Golden Compare, Defect Review, Recipe Rules, AI / Models, Yield Analytics, Export & Trace, Calibration, 3D Profile, Hardware Readiness, and System Settings.
 
 The application currently demonstrates the review loop with local files, local SQLite records, and clearly labeled demo placeholders where production data sources are not yet implemented. It can load a sample PCB image and a golden reference image, run the deterministic Pixel Difference Prototype Engine, optionally run a configured ONNX ML Model, produce an `OK`, `REVIEW`, or `NG` verdict, record disposition actions, collect candidate samples for local training-set export review, and write local export artifacts. It is not yet connected to live AOI hardware, cameras, PLCs, robots, conveyors, a centralized production database, or a bundled trained production ML model.
 
@@ -10,12 +10,15 @@ For the detailed feature inventory, see [IMPLEMENTED_FEATURES.md](IMPLEMENTED_FE
 
 Client/evaluator documents:
 
+- [Client Test Kit Guide](Docs/Client_Test_Kit_Guide.md)
 - [Installation Guide](Docs/Installation_Guide.md)
 - [User Manual](Docs/User_Manual.md)
 - [Stage Mapping](Docs/Stage_Mapping.md)
 - [Requirements Traceability Matrix](Docs/Requirements_Traceability_Matrix.md)
 - [Integration Boundaries](Docs/Integration_Boundaries.md)
 - [Stage 1 Acceptance Checklist](Docs/Stage1_Acceptance_Checklist.md)
+- [Design Contract](DESIGN.md)
+- [Frontend Design Review and Rework Plan](Docs/Frontend_Design_Review_and_Rework_Plan.md)
 - [Architecture Extension Guide](Docs/Architecture_Extension_Guide.md)
 - [Factory Acceptance Test Plan](Docs/Factory_Acceptance_Test_Plan.md)
 - [Developer CI and Release Checks](Docs/Developer_CI.md)
@@ -93,6 +96,14 @@ The test fixture configures `AoiDatabase` with an isolated temp folder per test 
 
 ## Publish A Shareable PoC Package
 
+For a client/evaluator handoff package, use:
+
+```powershell
+pwsh Scripts/prepare-client-test-package.ps1 -Zip
+```
+
+This creates a self-contained Windows x64 package with docs, a client handoff README, the customer validation manifest template, and client-demo quality gates enabled. Use `-SkipClientDemoGate` only for internal smoke packaging.
+
 Use the packaging script from the repository root:
 
 ```powershell
@@ -111,13 +122,13 @@ The release folder is intended to be zipped and shared. It intentionally exclude
 
 ## Basic Workflow
 
-1. Open Main Inspection from the left navigation.
-2. Use its shortcuts to open Image Library, Disposition, or Golden Compare as needed.
-3. In Image Library, choose a sample PCB image with Open Record.
+1. Open Run Inspection from the left navigation.
+2. Use Board & Images, Defect Review, or Golden Compare as needed.
+3. In Board & Images, choose a sample PCB image with Open Record.
 4. Choose a golden reference image with Compare Golden.
 5. Review the generated score, verdict, evidence, and hotspot on Golden Compare.
-6. Use Disposition to confirm, mark false calls, hold for review, or queue local candidate samples.
-7. Use Log & Export to inspect SQLite history, create CSV exports, build customer packages, and open database health.
+6. Use Defect Review to confirm, mark false calls, hold for review, or queue local candidate samples.
+7. Use Export & Trace to inspect SQLite history, create CSV exports, build customer packages, and open database health.
 
 Generated files are written below the running application's `exports/` folder, usually under:
 
@@ -133,11 +144,11 @@ Short walkthrough:
 
 1. Build the app with `dotnet build AOI_Monitor\AOI_Monitor.csproj`.
 2. Launch the app and confirm the readiness panel shows local Database and Image Vault availability.
-3. Open `Main Inspection > Image Library`, import a sample image, then select a golden/reference image with `Compare Golden`.
+3. Open `Board & Images`, import a sample image, then select a golden/reference image with `Compare Golden`.
 4. Review the Pixel Difference Prototype Engine result and defect overlay in `Golden Compare`.
-5. Open `Disposition` and record a review action or queue a local training-set export candidate.
-6. Open `AI Model Test`, select a small batch folder, and run the Stage 1 batch validation.
-7. Open `Log & Export`, export inspection/review CSV files, annotated overlays, and a customer validation package.
+5. Open `Defect Review` and record a review action or queue a local training-set export candidate.
+6. Open `AI / Models`, select a small batch folder, and run the Stage 1 batch validation.
+7. Open `Export & Trace`, export inspection/review CSV files, annotated overlays, and a customer validation package.
 
 Do not commit large demo image datasets. Keep customer/private images outside the repository and import them locally.
 
@@ -177,7 +188,7 @@ The database is initialized with tables for images, inspection results, defects,
 - If WPF build errors mention Windows targeting, run the project on Windows and build from the `AOI_Monitor` folder.
 - If images do not compare, make sure both the sample image and golden reference image are readable local image files.
 - If exports are missing, check the `exports/` folder under the executable directory, not necessarily the repository root.
-- If recipe or detection-priority controls seem locked, use the recipe lock/unlock action in the application shell or Log & Export page.
+- If recipe or detection-priority controls seem locked, use the recipe lock/unlock action in the application shell or Export & Trace page.
 - If generated reports look sparse, confirm images, inspections, and review events have been imported or saved into the local SQLite database. Remaining placeholder panels are labeled `Demo Data` or `Prototype Data`.
 - The 3D Profile Viewer supports Sample Data Mode only. Live 3D camera integration is planned Stage 2 work.
 

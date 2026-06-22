@@ -160,6 +160,14 @@ public static class CustomerValidationPackageService
         };
     }
 
+    public static async Task<CustomerValidationPackageResult> CreatePackageAsync(
+        CustomerValidationPackageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return await Task.Run(() => CreatePackage(request, cancellationToken), cancellationToken).ConfigureAwait(false);
+    }
+
     public static CustomerValidationPackageResult CreatePackage(
         CustomerValidationPackageRequest request,
         CancellationToken cancellationToken = default)

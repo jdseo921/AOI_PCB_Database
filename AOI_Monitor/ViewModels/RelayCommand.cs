@@ -15,10 +15,10 @@ public class RelayCommand : ICommand
 
     public event EventHandler? CanExecuteChanged
     {
-        add    => CommandManager.RequerySuggested += value;
+        add => CommandManager.RequerySuggested += value;
         remove => CommandManager.RequerySuggested -= value;
     }
 
     public bool CanExecute(object? p) => _canExecute?.Invoke(p) ?? true;
-    public void Execute(object? p)    => _execute(p);
+    public void Execute(object? p) => _execute(p);
 }

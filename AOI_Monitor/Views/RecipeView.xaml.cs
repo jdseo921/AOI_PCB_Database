@@ -14,7 +14,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class RecipeView : UserControl
+public partial class RecipeView : UserControl, IReleasablePageResources
 {
     private const double MinRoiPixels = 8;
     private readonly ObservableCollection<RecipeRoiRow> _rois = new();
@@ -53,7 +53,7 @@ public partial class RecipeView : UserControl
 
     private void OnWorkflowStateChanged()
     {
-        Dispatcher.Invoke(RefreshFromState);
+        UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshFromState);
     }
 
     private void LoadLatestRecipe()
@@ -117,12 +117,7 @@ public partial class RecipeView : UserControl
 
     private void LoadBackground(string path)
     {
-        var bmp = new BitmapImage();
-        bmp.BeginInit();
-        bmp.CacheOption = BitmapCacheOption.OnLoad;
-        bmp.UriSource = new Uri(path, UriKind.Absolute);
-        bmp.EndInit();
-        bmp.Freeze();
+        var bmp = ImageCacheService.LoadBitmap(path, decodePixelWidth: 1600);
 
         _backgroundImagePath = path;
         _backgroundBitmap = bmp;
@@ -136,6 +131,14 @@ public partial class RecipeView : UserControl
 
         FitToView();
         RenderRois();
+    }
+
+    public void ReleasePageResources()
+    {
+        _backgroundBitmap = null;
+        RecipeImage.Source = null;
+        RoiCanvas.Children.Clear();
+        ImageCacheService.ClearOnPageUnload();
     }
 
     private void OnCanvasLeftDown(object sender, MouseButtonEventArgs e)

@@ -8,10 +8,20 @@ public class NavPage : ViewModelBase
 {
     private bool _isActive;
     private bool _isEnabled = true;
-    public string Key      { get; set; } = "";
-    public string Number   { get; set; } = "";
-    public string Title    { get; set; } = "";
-    public string Subtitle { get; set; } = "";
+    private string _title = "";
+    private string _subtitle = "";
+    public string Key { get; set; } = "";
+    public string Number { get; set; } = "";
+    public string Title
+    {
+        get => _title;
+        set => SetField(ref _title, value);
+    }
+    public string Subtitle
+    {
+        get => _subtitle;
+        set => SetField(ref _subtitle, value);
+    }
     public bool IsEnabled
     {
         get => _isEnabled;
@@ -26,8 +36,8 @@ public class NavPage : ViewModelBase
 
 public class MainViewModel : ViewModelBase
 {
-    private string _currentPage = "monitor";
-    private string _clockText   = "00:00";
+    private string _currentPage = "home";
+    private string _clockText = "00:00";
 
     public string CurrentPage
     {
@@ -47,14 +57,19 @@ public class MainViewModel : ViewModelBase
 
     public ObservableCollection<NavPage> NavPages { get; } = new()
     {
-        new NavPage { Key="monitor",  Number="01", Title="Main Inspection",   Subtitle="review workflow" },
-        new NavPage { Key="recipe",   Number="02", Title="Recipe Editor",     Subtitle="ROI/rules" },
-        new NavPage { Key="modeltest",Number="03", Title="AI Model Test",     Subtitle="stage 1 validation" },
-        new NavPage { Key="reports",  Number="04", Title="Log & Export",      Subtitle="history/package" },
-        new NavPage { Key="pilot",    Number="05", Title="Pilot Wizard",      Subtitle="customer evidence" },
-        new NavPage { Key="profile",  Number="06", Title="3D Profile Viewer", Subtitle="sample CSV mode" },
-        new NavPage { Key="calibration", Number="07", Title="Calibration",     Subtitle="stage 2 prep" },
-        new NavPage { Key="guide",    Number="08", Title="Settings / Guide",  Subtitle="setup/docs" },
+        new NavPage { Key="home",        Number="01", Title="Home",               Subtitle="module map" },
+        new NavPage { Key="library",     Number="02", Title="Board & Images",     Subtitle="library, folders, golden refs" },
+        new NavPage { Key="monitor",     Number="03", Title="Run Inspection",     Subtitle="board execution" },
+        new NavPage { Key="compare",     Number="04", Title="Golden Compare",     Subtitle="template match, difference score" },
+        new NavPage { Key="review",      Number="05", Title="Defect Review",      Subtitle="queue, evidence, disposition" },
+        new NavPage { Key="recipe",      Number="06", Title="Recipe Rules",       Subtitle="ROI, masks, tolerances" },
+        new NavPage { Key="modeltest",   Number="07", Title="AI / Models",        Subtitle="model checks, false calls" },
+        new NavPage { Key="spc",         Number="08", Title="Yield Analytics",    Subtitle="SPC, Pareto, trends" },
+        new NavPage { Key="reports",     Number="09", Title="Export & Trace",     Subtitle="CSV, PDF, audit, MES" },
+        new NavPage { Key="calibration", Number="10", Title="Calibration",        Subtitle="2D transform, Stage 2 prep" },
+        new NavPage { Key="profile",     Number="11", Title="3D Profile",         Subtitle="height data, acceptance" },
+        new NavPage { Key="pilot",       Number="12", Title="Hardware Readiness", Subtitle="camera, lighting, robot gates" },
+        new NavPage { Key="settings",    Number="13", Title="System Settings",    Subtitle="display, storage, security" },
     };
 
     public RelayCommand NavigateCommand { get; }
@@ -62,6 +77,7 @@ public class MainViewModel : ViewModelBase
     public MainViewModel()
     {
         NavPages[0].IsActive = true;
+        RefreshLanguage(UiPreferencesService.Load().Language);
         RefreshRolePermissions(WorkflowState.Instance.CurrentRole);
         NavigateCommand = new RelayCommand(key =>
         {
@@ -79,13 +95,40 @@ public class MainViewModel : ViewModelBase
         TickClock();
     }
 
+    public void RefreshLanguage(UiLanguage language)
+    {
+        foreach (var page in NavPages)
+        {
+            (page.Title, page.Subtitle) = page.Key switch
+            {
+                "home" => T(language, "Home", "module map", "\uD648", "\uBAA8\uB4C8 \uB9F5"),
+                "library" => T(language, "Board & Images", "library, folders, golden refs", "\uBCF4\uB4DC / \uC774\uBBF8\uC9C0", "\uB77C\uC774\uBE0C\uB7EC\uB9AC/\uD3F4\uB354/\uAE30\uC900 \uC774\uBBF8\uC9C0"),
+                "monitor" => T(language, "Run Inspection", "board execution", "\uAC80\uC0AC \uC2E4\uD589", "\uBCF4\uB4DC \uC2E4\uD589"),
+                "compare" => T(language, "Golden Compare", "template match, difference score", "\uAE30\uC900 \uBE44\uAD50", "\uD15C\uD50C\uB9BF \uB9E4\uCE6D/\uCC28\uC774 \uC810\uC218"),
+                "review" => T(language, "Defect Review", "queue, evidence, disposition", "\uACB0\uD568 \uAC80\uD1A0", "\uB300\uAE30\uC5F4/\uC99D\uBE59/\uCC98\uBD84"),
+                "recipe" => T(language, "Recipe Rules", "ROI, masks, tolerances", "\uB808\uC2DC\uD53C \uADDC\uCE59", "ROI/\uB9C8\uC2A4\uD06C/\uACF5\uCC28"),
+                "modeltest" => T(language, "AI / Models", "model checks, false calls", "AI / \uBAA8\uB378", "\uBAA8\uB378 \uC810\uAC80/\uD5C8\uC704 \uAC80\uCD9C"),
+                "spc" => T(language, "Yield Analytics", "SPC, Pareto, trends", "\uC218\uC728 \uBD84\uC11D", "SPC/\uD30C\uB808\uD1A0/\uCD94\uC138"),
+                "reports" => T(language, "Export & Trace", "CSV, PDF, audit, MES", "\uB0B4\uBCF4\uB0B4\uAE30 / \uCD94\uC801", "CSV/PDF/\uAC10\uC0AC/MES"),
+                "calibration" => T(language, "Calibration", "2D transform, Stage 2 prep", "\uBCF4\uC815", "2D \uBCC0\uD658/2\uB2E8\uACC4 \uC900\uBE44"),
+                "profile" => T(language, "3D Profile", "height data, acceptance", "3D \uD504\uB85C\uD30C\uC77C", "\uB192\uC774 \uB370\uC774\uD130/\uC2B9\uC778"),
+                "pilot" => T(language, "Hardware Readiness", "camera, lighting, robot gates", "\uD558\uB4DC\uC6E8\uC5B4 \uC900\uBE44\uC131", "\uCE74\uBA54\uB77C/\uC870\uBA85/\uB85C\uBD07 \uAC8C\uC774\uD2B8"),
+                "settings" => T(language, "System Settings", "display, storage, security", "\uC2DC\uC2A4\uD15C \uC124\uC815", "\uD654\uBA74/\uC800\uC7A5\uC18C/\uBCF4\uC548"),
+                _ => T(language, page.Key, "", page.Key, ""),
+            };
+        }
+    }
+
+    private static (string Title, string Subtitle) T(UiLanguage language, string englishTitle, string englishSubtitle, string koreanTitle, string koreanSubtitle)
+        => language == UiLanguage.Korean ? (koreanTitle, koreanSubtitle) : (englishTitle, englishSubtitle);
+
     public void RefreshRolePermissions(UserRole role)
     {
         foreach (var page in NavPages)
             page.IsEnabled = RoleAuthorization.CanAccessPage(role, page.Key);
 
         if (!RoleAuthorization.CanAccessPage(role, CurrentPage))
-            CurrentPage = "monitor";
+            CurrentPage = "home";
     }
 
     private void TickClock()
@@ -101,9 +144,7 @@ public class MainViewModel : ViewModelBase
 
         return navKey switch
         {
-            "monitor" => currentPage is "review" or "compare" or "library",
-            "reports" => currentPage == "spc",
-            "guide" => currentPage is "settings" or "install",
+            "settings" => currentPage is "settings" or "install" or "guide",
             _ => false,
         };
     }

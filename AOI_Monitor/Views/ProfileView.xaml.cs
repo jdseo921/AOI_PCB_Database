@@ -12,7 +12,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class ProfileView : UserControl
+public partial class ProfileView : UserControl, IReleasablePageResources
 {
     private readonly Dictionary<(int X, int Y), double> _points = new();
     private int _minX;
@@ -272,6 +272,14 @@ public partial class ProfileView : UserControl
         var g = (byte)(80 + 120 * (1.0 - Math.Abs(t - 0.5) * 2.0));
         var b = (byte)(220 * (1.0 - t));
         return Color.FromRgb(r, g, b);
+    }
+
+    public void ReleasePageResources()
+    {
+        HeightMapImage.Source = null;
+        SelectionOverlay.Children.Clear();
+        ProfileCanvas.Children.Clear();
+        EmptyMapText.Visibility = Visibility.Visible;
     }
 
     private void OnHeightMapClick(object sender, MouseButtonEventArgs e)

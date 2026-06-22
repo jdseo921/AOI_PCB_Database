@@ -1,12 +1,12 @@
-﻿using System.Windows;
+using System.IO;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.IO;
-using Microsoft.Win32;
 using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
+using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
@@ -95,7 +95,7 @@ public partial class CompareView : UserControl
         OnExportPairClick(this, new RoutedEventArgs());
     }
 
-    private void OnStateChanged() => Dispatcher.Invoke(RefreshFromState);
+    private void OnStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshFromState);
 
     private void OnSyncZoomClick(object sender, RoutedEventArgs e)
     {

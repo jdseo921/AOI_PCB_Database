@@ -478,7 +478,7 @@ public partial class LibraryView : UserControl
 
         try
         {
-            var previewBitmap = LoadPreviewBitmap(path, 1400);
+            var previewBitmap = ImageCacheService.LoadBitmap(path, decodePixelWidth: 1400);
             var image = new System.Windows.Controls.Image
             {
                 Stretch = System.Windows.Media.Stretch.Uniform,
@@ -507,18 +507,6 @@ public partial class LibraryView : UserControl
         {
             MessageBox.Show($"Image preview failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
-    }
-
-    private static BitmapImage LoadPreviewBitmap(string path, int decodePixelWidth)
-    {
-        var bmp = new BitmapImage();
-        bmp.BeginInit();
-        bmp.CacheOption = BitmapCacheOption.OnLoad;
-        bmp.UriSource = new Uri(path, UriKind.Absolute);
-        bmp.DecodePixelWidth = decodePixelWidth;
-        bmp.EndInit();
-        bmp.Freeze();
-        return bmp;
     }
 
     private static string EscapeCsv(string value)

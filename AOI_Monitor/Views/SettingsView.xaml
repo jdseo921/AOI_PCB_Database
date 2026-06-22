@@ -1,658 +1,1016 @@
-﻿<UserControl x:Class="AOI_Monitor.Views.SettingsView"
+<UserControl x:Class="AOI_Monitor.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="#0B0E10">
+             Background="{DynamicResource Bg}">
   <UserControl.Resources>
-    <Style x:Key="SettingsCombo" TargetType="ComboBox">
-      <Setter Property="Background" Value="#0F1316"/>
-      <Setter Property="Foreground" Value="#E7EDF2"/>
-      <Setter Property="BorderBrush" Value="#4A535C"/>
+    <Style x:Key="SettingsPanel" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource CellBg}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
       <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="MinHeight" Value="28"/>
-      <Setter Property="Padding" Value="6,3"/>
-      <Setter Property="FontFamily" Value="Segoe UI"/>
-      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Padding" Value="12"/>
+      <Setter Property="Margin" Value="0,0,0,10"/>
+      <Setter Property="MinHeight" Value="54"/>
+    </Style>
+
+    <Style x:Key="SettingsField" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource Frame2Bg}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="10"/>
+      <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+
+    <Style x:Key="SettingsLabel" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="SettingsValueText" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <Style x:Key="SettingsCombo" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+      <Setter Property="Background" Value="{DynamicResource CellBg}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
+      <Setter Property="MinHeight" Value="38"/>
+      <Setter Property="FontSize" Value="14"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style x:Key="SettingsComboItem" TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+      <Setter Property="MinHeight" Value="34"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="Background" Value="{DynamicResource CellBg}"/>
+    </Style>
+
+    <Style x:Key="SettingsPasswordBox" TargetType="PasswordBox">
+      <Setter Property="Background" Value="{DynamicResource CellBg}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="MinHeight" Value="34"/>
+      <Setter Property="Padding" Value="8,5"/>
+      <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+      <Setter Property="MinHeight" Value="42"/>
+      <Setter Property="MinWidth" Value="120"/>
+      <Setter Property="Padding" Value="14,8"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="Background" Value="{DynamicResource CellBg}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
+      <Setter Property="HeaderTemplate">
+        <Setter.Value>
+          <DataTemplate>
+            <TextBlock Text="{Binding}"
+                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                       TextWrapping="NoWrap"
+                       TextTrimming="None"
+                       MinHeight="20"
+                       VerticalAlignment="Center"/>
+          </DataTemplate>
+        </Setter.Value>
+      </Setter>
       <Setter Property="Template">
         <Setter.Value>
-          <ControlTemplate TargetType="ComboBox">
-            <Grid>
-              <ToggleButton x:Name="ToggleButton"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            Foreground="{TemplateBinding Foreground}"
-                            IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                            Focusable="False" ClickMode="Press">
-                <ToggleButton.Template>
-                  <ControlTemplate TargetType="ToggleButton">
-                    <Border Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}">
-                      <Grid>
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="*"/>
-                          <ColumnDefinition Width="20"/>
-                        </Grid.ColumnDefinitions>
-                        <Path Grid.Column="1" Data="M 0 0 L 4 4 L 8 0 Z"
-                              Fill="#9AA6AF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                      </Grid>
-                    </Border>
-                  </ControlTemplate>
-                </ToggleButton.Template>
-              </ToggleButton>
-              <ContentPresenter x:Name="ContentSite"
-                                IsHitTestVisible="False"
-                                Content="{TemplateBinding SelectionBoxItem}"
-                                ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                Margin="8,3,24,3"
-                                VerticalAlignment="Center"
-                                HorizontalAlignment="Left"
-                                TextBlock.Foreground="#E7EDF2"/>
-              <Popup x:Name="Popup" Placement="Bottom"
-                     IsOpen="{TemplateBinding IsDropDownOpen}"
-                     AllowsTransparency="True" Focusable="False"
-                     PopupAnimation="Slide">
-                <Grid x:Name="DropDown" SnapsToDevicePixels="True"
-                      MinWidth="{TemplateBinding ActualWidth}"
-                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                  <Border Background="#0F1316" BorderBrush="#4A535C" BorderThickness="1">
-                    <ScrollViewer SnapsToDevicePixels="True">
-                      <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
-                    </ScrollViewer>
-                  </Border>
-                </Grid>
-              </Popup>
-            </Grid>
+          <ControlTemplate TargetType="TabItem">
+            <Border x:Name="TabFrame"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="1"
+                    MinHeight="{TemplateBinding MinHeight}"
+                    MinWidth="{TemplateBinding MinWidth}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter ContentSource="Header"
+                                HorizontalAlignment="Center"
+                                RecognizesAccessKey="True"
+                                VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="TabFrame" Property="Background" Value="#17324A"/>
+                <Setter TargetName="TabFrame" Property="BorderBrush" Value="{DynamicResource BlueBrush}"/>
+                <Setter Property="Foreground" Value="#F7FAFC"/>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="TabFrame" Property="Background" Value="#1E2D38"/>
+                <Setter TargetName="TabFrame" Property="BorderBrush" Value="{DynamicResource BlueBrush}"/>
+                <Setter Property="Foreground" Value="#F7FAFC"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource DimBrush}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
       </Setter>
     </Style>
-    <Style x:Key="SettingsComboItem" TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
-      <Setter Property="Background" Value="#101417"/>
-      <Setter Property="Foreground" Value="#E7EDF2"/>
-      <Style.Triggers>
-        <Trigger Property="IsHighlighted" Value="True">
-          <Setter Property="Background" Value="#2E5E80"/>
-          <Setter Property="Foreground" Value="#FFFFFF"/>
-        </Trigger>
-        <Trigger Property="IsSelected" Value="True">
-          <Setter Property="Background" Value="#1E4966"/>
-          <Setter Property="Foreground" Value="#FFFFFF"/>
-        </Trigger>
-      </Style.Triggers>
-    </Style>
   </UserControl.Resources>
-  <Grid Margin="8">
-    <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/>
-    </Grid.ColumnDefinitions>
 
-    <!-- Settings form -->
-    <Border Grid.Column="0" Style="{StaticResource Panel}">
+  <Grid Margin="10">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="10"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="10"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <Border Grid.Row="0" Style="{StaticResource SettingsPanel}">
       <Grid>
-        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock x:Name="DisplayLanguageHeaderText" Text="Display / Language" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-        </Border>
-        <StackPanel Grid.Row="1" Margin="12">
-          <Grid Margin="0,0,0,10">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <TextBlock x:Name="LanguageLabelText" Text="Language" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-            <ComboBox Grid.Column="1" x:Name="LangCombo" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}">English</ComboBoxItem>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}">Korean</ComboBoxItem>
-            </ComboBox>
-          </Grid>
-          <Grid Margin="0,0,0,10">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <TextBlock x:Name="FontSizeLabelText" Text="Font Size" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-            <ComboBox Grid.Column="1" x:Name="FontCombo" SelectedIndex="1" Style="{StaticResource SettingsCombo}">
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}">Compact</ComboBoxItem>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}">Standard</ComboBoxItem>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}">Large</ComboBoxItem>
-            </ComboBox>
-          </Grid>
-          <Grid Margin="0,0,0,10">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
-            <TextBlock x:Name="StoragePathLabelText" Text="Storage Path" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-            <TextBox x:Name="StorageRootText" Grid.Column="1" MinHeight="28" ToolTip="Local database, image vault, settings, and export storage root."/>
-            <Button x:Name="BrowseStorageRootBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseStorageRootClick"/>
-          </Grid>
-          <Grid>
-            <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <TextBlock x:Name="ReviewDefaultLabelText" Text="Review Default" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-            <TextBox x:Name="ReviewDefaultText" Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="Minimize False Positives"/>
-          </Grid>
-          <Grid Margin="0,10,0,0">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <TextBlock x:Name="DetectionPriorityLabelText" Text="Detection Priority" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-            <ComboBox x:Name="DetectionPriorityCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Minimize False Positives"/>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Balanced"/>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Maximize Defect Recall"/>
-            </ComboBox>
-          </Grid>
-          <Grid Margin="0,10,0,0">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <TextBlock Text="Deployment Target" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-            <ComboBox x:Name="DeploymentProfileCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 1 Customer Data Validation"/>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 2 Camera Pilot"/>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 3 Robot Cell Pilot"/>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 4 MES Traceability Pilot"/>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Full Factory Automation"/>
-            </ComboBox>
-          </Grid>
-          <Grid Margin="0,10,0,0">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <TextBlock Text="Operating Mode" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-            <ComboBox x:Name="OperatingModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Demo"/>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pilot"/>
-              <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Production"/>
-            </ComboBox>
-          </Grid>
-          <TextBlock x:Name="OperatingModePolicyText" Text="Demo Mode allows sample data, demo role selection, and simulated sources." Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="140,4,0,0"/>
-          <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
-            <StackPanel>
-              <TextBlock Text="Defect Taxonomy" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,6"/>
-              <TextBlock x:Name="TaxonomySummaryText" Text="Active taxonomy not loaded." Foreground="#DCE5EB" FontSize="11.5" TextWrapping="Wrap" Margin="0,0,0,8"/>
-              <WrapPanel>
-                <Button x:Name="ImportTaxonomyBtn" Style="{StaticResource MiniBtn}" Content="Import CSV" Margin="0,0,6,0" Click="OnImportTaxonomyClick"/>
-                <Button x:Name="ExportTaxonomyBtn" Style="{StaticResource MiniBtn}" Content="Export CSV" Click="OnExportTaxonomyClick"/>
-              </WrapPanel>
-              <TextBlock Text="Engineer/Admin only. Label aliases, customer display names, model label IDs, and MES defect codes are audited through the active taxonomy." Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
-            </StackPanel>
-          </Border>
-          <Border Style="{StaticResource FieldBox}" Margin="0,12,0,0">
-            <StackPanel>
-              <TextBlock Text="Inspection Engine Configuration" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Selected Engine" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <ComboBox x:Name="InspectionEngineCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pixel Difference Prototype Engine"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="ONNX ML Model"/>
-                </ComboBox>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Model Path" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="ModelPathText" Grid.Column="1" MinHeight="28"/>
-                <Button x:Name="BrowseModelBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseModelClick"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Model Version" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="ModelVersionText" Grid.Column="1" MinHeight="28" Text="UNCONFIGURED"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Label Map Path" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="LabelMapPathText" Grid.Column="1" MinHeight="28"/>
-                <Button x:Name="BrowseLabelMapBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseLabelMapClick"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Confidence" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="ConfidenceThresholdText" Grid.Column="1" MinHeight="28" Text="0.65"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Input Size" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="InputWidthText" Grid.Column="1" MinHeight="28" Text="640"/>
-                <TextBox x:Name="InputHeightText" Grid.Column="3" MinHeight="28" Text="640"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Input Tensor" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="InputTensorNameText" Grid.Column="1" MinHeight="28" ToolTip="Required for model readiness test."/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Output Tensor" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="OutputTensorNameText" Grid.Column="1" MinHeight="28" ToolTip="Required for model readiness test."/>
-              </Grid>
-              <UniformGrid Columns="2">
-                <TextBlock Text="Runtime status" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="EngineRuntimeStatusText" Text="Pixel Difference Prototype Engine" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
-                <TextBlock Text="Saved version" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="EngineVersionText" Text="PIXEL_DIFF_0.1" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
-                <TextBlock Text="Last model check" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="ModelCheckResultText" Text="Not Tested" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
-                <TextBlock Text="Checked at" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="ModelCheckTimestampText" Text="--" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
-              </UniformGrid>
-              <TextBlock x:Name="ModelCheckMessageText" Text="No model configuration test has been run." Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
-              <TextBlock Text="Local Model Registry" Foreground="#7F8C95" FontSize="10" Margin="0,10,0,6"/>
-              <DataGrid x:Name="ModelRegistryGrid" Height="132" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" CanUserAddRows="False">
-                <DataGrid.Columns>
-                  <DataGridTextColumn Header="Model" Binding="{Binding DisplayName}" Width="*"/>
-                  <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="85"/>
-                  <DataGridTextColumn Header="Lifecycle" Binding="{Binding LifecycleState}" Width="128"/>
-                  <DataGridTextColumn Header="Runtime" Binding="{Binding ValidationStatus}" Width="90"/>
-                  <DataGridTextColumn Header="Acceptance" Binding="{Binding LatestAcceptanceStatus}" Width="92"/>
-                  <DataGridTextColumn Header="Run" Binding="{Binding LatestAcceptanceRunDisplay}" Width="58"/>
-                  <DataGridTextColumn Header="Release" Binding="{Binding ReleasePackageDisplay}" Width="92"/>
-                  <DataGridTextColumn Header="Waiver" Binding="{Binding WaiverDisplay}" Width="120"/>
-                  <DataGridTextColumn Header="Threshold" Binding="{Binding ThresholdDisplay}" Width="78"/>
-                  <DataGridTextColumn Header="Active" Binding="{Binding ActiveDisplay}" Width="58"/>
-                </DataGrid.Columns>
-              </DataGrid>
-              <WrapPanel Margin="0,6,0,0">
-                <Button x:Name="RegisterModelBtn" Style="{StaticResource MiniBtnGreen}" Content="Register Model" Margin="0,0,6,6" Click="OnRegisterModelClick"/>
-                <Button x:Name="ValidateRegisteredModelBtn" Style="{StaticResource MiniBtn}" Content="Validate" Margin="0,0,6,6" Click="OnValidateRegisteredModelClick"/>
-                <Button x:Name="SetActiveModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Set Active" Margin="0,0,6,6" Click="OnSetActiveModelClick"/>
-                <Button x:Name="RunModelAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Run Model Acceptance" Margin="0,0,6,6" Click="OnRunModelAcceptanceClick"/>
-                <Button x:Name="CancelModelAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel Acceptance" Margin="0,0,6,6" Click="OnCancelModelAcceptanceClick" IsEnabled="False"/>
-                <Button x:Name="ViewModelAcceptanceRunsBtn" Style="{StaticResource MiniBtn}" Content="View Acceptance Runs" Margin="0,0,6,6" Click="OnViewModelAcceptanceRunsClick"/>
-                <Button x:Name="CreateModelReleasePackageBtn" Style="{StaticResource MiniBtnGreen}" Content="Create Model Release Package" Margin="0,0,6,6" Click="OnCreateModelReleasePackageClick"/>
-                <Button x:Name="PromoteProductionCandidateBtn" Style="{StaticResource MiniBtnAmber}" Content="Promote to Production Candidate" Margin="0,0,6,6" Click="OnPromoteProductionCandidateClick"/>
-                <Button x:Name="DeployModelBtn" Style="{StaticResource MiniBtnGreen}" Content="Deploy" Margin="0,0,6,6" Click="OnDeployModelClick"/>
-                <Button x:Name="WaiveDeployModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Deploy with Waiver" Margin="0,0,6,6" Click="OnWaiveDeployModelClick"/>
-                <Button x:Name="RetireModelBtn" Style="{StaticResource MiniBtn}" Content="Retire" Margin="0,0,0,6" Click="OnRetireModelClick"/>
-              </WrapPanel>
-              <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                <ProgressBar x:Name="ModelAcceptanceProgressBar" Width="170" Height="12" Minimum="0" Maximum="100" Value="0" IsIndeterminate="False" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                <TextBlock x:Name="ModelAcceptanceProgressText" Text="Model acceptance idle." Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap" VerticalAlignment="Center"/>
-              </StackPanel>
-              <DataGrid x:Name="ModelAcceptanceRunsGrid" Height="82" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" CanUserAddRows="False" Margin="0,4,0,0">
-                <DataGrid.Columns>
-                  <DataGridTextColumn Header="Run" Binding="{Binding Id}" Width="50"/>
-                  <DataGridTextColumn Header="Model" Binding="{Binding ModelId}" Width="*"/>
-                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
-                  <DataGridTextColumn Header="Dataset" Binding="{Binding DatasetName}" Width="110"/>
-                  <DataGridTextColumn Header="Candidate" Binding="{Binding CandidateDisplay}" Width="80"/>
-                </DataGrid.Columns>
-              </DataGrid>
-            </StackPanel>
-          </Border>
-          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-            <Button x:Name="ApplyBtn" Style="{StaticResource ActionBtnGreen}" Content="Apply" Click="OnApply" Margin="0,0,8,0"/>
-            <Button x:Name="TestModelBtn" Style="{StaticResource ActionBtnBlue}" Content="Test Model Configuration" Click="OnTestModelConfigurationClick" Margin="0,0,8,0"/>
-            <Button x:Name="ResetBtn" Style="{StaticResource ActionBtn}" Content="Reset" Click="OnReset" Margin="0,0,8,0"/>
-            <Button x:Name="RunSetupWizardBtn" Style="{StaticResource ActionBtnAmber}" Content="Run Setup Wizard Again" Click="OnRunSetupWizardClick" Margin="0,0,8,0"/>
-            <Button x:Name="ExportDiagnosticsBtn" Style="{StaticResource ActionBtn}" Content="Export Diagnostics Report" Click="OnExportDiagnosticsClick" Margin="0,0,8,0"/>
-            <Button x:Name="BackupConfigurationBtn" Style="{StaticResource ActionBtnGreen}" Content="Backup Configuration" Click="OnBackupConfigurationClick" Margin="0,0,8,0"/>
-            <Button x:Name="RestoreConfigurationPreviewBtn" Style="{StaticResource ActionBtnAmber}" Content="Restore Configuration Preview" Click="OnRestoreConfigurationPreviewClick" Margin="0,0,8,0"/>
-            <Button x:Name="ApplyRestoreBtn" Style="{StaticResource ActionBtnGreen}" Content="Apply Restore" Click="OnApplyRestoreClick" Margin="0,0,8,0" IsEnabled="False"/>
-            <Button x:Name="RollbackRestoreBtn" Style="{StaticResource ActionBtnAmber}" Content="Rollback Last Restore" Click="OnRollbackRestoreClick" Margin="0,0,8,0"/>
-            <CheckBox x:Name="SupportBundleRedactPathsCheck" Content="Redact image/storage paths" IsChecked="True" Foreground="#DCE5EB" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <CheckBox x:Name="SupportBundleIncludeModelsCheck" Content="Include model files" Foreground="#DCE5EB" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <Button x:Name="ExportSupportBundleBtn" Style="{StaticResource ActionBtn}" Content="Export Support Bundle" Click="OnExportSupportBundleClick"/>
-          </StackPanel>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="420"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock Text="Settings Control Center" Style="{StaticResource HmiPageTitleText}"/>
+          <TextBlock Text="Settings are staged by category. Apply writes changes through the existing services; Cancel reloads the last saved values."
+                     Style="{StaticResource HmiPageSubtitleText}" Margin="0,6,0,0"/>
         </StackPanel>
+        <Border Grid.Column="1" Style="{StaticResource HmiStatusInfo}" Padding="12" Margin="16,0,0,0">
+          <StackPanel>
+            <TextBlock Text="Staged changes" FontWeight="ExtraBold"/>
+            <TextBlock x:Name="SettingsStagedStatusText"
+                       Text="Apply writes settings and refreshes the shell. Cancel restores the last saved values."
+                       Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,0"/>
+          </StackPanel>
+        </Border>
       </Grid>
     </Border>
 
-    <!-- Candidate queue + Notes -->
-    <Border Grid.Column="2" Style="{StaticResource Panel}">
-      <Grid>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="25"/>
-          <RowDefinition Height="Auto"/>
-          <RowDefinition Height="8"/>
-          <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Training Set Export / Policy" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
-        </Border>
-        <StackPanel Grid.Row="1" Margin="8">
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-            <StackPanel>
-              <DockPanel Margin="0,0,0,6">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                  <Button x:Name="ApproveThresholdProfileBtn" Style="{StaticResource MiniBtn}" Content="Approve" Margin="0,0,6,0" Click="OnApproveThresholdProfileClick"/>
-                  <Button x:Name="DeployThresholdProfileBtn" Style="{StaticResource MiniBtnAmber}" Content="Deploy" Click="OnDeployThresholdProfileClick"/>
-                </StackPanel>
+    <TabControl x:Name="SettingsCategoryTabs" Grid.Row="2">
+      <TabItem Header="Basics">
+        <ScrollViewer Style="{StaticResource FactoryScrollablePage}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <Grid Margin="10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="12"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+              <Border Style="{StaticResource SettingsPanel}">
                 <StackPanel>
-                  <TextBlock Text="Threshold Profiles" Foreground="#7F8C95" FontSize="10"/>
-                  <TextBlock x:Name="ActiveThresholdProfileText" Text="Active profile: none" Foreground="#9AA6AF" FontSize="10.5"/>
+                  <TextBlock x:Name="DisplayLanguageHeaderText" Text="Display / Language" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="Resolution, language, theme, and font choices are staged until Apply." Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="LanguageLabelText" Text="Language" Style="{StaticResource SettingsLabel}"/>
+                    <ComboBox Grid.Column="1" x:Name="LangCombo" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">English</ComboBoxItem>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Korean</ComboBoxItem>
+                    </ComboBox>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="ResolutionLabelText" Text="Resolution" Style="{StaticResource SettingsLabel}"/>
+                    <ComboBox Grid.Column="1" x:Name="ResolutionCombo" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="1920 x 1080 minimum HMI"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="2560 x 1440 engineering monitor"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="3840 x 2160 wall display"/>
+                    </ComboBox>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="ThemeLabelText" Text="Theme" Style="{StaticResource SettingsLabel}"/>
+                    <ComboBox Grid.Column="1" x:Name="ThemeCombo" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Industrial Dark"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Industrial Light"/>
+                    </ComboBox>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="FontSizeLabelText" Text="Font Size" Style="{StaticResource SettingsLabel}"/>
+                    <ComboBox Grid.Column="1" x:Name="FontCombo" SelectedIndex="1" Style="{StaticResource SettingsCombo}">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Minimum 14 pt</ComboBoxItem>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Standard 15 pt</ComboBoxItem>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Large 17 pt</ComboBoxItem>
+                    </ComboBox>
+                  </Grid>
+
+                  <TextBlock x:Name="LocalizationStatusText"
+                             Text="Language/font changes are applied after pressing Apply. Supported shell, page, table, and Settings labels update immediately; technical codes and evidence IDs remain English for traceability."
+                             Style="{StaticResource HmiTechnicalHintText}"/>
                 </StackPanel>
-              </DockPanel>
-              <DataGrid x:Name="ThresholdProfilesGrid" Height="116" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" CanUserAddRows="False">
-                <DataGrid.Columns>
-                  <DataGridTextColumn Header="Profile" Binding="{Binding ProfileId}" Width="*"/>
-                  <DataGridTextColumn Header="Rev" Binding="{Binding Revision}" Width="62"/>
-                  <DataGridTextColumn Header="Board Model" Binding="{Binding BoardModel}" Width="100"/>
-                  <DataGridTextColumn Header="Board Program" Binding="{Binding BoardProgram}" Width="105"/>
-                  <DataGridTextColumn Header="Recipe" Binding="{Binding RecipeName}" Width="96"/>
-                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="78"/>
-                  <DataGridTextColumn Header="Created By" Binding="{Binding CreatedBy}" Width="120"/>
-                  <DataGridTextColumn Header="Approved By" Binding="{Binding ApprovedBy}" Width="120"/>
-                  <DataGridTextColumn Header="Deployed" Binding="{Binding Deployed}" Width="72"/>
-                  <DataGridTextColumn Header="FC Run" Binding="{Binding SourceFalseCallReductionRunDisplay}" Width="70"/>
-                  <DataGridTextColumn Header="Validation Run" Binding="{Binding SourceValidationRunDisplay}" Width="88"/>
-                  <DataGridTextColumn Header="Rules" Binding="{Binding RuleCount}" Width="52"/>
-                </DataGrid.Columns>
-              </DataGrid>
+              </Border>
+
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Basics" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="Storage, operating mode, and deployment profile affect readiness gates and audit records." Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="98"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="StoragePathLabelText" Text="Storage Path" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="StorageRootText" Grid.Column="1" MinHeight="34" ToolTip="Local database, image vault, settings, and export storage root."/>
+                    <Button x:Name="BrowseStorageRootBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseStorageRootClick"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Deployment Target" Style="{StaticResource SettingsLabel}" ToolTip="Selects the evidence stage expected by Factory Readiness. It does not certify production release by itself."/>
+                    <ComboBox x:Name="DeploymentProfileCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 1 Customer Data Validation"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 2 Camera Pilot"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 3 Robot Cell Pilot"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 4 MES Traceability Pilot"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Full Factory Automation"/>
+                    </ComboBox>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Operating Mode" Style="{StaticResource SettingsLabel}" ToolTip="Demo allows sample/mock sources. Pilot requires clear labels. Production blocks demo/fallback evidence where possible."/>
+                    <ComboBox x:Name="OperatingModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Demo"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pilot"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Production"/>
+                    </ComboBox>
+                  </Grid>
+
+                  <TextBlock x:Name="OperatingModePolicyText"
+                             Text="Demo Mode allows sample data, demo role selection, and simulated sources."
+                             Foreground="#E1A334" FontSize="14" TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
             </StackPanel>
-          </Border>
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-            <StackPanel>
-              <TextBlock Text="Camera Source" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Mode" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <ComboBox x:Name="CameraSourceCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="No Camera / Not Connected"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Folder Simulation"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Generic Vision Adapter (Real Hardware)"/>
-                </ComboBox>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Top Folder" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraTopFolderText" Grid.Column="1" MinHeight="28"/>
-                <Button x:Name="BrowseCameraTopBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseCameraTopClick"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Side Folder" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraSideFolderText" Grid.Column="1" MinHeight="28"/>
-                <Button x:Name="BrowseCameraSideBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseCameraSideClick"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Bottom Folder" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraBottomFolderText" Grid.Column="1" MinHeight="28"/>
-                <Button x:Name="BrowseCameraBottomBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseCameraBottomClick"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Top Device ID" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraTopDeviceIdText" Grid.Column="1" MinHeight="28" ToolTip="Stage 2 generic adapter device identifier. This does not imply camera connection."/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Side Device ID" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraSideDeviceIdText" Grid.Column="1" MinHeight="28"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Bottom Device ID" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraBottomDeviceIdText" Grid.Column="1" MinHeight="28"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Adapter Folder" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraAdapterFolderText" Grid.Column="1" MinHeight="28" ToolTip="External folder containing a camera_adapter_manifest.json or *.camera-adapter.json manifest."/>
-                <Button x:Name="BrowseCameraAdapterBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="6,0,0,0" Click="OnBrowseCameraAdapterClick"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Acquisition" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <ComboBox x:Name="CameraAcquisitionModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Continuous"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Software Trigger"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Hardware Trigger"/>
-                </ComboBox>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Exposure / Gain" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraExposureMsText" Grid.Column="1" MinHeight="28" Text="5.0" ToolTip="Exposure in milliseconds."/>
-                <TextBox x:Name="CameraGainText" Grid.Column="3" MinHeight="28" Text="1.0"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Timeouts ms" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraTriggerTimeoutMsText" Grid.Column="1" MinHeight="28" Text="250" ToolTip="Trigger timeout in milliseconds."/>
-                <TextBox x:Name="CameraFrameTimeoutMsText" Grid.Column="3" MinHeight="28" Text="1000" ToolTip="Frame timeout in milliseconds."/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Board Model" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraBoardModelText" Grid.Column="1" MinHeight="28" Text="TBOX-MAIN"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Lot ID" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CameraLotIdText" Grid.Column="1" MinHeight="28" Text="POC-LOT"/>
-              </Grid>
-              <UniformGrid Columns="2">
-                <TextBlock Text="Source status" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="CameraSourceStatusText" Text="Not Connected" FontWeight="Bold" FontSize="11.5" Foreground="#F27777" HorizontalAlignment="Right"/>
-                <TextBlock Text="Acceptance" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="CameraAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
-              </UniformGrid>
-              <WrapPanel Margin="0,6,0,0">
-                <Button x:Name="TestCameraSourceBtn" Style="{StaticResource MiniBtn}" Content="Test Camera Source" Margin="0,0,6,6" Click="OnTestCameraSourceClick"/>
-                <Button x:Name="DiscoverCameraAdaptersBtn" Style="{StaticResource MiniBtn}" Content="Discover Adapters" Margin="0,0,6,6" Click="OnDiscoverCameraAdaptersClick"/>
-                <Button x:Name="DiscoverCamerasBtn" Style="{StaticResource MiniBtn}" Content="Discover Cameras" Margin="0,0,6,6" Click="OnDiscoverCamerasClick"/>
-                <Button x:Name="RunCameraAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Camera Acceptance Test" Margin="0,0,6,6" Click="OnRunCameraAcceptanceClick"/>
-                <Button x:Name="CancelCameraAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,6,6" Click="OnCancelCameraAcceptanceClick" IsEnabled="False"/>
-                <Button x:Name="ExportCameraAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" Margin="0,0,0,6" Click="OnExportCameraAcceptanceClick"/>
-                <Button x:Name="ExportHardwareAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Hardware Acceptance Package" Margin="6,0,0,6" Click="OnExportHardwareAcceptanceClick"/>
-              </WrapPanel>
-              <TextBlock x:Name="CameraDiagnosticsText" Text="Generic adapter configured is not the same as camera connected." Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
+
+            <StackPanel Grid.Column="2">
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock x:Name="ProgramAssetsHeaderText" Text="Program Assets" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="Client-visible identity can be customized without changing code." Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="ConsoleTitleLabelText" Text="Console Title" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="ConsoleTitleText" Grid.Column="1" MinHeight="34" ToolTip="Client-visible title in the persistent header."/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="StationLabelText" Text="Station Label" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="StationNameText" Grid.Column="1" MinHeight="34" ToolTip="Short station label shown in the sidebar."/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="StationSubtitleLabelText" Text="Station Subtitle" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="StationSubtitleText" Grid.Column="1" MinHeight="34" ToolTip="Secondary station description shown under the station label."/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="AccentColorLabelText" Text="Accent Color" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="AccentColorText" Grid.Column="1" MinHeight="34" ToolTip="Hex color used for client branding accents. Example: #5CA0D3."/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="98"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="LogoImageLabelText" Text="Logo Image" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="BrandLogoPathText" Grid.Column="1" MinHeight="34" ToolTip="Optional PNG/JPG logo used in the persistent header."/>
+                    <Button x:Name="BrowseBrandLogoBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseBrandLogoClick"/>
+                  </Grid>
+
+                  <TextBlock x:Name="ProgramAssetsPolicyText"
+                             Text="Changes are staged until Apply. Cancel discards edits and restores the last saved asset settings."
+                             Foreground="#E1A334" FontSize="14" TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
+
             </StackPanel>
-          </Border>
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-            <StackPanel>
-              <TextBlock Text="Lighting Sync (Stage 2 Boundary)" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Mode" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <ComboBox x:Name="LightingModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="None / Not Connected"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Simulated"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="TCP Text Protocol (Real Hardware)"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Serial Text Protocol (Real Hardware)"/>
-                </ComboBox>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="70"/></Grid.ColumnDefinitions>
-                <TextBlock Text="TCP Host / Port" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="LightingTcpHostText" Grid.Column="1" MinHeight="28"/>
-                <TextBox x:Name="LightingTcpPortText" Grid.Column="3" MinHeight="28" Text="5025"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Serial / Baud" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="LightingSerialPortText" Grid.Column="1" MinHeight="28"/>
-                <TextBox x:Name="LightingBaudRateText" Grid.Column="3" MinHeight="28" Text="9600"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Programs" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="LightingTopProgramText" Grid.Column="1" MinHeight="28" Text="TOP"/>
-                <TextBox x:Name="LightingSideProgramText" Grid.Column="3" MinHeight="28" Text="SIDE"/>
-                <TextBox x:Name="LightingBottomProgramText" Grid.Column="5" MinHeight="28" Text="BOTTOM"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Command" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="LightingCommandTemplateText" Grid.Column="1" MinHeight="28" Text="SET {view} {program}\n" ToolTip="Template supports {view}, {program}, \n and \r."/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Timeout ms" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="LightingTimeoutMsText" Grid.Column="1" MinHeight="28" Text="500"/>
-              </Grid>
-              <UniformGrid Columns="2">
-                <TextBlock Text="Lighting status" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="LightingSettingsStatusText" Text="Lighting: Not Connected" FontWeight="Bold" FontSize="11.5" Foreground="#F27777" HorizontalAlignment="Right"/>
-                <TextBlock Text="Sync acceptance" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="LightingAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
-              </UniformGrid>
-              <WrapPanel Margin="0,6,0,0">
-                <Button x:Name="TestLightingBtn" Style="{StaticResource MiniBtn}" Content="Test Lighting" Margin="0,0,6,6" Click="OnTestLightingClick"/>
-                <Button x:Name="RunLightingAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Lighting Sync Test" Margin="0,0,6,6" Click="OnRunLightingAcceptanceClick"/>
-                <Button x:Name="CancelLightingAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,6,6" Click="OnCancelLightingAcceptanceClick" IsEnabled="False"/>
-                <Button x:Name="ExportLightingAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" Margin="0,0,0,6" Click="OnExportLightingAcceptanceClick"/>
-              </WrapPanel>
-              <TextBlock x:Name="LightingDiagnosticsText" Text="Simulated mode is not real hardware. TCP/serial commands are sent only when explicitly configured." Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="QOL">
+        <ScrollViewer Style="{StaticResource FactoryScrollablePage}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <Grid Margin="10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="12"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Style="{StaticResource SettingsPanel}">
+              <StackPanel>
+                <TextBlock Text="QOL" Style="{StaticResource HmiSectionHeaderText}"/>
+                <TextBlock Text="Operator comfort defaults that do not hide audit or hardware boundary information." Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="170"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock x:Name="ReviewDefaultLabelText" Text="Review Default" Style="{StaticResource SettingsLabel}"/>
+                  <TextBox x:Name="ReviewDefaultText" Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="Minimize False Positives"/>
+                </Grid>
+
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="170"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock x:Name="DetectionPriorityLabelText" Text="Detection Priority" Style="{StaticResource SettingsLabel}"/>
+                  <ComboBox x:Name="DetectionPriorityCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Minimize False Positives"/>
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Balanced"/>
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Maximize Defect Recall"/>
+                  </ComboBox>
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource SettingsPanel}">
+              <StackPanel>
+                <TextBlock Text="Operator Guardrails" Style="{StaticResource HmiSectionHeaderText}"/>
+                <TextBlock Text="Comfort settings cannot suppress critical alarms, hide simulated hardware banners, remove export verification, or bypass audit evidence."
+                           Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+                <CheckBox Content="Keep critical alarms pinned" IsChecked="True" IsEnabled="False"/>
+                <CheckBox Content="Keep simulated hardware boundary visible" IsChecked="True" IsEnabled="False"/>
+                <CheckBox Content="Keep failed quality gates visible" IsChecked="True" IsEnabled="False"/>
+              </StackPanel>
+            </Border>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="AI">
+        <ScrollViewer Style="{StaticResource FactoryScrollablePage}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <Grid Margin="10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="12"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Inspection Engine Configuration" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="ONNX is the production ML path. Pixel Difference remains a clearly labeled prototype fallback." Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Selected Engine" Style="{StaticResource SettingsLabel}"/>
+                    <ComboBox x:Name="InspectionEngineCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}" ToolTip="ONNX is the supported ML model format. Pixel Difference is a prototype fallback engine.">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pixel Difference Prototype Engine"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="ONNX ML Model"/>
+                    </ComboBox>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Model Path" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="ModelPathText" Grid.Column="1" MinHeight="34"/>
+                    <Button x:Name="BrowseModelBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseModelClick"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Model Version" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="ModelVersionText" Grid.Column="1" MinHeight="34" Text="UNCONFIGURED"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Label Map Path" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="LabelMapPathText" Grid.Column="1" MinHeight="34"/>
+                    <Button x:Name="BrowseLabelMapBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseLabelMapClick"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Confidence" Style="{StaticResource SettingsLabel}" ToolTip="Threshold: the score limit used to decide OK, REVIEW, or NG."/>
+                    <TextBox x:Name="ConfidenceThresholdText" Grid.Column="1" MinHeight="34" Text="0.65" ToolTip="Threshold value. Higher values usually reduce false calls but may increase possible escapes."/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Input Size" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="InputWidthText" Grid.Column="1" MinHeight="34" Text="640"/>
+                    <TextBox x:Name="InputHeightText" Grid.Column="3" MinHeight="34" Text="640"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Input Tensor" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="InputTensorNameText" Grid.Column="1" MinHeight="34" ToolTip="Required for model readiness test."/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Output Tensor" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="OutputTensorNameText" Grid.Column="1" MinHeight="34" ToolTip="Required for model readiness test."/>
+                  </Grid>
+
+                  <UniformGrid Columns="2" Margin="0,4,0,0">
+                    <TextBlock Text="Runtime status" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="EngineRuntimeStatusText" Text="Pixel Difference Prototype Engine" FontWeight="Bold" FontSize="14" Foreground="#E1A334" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock Text="Saved version" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="EngineVersionText" Text="PIXEL_DIFF_0.1" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock Text="Last model check" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="ModelCheckResultText" Text="Not Tested" FontWeight="Bold" FontSize="14" Foreground="#E1A334" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock Text="Checked at" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="ModelCheckTimestampText" Text="--" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                  </UniformGrid>
+                  <TextBlock x:Name="ModelCheckMessageText" Text="No model configuration test has been run." Style="{StaticResource HmiTechnicalHintText}" Margin="0,8,0,0"/>
+                  <Button x:Name="TestModelBtn" Style="{StaticResource ActionBtnBlue}" Content="Test Model Configuration" Click="OnTestModelConfigurationClick" Margin="0,10,0,0" HorizontalAlignment="Left"/>
+                </StackPanel>
+              </Border>
+
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Defect Taxonomy" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock x:Name="TaxonomySummaryText" Text="Active taxonomy not loaded." Style="{StaticResource HmiTechnicalHintText}" Margin="0,6,0,8"/>
+                  <WrapPanel>
+                    <Button x:Name="ImportTaxonomyBtn" Style="{StaticResource MiniBtn}" Content="Import CSV" Margin="0,0,8,8" Click="OnImportTaxonomyClick"/>
+                    <Button x:Name="ExportTaxonomyBtn" Style="{StaticResource MiniBtn}" Content="Export CSV" Margin="0,0,0,8" Click="OnExportTaxonomyClick"/>
+                  </WrapPanel>
+                  <TextBlock Text="Engineer/Admin only. Label aliases, customer display names, model label IDs, and MES defect codes are audited through the active taxonomy."
+                             Foreground="#E1A334" FontSize="14" TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
             </StackPanel>
-          </Border>
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-            <StackPanel>
-              <TextBlock Text="Robot Cell Acceptance (Stage 3 Boundary)" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
-              <UniformGrid Columns="2">
-                <TextBlock Text="Robot acceptance" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="RobotAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
-                <TextBlock Text="Evidence boundary" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock Text="Simulation is not production robot validation" FontWeight="Bold" FontSize="11.5" Foreground="#E1A334" HorizontalAlignment="Right"/>
-              </UniformGrid>
-              <WrapPanel Margin="0,6,0,0">
-                <Button x:Name="RunRobotCellAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Robot Cell Acceptance" Margin="0,0,6,6" Click="OnRunRobotCellAcceptanceClick"/>
-                <Button x:Name="CancelRobotCellAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,6,6" Click="OnCancelRobotCellAcceptanceClick" IsEnabled="False"/>
-                <Button x:Name="ExportRobotCellAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" Margin="0,0,0,6" Click="OnExportRobotCellAcceptanceClick"/>
-              </WrapPanel>
-              <TextBlock x:Name="RobotAcceptanceDiagnosticsText" Text="Robot/PLC controls default to Not Connected. Real Hardware is not connected from this screen. Simulated evidence never claims real hardware readiness or safety certification." Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
+
+            <StackPanel Grid.Column="2">
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Local Model Registry" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <DataGrid x:Name="ModelRegistryGrid" Height="190" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" CanUserAddRows="False" Style="{StaticResource HmiTable}" ToolTip="Model IDs and paths may be long. Hover rows/cells to inspect the full value." Margin="0,8,0,0">
+                    <DataGrid.Columns>
+                      <DataGridTextColumn Header="Model" Binding="{Binding DisplayName}" Width="*"/>
+                      <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="86"/>
+                      <DataGridTextColumn Header="Lifecycle" Binding="{Binding LifecycleState}" Width="120"/>
+                      <DataGridTextColumn Header="Runtime" Binding="{Binding ValidationStatus}" Width="90"/>
+                      <DataGridTextColumn Header="Acceptance" Binding="{Binding LatestAcceptanceStatus}" Width="100"/>
+                      <DataGridTextColumn Header="Active" Binding="{Binding ActiveDisplay}" Width="64"/>
+                    </DataGrid.Columns>
+                  </DataGrid>
+                  <WrapPanel Margin="0,8,0,0">
+                    <Button x:Name="RegisterModelBtn" Style="{StaticResource MiniBtnGreen}" Content="Register Model" Margin="0,0,8,8" Click="OnRegisterModelClick"/>
+                    <Button x:Name="ValidateRegisteredModelBtn" Style="{StaticResource MiniBtn}" Content="Validate" Margin="0,0,8,8" Click="OnValidateRegisteredModelClick"/>
+                    <Button x:Name="SetActiveModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Set Active" Margin="0,0,8,8" Click="OnSetActiveModelClick"/>
+                    <Button x:Name="RunModelAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Run Model Acceptance" MinWidth="170" Margin="0,0,8,8" Click="OnRunModelAcceptanceClick" ToolTip="Acceptance means evidence review against configured criteria; it does not automatically approve production release."/>
+                    <Button x:Name="CancelModelAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel Acceptance" MinWidth="150" Margin="0,0,8,8" Click="OnCancelModelAcceptanceClick" IsEnabled="False"/>
+                    <Button x:Name="ViewModelAcceptanceRunsBtn" Style="{StaticResource MiniBtn}" Content="View Acceptance Runs" MinWidth="170" Margin="0,0,8,8" Click="OnViewModelAcceptanceRunsClick"/>
+                    <Button x:Name="CreateModelReleasePackageBtn" Style="{StaticResource MiniBtnGreen}" Content="Create Model Release Package" MinWidth="220" Margin="0,0,8,8" Click="OnCreateModelReleasePackageClick"/>
+                    <Button x:Name="PromoteProductionCandidateBtn" Style="{StaticResource MiniBtnAmber}" Content="Promote to Production Candidate" MinWidth="230" Margin="0,0,8,8" Click="OnPromoteProductionCandidateClick"/>
+                    <Button x:Name="DeployModelBtn" Style="{StaticResource MiniBtnGreen}" Content="Deploy" Margin="0,0,8,8" Click="OnDeployModelClick"/>
+                    <Button x:Name="WaiveDeployModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Deploy with Waiver" MinWidth="160" Margin="0,0,8,8" Click="OnWaiveDeployModelClick"/>
+                    <Button x:Name="RetireModelBtn" Style="{StaticResource MiniBtn}" Content="Retire" Margin="0,0,0,8" Click="OnRetireModelClick"/>
+                  </WrapPanel>
+                  <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <ProgressBar x:Name="ModelAcceptanceProgressBar" Width="190" Height="12" Minimum="0" Maximum="100" Value="0" IsIndeterminate="False" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ModelAcceptanceProgressText" Text="Model acceptance idle." Style="{StaticResource HmiTechnicalHintText}" VerticalAlignment="Center"/>
+                  </StackPanel>
+                  <DataGrid x:Name="ModelAcceptanceRunsGrid" Height="120" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" CanUserAddRows="False" Style="{StaticResource HmiTable}" ToolTip="Model acceptance run history. REVIEW or CONDITIONAL status requires engineer/admin review.">
+                    <DataGrid.Columns>
+                      <DataGridTextColumn Header="Run" Binding="{Binding Id}" Width="56"/>
+                      <DataGridTextColumn Header="Model" Binding="{Binding ModelId}" Width="*"/>
+                      <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="86"/>
+                      <DataGridTextColumn Header="Dataset" Binding="{Binding DatasetName}" Width="130"/>
+                      <DataGridTextColumn Header="Candidate" Binding="{Binding CandidateDisplay}" Width="90"/>
+                    </DataGrid.Columns>
+                  </DataGrid>
+                </StackPanel>
+              </Border>
+
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <DockPanel Margin="0,0,0,8">
+                    <WrapPanel DockPanel.Dock="Right">
+                      <Button x:Name="ApproveThresholdProfileBtn" Style="{StaticResource MiniBtn}" Content="Approve" Margin="0,0,8,0" Click="OnApproveThresholdProfileClick"/>
+                      <Button x:Name="DeployThresholdProfileBtn" Style="{StaticResource MiniBtnAmber}" Content="Deploy" Click="OnDeployThresholdProfileClick"/>
+                    </WrapPanel>
+                    <StackPanel>
+                      <TextBlock Text="Threshold Profiles" Style="{StaticResource HmiSectionHeaderText}"/>
+                      <TextBlock x:Name="ActiveThresholdProfileText" Text="Active profile: none" Style="{StaticResource HmiTechnicalHintText}"/>
+                    </StackPanel>
+                  </DockPanel>
+                  <DataGrid x:Name="ThresholdProfilesGrid" Height="150" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" CanUserAddRows="False" Style="{StaticResource HmiTable}" ToolTip="Threshold profiles control OK/REVIEW/NG limits. Approve and deploy only after validation evidence is reviewed.">
+                    <DataGrid.Columns>
+                      <DataGridTextColumn Header="Profile" Binding="{Binding ProfileId}" Width="*"/>
+                      <DataGridTextColumn Header="Rev" Binding="{Binding Revision}" Width="62"/>
+                      <DataGridTextColumn Header="Board Model" Binding="{Binding BoardModel}" Width="106"/>
+                      <DataGridTextColumn Header="Recipe" Binding="{Binding RecipeName}" Width="110"/>
+                      <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="84"/>
+                      <DataGridTextColumn Header="Rules" Binding="{Binding RuleCount}" Width="62"/>
+                    </DataGrid.Columns>
+                  </DataGrid>
+                </StackPanel>
+              </Border>
             </StackPanel>
-          </Border>
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-            <StackPanel>
-              <TextBlock Text="MES / ERP Integration Boundary" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="MES Mode" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <ComboBox x:Name="MesModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Not Connected"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Mock Local / REST"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Production REST"/>
-                </ComboBox>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Mock Endpoint" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="MesEndpointText" Grid.Column="1" MinHeight="28" ToolTip="Optional. If blank, mock uploads are written to local JSON."/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="REST Base URL" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="MesRestBaseUrlText" Grid.Column="1" MinHeight="28" ToolTip="Explicit REST mode only. Example: https://mes.example.local"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="REST Paths" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="MesResultPathText" Grid.Column="1" MinHeight="28" Text="/api/aoi/results"/>
-                <TextBox x:Name="MesImagePathText" Grid.Column="3" MinHeight="28" Text="/api/aoi/images"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Auth Mode" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <ComboBox x:Name="MesAuthModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="None"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="API Key"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Bearer"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Basic"/>
-                </ComboBox>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="API Key" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="MesApiKeyHeaderText" Grid.Column="1" MinHeight="28" Text="X-API-Key"/>
-                <PasswordBox x:Name="MesApiKeyBox" Grid.Column="3" MinHeight="28"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Bearer Token" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <PasswordBox x:Name="MesBearerTokenBox" Grid.Column="1" MinHeight="28"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Basic Auth" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="MesUsernameText" Grid.Column="1" MinHeight="28"/>
-                <PasswordBox x:Name="MesPasswordBox" Grid.Column="3" MinHeight="28"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Retry" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="MesTimeoutText" Grid.Column="1" MinHeight="28" Text="10"/>
-                <TextBox x:Name="MesMaxRetryText" Grid.Column="3" MinHeight="28" Text="2"/>
-                <TextBox x:Name="MesRetryBackoffText" Grid.Column="5" MinHeight="28" Text="500"/>
-              </Grid>
-              <CheckBox x:Name="MesAutoUploadCheck" Content="Automatic upload when inspection result is saved" Foreground="#DCE5EB" FontSize="11" Margin="0,0,0,6"/>
-              <Button x:Name="TestMesRestBtn" Style="{StaticResource MiniBtn}" Content="Test / Send Payload" Margin="0,0,0,6" Click="OnTestMesRestClick"/>
-              <TextBlock Text="REST mode is an integration boundary, not MES validation. OPC UA is a Stage 4 adapter TODO. Secrets are redacted from logs/status."
-                         Foreground="#E1A334" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,6"/>
-              <UniformGrid Columns="2">
-                <TextBlock Text="MES status" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="MesMockStatusText" Text="MES: Not Connected" FontWeight="Bold" FontSize="11.5" Foreground="#F27777" HorizontalAlignment="Right"/>
-              </UniformGrid>
-              <TextBlock x:Name="MesDiagnosticsText" Text="Default mode is Not Connected. Mock local writes JSON evidence only." Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap" Margin="0,6,0,0"/>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Hardware">
+        <ScrollViewer Style="{StaticResource FactoryScrollablePage}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <Grid Margin="10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="12"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Camera Source" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="Hardware acceptance collects evidence. Simulated or not connected states remain clearly labeled and are not production camera validation."
+                             Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Mode" Style="{StaticResource SettingsLabel}"/>
+                    <ComboBox x:Name="CameraSourceCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="No Camera / Not Connected"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Folder Simulation"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Generic Vision Adapter (Real Hardware)"/>
+                    </ComboBox>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Top Folder" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraTopFolderText" Grid.Column="1" MinHeight="34"/>
+                    <Button x:Name="BrowseCameraTopBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseCameraTopClick"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Side Folder" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraSideFolderText" Grid.Column="1" MinHeight="34"/>
+                    <Button x:Name="BrowseCameraSideBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseCameraSideClick"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Bottom Folder" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraBottomFolderText" Grid.Column="1" MinHeight="34"/>
+                    <Button x:Name="BrowseCameraBottomBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseCameraBottomClick"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Top Device ID" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraTopDeviceIdText" Grid.Column="1" MinHeight="34" ToolTip="Stage 2 generic adapter device identifier. This does not imply camera connection."/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Side Device ID" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraSideDeviceIdText" Grid.Column="1" MinHeight="34"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Bottom Device ID" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraBottomDeviceIdText" Grid.Column="1" MinHeight="34"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Adapter Folder" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraAdapterFolderText" Grid.Column="1" MinHeight="34" ToolTip="External folder containing a camera_adapter_manifest.json or *.camera-adapter.json manifest."/>
+                    <Button x:Name="BrowseCameraAdapterBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseCameraAdapterClick"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Acquisition" Style="{StaticResource SettingsLabel}"/>
+                    <ComboBox x:Name="CameraAcquisitionModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Continuous"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Software Trigger"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Hardware Trigger"/>
+                    </ComboBox>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Exposure / Gain" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraExposureMsText" Grid.Column="1" MinHeight="34" Text="5.0" ToolTip="Exposure in milliseconds."/>
+                    <TextBox x:Name="CameraGainText" Grid.Column="3" MinHeight="34" Text="1.0"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Timeouts ms" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraTriggerTimeoutMsText" Grid.Column="1" MinHeight="34" Text="250" ToolTip="Trigger timeout in milliseconds."/>
+                    <TextBox x:Name="CameraFrameTimeoutMsText" Grid.Column="3" MinHeight="34" Text="1000" ToolTip="Frame timeout in milliseconds."/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Board Model" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraBoardModelText" Grid.Column="1" MinHeight="34" Text="TBOX-MAIN"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Lot ID" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="CameraLotIdText" Grid.Column="1" MinHeight="34" Text="POC-LOT"/>
+                  </Grid>
+
+                  <UniformGrid Columns="2">
+                    <TextBlock Text="Source status" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="CameraSourceStatusText" Text="Not Connected" FontWeight="Bold" FontSize="14" Foreground="#F27777" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock Text="Acceptance" Style="{StaticResource SettingsLabel}" ToolTip="Acceptance means evidence collected against configured criteria. It does not certify production readiness by itself."/>
+                    <TextBlock x:Name="CameraAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="14" Foreground="#E1A334" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                  </UniformGrid>
+
+                  <WrapPanel Margin="0,8,0,0">
+                    <Button x:Name="TestCameraSourceBtn" Style="{StaticResource MiniBtn}" Content="Test Camera Source" MinWidth="150" Margin="0,0,8,8" Click="OnTestCameraSourceClick"/>
+                    <Button x:Name="DiscoverCameraAdaptersBtn" Style="{StaticResource MiniBtn}" Content="Discover Adapters" MinWidth="160" Margin="0,0,8,8" Click="OnDiscoverCameraAdaptersClick"/>
+                    <Button x:Name="DiscoverCamerasBtn" Style="{StaticResource MiniBtn}" Content="Discover Cameras" MinWidth="150" Margin="0,0,8,8" Click="OnDiscoverCamerasClick"/>
+                    <Button x:Name="RunCameraAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Camera Acceptance Test" MinWidth="210" Margin="0,0,8,8" Click="OnRunCameraAcceptanceClick"/>
+                    <Button x:Name="CancelCameraAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,8,8" Click="OnCancelCameraAcceptanceClick" IsEnabled="False"/>
+                    <Button x:Name="ExportCameraAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" MinWidth="130" Margin="0,0,8,8" Click="OnExportCameraAcceptanceClick"/>
+                    <Button x:Name="ExportHardwareAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Hardware Acceptance Package" MinWidth="260" Margin="0,0,0,8" Click="OnExportHardwareAcceptanceClick" ToolTip="Exports camera, lighting, robot, and 3D acceptance evidence with simulated/mock limitations labeled."/>
+                  </WrapPanel>
+                  <TextBlock x:Name="CameraDiagnosticsText" Text="Generic adapter configured is not the same as camera connected." Style="{StaticResource HmiTechnicalHintText}"/>
+                </StackPanel>
+              </Border>
             </StackPanel>
-          </Border>
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-            <StackPanel>
-              <TextBlock Text="Central Sync (Optional Management Aggregation)" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Mode" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <ComboBox x:Name="CentralSyncModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Disabled"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="File Drop"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="REST API Boundary"/>
-                  <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Production Database Boundary"/>
-                </ComboBox>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Endpoint/Folder" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CentralSyncEndpointText" Grid.Column="1" MinHeight="28" ToolTip="FileDrop folder, REST endpoint, or future central database endpoint summary."/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Station / Interval" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CentralSyncStationIdText" Grid.Column="1" MinHeight="28"/>
-                <TextBox x:Name="CentralSyncIntervalText" Grid.Column="3" MinHeight="28" Text="300"/>
-              </Grid>
-              <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="120"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <TextBlock Text="Retry / Secret" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-                <TextBox x:Name="CentralSyncMaxRetryText" Grid.Column="1" MinHeight="28" Text="5"/>
-                <PasswordBox x:Name="CentralSyncSecretBox" Grid.Column="3" MinHeight="28"/>
-              </Grid>
-              <CheckBox x:Name="CentralSyncIncludeImagesCheck" Content="Include image file references only when explicitly enabled" Foreground="#DCE5EB" FontSize="11" Margin="0,0,0,4"/>
-              <CheckBox x:Name="CentralSyncRedactOperatorCheck" Content="Redact operator identifiers from payloads" Foreground="#DCE5EB" FontSize="11" Margin="0,0,0,4"/>
-              <CheckBox x:Name="CentralSyncRedactImagePathsCheck" Content="Redact image and package paths from payloads" Foreground="#DCE5EB" FontSize="11" Margin="0,0,0,4"/>
-              <CheckBox x:Name="CentralSyncRedactEndpointCheck" Content="Redact endpoints/folders from exported reports" Foreground="#DCE5EB" FontSize="11" Margin="0,0,0,6"/>
-              <TextBlock x:Name="CentralSyncStatusText" Text="Central sync disabled. Local SQLite remains the offline source of truth." Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap"/>
+
+            <StackPanel Grid.Column="2">
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Lighting Sync (Stage 2 Boundary)" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="Lighting can be simulated, TCP, or serial. Real hardware commands are sent only when explicitly configured."
+                             Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Mode" Style="{StaticResource SettingsLabel}"/>
+                    <ComboBox x:Name="LightingModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="None / Not Connected"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Simulated"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="TCP Text Protocol (Real Hardware)"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Serial Text Protocol (Real Hardware)"/>
+                    </ComboBox>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="TCP Host / Port" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="LightingTcpHostText" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="LightingTcpPortText" Grid.Column="3" MinHeight="34" Text="5025"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Serial / Baud" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="LightingSerialPortText" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="LightingBaudRateText" Grid.Column="3" MinHeight="34" Text="9600"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Programs" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="LightingTopProgramText" Grid.Column="1" MinHeight="34" Text="TOP"/>
+                    <TextBox x:Name="LightingSideProgramText" Grid.Column="3" MinHeight="34" Text="SIDE"/>
+                    <TextBox x:Name="LightingBottomProgramText" Grid.Column="5" MinHeight="34" Text="BOTTOM"/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Command" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="LightingCommandTemplateText" Grid.Column="1" MinHeight="34" Text="SET {view} {program}\n" ToolTip="Template supports {view}, {program}, \n and \r."/>
+                  </Grid>
+
+                  <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Timeout ms" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="LightingTimeoutMsText" Grid.Column="1" MinHeight="34" Text="500"/>
+                  </Grid>
+
+                  <UniformGrid Columns="2">
+                    <TextBlock Text="Lighting status" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="LightingSettingsStatusText" Text="Lighting: Not Connected" FontWeight="Bold" FontSize="14" Foreground="#F27777" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock Text="Sync acceptance" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="LightingAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="14" Foreground="#E1A334" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                  </UniformGrid>
+                  <WrapPanel Margin="0,8,0,0">
+                    <Button x:Name="TestLightingBtn" Style="{StaticResource MiniBtn}" Content="Test Lighting" Margin="0,0,8,8" Click="OnTestLightingClick"/>
+                    <Button x:Name="RunLightingAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Lighting Sync Test" MinWidth="190" Margin="0,0,8,8" Click="OnRunLightingAcceptanceClick"/>
+                    <Button x:Name="CancelLightingAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,8,8" Click="OnCancelLightingAcceptanceClick" IsEnabled="False"/>
+                    <Button x:Name="ExportLightingAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" MinWidth="130" Margin="0,0,0,8" Click="OnExportLightingAcceptanceClick"/>
+                  </WrapPanel>
+                  <TextBlock x:Name="LightingDiagnosticsText" Text="Simulated mode is not real hardware. TCP/serial commands are sent only when explicitly configured." Foreground="#E1A334" FontSize="14" TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
+
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Robot Cell Acceptance (Stage 3 Boundary)" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="Robot controls default to Not Connected. Simulated evidence never claims real hardware readiness or safety certification."
+                             Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+                  <UniformGrid Columns="2">
+                    <TextBlock Text="Robot acceptance" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="RobotAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="14" Foreground="#E1A334" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock Text="Evidence boundary" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock Text="Simulation is not production robot validation" FontWeight="Bold" FontSize="14" Foreground="#E1A334" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                  </UniformGrid>
+                  <WrapPanel Margin="0,8,0,0">
+                    <Button x:Name="RunRobotCellAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Robot Cell Acceptance" MinWidth="210" Margin="0,0,8,8" Click="OnRunRobotCellAcceptanceClick"/>
+                    <Button x:Name="CancelRobotCellAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,8,8" Click="OnCancelRobotCellAcceptanceClick" IsEnabled="False"/>
+                    <Button x:Name="ExportRobotCellAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" MinWidth="130" Margin="0,0,0,8" Click="OnExportRobotCellAcceptanceClick"/>
+                  </WrapPanel>
+                  <TextBlock x:Name="RobotAcceptanceDiagnosticsText" Text="Robot/PLC controls default to Not Connected. Real Hardware is not connected from this screen. Simulated evidence never claims real hardware readiness or safety certification." Foreground="#E1A334" FontSize="14" TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
             </StackPanel>
-          </Border>
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-            <StackPanel>
-              <TextBlock Text="Training Set Export (Local Files)" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,4"/>
-              <WrapPanel>
-                <Button Style="{StaticResource MiniBtnGreen}" Content="Prepare" Margin="0,0,6,6" Click="OnStartTrainingClick"/>
-                <Button Style="{StaticResource MiniBtn}" Content="Validate List" Margin="0,0,6,6" Click="OnRunEpochClick"/>
-                <Button Style="{StaticResource MiniBtnAmber}" Content="Stop" Margin="0,0,6,6" Click="OnStopTrainingClick"/>
-                <Button Style="{StaticResource MiniBtn}" Content="Open Folder" Margin="0,0,0,6" Click="OnOpenTrainingFolderClick"/>
-              </WrapPanel>
-              <UniformGrid Columns="2" Margin="0,4,0,0">
-                <TextBlock Text="Export status" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="TrainingStatusText" Text="IDLE" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
-                <TextBlock Text="Queued samples" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="TrainingQueueText" Text="0" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
-                <TextBlock Text="List checks" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="TrainingEpochText" Text="0" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
-                <TextBlock Text="List quality" Foreground="#9AA6AF" FontSize="11"/>
-                <TextBlock x:Name="TrainingValidationText" Text="--" FontWeight="Bold" FontSize="11.5" Foreground="#DCE5EB" HorizontalAlignment="Right"/>
-              </UniformGrid>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Traceability">
+        <ScrollViewer Style="{StaticResource FactoryScrollablePage}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <Grid Margin="10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="12"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource SettingsPanel}">
+              <StackPanel>
+                <TextBlock Text="MES / ERP Integration Boundary" Style="{StaticResource HmiSectionHeaderText}"/>
+                <TextBlock Text="MES is the factory system used for traceability, result upload, and production records. Mock REST is clearly labeled and is not production MES."
+                           Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="MES Mode" Style="{StaticResource SettingsLabel}"/>
+                  <ComboBox x:Name="MesModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}" ToolTip="Not Connected is blue/gray. Mock REST is purple and cannot be treated as production MES.">
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Not Connected"/>
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Mock Local / REST"/>
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Production REST"/>
+                  </ComboBox>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="Mock Endpoint" Style="{StaticResource SettingsLabel}"/>
+                  <TextBox x:Name="MesEndpointText" Grid.Column="1" MinHeight="34" ToolTip="Optional. If blank, mock uploads are written to local JSON."/>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="REST Base URL" Style="{StaticResource SettingsLabel}"/>
+                  <TextBox x:Name="MesRestBaseUrlText" Grid.Column="1" MinHeight="34" ToolTip="Explicit REST mode only. Example: https://mes.example.local"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="REST Paths" Style="{StaticResource SettingsLabel}"/>
+                  <TextBox x:Name="MesResultPathText" Grid.Column="1" MinHeight="34" Text="/api/aoi/results"/>
+                  <TextBox x:Name="MesImagePathText" Grid.Column="3" MinHeight="34" Text="/api/aoi/images"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="Auth Mode" Style="{StaticResource SettingsLabel}"/>
+                  <ComboBox x:Name="MesAuthModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="None"/>
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="API Key"/>
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Bearer"/>
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Basic"/>
+                  </ComboBox>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="API Key" Style="{StaticResource SettingsLabel}"/>
+                  <TextBox x:Name="MesApiKeyHeaderText" Grid.Column="1" MinHeight="34" Text="X-API-Key"/>
+                  <PasswordBox x:Name="MesApiKeyBox" Grid.Column="3" Style="{StaticResource SettingsPasswordBox}"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="Bearer Token" Style="{StaticResource SettingsLabel}"/>
+                  <PasswordBox x:Name="MesBearerTokenBox" Grid.Column="1" Style="{StaticResource SettingsPasswordBox}"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="Basic Auth" Style="{StaticResource SettingsLabel}"/>
+                  <TextBox x:Name="MesUsernameText" Grid.Column="1" MinHeight="34"/>
+                  <PasswordBox x:Name="MesPasswordBox" Grid.Column="3" Style="{StaticResource SettingsPasswordBox}"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="Retry" Style="{StaticResource SettingsLabel}"/>
+                  <TextBox x:Name="MesTimeoutText" Grid.Column="1" MinHeight="34" Text="10"/>
+                  <TextBox x:Name="MesMaxRetryText" Grid.Column="3" MinHeight="34" Text="2"/>
+                  <TextBox x:Name="MesRetryBackoffText" Grid.Column="5" MinHeight="34" Text="500"/>
+                </Grid>
+
+                <CheckBox x:Name="MesAutoUploadCheck" Content="Automatic upload when inspection result is saved" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,8"/>
+                <Button x:Name="TestMesRestBtn" Style="{StaticResource MiniBtn}" Content="Test / Send Payload" MinWidth="160" Margin="0,0,0,8" Click="OnTestMesRestClick" HorizontalAlignment="Left"/>
+                <TextBlock Text="REST mode is an integration boundary, not MES validation. OPC UA is a Stage 4 adapter TODO. Secrets are redacted from logs/status."
+                           Foreground="#E1A334" FontSize="14" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <UniformGrid Columns="2">
+                  <TextBlock Text="MES status" Style="{StaticResource SettingsLabel}"/>
+                  <TextBlock x:Name="MesMockStatusText" Text="MES: Not Connected" FontWeight="Bold" FontSize="14" Foreground="#F27777" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                </UniformGrid>
+                <TextBlock x:Name="MesDiagnosticsText" Text="Default mode is Not Connected. Mock local writes JSON evidence only." Style="{StaticResource HmiTechnicalHintText}" Margin="0,8,0,0"/>
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource SettingsPanel}">
+              <StackPanel>
+                <TextBlock Text="Central Sync (Optional Management Aggregation)" Style="{StaticResource HmiSectionHeaderText}"/>
+                <TextBlock Text="Central Sync copies selected evidence to a configured folder or service. Local SQLite remains the offline source of truth."
+                           Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="Mode" Style="{StaticResource SettingsLabel}"/>
+                  <ComboBox x:Name="CentralSyncModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}" ToolTip="Endpoint summaries and folders may be redacted in exported reports.">
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Disabled"/>
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="File Drop"/>
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="REST API Boundary"/>
+                    <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Production Database Boundary"/>
+                  </ComboBox>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="Endpoint/Folder" Style="{StaticResource SettingsLabel}"/>
+                  <TextBox x:Name="CentralSyncEndpointText" Grid.Column="1" MinHeight="34" ToolTip="FileDrop folder, REST endpoint, or future central database endpoint summary."/>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="Station / Interval" Style="{StaticResource SettingsLabel}"/>
+                  <TextBox x:Name="CentralSyncStationIdText" Grid.Column="1" MinHeight="34"/>
+                  <TextBox x:Name="CentralSyncIntervalText" Grid.Column="3" MinHeight="34" Text="300"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="Retry / Secret" Style="{StaticResource SettingsLabel}"/>
+                  <TextBox x:Name="CentralSyncMaxRetryText" Grid.Column="1" MinHeight="34" Text="5"/>
+                  <PasswordBox x:Name="CentralSyncSecretBox" Grid.Column="3" Style="{StaticResource SettingsPasswordBox}"/>
+                </Grid>
+
+                <CheckBox x:Name="CentralSyncIncludeImagesCheck" Content="Include image file references only when explicitly enabled" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,4"/>
+                <CheckBox x:Name="CentralSyncRedactOperatorCheck" Content="Redact operator identifiers from payloads" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,4"/>
+                <CheckBox x:Name="CentralSyncRedactImagePathsCheck" Content="Redact image and package paths from payloads" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,4"/>
+                <CheckBox x:Name="CentralSyncRedactEndpointCheck" Content="Redact endpoints/folders from exported reports" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,8"/>
+                <TextBlock x:Name="CentralSyncStatusText" Text="Central sync disabled. Local SQLite remains the offline source of truth." Style="{StaticResource HmiTechnicalHintText}"/>
+              </StackPanel>
+            </Border>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Evidence">
+        <ScrollViewer Style="{StaticResource FactoryScrollablePage}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <Grid Margin="10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="12"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Training Set Export (Local Files)" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="Prepares local candidate files only. No model training, fine-tuning, or deployment is run from this prototype."
+                             Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+                  <WrapPanel>
+                    <Button Style="{StaticResource MiniBtnGreen}" Content="Prepare" Margin="0,0,8,8" Click="OnStartTrainingClick"/>
+                    <Button Style="{StaticResource MiniBtn}" Content="Validate List" MinWidth="130" Margin="0,0,8,8" Click="OnRunEpochClick"/>
+                    <Button Style="{StaticResource MiniBtnAmber}" Content="Stop" Margin="0,0,8,8" Click="OnStopTrainingClick"/>
+                    <Button Style="{StaticResource MiniBtn}" Content="Open Folder" Margin="0,0,0,8" Click="OnOpenTrainingFolderClick"/>
+                  </WrapPanel>
+                  <UniformGrid Columns="2" Margin="0,4,0,0">
+                    <TextBlock Text="Export status" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="TrainingStatusText" Text="IDLE" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock Text="Queued samples" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="TrainingQueueText" Text="0" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock Text="List checks" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="TrainingEpochText" Text="0" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock Text="List quality" Style="{StaticResource SettingsLabel}"/>
+                    <TextBlock x:Name="TrainingValidationText" Text="--" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                  </UniformGrid>
+                </StackPanel>
+              </Border>
+
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Localization" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock x:Name="LocalizationScopeText" TextWrapping="Wrap" LineHeight="20" FontSize="14"
+                             Text="Language/font changes are applied after pressing Apply. Supported shell, page, table, and Settings labels update immediately; technical codes and evidence IDs remain English for traceability."/>
+                </StackPanel>
+              </Border>
             </StackPanel>
-          </Border>
-        </StackPanel>
-        <StackPanel Grid.Row="3" Margin="8,0,8,8">
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-            <StackPanel>
-              <TextBlock Text="Localization" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,4"/>
-              <TextBlock TextWrapping="Wrap" LineHeight="18" FontSize="11.5"
-                Text="All workstation labels are switched at runtime. Technical codes remain unchanged for traceability."/>
+
+            <StackPanel Grid.Column="2">
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Evidence Exports / Maintenance" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="These actions create diagnostics, backups, restore previews, or support bundles. Package outputs redact secrets by default."
+                             Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+                  <WrapPanel>
+                    <Button x:Name="RunSetupWizardBtn" Style="{StaticResource ActionBtnAmber}" Content="Run Setup Wizard Again" MinWidth="210" Click="OnRunSetupWizardClick" Margin="0,0,8,8"/>
+                    <Button x:Name="OpenInstallNotesBtn" Style="{StaticResource ActionBtn}" Content="Installation Notes" MinWidth="170" Click="OnOpenInstallNotesClick" Margin="0,0,8,8"/>
+                    <Button x:Name="OpenGuideBtn" Style="{StaticResource ActionBtn}" Content="Open Guide" MinWidth="150" Click="OnOpenGuideClick" Margin="0,0,8,8"/>
+                    <Button x:Name="ExportDiagnosticsBtn" Style="{StaticResource ActionBtn}" Content="Export Diagnostics Report" MinWidth="220" Click="OnExportDiagnosticsClick" Margin="0,0,8,8"/>
+                    <Button x:Name="BackupConfigurationBtn" Style="{StaticResource ActionBtnGreen}" Content="Backup Configuration" MinWidth="190" Click="OnBackupConfigurationClick" Margin="0,0,8,8"/>
+                    <Button x:Name="RestoreConfigurationPreviewBtn" Style="{StaticResource ActionBtnAmber}" Content="Restore Configuration Preview" MinWidth="240" Click="OnRestoreConfigurationPreviewClick" Margin="0,0,8,8"/>
+                    <Button x:Name="ApplyRestoreBtn" Style="{StaticResource ActionBtnGreen}" Content="Apply Restore" Click="OnApplyRestoreClick" Margin="0,0,8,8" IsEnabled="False"/>
+                    <Button x:Name="RollbackRestoreBtn" Style="{StaticResource ActionBtnAmber}" Content="Rollback Last Restore" MinWidth="200" Click="OnRollbackRestoreClick" Margin="0,0,8,8"/>
+                  </WrapPanel>
+                  <WrapPanel Margin="0,6,0,0">
+                    <CheckBox x:Name="SupportBundleRedactPathsCheck" Content="Redact image/storage paths" IsChecked="True" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Margin="0,0,12,8"/>
+                    <CheckBox x:Name="SupportBundleIncludeModelsCheck" Content="Include model files" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Margin="0,0,12,8"/>
+                    <Button x:Name="ExportSupportBundleBtn" Style="{StaticResource ActionBtn}" Content="Export Support Bundle" MinWidth="190" Click="OnExportSupportBundleClick" Margin="0,0,0,8"/>
+                  </WrapPanel>
+                </StackPanel>
+              </Border>
+
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Configuration Policy" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock TextWrapping="Wrap" LineHeight="20" FontSize="14"
+                             Text="Training set export prepares local candidate files only. No model training, fine-tuning, or deployment is run from this prototype."/>
+                </StackPanel>
+              </Border>
             </StackPanel>
-          </Border>
-          <Border Style="{StaticResource FieldBox}">
-            <StackPanel>
-              <TextBlock Text="Configuration Policy" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,4"/>
-              <TextBlock TextWrapping="Wrap" LineHeight="18" FontSize="11.5"
-                Text="Training set export prepares local candidate files only. No model training, fine-tuning, or deployment is run from this prototype."/>
-            </StackPanel>
-          </Border>
-        </StackPanel>
-      </Grid>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <Border Grid.Row="4" Style="{StaticResource SettingsPanel}" Margin="0">
+      <DockPanel LastChildFill="False">
+        <TextBlock DockPanel.Dock="Left"
+                   Text="Apply/Cancel controls remain available regardless of category."
+                   Style="{StaticResource HmiTechnicalHintText}"
+                   VerticalAlignment="Center"
+                   Margin="0,0,18,0"/>
+        <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+          <Button x:Name="ApplyBtn" Style="{StaticResource ActionBtnGreen}" Content="Apply" Click="OnApply" Margin="0,0,8,0"/>
+          <Button x:Name="CancelBtn" Style="{StaticResource ActionBtn}" Content="Cancel" Click="OnCancel" Margin="0,0,8,0"/>
+          <Button x:Name="ResetBtn" Style="{StaticResource ActionBtn}" Content="Reset" Click="OnReset"/>
+        </WrapPanel>
+      </DockPanel>
     </Border>
   </Grid>
 </UserControl>

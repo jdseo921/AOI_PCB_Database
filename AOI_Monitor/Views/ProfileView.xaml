@@ -18,11 +18,11 @@
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <StackPanel>
-          <TextBlock Text="3D Profile Viewer" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <TextBlock Text="3D Profile Viewer" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           <TextBlock Text="Sample Data Mode. CSV height-map review only. 3D Camera Not Connected."
-                     Foreground="#E1A334" FontSize="11" FontWeight="Bold" Margin="0,3,0,0"/>
+                     Foreground="#E1A334" FontSize="14" FontWeight="Bold" Margin="0,3,0,0"/>
         </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
           <TextBlock Text="Source" Foreground="#9AA6AF" VerticalAlignment="Center" Margin="0,0,6,0"/>
           <ComboBox x:Name="ProfileSourceCombo" Width="150" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="OnProfileSourceChanged">
             <ComboBoxItem Content="Sample CSV"/>
@@ -34,12 +34,12 @@
           <Button x:Name="CancelAcceptanceButton" Style="{StaticResource ActionBtnAmber}" Content="Cancel" Margin="0,0,8,0" Click="OnCancelAcceptanceClick" IsEnabled="False"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Export 3D Report" Margin="0,0,8,0" Click="OnExportAcceptanceClick"/>
           <Border Style="{StaticResource ChipAmber}" VerticalAlignment="Center">
-            <TextBlock Text="Sample Data Mode" FontWeight="Bold" FontSize="10.5"/>
+            <TextBlock Text="Sample Data Mode" FontWeight="Bold" FontSize="14"/>
           </Border>
           <Border Style="{StaticResource ChipRed}" VerticalAlignment="Center" Margin="6,0,0,0">
-            <TextBlock Text="3D Camera Not Connected" FontWeight="Bold" FontSize="10.5"/>
+            <TextBlock Text="3D Camera Not Connected" FontWeight="Bold" FontSize="14"/>
           </Border>
-        </StackPanel>
+        </WrapPanel>
       </Grid>
     </Border>
 
@@ -58,8 +58,8 @@
           </Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
-              <TextBlock x:Name="MapStatusText" DockPanel.Dock="Right" Text="No CSV loaded" Foreground="#9AA6AF" FontSize="11"/>
-              <TextBlock Text="2D Color-Coded Height Map" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+              <TextBlock x:Name="MapStatusText" DockPanel.Dock="Right" Text="No CSV loaded" Foreground="#9AA6AF" FontSize="14"/>
+              <TextBlock Text="2D Color-Coded Height Map" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
             </DockPanel>
           </Border>
           <Border Grid.Row="1" Margin="8" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
@@ -79,8 +79,8 @@
                     <RowDefinition Height="Auto"/>
                   </Grid.RowDefinitions>
                   <DockPanel>
-                    <TextBlock x:Name="LegendMaxText" DockPanel.Dock="Right" Text="--" Foreground="#DCE5EB" FontSize="10.5" FontWeight="Bold"/>
-                    <TextBlock Text="Height Scale" Foreground="#9AA6AF" FontSize="10.5"/>
+                    <TextBlock x:Name="LegendMaxText" DockPanel.Dock="Right" Text="--" Foreground="#DCE5EB" FontSize="14" FontWeight="Bold"/>
+                    <TextBlock Text="Height Scale" Foreground="#9AA6AF" FontSize="14"/>
                   </DockPanel>
                   <Rectangle Grid.Row="1" Height="10" RadiusX="1" RadiusY="1">
                     <Rectangle.Fill>
@@ -92,8 +92,8 @@
                     </Rectangle.Fill>
                   </Rectangle>
                   <DockPanel Grid.Row="2" Margin="0,4,0,0">
-                    <TextBlock x:Name="LegendMinText" Text="--" Foreground="#DCE5EB" FontSize="10.5" FontWeight="Bold"/>
-                    <TextBlock Text="low to high" HorizontalAlignment="Center" Foreground="#7F8C95" FontSize="10" TextAlignment="Center"/>
+                    <TextBlock x:Name="LegendMinText" Text="--" Foreground="#DCE5EB" FontSize="14" FontWeight="Bold"/>
+                    <TextBlock Text="low to high" HorizontalAlignment="Center" Foreground="#7F8C95" FontSize="14" TextAlignment="Center"/>
                   </DockPanel>
                 </Grid>
               </Border>
@@ -116,7 +116,7 @@
               <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Selected Defect Details" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+              <TextBlock Text="Selected Defect Details" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
             </Border>
             <Grid Grid.Row="1" Margin="8">
               <Grid.ColumnDefinitions>
@@ -124,17 +124,17 @@
                 <ColumnDefinition Width="*"/>
               </Grid.ColumnDefinitions>
               <Grid.RowDefinitions>
-                <RowDefinition Height="28"/>
-                <RowDefinition Height="28"/>
-                <RowDefinition Height="28"/>
-                <RowDefinition Height="28"/>
-                <RowDefinition Height="28"/>
-                <RowDefinition Height="28"/>
-                <RowDefinition Height="28"/>
-                <RowDefinition Height="28"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
               </Grid.RowDefinitions>
               <TextBlock Text="CSV" Foreground="#9AA6AF" VerticalAlignment="Center"/>
-              <TextBlock Grid.Column="1" x:Name="CsvNameText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+              <TextBlock Grid.Column="1" x:Name="CsvNameText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
               <TextBlock Grid.Row="1" Text="Type" Foreground="#9AA6AF" VerticalAlignment="Center"/>
               <TextBlock Grid.Row="1" Grid.Column="1" x:Name="DefectTypeText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
               <TextBlock Grid.Row="2" Text="Height" Foreground="#9AA6AF" VerticalAlignment="Center"/>
@@ -160,7 +160,7 @@
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Height Slice Profile" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+              <TextBlock Text="Height Slice Profile" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
             </Border>
             <Canvas Grid.Row="1" x:Name="ProfileCanvas" Background="#050607" Margin="8"/>
           </Grid>
@@ -172,13 +172,14 @@
       <DockPanel Margin="8">
         <TextBlock x:Name="StatusText"
                    Text="Sample Data Mode. 3D Camera Not Connected. Stage 2 hardware integration required for live 3D profile inspection."
-                   Foreground="#E1A334" FontWeight="Bold" VerticalAlignment="Center"/>
+                   Foreground="#E1A334" FontWeight="Bold" VerticalAlignment="Center" TextWrapping="Wrap"/>
         <ProgressBar x:Name="AcceptanceProgressBar" DockPanel.Dock="Right" Width="140" Height="12" Minimum="0" Maximum="100" Value="0" Margin="0,0,8,0" VerticalAlignment="Center"/>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+        <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
           <Button Style="{StaticResource ActionBtnGreen}" Content="Accept Defect" Margin="0,0,8,0" Click="OnAcceptDefectClick"/>
           <Button Style="{StaticResource ActionBtnRed}" Content="Reject Defect" Click="OnRejectDefectClick"/>
-        </StackPanel>
+        </WrapPanel>
       </DockPanel>
     </Border>
   </Grid>
 </UserControl>
+

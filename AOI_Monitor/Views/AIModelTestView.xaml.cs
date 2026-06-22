@@ -325,11 +325,11 @@ public partial class AIModelTestView : UserControl
             _currentRunUsedFormalManifest = batch.IsFormalManifest;
             _lastAnnotatedImageFolder = string.Empty;
             _lastReportPath = string.Empty;
-        _currentFalseCallRun = null;
-        _falseCallPoints.Clear();
-        FalseCallRecommendationText.Text = "Batch complete. Analyze false calls to generate threshold candidates.";
-        CreateThresholdProfileDraftButton.IsEnabled = false;
-        ApplyRecommendedThresholdButton.IsEnabled = false;
+            _currentFalseCallRun = null;
+            _falseCallPoints.Clear();
+            FalseCallRecommendationText.Text = "Batch complete. Analyze false calls to generate threshold candidates.";
+            CreateThresholdProfileDraftButton.IsEnabled = false;
+            ApplyRecommendedThresholdButton.IsEnabled = false;
 
             _rows.Clear();
             foreach (var row in batch.Rows)
@@ -384,7 +384,7 @@ public partial class AIModelTestView : UserControl
             StatusText.Text = $"{row.Image}: {row.EngineResult}, score {row.ScoreDisplay}, {row.PassFail}, time {row.TotalTimeDisplay}.";
     }
 
-    private void OnInspectionConfigurationChanged() => Dispatcher.Invoke(RefreshEngineText);
+    private void OnInspectionConfigurationChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshEngineText);
 
     private void RefreshEngineText()
     {
@@ -1213,15 +1213,7 @@ public partial class AIModelTestView : UserControl
     }
 
     private static BitmapSource LoadBitmap(string path)
-    {
-        var bmp = new BitmapImage();
-        bmp.BeginInit();
-        bmp.CacheOption = BitmapCacheOption.OnLoad;
-        bmp.UriSource = new Uri(path, UriKind.Absolute);
-        bmp.EndInit();
-        bmp.Freeze();
-        return bmp;
-    }
+        => ImageCacheService.LoadBitmap(path, cache: false);
 
     private static void SavePng(BitmapSource bitmap, string path)
     {

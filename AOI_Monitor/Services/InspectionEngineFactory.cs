@@ -34,8 +34,9 @@ public static class InspectionEngineFactory
             if (ModelRegistryService.GetActiveModel() is { } activeModel)
                 return ModelRegistryService.ToInspectionConfiguration(activeModel);
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Active model registry configuration fallback used: {ex.Message}");
         }
 
         return new InspectionModelConfiguration

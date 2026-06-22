@@ -16,9 +16,9 @@
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <StackPanel>
-          <TextBlock Text="2D Calibration Profile / Stage 2 Preparation" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <TextBlock Text="2D Calibration Profile / Stage 2 Preparation" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           <TextBlock Text="Define image-to-board point pairs for planning camera/robot coordinate mapping. This is approximate 2D profile data only; no real camera or robot calibration is claimed."
-                     Foreground="#8B969E" FontSize="10.5" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                     Foreground="#8B969E" FontSize="14" TextWrapping="Wrap" Margin="0,3,0,0"/>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
           <Button Style="{StaticResource ActionBtnBlue}" Content="Reload Profiles" Margin="0,0,6,0" Click="OnReloadProfilesClick"/>
@@ -43,29 +43,29 @@
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-            <TextBlock Text="Calibration Profile" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            <TextBlock Text="Calibration Profile" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
 
           <StackPanel Grid.Row="1" Margin="10">
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <TextBlock Text="Saved Profile" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-              <ComboBox x:Name="ProfileCombo" Grid.Column="1" MinHeight="28" DisplayMemberPath="DisplayName" SelectionChanged="OnProfileSelectionChanged"/>
+              <TextBlock Text="Saved Profile" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
+              <ComboBox x:Name="ProfileCombo" Grid.Column="1" MinHeight="34" DisplayMemberPath="DisplayName" SelectionChanged="OnProfileSelectionChanged"/>
             </Grid>
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <TextBlock Text="Profile Name" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-              <TextBox x:Name="ProfileNameText" Grid.Column="1" MinHeight="28" Text="TBOX 2D Top Calibration"/>
+              <TextBlock Text="Profile Name" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
+              <TextBox x:Name="ProfileNameText" Grid.Column="1" MinHeight="34" Text="TBOX 2D Top Calibration"/>
             </Grid>
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <TextBlock Text="Board Model" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-              <TextBox x:Name="BoardModelText" Grid.Column="1" MinHeight="28" Text="TBOX-MAIN"/>
+              <TextBlock Text="Board Model" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
+              <TextBox x:Name="BoardModelText" Grid.Column="1" MinHeight="34" Text="TBOX-MAIN"/>
             </Grid>
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <TextBlock Text="View" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-              <ComboBox x:Name="ViewTypeCombo" Grid.Column="1" MinHeight="28" SelectedIndex="0">
+              <TextBlock Text="View" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
+              <ComboBox x:Name="ViewTypeCombo" Grid.Column="1" MinHeight="34" SelectedIndex="0">
                 <ComboBoxItem Content="Top"/>
                 <ComboBoxItem Content="Side"/>
                 <ComboBoxItem Content="Bottom"/>
@@ -73,19 +73,19 @@
             </Grid>
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
-              <TextBlock Text="Sample Image" Foreground="#9AA6AF" FontSize="12" VerticalAlignment="Center"/>
-              <TextBox x:Name="SampleImagePathText" Grid.Column="1" MinHeight="28"/>
+              <TextBlock Text="Sample Image" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
+              <TextBox x:Name="SampleImagePathText" Grid.Column="1" MinHeight="34"/>
               <Button Style="{StaticResource MiniBtn}" Grid.Column="2" Content="Browse" Margin="6,0,0,0" Click="OnBrowseSampleImageClick"/>
             </Grid>
 
             <Border Style="{StaticResource FieldBox}" Margin="0,6,0,0">
               <StackPanel>
-                <TextBlock Text="Add Calibration Point" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,8"/>
+                <TextBlock Text="Add Calibration Point" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,8"/>
                 <UniformGrid Columns="4" Margin="0,0,0,8">
-                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Image X" Foreground="#9AA6AF" FontSize="11"/><TextBox x:Name="ImageXText" MinHeight="26"/></StackPanel>
-                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Image Y" Foreground="#9AA6AF" FontSize="11"/><TextBox x:Name="ImageYText" MinHeight="26"/></StackPanel>
-                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Board X mm" Foreground="#9AA6AF" FontSize="11"/><TextBox x:Name="BoardXText" MinHeight="26"/></StackPanel>
-                  <StackPanel><TextBlock Text="Board Y mm" Foreground="#9AA6AF" FontSize="11"/><TextBox x:Name="BoardYText" MinHeight="26"/></StackPanel>
+                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Image X" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="ImageXText" MinHeight="34"/></StackPanel>
+                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Image Y" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="ImageYText" MinHeight="34"/></StackPanel>
+                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Board X mm" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="BoardXText" MinHeight="34"/></StackPanel>
+                  <StackPanel><TextBlock Text="Board Y mm" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="BoardYText" MinHeight="34"/></StackPanel>
                 </UniformGrid>
                 <StackPanel Orientation="Horizontal">
                   <Button Style="{StaticResource ActionBtnBlue}" Content="Add Point" Margin="0,0,6,0" Click="OnAddPointClick"/>
@@ -96,8 +96,8 @@
 
             <Border Style="{StaticResource FieldBox}" Margin="0,10,0,0">
               <StackPanel>
-                <TextBlock Text="Transform Status" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,4"/>
-                <TextBlock x:Name="TransformStatusText" Text="Add at least two points to calculate an approximate 2D transform." Foreground="#DCE5EB" FontSize="11.5" TextWrapping="Wrap"/>
+                <TextBlock Text="Transform Status" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,4"/>
+                <TextBlock x:Name="TransformStatusText" Text="Add at least two points to calculate an approximate 2D transform." Foreground="#DCE5EB" FontSize="14" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -105,7 +105,7 @@
           <Border Grid.Row="3" Margin="10,0,10,10" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
             <Grid>
               <TextBlock x:Name="EmptyImageText" Text="Load a sample calibration image. Optional: click the preview to fill Image X/Y fields."
-                         Foreground="#68757D" FontSize="12" TextWrapping="Wrap" TextAlignment="Center"
+                         Foreground="#68757D" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
                          HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"/>
               <Image x:Name="CalibrationImage" Stretch="Uniform" MouseLeftButtonDown="OnCalibrationImageClick"/>
             </Grid>
@@ -122,7 +122,7 @@
             <RowDefinition Height="160"/>
           </Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-            <TextBlock Text="Calibration Points" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            <TextBlock Text="Calibration Points" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
           <DataGrid Grid.Row="1" x:Name="PointsGrid" AutoGenerateColumns="False" Margin="0,0,0,0">
             <DataGrid.Columns>
@@ -135,10 +135,10 @@
           </DataGrid>
           <Border Grid.Row="3" Style="{StaticResource FieldBox}" Margin="8">
             <StackPanel>
-              <TextBlock Text="Saved Profile Details" Foreground="#7F8C95" FontSize="10" Margin="0,0,0,6"/>
-              <TextBlock x:Name="SavedProfileText" Text="No saved profile loaded." Foreground="#DCE5EB" FontWeight="Bold" FontSize="11.5" TextWrapping="Wrap"/>
+              <TextBlock Text="Saved Profile Details" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,6"/>
+              <TextBlock x:Name="SavedProfileText" Text="No saved profile loaded." Foreground="#DCE5EB" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
               <TextBlock Text="Coordinate mapping shown in Main Inspection is approximate board-mm evidence for planning only. Stage 2 camera calibration and Stage 3 robot coordinate validation are still required."
-                         Foreground="#8B969E" FontSize="10.5" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                         Foreground="#8B969E" FontSize="14" TextWrapping="Wrap" Margin="0,8,0,0"/>
             </StackPanel>
           </Border>
         </Grid>
@@ -146,3 +146,4 @@
     </Grid>
   </Grid>
 </UserControl>
+

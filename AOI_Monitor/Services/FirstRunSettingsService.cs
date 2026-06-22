@@ -30,8 +30,9 @@ public static class FirstRunSettingsService
             var json = File.ReadAllText(SettingsPath);
             _cached = JsonSerializer.Deserialize<FirstRunSettings>(json) ?? new FirstRunSettings();
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"First-run settings load fallback used: {ex.Message}");
             _cached = new FirstRunSettings();
         }
 

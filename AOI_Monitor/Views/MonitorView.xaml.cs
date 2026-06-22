@@ -14,7 +14,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class MonitorView : UserControl
+public partial class MonitorView : UserControl, IReleasablePageResources
 {
     private readonly ObservableCollection<DefectRow> _defects = new();
     private readonly ObservableCollection<AlarmRow> _alarms = new();
@@ -83,10 +83,10 @@ public partial class MonitorView : UserControl
             IntegrationBoundaryRegistry.EmergencyStopMonitor = new NullEmergencyStopMonitor();
     }
 
-    private void OnWorkflowStateChanged() => Dispatcher.Invoke(RefreshFromState);
-    private void OnEngineConfigurationChanged() => Dispatcher.Invoke(RefreshHeader);
-    private void OnLightingSettingsChanged() => Dispatcher.Invoke(RefreshHeader);
-    private void OnRobotCycleStateChanged(RobotCycleState state) => Dispatcher.Invoke(UpdateRobotSimulationStatus);
+    private void OnWorkflowStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshFromState);
+    private void OnEngineConfigurationChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshHeader);
+    private void OnLightingSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshHeader);
+    private void OnRobotCycleStateChanged(RobotCycleState state) => UiDispatcher.InvokeIfAvailable(Dispatcher, UpdateRobotSimulationStatus);
 
     private void OnOpenDispositionClick(object sender, RoutedEventArgs e) => Navigate("review");
     private void OnOpenCompareClick(object sender, RoutedEventArgs e) => Navigate("compare");
@@ -207,6 +207,14 @@ public partial class MonitorView : UserControl
             var result = await _robotCycleService.LoadAsync(BuildLoadCommand(), token);
             LogRobotCommandResult("ROBOT LOAD", result);
         }
+        catch (OperationCanceledException)
+        {
+            LogEvent("ROBOT LOAD", "Robot load canceled.");
+        }
+        catch (Exception ex)
+        {
+            HandleRobotOperationException("ROBOT LOAD", ex);
+        }
         finally
         {
             EndRobotOperation();
@@ -237,6 +245,14 @@ public partial class MonitorView : UserControl
             if (analysis is not null)
                 LogEvent("ROBOT INSPECT", $"Inspection step completed through cycle service: {analysis.Verdict}.");
         }
+        catch (OperationCanceledException)
+        {
+            LogEvent("ROBOT INSPECT", "Robot inspect canceled.");
+        }
+        catch (Exception ex)
+        {
+            HandleRobotOperationException("ROBOT INSPECT", ex);
+        }
         finally
         {
             EndRobotOperation();
@@ -252,6 +268,14 @@ public partial class MonitorView : UserControl
         {
             var result = await _robotCycleService.UnloadAsync(BuildUnloadCommand(), token);
             LogRobotCommandResult("ROBOT UNLOAD", result);
+        }
+        catch (OperationCanceledException)
+        {
+            LogEvent("ROBOT UNLOAD", "Robot unload canceled.");
+        }
+        catch (Exception ex)
+        {
+            HandleRobotOperationException("ROBOT UNLOAD", ex);
         }
         finally
         {
@@ -281,6 +305,14 @@ public partial class MonitorView : UserControl
         {
             var result = await _robotCycleService.ResetAsync(token);
             LogRobotCommandResult("ROBOT RESET", result);
+        }
+        catch (OperationCanceledException)
+        {
+            LogEvent("ROBOT RESET", "Robot reset canceled.");
+        }
+        catch (Exception ex)
+        {
+            HandleRobotOperationException("ROBOT RESET", ex);
         }
         finally
         {
@@ -313,6 +345,14 @@ public partial class MonitorView : UserControl
         {
             await RunRobotCycleAsync(token);
         }
+        catch (OperationCanceledException)
+        {
+            LogEvent("ROBOT CYCLE", "Robot cycle canceled.");
+        }
+        catch (Exception ex)
+        {
+            HandleRobotOperationException("ROBOT CYCLE", ex);
+        }
         finally
         {
             EndRobotOperation();
@@ -342,6 +382,11 @@ public partial class MonitorView : UserControl
         {
             RobotAcceptanceStatusText.Text = "Robot acceptance: canceled";
             LogEvent("ROBOT ACCEPTANCE", "Robot acceptance canceled.");
+        }
+        catch (Exception ex)
+        {
+            RobotAcceptanceStatusText.Text = "Robot acceptance: failed safely";
+            HandleRobotOperationException("ROBOT ACCEPTANCE", ex);
         }
         finally
         {
@@ -518,18 +563,22 @@ public partial class MonitorView : UserControl
 
     private void LoadImage(string imagePath)
     {
-        var bitmap = new BitmapImage();
-        bitmap.BeginInit();
-        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-        bitmap.UriSource = new Uri(imagePath, UriKind.Absolute);
-        bitmap.EndInit();
-        bitmap.Freeze();
+        var bitmap = ImageCacheService.LoadBitmap(imagePath, decodePixelWidth: 1400);
 
         _currentBitmap = bitmap;
         InspectionImage.Source = bitmap;
         EmptyImageText.Visibility = Visibility.Collapsed;
         ImageStatusText.Text = Path.GetFileName(imagePath);
         LogEvent("NEXT BOARD", $"Loaded simulated board image: {Path.GetFileName(imagePath)}.");
+    }
+
+    public void ReleasePageResources()
+    {
+        _currentBitmap = null;
+        InspectionImage.Source = null;
+        DefectOverlayCanvas.Children.Clear();
+        EmptyImageText.Visibility = Visibility.Visible;
+        ImageCacheService.ClearOnPageUnload();
     }
 
     private AnalysisResult? RunInspection(string imagePath)
@@ -878,6 +927,21 @@ public partial class MonitorView : UserControl
         LogEvent(
             result.Accepted ? eventName : $"{eventName} WARNING",
             $"{result.Message} Status={result.Status}; state={_robotCycleService.CurrentState}; elapsed={elapsedMs:F0} ms.");
+    }
+
+    private void HandleRobotOperationException(string operationName, Exception ex)
+    {
+        var report = CrashReportService.WriteReport(new CrashReportRequest
+        {
+            Exception = ex,
+            OperationName = operationName,
+            CurrentPage = "Main Inspection",
+            IsFatal = false,
+            IsUiThread = true,
+        });
+
+        LogEvent("ROBOT ERROR", $"{operationName} failed safely. Diagnostic: {Path.GetFileName(report.ReportPath)}");
+        MessageBox.Show(report.OperatorMessage, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private LoadCommand BuildLoadCommand()

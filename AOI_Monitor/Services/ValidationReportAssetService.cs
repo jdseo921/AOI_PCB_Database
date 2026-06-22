@@ -47,6 +47,7 @@ public static class ValidationReportAssetService
                 var fileName = $"{images.Count + 1:00}_{SanitizeFileName(Path.GetFileNameWithoutExtension(row.Image))}_annotated.png";
                 var path = Path.Combine(outputFolder, fileName);
                 SavePng(CreateAnnotatedBitmap(row), path);
+                MemoryDiagnosticsService.RecordExportCheckpoint("Validation report sample image export", images.Count + 1);
                 images.Add(new ReportImageReference(
                     CombineRelativePath(relativeFolder, fileName),
                     $"{row.Image} - {row.EngineResult} / {row.PassFail}"));
@@ -114,15 +115,7 @@ public static class ValidationReportAssetService
     }
 
     private static BitmapSource LoadBitmap(string path)
-    {
-        var bmp = new BitmapImage();
-        bmp.BeginInit();
-        bmp.CacheOption = BitmapCacheOption.OnLoad;
-        bmp.UriSource = new Uri(path, UriKind.Absolute);
-        bmp.EndInit();
-        bmp.Freeze();
-        return bmp;
-    }
+        => ImageCacheService.LoadBitmap(path, cache: false);
 
     private static void SavePng(BitmapSource bitmap, string path)
     {

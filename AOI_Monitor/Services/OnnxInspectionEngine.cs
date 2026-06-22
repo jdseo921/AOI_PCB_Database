@@ -327,8 +327,9 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
             result.BoardId = state.BoardProgram;
             result.OperatorId = state.OperatorWithRole;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"ONNX analysis workflow context could not be applied: {ex.Message}");
         }
     }
 
@@ -600,8 +601,9 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
 
             return sum / (count / 4.0);
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"ONNX brightness estimate fallback used: {ex.Message}");
             return 0;
         }
         finally

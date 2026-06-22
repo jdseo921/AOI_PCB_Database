@@ -2380,7 +2380,7 @@ public static class AoiDatabase
             ? $"ISSUE-{now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}"
             : issue.IssueId.Trim();
         issue.CreatedAtUtc = issue.CreatedAtUtc == DateTime.MinValue ? now : issue.CreatedAtUtc.ToUniversalTime();
-        if (issue.Status is PilotIssueStatus.Closed or PilotIssueStatus.Waived or PilotIssueStatus.Fixed)
+        if (issue.Status is PilotIssueStatus.Closed or PilotIssueStatus.Waived or PilotIssueStatus.Fixed or PilotIssueStatus.Verified)
             issue.ClosedAtUtc ??= now;
         else
             issue.ClosedAtUtc = null;
@@ -2392,10 +2392,12 @@ public static class AoiDatabase
         command.CommandText =
             """
             INSERT INTO PilotIssues
-                (IssueId, CreatedAtUtc, Category, Severity, BoardModel, LotId, ImagePath, RelatedInspectionId,
+                (IssueId, CreatedAtUtc, Category, Severity, BoardModel, LotId, ImagePath, PageName, ReproductionSteps,
+                 ExpectedBehavior, ActualBehavior, ScreenshotPath, RelatedInspectionId,
                  RelatedAcceptanceRunId, Status, Owner, Notes, Resolution, ClosedAtUtc)
             VALUES
-                ($issueId, $createdAtUtc, $category, $severity, $boardModel, $lotId, $imagePath, $relatedInspectionId,
+                ($issueId, $createdAtUtc, $category, $severity, $boardModel, $lotId, $imagePath, $pageName, $reproductionSteps,
+                 $expectedBehavior, $actualBehavior, $screenshotPath, $relatedInspectionId,
                  $relatedAcceptanceRunId, $status, $owner, $notes, $resolution, $closedAtUtc)
             ON CONFLICT(IssueId) DO UPDATE SET
                 Category = excluded.Category,
@@ -2403,6 +2405,11 @@ public static class AoiDatabase
                 BoardModel = excluded.BoardModel,
                 LotId = excluded.LotId,
                 ImagePath = excluded.ImagePath,
+                PageName = excluded.PageName,
+                ReproductionSteps = excluded.ReproductionSteps,
+                ExpectedBehavior = excluded.ExpectedBehavior,
+                ActualBehavior = excluded.ActualBehavior,
+                ScreenshotPath = excluded.ScreenshotPath,
                 RelatedInspectionId = excluded.RelatedInspectionId,
                 RelatedAcceptanceRunId = excluded.RelatedAcceptanceRunId,
                 Status = excluded.Status,
@@ -2478,6 +2485,11 @@ public static class AoiDatabase
         {
             where.Add("LotId LIKE $lotId");
             command.Parameters.AddWithValue("$lotId", $"%{filter.LotId.Trim()}%");
+        }
+        if (!string.IsNullOrWhiteSpace(filter.PageName))
+        {
+            where.Add("PageName LIKE $pageName");
+            command.Parameters.AddWithValue("$pageName", $"%{filter.PageName.Trim()}%");
         }
 
         command.CommandText =
@@ -4032,6 +4044,11 @@ public static class AoiDatabase
             BoardModel = reader.GetString(reader.GetOrdinal("BoardModel")),
             LotId = reader.GetString(reader.GetOrdinal("LotId")),
             ImagePath = reader.GetString(reader.GetOrdinal("ImagePath")),
+            PageName = GetStringIfColumnExists(reader, "PageName"),
+            ReproductionSteps = GetStringIfColumnExists(reader, "ReproductionSteps"),
+            ExpectedBehavior = GetStringIfColumnExists(reader, "ExpectedBehavior"),
+            ActualBehavior = GetStringIfColumnExists(reader, "ActualBehavior"),
+            ScreenshotPath = GetStringIfColumnExists(reader, "ScreenshotPath"),
             RelatedInspectionId = reader.GetString(reader.GetOrdinal("RelatedInspectionId")),
             RelatedAcceptanceRunId = reader.GetString(reader.GetOrdinal("RelatedAcceptanceRunId")),
             Status = Enum.TryParse<PilotIssueStatus>(statusText, ignoreCase: true, out var status) ? status : PilotIssueStatus.Open,
@@ -4042,6 +4059,17 @@ public static class AoiDatabase
                 ? null
                 : ParseDateTime(reader.GetString(reader.GetOrdinal("ClosedAtUtc"))),
         };
+    }
+
+    private static string GetStringIfColumnExists(SqliteDataReader reader, string columnName)
+    {
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            if (string.Equals(reader.GetName(i), columnName, StringComparison.OrdinalIgnoreCase))
+                return reader.IsDBNull(i) ? string.Empty : reader.GetString(i);
+        }
+
+        return string.Empty;
     }
 
     private static PilotIssueEvent ReadPilotIssueEvent(SqliteDataReader reader)
@@ -4098,6 +4126,11 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$boardModel", issue.BoardModel?.Trim() ?? string.Empty);
         command.Parameters.AddWithValue("$lotId", issue.LotId?.Trim() ?? string.Empty);
         command.Parameters.AddWithValue("$imagePath", issue.ImagePath?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$pageName", issue.PageName?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$reproductionSteps", issue.ReproductionSteps?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$expectedBehavior", issue.ExpectedBehavior?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$actualBehavior", issue.ActualBehavior?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$screenshotPath", issue.ScreenshotPath?.Trim() ?? string.Empty);
         command.Parameters.AddWithValue("$relatedInspectionId", issue.RelatedInspectionId?.Trim() ?? string.Empty);
         command.Parameters.AddWithValue("$relatedAcceptanceRunId", issue.RelatedAcceptanceRunId?.Trim() ?? string.Empty);
         command.Parameters.AddWithValue("$status", issue.Status.ToString());
@@ -5242,8 +5275,9 @@ public static class AoiDatabase
         {
             return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"String-list JSON deserialize fallback used: {ex.Message}");
             return Array.Empty<string>();
         }
     }
@@ -5254,8 +5288,9 @@ public static class AoiDatabase
         {
             return JsonSerializer.Deserialize<T>(json) ?? fallback;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"JSON deserialize fallback used for {typeof(T).Name}: {ex.Message}");
             return fallback;
         }
     }
@@ -5455,6 +5490,11 @@ public static class AoiDatabase
                 BoardModel TEXT NOT NULL DEFAULT '',
                 LotId TEXT NOT NULL DEFAULT '',
                 ImagePath TEXT NOT NULL DEFAULT '',
+                PageName TEXT NOT NULL DEFAULT '',
+                ReproductionSteps TEXT NOT NULL DEFAULT '',
+                ExpectedBehavior TEXT NOT NULL DEFAULT '',
+                ActualBehavior TEXT NOT NULL DEFAULT '',
+                ScreenshotPath TEXT NOT NULL DEFAULT '',
                 RelatedInspectionId TEXT NOT NULL DEFAULT '',
                 RelatedAcceptanceRunId TEXT NOT NULL DEFAULT '',
                 Status TEXT NOT NULL DEFAULT 'Open',
@@ -5483,6 +5523,15 @@ public static class AoiDatabase
             CREATE INDEX IF NOT EXISTS IX_PilotIssueEvents_IssueId ON PilotIssueEvents(IssueId, CreatedAtUtc);
             """;
         command.ExecuteNonQuery();
+        AddColumnIfMissing(connection, transaction, "PilotIssues", "PageName", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, transaction, "PilotIssues", "ReproductionSteps", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, transaction, "PilotIssues", "ExpectedBehavior", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, transaction, "PilotIssues", "ActualBehavior", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(connection, transaction, "PilotIssues", "ScreenshotPath", "TEXT NOT NULL DEFAULT ''");
+        using var indexCommand = connection.CreateCommand();
+        indexCommand.Transaction = transaction;
+        indexCommand.CommandText = "CREATE INDEX IF NOT EXISTS IX_PilotIssues_PageName ON PilotIssues(PageName);";
+        indexCommand.ExecuteNonQuery();
     }
 
     internal static void EnsureDefectTaxonomyTables(SqliteConnection connection, SqliteTransaction? transaction = null)

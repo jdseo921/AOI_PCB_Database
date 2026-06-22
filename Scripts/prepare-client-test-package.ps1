@@ -1,0 +1,129 @@
+param(
+    [string]$Configuration = "Release",
+    [string]$Runtime = "win-x64",
+    [string]$OutputRoot = "",
+    [switch]$FrameworkDependent,
+    [switch]$SkipClientDemoGate,
+    [switch]$IncludeTemplates,
+    [switch]$NoRestore,
+    [switch]$Zip
+)
+
+$ErrorActionPreference = "Stop"
+
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Resolve-Path (Join-Path $scriptRoot "..")
+$publishScript = Join-Path $scriptRoot "publish.ps1"
+
+if (!(Test-Path $publishScript)) {
+    throw "Publish script was not found: $publishScript"
+}
+
+$publishArgs = @(
+    "-Configuration", $Configuration,
+    "-Runtime", $Runtime,
+    "-IncludeDocs",
+    "-IncludeSampleManifestTemplate"
+)
+
+if (-not $FrameworkDependent) {
+    $publishArgs += "-SelfContained"
+}
+
+if (-not $SkipClientDemoGate) {
+    $publishArgs += "-ClientDemoGate"
+}
+
+if ($IncludeTemplates) {
+    $publishArgs += "-IncludeTemplates"
+}
+
+if ($NoRestore) {
+    $publishArgs += "-NoRestore"
+}
+
+if (![string]::IsNullOrWhiteSpace($OutputRoot)) {
+    $publishArgs += @("-OutputRoot", $OutputRoot)
+}
+
+Write-Host "Preparing AOI Monitor client test package..."
+Write-Host "Repository:       $repoRoot"
+Write-Host "Runtime:          $Runtime"
+Write-Host "Mode:             $(if ($FrameworkDependent) { 'framework-dependent' } else { 'self-contained' })"
+Write-Host "Client demo gate: $(if ($SkipClientDemoGate) { 'skipped by caller' } else { 'required' })"
+Write-Host "Zip:              $(if ($Zip) { 'yes' } else { 'no' })"
+
+& pwsh $publishScript @publishArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "Client test package preparation failed during publish."
+}
+
+$releaseRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    Join-Path $repoRoot "Release"
+} else {
+    $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputRoot)
+}
+
+$releaseDir = Get-ChildItem -LiteralPath $releaseRoot -Directory -Filter "AOI_Monitor_PoC_*" -ErrorAction Stop |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1
+
+if ($null -eq $releaseDir) {
+    throw "Publish completed but no AOI_Monitor_PoC_* release folder was found under $releaseRoot."
+}
+
+$handoffReadmePath = Join-Path $releaseDir.FullName "CLIENT_HANDOFF_README.md"
+$handoffText = @'
+# AOI Monitor Client Test Handoff
+
+This folder is ready for client software evaluation.
+
+## Quick Start
+
+1. Open `app/`.
+2. Run `AOI_Monitor.exe`.
+3. Use Demo Mode unless LocalUsers authentication was configured for this evaluation.
+4. Use Admin or Engineer role for setup, import, validation, and export tests.
+5. Follow `Docs/Client_Test_Kit_Guide.md`.
+
+## Suggested First Tests
+
+1. Confirm the readiness panel labels simulated/mock/not-connected features.
+2. Import a small non-confidential PCB image.
+3. Compare it with a golden/reference image.
+4. Record one disposition.
+5. Run a small AI Model Test batch.
+6. Export inspection/review CSV evidence.
+7. Export Factory Readiness, Client Demo Readiness, and Standards Traceability reports.
+
+## Evidence To Return
+
+- Factory readiness package.
+- Standards traceability matrix export.
+- Client demo readiness gate export.
+- Screenshots of any warnings, alarms, or layout issues.
+- Crash report folder if a crash occurs.
+
+## Boundary
+
+This package is standards-aligned project evidence for client evaluation. It is not formal ISO, IEC, ISA, safety, cybersecurity, or production-equipment certification. Simulated camera/robot/MES evidence must not be treated as real hardware validation.
+'@
+
+Set-Content -LiteralPath $handoffReadmePath -Value $handoffText -Encoding UTF8
+
+$zipPath = $null
+if ($Zip) {
+    $zipPath = Join-Path $releaseRoot "$($releaseDir.Name).zip"
+    if (Test-Path $zipPath) {
+        Remove-Item -LiteralPath $zipPath -Force
+    }
+
+    Compress-Archive -LiteralPath $releaseDir.FullName -DestinationPath $zipPath -Force
+}
+
+Write-Host "Client test package ready:"
+Write-Host $releaseDir.FullName
+if ($Zip) {
+    Write-Host "Zip package:"
+    Write-Host $zipPath
+}

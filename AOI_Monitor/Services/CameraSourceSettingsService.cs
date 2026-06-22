@@ -32,8 +32,9 @@ public static class CameraSourceSettingsService
             var json = File.ReadAllText(SettingsPath);
             _cached = JsonSerializer.Deserialize<CameraSourceSettings>(json) ?? new CameraSourceSettings();
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Camera source settings load fallback used: {ex.Message}");
             _cached = new CameraSourceSettings();
         }
 

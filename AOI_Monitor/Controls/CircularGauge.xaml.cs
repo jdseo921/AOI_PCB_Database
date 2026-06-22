@@ -79,23 +79,23 @@ public partial class CircularGauge : UserControl
 
         if (value >= 99.9)
         {
-            ArcPath.Data   = new EllipseGeometry(new Point(cx, cy), r, r);
+            ArcPath.Data = new EllipseGeometry(new Point(cx, cy), r, r);
             ArcPath.Stroke = color;
             return;
         }
 
-        double angleDeg  = value / 100.0 * 360.0;
-        double startRad  = -Math.PI / 2;
-        double endRad    = startRad + angleDeg * Math.PI / 180.0;
+        double angleDeg = value / 100.0 * 360.0;
+        double startRad = -Math.PI / 2;
+        double endRad = startRad + angleDeg * Math.PI / 180.0;
 
         var start = new Point(cx + r * Math.Cos(startRad), cy + r * Math.Sin(startRad));
-        var end   = new Point(cx + r * Math.Cos(endRad),   cy + r * Math.Sin(endRad));
+        var end = new Point(cx + r * Math.Cos(endRad), cy + r * Math.Sin(endRad));
 
         var fig = new PathFigure { StartPoint = start };
         fig.Segments.Add(new ArcSegment(end, new Size(r, r), 0,
                                         angleDeg > 180, SweepDirection.Clockwise, true));
 
-        ArcPath.Data   = new PathGeometry(new[] { fig });
+        ArcPath.Data = new PathGeometry(new[] { fig });
         ArcPath.Stroke = color;
     }
 }

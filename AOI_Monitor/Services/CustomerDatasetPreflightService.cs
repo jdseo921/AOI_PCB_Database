@@ -68,18 +68,30 @@ public static class CustomerDatasetPreflightService
 
         if (string.IsNullOrWhiteSpace(datasetFolder) || !Directory.Exists(datasetFolder))
         {
-            result.BlockingFailures.Add($"Dataset folder was not found: {datasetFolder}");
+            result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                $"The dataset folder was not found: {datasetFolder}",
+                "The customer image set cannot be checked.",
+                "Choose a readable dataset folder before running preflight."));
             return Finalize(result);
         }
 
         if (criteria.RequireImagesSubfolder && !Directory.Exists(Path.Combine(datasetFolder, "images")))
-            result.BlockingFailures.Add("Dataset folder must contain an images/ subfolder.");
+            result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                "The dataset folder has no images/ subfolder.",
+                "The app cannot find the board images to test.",
+                "Add the images/ folder or select the correct dataset root."));
         if (criteria.RequireGoldenSubfolder && !Directory.Exists(Path.Combine(datasetFolder, "golden")))
-            result.Warnings.Add("Dataset folder should contain a golden/ subfolder for reference images.");
+            result.Warnings.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                "The dataset folder has no golden/ subfolder.",
+                "Golden images are the reference images used to compare known-good boards.",
+                "Add golden/ reference images when customer validation requires image comparison."));
 
         if (string.IsNullOrWhiteSpace(manifestPath) || !File.Exists(manifestPath))
         {
-            result.BlockingFailures.Add($"Manifest CSV was not found: {manifestPath}");
+            result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                $"The manifest CSV was not found: {manifestPath}",
+                "The app does not know which images are OK, NG, or linked to defects.",
+                "Provide the labeled manifest CSV."));
             return Finalize(result);
         }
 
@@ -108,7 +120,10 @@ public static class CustomerDatasetPreflightService
                 if (string.IsNullOrWhiteSpace(entry.ImagePath) || !File.Exists(entry.ImagePath))
                 {
                     result.MissingImageCount++;
-                    result.BlockingFailures.Add($"Image file is missing: {entry.ImagePath ?? "(blank)"}");
+                    result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                        $"An image file is missing: {entry.ImagePath ?? "(blank)"}",
+                        "The validation result would not cover every manifest row.",
+                        "Fix the image path or remove the row from the manifest."));
                     continue;
                 }
 
@@ -121,7 +136,10 @@ public static class CustomerDatasetPreflightService
                 if (string.IsNullOrWhiteSpace(entry.GoldenPath) || !File.Exists(entry.GoldenPath))
                 {
                     result.MissingGoldenCount++;
-                    var message = $"Golden image is missing for {Path.GetFileName(entry.ImagePath)}: {entry.GoldenPath ?? "(blank)"}";
+                    var message = PlainLanguageGlossaryService.EvidenceMissing(
+                        $"Golden image is missing for {Path.GetFileName(entry.ImagePath)}: {entry.GoldenPath ?? "(blank)"}",
+                        "The app cannot compare this board image against the expected reference.",
+                        "Provide the golden image path or mark this dataset as not using golden references.");
                     if (criteria.TreatMissingGoldenAsFailure)
                         result.BlockingFailures.Add(message);
                     else
@@ -152,21 +170,30 @@ public static class CustomerDatasetPreflightService
             result.DefectClassCount = result.DatasetQuality.DefectClassCount;
             result.DuplicateFileHashCount = result.DatasetQuality.DuplicateFileHashes;
             if (result.DuplicateFileHashCount > 0)
-                result.BlockingFailures.Add($"Dataset contains {result.DuplicateFileHashCount} row(s) with duplicate image file hashes.");
+                result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                    $"Dataset contains {result.DuplicateFileHashCount} row(s) with duplicate image file hashes.",
+                    "Duplicate images can make model results look better than they really are.",
+                    "Remove duplicate image rows before client validation."));
             result.SideCoverageCount = rows
                 .Select(row => BatchValidationService.NormalizeSide(row.Side))
                 .Where(side => side != "UNASSIGNED")
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count();
             if (rows.Length > 0 && result.SideCoverageCount == 0)
-                result.BlockingFailures.Add("Manifest must identify side/view coverage for the validation rows.");
+                result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                    "The manifest does not identify top/side/bottom view coverage.",
+                    "Operators need to know which board view was inspected.",
+                    "Fill the side/view column for validation rows."));
             result.BlockingFailures.AddRange(result.DatasetQuality.BlockingFailures);
             result.Warnings.AddRange(result.DatasetQuality.Warnings.Where(warning => !warning.Contains("duplicate file hashes", StringComparison.OrdinalIgnoreCase)));
             result.Warnings.AddRange(manifest.Warnings);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
         {
-            result.BlockingFailures.Add($"Preflight could not parse the manifest: {ex.Message}");
+            result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                "Dataset preflight could not read the manifest CSV.",
+                "The dataset cannot be trusted until the label file opens cleanly.",
+                $"Fix file access or CSV format. Detail: {ex.GetType().Name}."));
         }
 
         return Finalize(result);
@@ -187,7 +214,10 @@ public static class CustomerDatasetPreflightService
         foreach (var column in RequiredManifestColumns)
         {
             if (!headers.Contains(column))
-                result.BlockingFailures.Add($"Manifest CSV is missing required column '{column}'.");
+                result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                    $"Manifest CSV is missing required column '{column}'.",
+                    "The app cannot verify all required dataset evidence.",
+                    $"Add the '{column}' column."));
         }
     }
 
@@ -206,7 +236,10 @@ public static class CustomerDatasetPreflightService
         if (BatchValidationService.NormalizeSide(entry.Side) == "UNASSIGNED")
         {
             result.MissingMetadataCount++;
-            result.BlockingFailures.Add($"Manifest row is missing side/view metadata for {Path.GetFileName(entry.ImagePath ?? string.Empty)}.");
+            result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                $"Manifest row is missing side/view metadata for {Path.GetFileName(entry.ImagePath ?? string.Empty)}.",
+                "The validation evidence cannot show which board view was checked.",
+                "Fill the side/view field."));
         }
 
         var hasAnyRoiMetadata =
@@ -221,7 +254,10 @@ public static class CustomerDatasetPreflightService
         if (hasAnyRoiMetadata && !hasAllRoiMetadata)
         {
             result.MissingMetadataCount++;
-            result.BlockingFailures.Add($"ROI/refdes metadata is incomplete for {Path.GetFileName(entry.ImagePath ?? string.Empty)}. Provide refdes, roi_id, and roi_type together.");
+            result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
+                $"ROI/refdes metadata is incomplete for {Path.GetFileName(entry.ImagePath ?? string.Empty)}.",
+                $"{PlainLanguageGlossaryService.Explain("ROI")} Missing ROI/refdes data makes defect location evidence unclear.",
+                "Provide refdes, roi_id, and roi_type together."));
         }
     }
 

@@ -49,8 +49,9 @@ public static class OperatingModeSettingsService
         {
             _cached = JsonSerializer.Deserialize<OperatingModeSettings>(File.ReadAllText(SettingsPath), JsonOptions) ?? new OperatingModeSettings();
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Operating mode settings load fallback used: {ex.Message}");
             _cached = new OperatingModeSettings();
         }
 

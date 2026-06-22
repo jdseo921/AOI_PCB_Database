@@ -1,0 +1,46 @@
+# Repository quality ownership.
+# These team handles must exist in the jdseo921 organization for GitHub to
+# enforce required review. If the team names differ, update this file before
+# enabling branch protection.
+
+# UI/XAML changes require UI quality review.
+AOI_Monitor/App.xaml @jdseo921/ui-quality-reviewers
+AOI_Monitor/MainWindow.xaml @jdseo921/ui-quality-reviewers
+AOI_Monitor/MainWindow.xaml.cs @jdseo921/ui-quality-reviewers
+AOI_Monitor/Controls/ @jdseo921/ui-quality-reviewers
+AOI_Monitor/Styles/ @jdseo921/ui-quality-reviewers
+AOI_Monitor/Views/ @jdseo921/ui-quality-reviewers
+AOI_Monitor.UiTests/ @jdseo921/ui-quality-reviewers
+
+# Services, data, and models require software-quality review.
+AOI_Monitor/Data/ @jdseo921/software-quality-reviewers
+AOI_Monitor/Models/ @jdseo921/software-quality-reviewers
+AOI_Monitor/Services/ @jdseo921/software-quality-reviewers
+AOI_Monitor.Tests/ @jdseo921/software-quality-reviewers
+Tools/quality-gates/ @jdseo921/software-quality-reviewers
+
+# Hardware, robot, camera, lighting, traceability, and MES changes require
+# integration review in addition to software-quality review where applicable.
+Templates/ @jdseo921/integration-reviewers
+AOI_Monitor/Models/*Camera* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Models/*CentralSync* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Models/*Lighting* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Models/*Mes* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Models/*MES* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Models/*Robot* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Models/*Traceability* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Services/*Camera* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Services/*CentralSync* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Services/*Integration* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Services/*Lighting* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Services/*Mes* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Services/*MES* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Services/*Robot* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+AOI_Monitor/Services/*Traceability* @jdseo921/software-quality-reviewers @jdseo921/integration-reviewers
+
+# Release, packaging, CI, and governance changes require maintainer review.
+.github/ @jdseo921/maintainers
+Scripts/ @jdseo921/maintainers
+DESIGN.md @jdseo921/maintainers @jdseo921/ui-quality-reviewers
+Docs/Branch_Protection_and_Quality_Gates.md @jdseo921/maintainers
+AOI_PCB_Database.slnx @jdseo921/maintainers

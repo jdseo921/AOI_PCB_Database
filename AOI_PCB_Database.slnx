@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="AOI_Monitor.Tests/AOI_Monitor.Tests.csproj" />
+  <Project Path="AOI_Monitor.UiTests/AOI_Monitor.UiTests.csproj" />
   <Project Path="AOI_Monitor/AOI_Monitor.csproj" />
   <Project Path="Templates/CameraAdapterTemplate/CameraAdapterTemplate.csproj" />
   <Project Path="Templates/LightingAdapterTemplate/LightingAdapterTemplate.csproj" />

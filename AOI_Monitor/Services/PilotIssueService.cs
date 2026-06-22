@@ -45,7 +45,7 @@ public static class PilotIssueService
     {
         var existing = AoiDatabase.GetPilotIssue(issue.IssueId) ?? throw new InvalidOperationException("Pilot issue does not exist.");
         Normalize(issue);
-        if (issue.Status is PilotIssueStatus.Closed or PilotIssueStatus.Waived or PilotIssueStatus.Fixed)
+        if (issue.Status is PilotIssueStatus.Closed or PilotIssueStatus.Waived or PilotIssueStatus.Fixed or PilotIssueStatus.Verified)
             issue.ClosedAtUtc ??= DateTime.UtcNow;
         else
             issue.ClosedAtUtc = null;
@@ -138,11 +138,91 @@ public static class PilotIssueService
             Owner = operatorId,
         }, operatorId);
 
+    public static PilotIssue CreateManualIssue(
+        PilotIssueCategory category,
+        string severity,
+        string pageName,
+        string reproductionSteps,
+        string expectedBehavior,
+        string actualBehavior,
+        string screenshotPath,
+        string owner,
+        string operatorId)
+        => Create(new PilotIssue
+        {
+            Category = category,
+            Severity = severity,
+            PageName = pageName,
+            ReproductionSteps = reproductionSteps,
+            ExpectedBehavior = expectedBehavior,
+            ActualBehavior = actualBehavior,
+            ScreenshotPath = screenshotPath,
+            Owner = owner,
+            Notes = $"{expectedBehavior}\n\nActual: {actualBehavior}".Trim(),
+        }, operatorId);
+
+    public static void CreateCrashIssue(string pageName, string operationName, Exception exception, string crashReportPath, string operatorId)
+        => SafeCreate(new PilotIssue
+        {
+            Category = PilotIssueCategory.Crash,
+            Severity = "Critical",
+            PageName = pageName,
+            ReproductionSteps = $"Operation: {operationName}",
+            ExpectedBehavior = "The app contains the failure and remains usable.",
+            ActualBehavior = $"{exception.GetType().Name}: {CrashReportService.RedactDiagnosticText(exception.Message)}",
+            ScreenshotPath = crashReportPath,
+            Owner = operatorId,
+            Notes = $"Crash report: {crashReportPath}",
+        }, operatorId);
+
+    public static void CreateNavigationPerformanceIssue(string pageName, long durationMilliseconds, string message)
+        => SafeCreate(new PilotIssue
+        {
+            Category = PilotIssueCategory.NavigationPerformance,
+            Severity = durationMilliseconds >= 1000 ? "High" : "Medium",
+            PageName = pageName,
+            ReproductionSteps = $"Switch menu/page to {pageName}.",
+            ExpectedBehavior = "Menu click responds under 100 ms and cached page switch completes under 300 ms.",
+            ActualBehavior = message,
+            Owner = "Engineering",
+            Notes = $"Navigation duration {durationMilliseconds} ms.",
+        }, "SYSTEM");
+
+    public static void CreateLayoutIssue(string pageName, string auditReportPath, string evidence)
+        => SafeCreate(new PilotIssue
+        {
+            Category = PilotIssueCategory.UIClipping,
+            Severity = "High",
+            PageName = pageName,
+            ReproductionSteps = "Run developer Layout Stress audit.",
+            ExpectedBehavior = "No visible text, controls, tables, tabs, or status panels clip at factory resolutions/DPI.",
+            ActualBehavior = evidence,
+            ScreenshotPath = auditReportPath,
+            Owner = "Engineering",
+            Notes = $"Layout audit report: {auditReportPath}",
+        }, "SYSTEM");
+
     public static bool IsCritical(string severity)
         => string.Equals(severity?.Trim(), "Critical", StringComparison.OrdinalIgnoreCase);
 
+    public static bool IsHighOrCritical(string severity)
+        => string.Equals(severity?.Trim(), "Critical", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(severity?.Trim(), "High", StringComparison.OrdinalIgnoreCase);
+
     private static bool IsOpen(PilotIssue issue)
         => issue.Status is PilotIssueStatus.Open or PilotIssueStatus.Investigating;
+
+    private static void SafeCreate(PilotIssue issue, string operatorId)
+    {
+        try
+        {
+            Create(issue, operatorId);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Pilot issue safe-create failed: {ex.Message}");
+        }
+    }
 
     private static void Normalize(PilotIssue issue)
     {
@@ -150,6 +230,11 @@ public static class PilotIssueService
         issue.BoardModel = issue.BoardModel?.Trim() ?? string.Empty;
         issue.LotId = issue.LotId?.Trim() ?? string.Empty;
         issue.ImagePath = issue.ImagePath?.Trim() ?? string.Empty;
+        issue.PageName = issue.PageName?.Trim() ?? string.Empty;
+        issue.ReproductionSteps = SecretProtectionService.RedactKnownSecrets(issue.ReproductionSteps?.Trim() ?? string.Empty);
+        issue.ExpectedBehavior = SecretProtectionService.RedactKnownSecrets(issue.ExpectedBehavior?.Trim() ?? string.Empty);
+        issue.ActualBehavior = SecretProtectionService.RedactKnownSecrets(issue.ActualBehavior?.Trim() ?? string.Empty);
+        issue.ScreenshotPath = issue.ScreenshotPath?.Trim() ?? string.Empty;
         issue.RelatedInspectionId = issue.RelatedInspectionId?.Trim() ?? string.Empty;
         issue.RelatedAcceptanceRunId = issue.RelatedAcceptanceRunId?.Trim() ?? string.Empty;
         issue.Owner = issue.Owner?.Trim() ?? string.Empty;
@@ -167,6 +252,11 @@ public static class PilotIssueService
             issue.BoardModel,
             issue.LotId,
             imagePath = RedactPath(issue.ImagePath, redactImagePaths),
+            issue.PageName,
+            issue.ReproductionSteps,
+            issue.ExpectedBehavior,
+            issue.ActualBehavior,
+            screenshotPath = RedactPath(issue.ScreenshotPath, redactImagePaths),
             issue.RelatedInspectionId,
             issue.RelatedAcceptanceRunId,
             status = issue.Status.ToString(),
@@ -182,9 +272,9 @@ public static class PilotIssueService
         sb.AppendLine("<!doctype html><html><head><meta charset=\"utf-8\"><title>Pilot Issue Report</title>");
         sb.AppendLine("<style>body{font-family:Segoe UI,Arial,sans-serif;margin:24px;color:#17212b;background:#f7f9fb}.hero{background:#fff;border:1px solid #d7e0e8;padding:18px;margin-bottom:16px}.Critical{color:#a12626;font-weight:700}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #d7e0e8;padding:7px;text-align:left;vertical-align:top}th{background:#eef3f7}</style></head><body>");
         sb.AppendLine($"<div class=\"hero\"><h1>Pilot Issue Report</h1><p>Total={summary.Total}; open={summary.Open}; critical open={summary.CriticalOpen}; generated UTC={DateTime.UtcNow:O}</p></div>");
-        sb.AppendLine("<table><tr><th>ID</th><th>Created</th><th>Category</th><th>Severity</th><th>Status</th><th>Board</th><th>Lot</th><th>Image</th><th>Owner</th><th>Notes</th><th>Resolution</th></tr>");
+        sb.AppendLine("<table><tr><th>ID</th><th>Created</th><th>Category</th><th>Severity</th><th>Status</th><th>Page</th><th>Steps</th><th>Expected</th><th>Actual</th><th>Screenshot</th><th>Board</th><th>Lot</th><th>Image</th><th>Owner</th><th>Notes</th><th>Resolution</th></tr>");
         foreach (var issue in issues)
-            sb.AppendLine($"<tr><td>{Html(issue.IssueId)}</td><td>{issue.CreatedAtUtc:O}</td><td>{issue.Category}</td><td class=\"{Html(issue.Severity)}\">{Html(issue.Severity)}</td><td>{issue.Status}</td><td>{Html(issue.BoardModel)}</td><td>{Html(issue.LotId)}</td><td>{Html(RedactPath(issue.ImagePath, redactImagePaths))}</td><td>{Html(issue.Owner)}</td><td>{Html(issue.Notes)}</td><td>{Html(issue.Resolution)}</td></tr>");
+            sb.AppendLine($"<tr><td>{Html(issue.IssueId)}</td><td>{issue.CreatedAtUtc:O}</td><td>{issue.Category}</td><td class=\"{Html(issue.Severity)}\">{Html(issue.Severity)}</td><td>{issue.Status}</td><td>{Html(issue.PageName)}</td><td>{Html(issue.ReproductionSteps)}</td><td>{Html(issue.ExpectedBehavior)}</td><td>{Html(issue.ActualBehavior)}</td><td>{Html(RedactPath(issue.ScreenshotPath, redactImagePaths))}</td><td>{Html(issue.BoardModel)}</td><td>{Html(issue.LotId)}</td><td>{Html(RedactPath(issue.ImagePath, redactImagePaths))}</td><td>{Html(issue.Owner)}</td><td>{Html(issue.Notes)}</td><td>{Html(issue.Resolution)}</td></tr>");
         sb.AppendLine("</table></body></html>");
         return sb.ToString();
     }
@@ -192,7 +282,7 @@ public static class PilotIssueService
     private static string BuildCsv(IReadOnlyList<PilotIssue> issues, bool redactImagePaths)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("IssueId,CreatedAtUtc,Category,Severity,Status,BoardModel,LotId,ImagePath,RelatedInspectionId,RelatedAcceptanceRunId,Owner,Notes,Resolution,ClosedAtUtc");
+        sb.AppendLine("IssueId,CreatedAtUtc,Category,Severity,Status,PageName,ReproductionSteps,ExpectedBehavior,ActualBehavior,ScreenshotPath,BoardModel,LotId,ImagePath,RelatedInspectionId,RelatedAcceptanceRunId,Owner,Notes,Resolution,ClosedAtUtc");
         foreach (var issue in issues)
         {
             sb.AppendLine(string.Join(",",
@@ -201,6 +291,11 @@ public static class PilotIssueService
                 Csv(issue.Category.ToString()),
                 Csv(issue.Severity),
                 Csv(issue.Status.ToString()),
+                Csv(issue.PageName),
+                Csv(issue.ReproductionSteps),
+                Csv(issue.ExpectedBehavior),
+                Csv(issue.ActualBehavior),
+                Csv(RedactPath(issue.ScreenshotPath, redactImagePaths)),
                 Csv(issue.BoardModel),
                 Csv(issue.LotId),
                 Csv(RedactPath(issue.ImagePath, redactImagePaths)),

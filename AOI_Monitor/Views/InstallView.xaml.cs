@@ -23,7 +23,7 @@ public partial class InstallView : UserControl
     public InstallView()
     {
         InitializeComponent();
-        RuntimeGrid.ItemsSource  = Runtime;
+        RuntimeGrid.ItemsSource = Runtime;
         BoundaryGrid.ItemsSource = Boundary;
     }
 }

@@ -33,8 +33,9 @@ public static class CentralSyncSettingsService
             _cached = JsonSerializer.Deserialize<CentralSyncSettings>(File.ReadAllText(SettingsPath)) ?? new CentralSyncSettings();
             _cached.SharedSecret = SecretProtectionService.Unprotect(_cached.SharedSecret);
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Central sync settings load fallback used: {ex.Message}");
             _cached = new CentralSyncSettings();
         }
 

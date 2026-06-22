@@ -32,6 +32,18 @@ public sealed class CompletionAssessmentCriterion
 
 public static class CompletionAssessmentService
 {
+    public static async Task<CompletionAssessmentReport> AssessAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var report = Assess();
+            cancellationToken.ThrowIfCancellationRequested();
+            return report;
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
     public static CompletionAssessmentReport Assess()
     {
         AoiDatabase.Initialize();

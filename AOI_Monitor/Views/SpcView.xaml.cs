@@ -1,46 +1,70 @@
+using System.IO;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.IO;
 using AOI_Monitor.Data;
 using AOI_Monitor.Models;
+using AOI_Monitor.Services;
 
 namespace AOI_Monitor.Views;
 
-public partial class SpcView : UserControl
+public partial class SpcView : UserControl, IAsyncNavigationPage
 {
     public SpcView()
     {
         InitializeComponent();
-        RefreshFromState();
     }
 
-    public void RefreshFromState()
+    public Task OnNavigatedToAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
+
+    public async Task RefreshAsync(CancellationToken cancellationToken)
     {
-        var healthRows = AoiDatabase.GetDatabaseHealthRows();
-        DbHealthGrid.ItemsSource = healthRows;
+        var snapshot = await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var healthRows = AoiDatabase.GetDatabaseHealthRows();
+            var inspections = AoiDatabase.GetInspectionHistory(new LogFilter());
+            var reviews = AoiDatabase.GetReviewEvents(new LogFilter());
+            var images = AoiDatabase.GetImportedImages();
+            var ok = inspections.Count(row => string.Equals(row.Verdict, "OK", StringComparison.OrdinalIgnoreCase));
+            var ng = inspections.Count(row => string.Equals(row.Verdict, "NG", StringComparison.OrdinalIgnoreCase));
+            var review = inspections.Count(row => string.Equals(row.Verdict, "REVIEW", StringComparison.OrdinalIgnoreCase));
+            var brokenLinks = images.Count(image => string.IsNullOrWhiteSpace(image.VaultPath) || !File.Exists(image.VaultPath));
+            var yield = inspections.Count == 0
+                ? "--"
+                : (ok / (double)inspections.Count).ToString("P1", System.Globalization.CultureInfo.InvariantCulture);
+            return new SpcSnapshot(healthRows, inspections.Count, reviews.Count, images.Count, ok, ng, review, brokenLinks, yield);
+        }, cancellationToken);
 
-        var inspections = AoiDatabase.GetInspectionHistory(new LogFilter());
-        var reviews = AoiDatabase.GetReviewEvents(new LogFilter());
-        var images = AoiDatabase.GetImportedImages();
-        var ok = inspections.Count(row => string.Equals(row.Verdict, "OK", StringComparison.OrdinalIgnoreCase));
-        var ng = inspections.Count(row => string.Equals(row.Verdict, "NG", StringComparison.OrdinalIgnoreCase));
-        var review = inspections.Count(row => string.Equals(row.Verdict, "REVIEW", StringComparison.OrdinalIgnoreCase));
-        var brokenLinks = images.Count(image => string.IsNullOrWhiteSpace(image.VaultPath) || !File.Exists(image.VaultPath));
-        var yield = inspections.Count == 0
-            ? "--"
-            : (ok / (double)inspections.Count).ToString("P1", System.Globalization.CultureInfo.InvariantCulture);
+        DbHealthGrid.ItemsSource = snapshot.HealthRows;
 
-        InspectionCountText.Text = inspections.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
-        VerdictBreakdownText.Text = $"{ok:N0} / {ng:N0} / {review:N0}";
-        YieldText.Text = yield;
-        ReviewEventCountText.Text = reviews.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
-        ImportedImageCountText.Text = images.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
-        BrokenImageLinksText.Text = brokenLinks.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
-        BrokenImageLinksText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(brokenLinks > 0 ? "#F13B3F" : "#DCE5EB"));
+        InspectionCountText.Text = snapshot.InspectionCount.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+        VerdictBreakdownText.Text = $"{snapshot.Ok:N0} / {snapshot.Ng:N0} / {snapshot.Review:N0}";
+        YieldText.Text = snapshot.Yield;
+        ReviewEventCountText.Text = snapshot.ReviewCount.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+        ImportedImageCountText.Text = snapshot.ImageCount.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+        BrokenImageLinksText.Text = snapshot.BrokenLinks.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+        BrokenImageLinksText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(snapshot.BrokenLinks > 0 ? "#F13B3F" : "#DCE5EB"));
 
-        DatabaseWarningText.Text = brokenLinks > 0
-            ? $"SQLite warning: {brokenLinks:N0} imported image vault link(s) are missing. Run Verify Paths in Log & Export."
+        DatabaseWarningText.Text = snapshot.BrokenLinks > 0
+            ? $"SQLite warning: {snapshot.BrokenLinks:N0} imported image vault link(s) are missing. Run Verify Paths in Log & Export."
             : "SQLite summary uses local database counts. Trend chart is prototype data, not live factory SPC.";
-        DatabaseWarningText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(brokenLinks > 0 ? "#F27777" : "#E1A334"));
+        DatabaseWarningText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(snapshot.BrokenLinks > 0 ? "#F27777" : "#E1A334"));
     }
+
+    public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);
+
+    public void CancelWork()
+    {
+    }
+
+    private sealed record SpcSnapshot(
+        IReadOnlyList<DbHealthRow> HealthRows,
+        int InspectionCount,
+        int ReviewCount,
+        int ImageCount,
+        int Ok,
+        int Ng,
+        int Review,
+        int BrokenLinks,
+        string Yield);
 }

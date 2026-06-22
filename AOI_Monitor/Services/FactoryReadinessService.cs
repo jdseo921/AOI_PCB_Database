@@ -16,6 +16,21 @@ public static class FactoryReadinessService
         WriteIndented = true,
     };
 
+    public static async Task<FactoryReadinessReport> EvaluateAsync(
+        FactoryReadinessCriteria? criteria = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var report = await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = Evaluate(criteria);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
+        }, cancellationToken).ConfigureAwait(false);
+        return report;
+    }
+
     public static FactoryReadinessReport Evaluate(FactoryReadinessCriteria? criteria = null)
     {
         criteria ??= CriteriaForProfile(DeploymentProfileSettingsService.Load());
@@ -65,6 +80,7 @@ public static class FactoryReadinessService
         AddRobot(report, criteria, robot);
         AddMes(report, criteria, mes);
         AddCentralSync(report, criteria, centralSync);
+        AddAlarmEvents(report);
         AddPilotIssues(report);
         AddAuthenticationMode(report, operatingMode);
         AddSecurityAudit(report);
@@ -241,10 +257,14 @@ public static class FactoryReadinessService
         var htmlPath = Path.Combine(packageFolder, "factory_readiness_summary.html");
         var pdfPath = Path.Combine(packageFolder, "factory_readiness_summary.pdf");
         var readmePath = Path.Combine(packageFolder, "README.txt");
+        var clientDemoGate = ClientDemoReadinessGateService.Evaluate(criteria?.DeploymentProfile);
         File.WriteAllText(jsonPath, JsonSerializer.Serialize(report, JsonOptions), Encoding.UTF8);
         File.WriteAllText(htmlPath, BuildHtml(report), Encoding.UTF8);
         PdfExportService.ExportHtmlFileToPdf(htmlPath, pdfPath, "Factory Readiness Go/No-Go Summary");
         File.WriteAllText(readmePath, BuildReadme(report), Encoding.UTF8);
+        File.WriteAllText(Path.Combine(packageFolder, "client_demo_readiness_gate.json"), JsonSerializer.Serialize(clientDemoGate, JsonOptions), Encoding.UTF8);
+        File.WriteAllText(Path.Combine(packageFolder, "client_demo_readiness_gate.html"), ClientDemoReadinessGateService.BuildHtml(clientDemoGate), Encoding.UTF8);
+        StandardsTraceabilityService.ExportToFolder(packageFolder, profile: criteria?.DeploymentProfile, recordExport: false);
 
         CopyLatestValidationManifest(packageFolder);
         WriteLatestExportVerification(packageFolder);
@@ -371,7 +391,11 @@ public static class FactoryReadinessService
         var text = InspectionModelConfigurationService.GetStatusText(status);
         if (!criteria.RequireProductionModel && status == InspectionEngineStatus.PrototypeEngine)
         {
-            Add(report, "Active model readiness", "Conditional", "Pixel Difference prototype engine is active. Acceptable for Stage 1 evidence only.", "Use a validated production model before claiming full production accuracy.");
+            Add(report, "Active model readiness", "Conditional", PlainLanguageGlossaryService.EvidenceMissing(
+                "The simple Pixel Difference engine is active.",
+                "This is acceptable for Stage 1 image evidence, but it is not an accepted AI model for factory automation.",
+                $"{PlainLanguageGlossaryService.Explain("ONNXModel")} Run model acceptance before making factory accuracy claims."),
+                "Use an accepted inspection model before claiming full factory accuracy.");
             return;
         }
 
@@ -389,7 +413,10 @@ public static class FactoryReadinessService
                     report,
                     "Active model readiness",
                     waiverExpired ? "No-Go" : "Conditional",
-                    $"Active ONNX model is deployed with Admin waiver by {activeModel.DeploymentWaivedBy}: risk={activeModel.DeploymentWaiverRiskClassification}; reason={activeModel.DeploymentWaiverReason}; expires={activeModel.WaiverExpiresAtUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "not recorded"}.",
+                    PlainLanguageGlossaryService.EvidenceMissing(
+                        $"The active AI model is running under an Admin waiver by {activeModel.DeploymentWaivedBy}. Risk={activeModel.DeploymentWaiverRiskClassification}; reason={activeModel.DeploymentWaiverReason}; expires={activeModel.WaiverExpiresAtUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "not recorded"}.",
+                        "A waiver means the normal evidence gate has not been fully completed.",
+                        "Record PASS model acceptance, release package, and lifecycle approval."),
                     waiverExpired
                         ? "Waiver has expired. Retire or replace the model, or record a new Admin waiver after review."
                         : "Active waiver downgrades readiness to Conditional at best. Complete PASS model acceptance, release packaging, and approved lifecycle promotion before Go readiness claims.");
@@ -400,13 +427,21 @@ public static class FactoryReadinessService
             {
                 if (activeModel is null)
                 {
-                    Add(report, "Active model readiness", "No-Go", $"Active ONNX model configuration has no matching model registry lifecycle record. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}.", "Register the model and complete lifecycle promotion before full factory automation.");
+                    Add(report, "Active model readiness", "No-Go", PlainLanguageGlossaryService.EvidenceMissing(
+                        $"The selected AI model has no matching model registry record. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}.",
+                        "The app cannot prove which model file is approved for inspection.",
+                        "Register the model and complete lifecycle promotion."),
+                        "Register the model and complete lifecycle promotion before full factory automation.");
                     return;
                 }
 
                 if (!hasPassAcceptance)
                 {
-                    Add(report, "Active model readiness", "No-Go", $"Active ONNX model is runtime-ready but has no PASS model acceptance run. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}.", "Run model acceptance on customer validation data, create a release package, and promote the PASS run to production candidate.");
+                    Add(report, "Active model readiness", "No-Go", PlainLanguageGlossaryService.EvidenceMissing(
+                        $"The active AI model can load, but no PASS model acceptance run was found. ModelId={configuration.ActiveModelId}; version={configuration.ModelVersion}.",
+                        $"{PlainLanguageGlossaryService.Explain("AcceptanceTest")} A load check alone does not prove customer validation results.",
+                        "Run model acceptance on customer validation data and save the release package."),
+                        "Run model acceptance on customer validation data, create a release package, and promote the PASS run to production candidate.");
                     return;
                 }
 
@@ -414,7 +449,11 @@ public static class FactoryReadinessService
                     activeModel.LifecycleState == ModelLifecycleState.ProductionCandidate;
                 if (!lifecycleOk)
                 {
-                    Add(report, "Active model readiness", "No-Go", $"Active model lifecycle state is {activeModel.LifecycleState}; latest acceptance={activeModel.LatestAcceptanceStatus}; releasePackage={activeModel.LatestReleasePackagePath}.", "Promote a PASS model acceptance run to ProductionCandidate or deploy the model through lifecycle approval.");
+                    Add(report, "Active model readiness", "No-Go", PlainLanguageGlossaryService.EvidenceMissing(
+                        $"The active model lifecycle state is {activeModel.LifecycleState}. Latest acceptance={activeModel.LatestAcceptanceStatus}; releasePackage={activeModel.LatestReleasePackagePath}.",
+                        "The model has not reached an approved lifecycle state for the selected readiness profile.",
+                        "Promote a PASS acceptance run to Production Candidate or deploy through lifecycle approval."),
+                        "Promote a PASS model acceptance run to Production Candidate or deploy the model through lifecycle approval.");
                     return;
                 }
             }
@@ -426,7 +465,11 @@ public static class FactoryReadinessService
                 "No action required.");
         }
         else
-            Add(report, "Active model readiness", criteria.RequireProductionModel ? "No-Go" : "Conditional", $"Active model is not production-ready: {text}.", "Register and validate the production ONNX model or keep the review scoped to Stage 1 prototype evidence.");
+            Add(report, "Active model readiness", criteria.RequireProductionModel ? "No-Go" : "Conditional", PlainLanguageGlossaryService.EvidenceMissing(
+                $"The active inspection model is not ready for this profile: {text}.",
+                "Operators need a validated inspection engine before relying on factory results.",
+                "Register and validate the AI model, or keep the review scoped to Stage 1 prototype evidence."),
+                "Register and validate the inspection model or keep the review scoped to Stage 1 prototype evidence.");
     }
 
     private static void AddValidationPackage(FactoryReadinessReport report, FactoryReadinessCriteria criteria, ValidationPackageRecord? package, BatchTestRunRecord? run)
@@ -447,7 +490,11 @@ public static class FactoryReadinessService
     {
         if (run?.Recommendation?.Point is not { } point)
         {
-            Add(report, "False-call reduction status", criteria.RequireFalseCallEvidence ? "No-Go" : "Conditional", "No false-call reduction recommendation is available.", "Run False Call Reduction Workbench on customer-labeled Stage 1 data.");
+            Add(report, "False-call reduction status", criteria.RequireFalseCallEvidence ? "No-Go" : "Conditional", PlainLanguageGlossaryService.EvidenceMissing(
+                "No false-call reduction recommendation is available.",
+                PlainLanguageGlossaryService.Explain("FalseCall"),
+                "Run false-call reduction on customer-labeled OK/NG data."),
+                "Run False Call Reduction Workbench on customer-labeled Stage 1 data.");
             return;
         }
 
@@ -456,7 +503,7 @@ public static class FactoryReadinessService
             : run.Recommendation.Status == "INVALID"
                 ? "No-Go"
                 : "Conditional";
-        Add(report, "False-call reduction status", status, $"Recommendation={run.Recommendation.Status}; threshold={point.DifferenceThreshold:F2}; false-call-rate={point.FalseCallRate:P1}; possible-escape-rate={point.PossibleEscapeRate:P1}; review-rate={point.ReviewRate:P1}.", status == "Go" ? "No action required." : "Tune thresholds with sufficient labeled OK/NG data and review possible escapes.");
+        Add(report, "False-call reduction status", status, $"{PlainLanguageGlossaryService.Explain("FalseCall")} {PlainLanguageGlossaryService.Explain("PossibleEscape")} Recommendation={run.Recommendation.Status}; threshold={point.DifferenceThreshold:F2}; good-board false-call rate={point.FalseCallRate:P1}; possible escape rate={point.PossibleEscapeRate:P1}; manual review rate={point.ReviewRate:P1}.", status == "Go" ? "No action required." : "Tune thresholds with enough labeled OK/NG data and review possible escapes before reducing manual review.");
     }
 
     private static void AddDatasetQuality(FactoryReadinessReport report, FactoryReadinessCriteria criteria, ValidationPackageRecord? package)
@@ -464,7 +511,11 @@ public static class FactoryReadinessService
         var manifest = TryReadManifest(package?.ManifestPath);
         if (manifest is null)
         {
-            Add(report, "Dataset quality status", criteria.RequireDatasetQualityEvidence ? "No-Go" : "Conditional", "No validation manifest with dataset-quality summary is available.", "Generate a validation package from a labeled dataset.");
+            Add(report, "Dataset quality status", criteria.RequireDatasetQualityEvidence ? "No-Go" : "Conditional", PlainLanguageGlossaryService.EvidenceMissing(
+                "No validation manifest with dataset-quality summary is available.",
+                "The app cannot prove which images and labels were used for validation.",
+                "Generate a validation package from a labeled dataset."),
+                "Generate a validation package from a labeled dataset.");
             return;
         }
 
@@ -489,7 +540,7 @@ public static class FactoryReadinessService
         var preflightEvidence = preflightStatus.Equals("PASS", StringComparison.OrdinalIgnoreCase)
             ? "preflight=PASS"
             : $"preflight={preflightStatus}; failures={manifest.DatasetPreflightFailures.Count}; warnings={manifest.DatasetPreflightWarnings.Count}";
-        Add(report, "Dataset quality status", status, $"Dataset quality={manifest.DatasetQualitySummary.Status}; {preflightEvidence}; total={manifest.DatasetQualitySummary.TotalImages}; known GT={manifest.DatasetQualitySummary.KnownGroundTruthImages}; OK={manifest.DatasetQualitySummary.OkImages}; NG={manifest.DatasetQualitySummary.NgImages}.", status == "Go" ? "No action required." : "Run Dataset Preflight, balance dataset labels, reduce UNKNOWN labels, and include required golden images.");
+        Add(report, "Dataset quality status", status, $"Dataset check={manifest.DatasetQualitySummary.Status}; {preflightEvidence}; total images={manifest.DatasetQualitySummary.TotalImages}; images with known labels={manifest.DatasetQualitySummary.KnownGroundTruthImages}; good boards={manifest.DatasetQualitySummary.OkImages}; defect boards={manifest.DatasetQualitySummary.NgImages}.", status == "Go" ? "No action required." : "Run Dataset Preflight, balance OK/NG labels, reduce UNKNOWN labels, and include required golden images.");
     }
 
     private static void AddExportVerification(FactoryReadinessReport report, FactoryReadinessCriteria criteria, IReadOnlyList<ExportVerificationRecord> verifications)
@@ -591,14 +642,18 @@ public static class FactoryReadinessService
         var realRequired = criteria.RequireRealHardwareAcceptance && required;
         var ok = summary.AcceptanceStatus is "PASS" or "WARN" && (!realRequired || summary.IsRealHardware);
         var status = ok ? "Go" : required ? "No-Go" : "Conditional";
-        Add(report, "Camera acceptance status", status, $"Status={summary.Status}; acceptance={summary.AcceptanceStatus}; realHardware={summary.IsRealHardware}; adapter={summary.AdapterName}; received={summary.TotalReceivedFrames}/{summary.TotalRequestedFrames}. {string.Join(" ", summary.Messages)}", ok ? "No action required." : "Run camera acceptance with the required production camera profile.");
+        Add(report, "Camera acceptance status", status, $"{PlainLanguageGlossaryService.AcceptanceBoundary("Camera")} Status={summary.Status}; result={summary.AcceptanceStatus}; real hardware={summary.IsRealHardware}; adapter={summary.AdapterName}; frames received={summary.TotalReceivedFrames}/{summary.TotalRequestedFrames}. {string.Join(" ", summary.Messages)}", ok ? "No action required." : "Run camera evidence check with the required factory camera profile.");
     }
 
     private static void AddProfile3D(FactoryReadinessReport report, FactoryReadinessCriteria criteria, Profile3DAcceptanceRun? run)
     {
         if (run is null)
         {
-            Add(report, "3D profile acceptance status", criteria.RequireProfile3DAcceptance ? "No-Go" : "Conditional", "No 3D profile acceptance run has been recorded.", "Run 3D profile acceptance when height/coplanarity inspection is part of the deployment profile.");
+            Add(report, "3D profile acceptance status", criteria.RequireProfile3DAcceptance ? "No-Go" : "Conditional", PlainLanguageGlossaryService.EvidenceMissing(
+                "No 3D height/profile evidence check has been recorded.",
+                "Height or coplanarity inspection cannot be claimed without a recorded 3D source check.",
+                "Run the 3D profile evidence check when height inspection is in scope."),
+                "Run 3D profile evidence check when height/coplanarity inspection is part of the deployment profile.");
             return;
         }
 
@@ -608,8 +663,8 @@ public static class FactoryReadinessService
             report,
             "3D profile acceptance status",
             ok ? "Go" : criteria.RequireProfile3DAcceptance ? "No-Go" : "Conditional",
-            $"Status={run.Status}; readiness={run.FactoryReadinessStatus}; source={run.SourceName}; simulated={run.IsSimulated}; frame={run.FrameId}; dimensions={run.Width}x{run.Height}; invalidHeights={run.NaNHeightCount + run.MissingHeightCount}. {string.Join(" ", run.Warnings.Concat(run.Failures))}",
-            ok ? "No action required." : "Run 3D profile acceptance with the required source, and do not treat sample CSV evidence as real 3D camera validation.");
+            $"{PlainLanguageGlossaryService.AcceptanceBoundary("3D height")} Status={run.Status}; readiness={run.FactoryReadinessStatus}; source={run.SourceName}; simulated={run.IsSimulated}; frame={run.FrameId}; dimensions={run.Width}x{run.Height}; invalid heights={run.NaNHeightCount + run.MissingHeightCount}. {string.Join(" ", run.Warnings.Concat(run.Failures))}",
+            ok ? "No action required." : "Run 3D profile evidence check with the required source, and do not treat sample CSV evidence as real 3D camera validation.");
     }
 
     private static void AddLighting(FactoryReadinessReport report, FactoryReadinessCriteria criteria, LightingAcceptanceRun? run)
@@ -632,7 +687,7 @@ public static class FactoryReadinessService
         var eStopOk = !criteria.RequireRobotAcceptance || summary.EmergencyStopBlocked;
         var safetyOk = !criteria.RequireRobotAcceptance || summary.SafetyFaultBlocked || summary.SafetySourceKind == "Real";
         var ok = summary.Status == "PASS" && realOk && eStopOk && safetyOk;
-        Add(report, "Robot acceptance status", ok ? "Go" : criteria.RequireRobotAcceptance ? "No-Go" : "Conditional", $"Status={summary.Status}; source={summary.SourceKind}; controller={summary.ControllerName}; safety={summary.SafetyControllerName}/{summary.SafetySourceKind}; fullCycleMs={summary.FullCycleMs:F1}; emergencyStopBlocked={summary.EmergencyStopBlocked}; safetyFaultBlocked={summary.SafetyFaultBlocked}. {string.Join(" ", summary.Messages)}", ok ? "No action required." : "Run robot cell acceptance with PLC/safety interlock evidence, including emergency-stop and guard/clamp blocking, without equating simulation to real machine validation.");
+        Add(report, "Robot acceptance status", ok ? "Go" : criteria.RequireRobotAcceptance ? "No-Go" : "Conditional", $"{PlainLanguageGlossaryService.AcceptanceBoundary("Robot cell")} Status={summary.Status}; source={summary.SourceKind}; controller={summary.ControllerName}; safety={summary.SafetyControllerName}/{summary.SafetySourceKind}; full cycle ms={summary.FullCycleMs:F1}; emergency stop blocked motion={summary.EmergencyStopBlocked}; safety fault blocked motion={summary.SafetyFaultBlocked}. {string.Join(" ", summary.Messages)}", ok ? "No action required." : "Run robot cell evidence check with PLC/safety interlock evidence, including emergency-stop and guard/clamp blocking. Simulation is not real machine validation.");
     }
 
     private static void AddMes(FactoryReadinessReport report, FactoryReadinessCriteria criteria, MesReadinessSummary mes)
@@ -646,7 +701,7 @@ public static class FactoryReadinessService
             "MES Mock Only" or "MES Not Configured" => productionMes ? "No-Go" : "Conditional",
             _ => "Conditional",
         };
-        Add(report, "MES/spool status", status, $"{mes.Status}; mode={mes.Mode}; pending={mes.PendingCount}; oldPending={mes.OldPendingCount}; failed={mes.FailedCount}; sent={mes.SentCount}; abandoned={mes.AbandonedCount}; traceability={mes.LatestTraceabilityTestStatus}; latestTraceabilityTest={mes.LatestTraceabilityTestStatus}. {string.Join(" ", mes.Messages)}", status == "Go" ? "No action required." : "Resolve pending/failed MES queue items, configure production REST or accepted adapter, and run a passing traceability signoff.");
+        Add(report, "MES/spool status", status, $"{PlainLanguageGlossaryService.Explain("MES")} {mes.Status}; mode={mes.Mode}; waiting={mes.PendingCount}; old waiting={mes.OldPendingCount}; failed={mes.FailedCount}; sent={mes.SentCount}; abandoned={mes.AbandonedCount}; traceability={mes.LatestTraceabilityTestStatus}; latest traceability check={mes.LatestTraceabilityTestStatus}. {string.Join(" ", mes.Messages)}", status == "Go" ? "No action required." : "Resolve pending/failed MES queue items, configure accepted factory traceability connection, and run a passing traceability signoff.");
     }
 
     private static void AddCentralSync(FactoryReadinessReport report, FactoryReadinessCriteria criteria, CentralSyncReadinessSummary summary)
@@ -684,6 +739,33 @@ public static class FactoryReadinessService
             summary.CriticalOpen > 0
                 ? "Resolve, waive, or close critical pilot issues before customer/factory Go claims."
                 : "No critical open pilot issues recorded.");
+    }
+
+    private static void AddAlarmEvents(FactoryReadinessReport report)
+    {
+        var critical = AlarmEventService.GetActiveCriticalAlarms();
+        if (critical.Count > 0)
+        {
+            Add(
+                report,
+                "Alarm/event status",
+                "No-Go",
+                $"{critical.Count} active Critical alarm(s) exist. Latest={critical[0].TimestampUtc:O}; source={critical[0].Source}; message={critical[0].Message}.",
+                "Resolve Critical alarms before factory/client readiness can pass.");
+            return;
+        }
+
+        var unacknowledgedAlarms = AlarmEventService.GetUnacknowledgedAlarmLevelEvents();
+        Add(
+            report,
+            "Alarm/event status",
+            unacknowledgedAlarms.Count > 0 ? "Conditional" : "Go",
+            unacknowledgedAlarms.Count > 0
+                ? $"{unacknowledgedAlarms.Count} unacknowledged Alarm-level event(s) are active."
+                : "No active Critical alarms or unacknowledged Alarm-level events are present.",
+            unacknowledgedAlarms.Count > 0
+                ? "Acknowledge or resolve Alarm-level events before release packaging."
+                : "No action required.");
     }
 
     private static void AddSecurityAudit(FactoryReadinessReport report)
@@ -847,6 +929,8 @@ public static class FactoryReadinessService
         var fileName = Path.GetFileName(path);
         if (fileName.Contains("factory_readiness_summary", StringComparison.OrdinalIgnoreCase))
             return "Factory readiness summary";
+        if (fileName.Contains("standards_traceability_matrix", StringComparison.OrdinalIgnoreCase))
+            return "Standards traceability matrix";
         if (fileName.Contains("validation_manifest", StringComparison.OrdinalIgnoreCase))
             return "Latest validation manifest";
         if (fileName.Contains("export_verification", StringComparison.OrdinalIgnoreCase))
@@ -879,6 +963,7 @@ public static class FactoryReadinessService
         - factory_readiness_summary.html: management-readable Go/No-Go summary.
         - factory_readiness_summary.pdf: native PDF rendering of the Go/No-Go summary.
         - factory_readiness_summary.json: machine-readable category evidence.
+        - standards_traceability_matrix.html/pdf/json: standards-alignment checklist mapping project, HMI, quality, and alarm expectations to evidence.
         - latest_validation_manifest.json: copied when a Stage 1 validation package exists.
         - latest_export_verification_report.json: copied when export verification records exist.
         - build_test_evidence/: latest imported hygiene/build/test/publish validation evidence when available.
@@ -886,6 +971,7 @@ public static class FactoryReadinessService
 
         Evidence boundary:
         This package distinguishes Stage 1 customer/demo readiness from full factory readiness. Simulated camera, lighting, robot, or MES evidence must not be described as production equipment validation.
+        The standards traceability matrix is standards-aligned project evidence only. It is not formal ISO, IEC, ISA, or third-party certification.
 
         Blocking issues:
         {FormatLines(report.BlockingIssues)}

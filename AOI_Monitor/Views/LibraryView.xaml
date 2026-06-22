@@ -21,7 +21,7 @@
     </Style>
     <Style x:Key="LibraryRiskChipText" TargetType="TextBlock">
       <Setter Property="Foreground" Value="#DCE5EB"/>
-      <Setter Property="FontSize" Value="9.5"/>
+      <Setter Property="FontSize" Value="14"/>
       <Setter Property="FontWeight" Value="Bold"/>
       <Style.Triggers>
         <DataTrigger Binding="{Binding Risk}" Value="Possible Escape">
@@ -52,9 +52,9 @@
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
             <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
-              <TextBlock Text="Prototype Filters" Foreground="#FFE0A7" FontWeight="Bold" FontSize="9.5"/>
+              <TextBlock Text="Prototype Filters" Foreground="#FFE0A7" FontWeight="Bold" FontSize="14"/>
             </Border>
-            <TextBlock Text="Database Filter Console" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            <TextBlock Text="Database Filter Console" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </DockPanel>
         </Border>
         <StackPanel Grid.Row="1" Margin="8">
@@ -68,27 +68,27 @@
               <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0">
-              <TextBlock Text="Board Model" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <TextBlock Text="Board Model" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>TBOX-MAIN</ComboBoxItem></ComboBox>
             </StackPanel>
             <StackPanel Grid.Column="2">
-              <TextBlock Text="Defect Type" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <TextBlock Text="Defect Type" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>All defect types</ComboBoxItem></ComboBox>
             </StackPanel>
             <StackPanel Grid.Column="4">
-              <TextBlock Text="Risk Class" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <TextBlock Text="Risk Class" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>Possible Escape first</ComboBoxItem></ComboBox>
             </StackPanel>
             <StackPanel Grid.Column="6">
-              <TextBlock Text="Review Status" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <TextBlock Text="Review Status" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>Pending / Verified</ComboBoxItem></ComboBox>
             </StackPanel>
             <StackPanel Grid.Column="8">
-              <TextBlock Text="Recipe Version" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <TextBlock Text="Recipe Version" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>TBOX_TOP_V1.2</ComboBoxItem></ComboBox>
             </StackPanel>
             <StackPanel Grid.Column="10">
-              <TextBlock Text="Image Link State" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+              <TextBlock Text="Image Link State" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>Linked only</ComboBoxItem></ComboBox>
             </StackPanel>
           </Grid>
@@ -103,7 +103,7 @@
           <TextBlock x:Name="ImportStatusText"
                      Text="Imported images are loaded from the local SQLite image table."
                      Foreground="#9AA6AF"
-                     FontSize="11"
+                     FontSize="14"
                      TextWrapping="Wrap"
                      Margin="0,6,0,0"/>
           <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
@@ -121,9 +121,9 @@
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
             <Border DockPanel.Dock="Right" x:Name="RecordsSourceChip" Style="{StaticResource Chip}" Padding="6,1">
-              <TextBlock x:Name="RecordsSourceText" Text="SQLite Records" Foreground="#DCE5EB" FontWeight="Bold" FontSize="9.5"/>
+              <TextBlock x:Name="RecordsSourceText" Text="SQLite Records" Foreground="#DCE5EB" FontWeight="Bold" FontSize="14"/>
             </Border>
-            <TextBlock Text="Inspection Records" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            <TextBlock Text="Inspection Records" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </DockPanel>
         </Border>
         <DataGrid Grid.Row="1" x:Name="RecordsGrid" SelectionChanged="OnRecordsSelectionChanged">
@@ -158,9 +158,9 @@
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
             <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
-              <TextBlock Text="Static Schema Reference" Foreground="#FFE0A7" FontWeight="Bold" FontSize="9.5"/>
+              <TextBlock Text="Static Schema Reference" Foreground="#FFE0A7" FontWeight="Bold" FontSize="14"/>
             </Border>
-            <TextBlock Text="Database Transparency" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            <TextBlock Text="Database Transparency" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </DockPanel>
         </Border>
         <DataGrid Grid.Row="1" x:Name="SchemaGrid" MaxHeight="120">
@@ -174,3 +174,4 @@
     </Border>
   </Grid>
 </UserControl>
+

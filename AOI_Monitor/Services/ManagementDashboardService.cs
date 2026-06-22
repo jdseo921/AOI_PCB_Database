@@ -88,6 +88,20 @@ public static class ManagementDashboardService
         WriteIndented = true,
     };
 
+    public static async Task<ManagementDashboardReport> BuildAsync(
+        ManagementDashboardFilter? filter = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var report = Build(filter);
+            cancellationToken.ThrowIfCancellationRequested();
+            return report;
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
     public static ManagementDashboardReport Build(ManagementDashboardFilter? filter = null)
     {
         filter ??= new ManagementDashboardFilter();

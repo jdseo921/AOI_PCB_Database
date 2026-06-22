@@ -421,8 +421,9 @@ public static class BenchmarkInspectionService
             var frame = BitmapFrame.Create(new Uri(path, UriKind.Absolute), BitmapCreateOptions.DelayCreation, BitmapCacheOption.OnLoad);
             return (frame.PixelWidth, frame.PixelHeight);
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Image metadata read failed for benchmark source '{path}': {ex.Message}");
             return (0, 0);
         }
     }

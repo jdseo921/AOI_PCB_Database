@@ -266,8 +266,9 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
             result.BoardId = state.BoardProgram;
             result.OperatorId = state.OperatorWithRole;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Pixel-difference analysis workflow context could not be applied: {ex.Message}");
         }
     }
 

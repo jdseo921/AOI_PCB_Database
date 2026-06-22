@@ -32,8 +32,9 @@ public static class LightingSettingsService
             var json = File.ReadAllText(SettingsPath);
             _cached = JsonSerializer.Deserialize<LightingSettings>(json) ?? new LightingSettings();
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Lighting settings load fallback used: {ex.Message}");
             _cached = new LightingSettings();
         }
 

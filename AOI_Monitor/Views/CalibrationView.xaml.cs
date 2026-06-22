@@ -12,7 +12,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class CalibrationView : UserControl
+public partial class CalibrationView : UserControl, IReleasablePageResources
 {
     private readonly ObservableCollection<CalibrationPointRow> _points = new();
     private bool _loadingProfile;
@@ -250,12 +250,7 @@ public partial class CalibrationView : UserControl
     {
         try
         {
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.UriSource = new Uri(imagePath, UriKind.Absolute);
-            bitmap.EndInit();
-            bitmap.Freeze();
+            var bitmap = ImageCacheService.LoadBitmap(imagePath, decodePixelWidth: 1600);
 
             _sampleBitmap = bitmap;
             CalibrationImage.Source = bitmap;
@@ -273,6 +268,12 @@ public partial class CalibrationView : UserControl
         CalibrationImage.Source = null;
         EmptyImageText.Text = message;
         EmptyImageText.Visibility = Visibility.Visible;
+    }
+
+    public void ReleasePageResources()
+    {
+        ClearCalibrationImage("Calibration image released to reduce memory use. Reload an image to continue.");
+        ImageCacheService.ClearOnPageUnload();
     }
 
     private void RenumberPoints()

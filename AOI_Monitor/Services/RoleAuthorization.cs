@@ -22,10 +22,12 @@ public static class RoleAuthorization
     {
         return pageKey switch
         {
+            "home" => true,
             "recipe" => CanEditRecipes(role),
             "calibration" => CanEditCalibration(role),
-            "modeltest" => CanRunModelTests(role),
-            "reports" or "spc" or "pilot" => CanExportLogs(role),
+            "modeltest" or "spc" => CanRunModelTests(role),
+            "pilot" => role >= UserRole.Engineer,
+            "reports" => CanExportLogs(role),
             "settings" => role >= UserRole.Engineer,
             "install" => CanManageSettings(role),
             _ => true,

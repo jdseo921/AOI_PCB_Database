@@ -16,7 +16,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class ReportsView : UserControl
+public partial class ReportsView : UserControl, IAsyncNavigationPage
 {
     private static readonly Encoding CsvEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -32,14 +32,17 @@ public partial class ReportsView : UserControl
     private readonly ObservableCollection<CentralSyncQueueRow> _centralSyncRows = new();
     private readonly ObservableCollection<PilotIssueRow> _pilotIssueRows = new();
     private readonly ObservableCollection<FactoryReadinessRow> _factoryReadinessRows = new();
+    private readonly ObservableCollection<StandardsTraceabilityMatrix> _standardsTraceabilityRows = new();
     private readonly ObservableCollection<CompletionMatrixRow> _completionMatrixRows = new();
     private readonly ObservableCollection<FactoryAcceptanceChecklistItem> _factoryAcceptanceRows = new();
+    private readonly ObservableCollection<UiNavigationSoakEvent> _uiStabilityEvents = new();
     private readonly ObservableCollection<ManagementDashboardContributor> _managementDefectRows = new();
     private readonly ObservableCollection<ManagementDashboardContributor> _managementRoiRows = new();
     private readonly ObservableCollection<ManagementDashboardTrendPoint> _managementTrendRows = new();
     private readonly ObservableCollection<ManagementDashboardBreakdown> _managementBreakdownRows = new();
     private ManagementDashboardReport? _managementDashboardReport;
     private CancellationTokenSource? _workCts;
+    private CancellationTokenSource? _refreshCts;
 
     public ReportsView()
     {
@@ -52,8 +55,10 @@ public partial class ReportsView : UserControl
         CentralSyncGrid.ItemsSource = _centralSyncRows;
         PilotIssuesGrid.ItemsSource = _pilotIssueRows;
         FactoryReadinessGrid.ItemsSource = _factoryReadinessRows;
+        StandardsTraceabilityGrid.ItemsSource = _standardsTraceabilityRows;
         CompletionMatrixGrid.ItemsSource = _completionMatrixRows;
         FactoryAcceptanceGrid.ItemsSource = _factoryAcceptanceRows;
+        UiStabilityEventsGrid.ItemsSource = _uiStabilityEvents;
         ManagementDefectGrid.ItemsSource = _managementDefectRows;
         ManagementRoiGrid.ItemsSource = _managementRoiRows;
         ManagementModelTrendGrid.ItemsSource = _managementTrendRows;
@@ -63,16 +68,51 @@ public partial class ReportsView : UserControl
         PopulatePilotIssueFilters();
         FromDatePicker.SelectedDate = DateTime.Today.AddDays(-30);
         ToDatePicker.SelectedDate = DateTime.Today;
-        LoadLogs();
+        StatusText.Text = "Ready. Select Refresh or open this page to load logs.";
     }
 
-    public void RefreshFromState() => LoadLogs();
+    public Task OnNavigatedToAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
 
-    private void OnApplyFiltersClick(object sender, RoutedEventArgs e) => LoadLogs();
+    public async Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        _refreshCts?.Cancel();
+        _refreshCts?.Dispose();
+        _refreshCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        await LoadLogsAsync(_refreshCts.Token);
+    }
+
+    public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);
+
+    public void CancelWork()
+    {
+        _refreshCts?.Cancel();
+        _workCts?.Cancel();
+        StatusText.Text = "Cancel requested. Finishing current operation...";
+    }
+
+    private async void OnApplyFiltersClick(object sender, RoutedEventArgs e)
+    {
+        var button = sender as Button;
+        await ErrorBoundaryService.SafeAsyncCommand(
+            "Apply report filters",
+            "Log & Export",
+            RefreshAsync,
+            running =>
+            {
+                if (button is not null)
+                    button.IsEnabled = !running;
+            },
+            message => StatusText.Text = message);
+    }
 
     private IEnumerable<MesSpoolQueueRow> ApplyMesQueueFilter(IEnumerable<MesSpoolQueueRow> rows)
     {
         var selected = (MesQueueStatusFilter?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All";
+        return ApplyMesQueueFilter(rows, selected);
+    }
+
+    private static IEnumerable<MesSpoolQueueRow> ApplyMesQueueFilter(IEnumerable<MesSpoolQueueRow> rows, string selected)
+    {
         return string.Equals(selected, "All", StringComparison.OrdinalIgnoreCase)
             ? rows
             : rows.Where(row => row.Status.Equals(selected, StringComparison.OrdinalIgnoreCase));
@@ -162,63 +202,210 @@ public partial class ReportsView : UserControl
         ResultFilterCombo.SelectedIndex = 0;
         RoleFilterCombo.SelectedIndex = 0;
         ActionTypeFilterText.Text = string.Empty;
-        LoadLogs();
+        _ = RefreshAsync(CancellationToken.None);
     }
 
-    private void LoadLogs()
+    private async Task LoadLogsAsync(CancellationToken cancellationToken)
     {
         var filter = BuildFilter();
-        var inspections = AoiDatabase.GetInspectionHistory(filter).Select(InspectionLogRow.FromRecord).ToArray();
-        var reviews = AoiDatabase.GetReviewEvents(filter).Select(ReviewLogRow.FromRecord).ToArray();
-        var exports = AoiDatabase.GetExportHistory()
-            .Select(record => ExportHistoryRow.FromRecord(record, AoiDatabase.GetLatestExportVerification(record.Id)))
-            .ToArray();
-        var audits = AoiDatabase.GetAuditEvents(filter).Select(AuditLogRow.FromRecord).ToArray();
-        var mesSpool = ApplyMesQueueFilter(AoiDatabase.GetMesSpoolQueue().Select(MesSpoolQueueRow.FromRecord)).ToArray();
-        var centralSync = AoiDatabase.GetCentralSyncQueue().Select(CentralSyncQueueRow.FromRecord).ToArray();
-        var pilotIssues = AoiDatabase.GetPilotIssues(BuildPilotIssueFilter()).Select(PilotIssueRow.FromIssue).ToArray();
-        var readinessReport = FactoryReadinessService.Evaluate();
-        var readiness = readinessReport.Categories.Select(FactoryReadinessRow.FromCategory).ToArray();
-        var completionReport = CompletionAssessmentService.Assess();
-        var completionRows = completionReport.Categories.Select(CompletionMatrixRow.FromCategory).ToArray();
-        var buildEvidence = BuildTestEvidenceService.GetSummary();
+        var pilotIssueFilter = BuildPilotIssueFilter();
+        var mesQueueStatus = (MesQueueStatusFilter?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All";
+        var acceptanceProfile = SelectedFactoryAcceptanceProfile();
+        var managementFilter = BuildManagementDashboardFilter();
+        StatusText.Text = "Loading logs and factory readiness...";
 
-        ReplaceRows(_inspectionRows, inspections);
-        ReplaceRows(_reviewRows, reviews);
-        ReplaceRows(_exportRows, exports);
-        ReplaceRows(_auditRows, audits);
-        ReplaceRows(_mesSpoolRows, mesSpool);
-        ReplaceRows(_centralSyncRows, centralSync);
-        ReplaceRows(_pilotIssueRows, pilotIssues);
-        ReplaceRows(_factoryReadinessRows, readiness);
-        ReplaceRows(_completionMatrixRows, completionRows);
+        var snapshot = await Task.Run(async () =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var inspections = AoiDatabase.GetInspectionHistory(filter).Select(InspectionLogRow.FromRecord).ToArray();
+            var reviews = AoiDatabase.GetReviewEvents(filter).Select(ReviewLogRow.FromRecord).ToArray();
+            var exports = AoiDatabase.GetExportHistory()
+                .Select(record => ExportHistoryRow.FromRecord(record, AoiDatabase.GetLatestExportVerification(record.Id)))
+                .ToArray();
+            var audits = AoiDatabase.GetAuditEvents(filter).Select(AuditLogRow.FromRecord).ToArray();
+            var mesSpool = ApplyMesQueueFilter(AoiDatabase.GetMesSpoolQueue().Select(MesSpoolQueueRow.FromRecord), mesQueueStatus).ToArray();
+            var centralSync = AoiDatabase.GetCentralSyncQueue().Select(CentralSyncQueueRow.FromRecord).ToArray();
+            var pilotIssues = AoiDatabase.GetPilotIssues(pilotIssueFilter).Select(PilotIssueRow.FromIssue).ToArray();
+            var readinessReport = await FactoryReadinessService.EvaluateAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            var readiness = readinessReport.Categories.Select(FactoryReadinessRow.FromCategory).ToArray();
+            var standardsReport = StandardsTraceabilityService.Evaluate();
+            var standardsRows = standardsReport.Items.ToArray();
+            var completionReport = await CompletionAssessmentService.AssessAsync(cancellationToken).ConfigureAwait(false);
+            var completionRows = completionReport.Categories.Select(CompletionMatrixRow.FromCategory).ToArray();
+            var checklist = FactoryAcceptanceChecklistService.Generate(acceptanceProfile).Items;
+            var issueSummary = PilotIssueService.Summarize();
+            var buildEvidence = BuildTestEvidenceService.GetSummary();
+            var managementReport = await ManagementDashboardService.BuildAsync(managementFilter, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            return new LogLoadSnapshot(
+                inspections,
+                reviews,
+                exports,
+                audits,
+                mesSpool,
+                centralSync,
+                pilotIssues,
+                readiness,
+                readinessReport.OverallStatus,
+                standardsRows,
+                StandardsTraceabilitySummaryFor(standardsReport),
+                completionRows,
+                completionReport.OverallPercent,
+                checklist,
+                issueSummary,
+                BuildEvidenceSummaryTextFor(buildEvidence),
+                managementReport);
+        }, cancellationToken);
+
+        ReplaceRows(_inspectionRows, snapshot.Inspections);
+        ReplaceRows(_reviewRows, snapshot.Reviews);
+        ReplaceRows(_exportRows, snapshot.Exports);
+        ReplaceRows(_auditRows, snapshot.Audits);
+        ReplaceRows(_mesSpoolRows, snapshot.MesSpool);
+        ReplaceRows(_centralSyncRows, snapshot.CentralSync);
+        ReplaceRows(_pilotIssueRows, snapshot.PilotIssues);
+        ReplaceRows(_factoryReadinessRows, snapshot.Readiness);
+        ReplaceRows(_standardsTraceabilityRows, snapshot.StandardsTraceabilityRows);
+        ReplaceRows(_completionMatrixRows, snapshot.CompletionRows);
         if (_factoryAcceptanceRows.Count == 0)
-            ReplaceRows(_factoryAcceptanceRows, FactoryAcceptanceChecklistService.Generate(SelectedFactoryAcceptanceProfile()).Items);
+            ReplaceRows(_factoryAcceptanceRows, snapshot.FactoryAcceptanceRows);
 
-        var issueSummary = PilotIssueService.Summarize();
-        PilotIssueSummaryText.Text = $"Issues total={issueSummary.Total}; open={issueSummary.Open}; critical open={issueSummary.CriticalOpen}.";
-        LogSummaryText.Text = $"{inspections.Length} inspections / {reviews.Length} review events / {exports.Length} exports / {audits.Length} audit rows / {mesSpool.Length} MES spool / {centralSync.Length} central sync / {pilotIssues.Length} pilot issues / readiness {readinessReport.OverallStatus}";
-        CompletionMatrixSummaryText.Text = $"Overall evidence completion {completionReport.OverallPercent:F1}% across {completionRows.Length} readiness areas.";
-        BuildEvidenceSummaryText.Text = BuildEvidenceSummaryTextFor(buildEvidence);
+        PilotIssueSummaryText.Text = $"Issues total={snapshot.IssueSummary.Total}; open={snapshot.IssueSummary.Open}; critical open={snapshot.IssueSummary.CriticalOpen}.";
+        LogSummaryText.Text = $"{snapshot.Inspections.Length} inspections / {snapshot.Reviews.Length} review events / {snapshot.Exports.Length} exports / {snapshot.Audits.Length} audit rows / {snapshot.MesSpool.Length} MES spool / {snapshot.CentralSync.Length} central sync / {snapshot.PilotIssues.Length} pilot issues / readiness {snapshot.ReadinessOverallStatus}";
+        StandardsTraceabilitySummaryText.Text = snapshot.StandardsTraceabilitySummary;
+        CompletionMatrixSummaryText.Text = $"Overall evidence completion {snapshot.CompletionOverallPercent:F1}% across {snapshot.CompletionRows.Length} readiness areas.";
+        BuildEvidenceSummaryText.Text = snapshot.BuildEvidenceSummary;
+        UpdateClientDemoGateText(ClientDemoReadinessGateService.Evaluate());
         StatusText.Text = "Loaded real SQLite log records.";
-        LoadManagementDashboard();
+        ApplyManagementDashboard(snapshot.ManagementDashboardReport);
     }
 
-    private void OnRefreshCompletionMatrixClick(object sender, RoutedEventArgs e)
+    private void OnClientDemoReadinessClick(object sender, RoutedEventArgs e)
     {
-        var completionReport = CompletionAssessmentService.Assess();
-        ReplaceRows(_completionMatrixRows, completionReport.Categories.Select(CompletionMatrixRow.FromCategory));
-        CompletionMatrixSummaryText.Text = $"Overall evidence completion {completionReport.OverallPercent:F1}% across {completionReport.Categories.Count} readiness areas.";
-        StatusText.Text = "Completion matrix refreshed from evidence records.";
+        var report = ClientDemoReadinessGateService.Evaluate();
+        UpdateClientDemoGateText(report);
+        MessageBox.Show(
+            $"Client demo readiness: {report.OverallStatus}\n\nBlocking: {report.BlockingIssues.Count}\nWarnings: {report.Warnings.Count}\n\n{string.Join("\n", report.Checks.Select(check => $"{check.Name}: {check.Status}").Take(10))}",
+            "Client Demo Readiness",
+            MessageBoxButton.OK,
+            report.OverallStatus == ClientDemoGateStatus.Blocked ? MessageBoxImage.Warning : MessageBoxImage.Information);
+    }
+
+    private void OnExportClientDemoReadinessClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting client demo readiness gate", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            var result = ClientDemoReadinessGateService.ExportReport();
+            var report = ClientDemoReadinessGateService.Evaluate();
+            UpdateClientDemoGateText(report);
+            WorkflowState.Instance.AddEvent("CLIENT_DEMO_GATE_EXPORT", $"Client demo readiness gate exported: {Path.GetFileName(result.Folder)}.");
+            RefreshAfterExport($"Client demo readiness gate exported: {result.Folder}. Status: {report.OverallStatus}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Client demo readiness export failed", ex, "CLIENT_DEMO_GATE_EXPORT_ERROR");
+        }
+    }
+
+    private void UpdateClientDemoGateText(ClientDemoReadinessGateReport report)
+    {
+        ClientDemoGateText.Text = $"Client demo readiness: {report.OverallStatus}; blocking={report.BlockingIssues.Count}; warnings={report.Warnings.Count}";
+        ClientDemoGateText.Foreground = report.OverallStatus switch
+        {
+            ClientDemoGateStatus.Pass => Brushes.LightGreen,
+            ClientDemoGateStatus.Blocked => Brushes.LightCoral,
+            _ => Brushes.Orange,
+        };
+        ClientDemoGateText.ToolTip = string.Join(Environment.NewLine, report.Checks.Select(check => $"{check.Name}: {check.Status} - {check.Evidence}"));
+    }
+
+    private async void OnRefreshStandardsTraceabilityClick(object sender, RoutedEventArgs e)
+    {
+        var button = sender as Button;
+        await ErrorBoundaryService.SafeAsyncCommand(
+            "Refresh standards traceability",
+            "Standards & Quality Checklist",
+            async token =>
+            {
+                token.ThrowIfCancellationRequested();
+                var report = await Task.Run(() => StandardsTraceabilityService.Evaluate(), token);
+                ReplaceRows(_standardsTraceabilityRows, report.Items);
+                StandardsTraceabilitySummaryText.Text = StandardsTraceabilitySummaryFor(report);
+                StatusText.Text = "Standards traceability matrix refreshed.";
+            },
+            running =>
+            {
+                if (button is not null)
+                    button.IsEnabled = !running;
+            },
+            message =>
+            {
+                StandardsTraceabilitySummaryText.Text = "Standards traceability refresh failed safely. Review diagnostics.";
+                StatusText.Text = message;
+            });
+    }
+
+    private void OnExportStandardsTraceabilityClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting standards traceability matrix", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            var export = StandardsTraceabilityService.ExportReport();
+            var report = StandardsTraceabilityService.Evaluate();
+            ReplaceRows(_standardsTraceabilityRows, report.Items);
+            StandardsTraceabilitySummaryText.Text = StandardsTraceabilitySummaryFor(report);
+            WorkflowState.Instance.AddEvent("STANDARDS_TRACEABILITY_EXPORT", $"Standards traceability matrix exported: {Path.GetFileName(export.Folder)}.", relatedPath: export.Folder);
+            RefreshAfterExport($"Standards traceability matrix exported. HTML: {export.HtmlPath}; PDF: {export.PdfPath}; JSON: {export.JsonPath}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Standards traceability export failed", ex, "STANDARDS_TRACEABILITY_EXPORT_ERROR");
+        }
+    }
+
+    private async void OnRefreshCompletionMatrixClick(object sender, RoutedEventArgs e)
+    {
+        var button = sender as Button;
+        await ErrorBoundaryService.SafeAsyncCommand(
+            "Refresh completion matrix",
+            "Completion Matrix",
+            async token =>
+            {
+                var completionReport = await CompletionAssessmentService.AssessAsync(token);
+                ReplaceRows(_completionMatrixRows, completionReport.Categories.Select(CompletionMatrixRow.FromCategory));
+                CompletionMatrixSummaryText.Text = $"Overall evidence completion {completionReport.OverallPercent:F1}% across {completionReport.Categories.Count} readiness areas.";
+                StatusText.Text = "Completion matrix refreshed from evidence records.";
+            },
+            running =>
+            {
+                if (button is not null)
+                    button.IsEnabled = !running;
+            },
+            message =>
+            {
+                CompletionMatrixSummaryText.Text = "Completion matrix refresh failed safely. Review the diagnostic report.";
+                StatusText.Text = message;
+            });
     }
 
     private void OnRefreshManagementDashboardClick(object sender, RoutedEventArgs e)
     {
-        LoadManagementDashboard();
+        _ = LoadManagementDashboardAsync();
         StatusText.Text = "Management dashboard refreshed from local SQLite.";
     }
 
-    private void OnExportManagementDashboardClick(object sender, RoutedEventArgs e)
+    private async void OnExportManagementDashboardClick(object sender, RoutedEventArgs e)
     {
         if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting management dashboard", out var permissionMessage))
         {
@@ -226,7 +413,7 @@ public partial class ReportsView : UserControl
             return;
         }
 
-        var report = _managementDashboardReport ?? ManagementDashboardService.Build(BuildManagementDashboardFilter());
+        var report = _managementDashboardReport ?? await ManagementDashboardService.BuildAsync(BuildManagementDashboardFilter());
         var dialog = new OpenFolderDialog
         {
             Title = "Select management dashboard export folder",
@@ -252,12 +439,12 @@ public partial class ReportsView : UserControl
     {
         if (!IsLoaded)
             return;
-        LoadLogs();
+        _ = RefreshAsync(CancellationToken.None);
     }
 
     private void OnRefreshPilotIssuesClick(object sender, RoutedEventArgs e)
     {
-        LoadLogs();
+        _ = RefreshAsync(CancellationToken.None);
         StatusText.Text = "Pilot issues refreshed.";
     }
 
@@ -292,7 +479,7 @@ public partial class ReportsView : UserControl
             Owner = WorkflowState.Instance.OperatorWithRole,
             Notes = $"{notes} Verdict={row.Verdict}; defect={row.SuggestedDefect}; score={row.ScoreDisplay}.",
         }, WorkflowState.Instance.OperatorWithRole);
-        LoadLogs();
+        _ = RefreshAsync(CancellationToken.None);
         StatusText.Text = $"Pilot issue created: {issue.IssueId}.";
     }
 
@@ -311,7 +498,7 @@ public partial class ReportsView : UserControl
         }
 
         PilotIssueService.Close(row.IssueId, "Closed from Log & Export after engineering review.", WorkflowState.Instance.OperatorWithRole);
-        LoadLogs();
+        _ = RefreshAsync(CancellationToken.None);
         StatusText.Text = $"Pilot issue closed: {row.IssueId}.";
     }
 
@@ -347,25 +534,30 @@ public partial class ReportsView : UserControl
         }
     }
 
-    private void LoadManagementDashboard()
+    private async Task LoadManagementDashboardAsync()
     {
         try
         {
-            _managementDashboardReport = ManagementDashboardService.Build(BuildManagementDashboardFilter());
-            ReplaceRows(_managementDefectRows, _managementDashboardReport.TopDefectClasses);
-            ReplaceRows(_managementRoiRows, _managementDashboardReport.TopRoiRefdesContributors);
-            ReplaceRows(_managementTrendRows, _managementDashboardReport.ModelVersionTrend);
-            ReplaceRows(_managementBreakdownRows, _managementDashboardReport.LotModelBreakdown);
-            ManagementDashboardSummaryText.Text =
-                $"Boards={_managementDashboardReport.TotalBoardsInspected:N0}; OK/NG/REVIEW={_managementDashboardReport.OkCount:N0}/{_managementDashboardReport.NgCount:N0}/{_managementDashboardReport.ReviewCount:N0}; " +
-                $"false-call={_managementDashboardReport.FalseCallRate:P1}; escapes={_managementDashboardReport.PossibleEscapeCount:N0}; review burden={_managementDashboardReport.ManualReviewBurdenMinutes:F1} min; " +
-                $"avg/p95={_managementDashboardReport.AverageInspectionTimeMs:F0}/{_managementDashboardReport.P95InspectionTimeMs:F0} ms; readiness={_managementDashboardReport.AcceptanceReadinessStatus}; " +
-                $"MES={_managementDashboardReport.MesSyncStatus}; central={_managementDashboardReport.CentralSyncStatus}";
+            ApplyManagementDashboard(await ManagementDashboardService.BuildAsync(BuildManagementDashboardFilter()));
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
         {
             ManagementDashboardSummaryText.Text = $"Management dashboard unavailable: {ex.Message}";
         }
+    }
+
+    private void ApplyManagementDashboard(ManagementDashboardReport report)
+    {
+        _managementDashboardReport = report;
+        ReplaceRows(_managementDefectRows, report.TopDefectClasses);
+        ReplaceRows(_managementRoiRows, report.TopRoiRefdesContributors);
+        ReplaceRows(_managementTrendRows, report.ModelVersionTrend);
+        ReplaceRows(_managementBreakdownRows, report.LotModelBreakdown);
+        ManagementDashboardSummaryText.Text =
+            $"Boards={report.TotalBoardsInspected:N0}; OK/NG/REVIEW={report.OkCount:N0}/{report.NgCount:N0}/{report.ReviewCount:N0}; " +
+            $"false-call={report.FalseCallRate:P1}; escapes={report.PossibleEscapeCount:N0}; review burden={report.ManualReviewBurdenMinutes:F1} min; " +
+            $"avg/p95={report.AverageInspectionTimeMs:F0}/{report.P95InspectionTimeMs:F0} ms; readiness={report.AcceptanceReadinessStatus}; " +
+            $"MES={report.MesSyncStatus}; central={report.CentralSyncStatus}";
     }
 
     private ManagementDashboardFilter BuildManagementDashboardFilter()
@@ -541,6 +733,14 @@ public partial class ReportsView : UserControl
             return;
         }
 
+        var gateReport = ClientDemoReadinessGateService.Evaluate();
+        if (!EnsureClientDemoGateAllowsExport(gateReport, allowMissingStage1PackageForStage1Export: true))
+            return;
+        var gateWarnings = gateReport.Checks
+            .Where(check => check.Status != ClientDemoGateStatus.Pass)
+            .Select(check => $"Client demo readiness gate {check.Status}: {check.Name}: {check.Evidence}")
+            .ToArray();
+
         if (!ConfirmExport("Create a Stage 1 customer-demo evidence package from the current filtered logs and latest validation run?"))
             return;
 
@@ -566,6 +766,7 @@ public partial class ReportsView : UserControl
             {
                 cts.Token.ThrowIfCancellationRequested();
                 var warnings = new List<string>();
+                warnings.AddRange(gateWarnings);
                 var packageDir = Path.Combine(dialog.FolderName, $"stage1_customer_package_{DateTime.Now:yyyyMMdd_HHmmss}");
                 var validationDir = Path.Combine(packageDir, "validation");
                 var logsDir = Path.Combine(packageDir, "logs");
@@ -697,6 +898,9 @@ public partial class ReportsView : UserControl
 
         try
         {
+            var gateReport = ClientDemoReadinessGateService.Evaluate();
+            if (!EnsureClientDemoGateAllowsExport(gateReport, allowMissingStage1PackageForStage1Export: false))
+                return;
             var result = FactoryReadinessService.ExportGoNoGoPackage();
             WorkflowState.Instance.AddEvent("FACTORY_READINESS_EXPORT", $"Factory readiness package exported: {Path.GetFileName(result.PackageFolder)}.");
             RefreshAfterExport($"Factory readiness package exported: {result.PackageFolder}. Summary: {result.SummaryHtmlPath}.");
@@ -705,6 +909,42 @@ public partial class ReportsView : UserControl
         {
             HandleWorkError("Factory readiness package export failed", ex, "FACTORY_READINESS_EXPORT_ERROR");
         }
+    }
+
+    private bool EnsureClientDemoGateAllowsExport(ClientDemoReadinessGateReport report, bool allowMissingStage1PackageForStage1Export)
+    {
+        UpdateClientDemoGateText(report);
+        var blocking = report.Checks
+            .Where(check => check.Status == ClientDemoGateStatus.Blocked)
+            .Where(check => !(allowMissingStage1PackageForStage1Export && check.Name == "Stage 1 package"))
+            .ToArray();
+        if (blocking.Length > 0)
+        {
+            MessageBox.Show(
+                $"Client demo readiness is BLOCKED.\n\n{string.Join("\n", blocking.Select(check => $"- {check.Name}: {check.Evidence}"))}",
+                "Client Demo Readiness Gate",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            WorkflowState.Instance.AddEvent("CLIENT_DEMO_GATE_BLOCKED", $"Client-facing export blocked: {string.Join("; ", blocking.Select(check => check.Name))}.");
+            return false;
+        }
+
+        if (report.OverallStatus == ClientDemoGateStatus.Pass)
+            return true;
+
+        var warningText = string.Join("\n", report.Checks
+            .Where(check => check.Status != ClientDemoGateStatus.Pass)
+            .Select(check => $"- {check.Name}: {check.Status}; {check.Evidence}"));
+        var proceed = MessageBox.Show(
+            $"Client demo readiness has warnings.\n\n{warningText}\n\nProceed and include these warnings in the client-facing package?",
+            "Client Demo Readiness Gate",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (proceed != MessageBoxResult.Yes)
+            return false;
+
+        WorkflowState.Instance.AddEvent("CLIENT_DEMO_GATE_WARNING", $"Client-facing export proceeded with gate status {report.OverallStatus}.");
+        return true;
     }
 
     private void OnExportFactoryAcceptanceChecklistClick(object sender, RoutedEventArgs e)
@@ -756,7 +996,7 @@ public partial class ReportsView : UserControl
         {
             var evidence = BuildTestEvidenceService.ImportEvidence(dialog.FileName, WorkflowState.Instance.OperatorWithRole);
             WorkflowState.Instance.AddEvent("BUILD_TEST_EVIDENCE", $"Build/test evidence imported: {Path.GetFileName(evidence.EvidencePath)}.");
-            LoadLogs();
+            _ = RefreshAsync(CancellationToken.None);
             StatusText.Text = $"Build/test evidence imported: {evidence.EvidencePath}.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException)
@@ -1012,6 +1252,77 @@ public partial class ReportsView : UserControl
         }
     }
 
+    private async void OnRunUiStabilityTestClick(object sender, RoutedEventArgs e)
+    {
+        if (_workCts is not null)
+        {
+            MessageBox.Show("An export or utility task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanUseMaintenanceActions, "Running UI stability test", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var profile = SelectedUiStabilityProfile();
+        var state = WorkflowState.Instance;
+        var options = UiNavigationSoakTestService.CreateProfileOptions(
+            profile,
+            UiNavigationSoakTestService.DefaultOutputRoot,
+            testMode: false,
+            operatorId: state.OperatorWithRole) with
+        {
+            IncludeHeavyPageLoads = UiStabilityHeavyLoadsCheck.IsChecked == true ||
+                profile is UiNavigationSoakProfile.FourHourClientDemoReadiness or UiNavigationSoakProfile.EightHourFactoryPoC,
+        };
+
+        var cts = BeginWork("Running UI stability test...");
+        var progress = new Progress<UiNavigationSoakProgress>(p =>
+        {
+            UiStabilityStatsText.Text =
+                $"cycles={p.CyclesCompleted}; slow={p.SlowNavigationCount}; max load={p.MaxPageLoadMilliseconds} ms; " +
+                $"memory start/current/max={p.StartMemoryMegabytes:F1}/{p.CurrentMemoryMegabytes:F1}/{p.MaxMemoryMegabytes:F1} MB; " +
+                $"crashes={p.CrashCount}; open High/Critical issues={p.OpenHighCriticalIssues}.";
+            UpdateProgress(new WorkProgress(p.ElapsedSeconds, p.TotalSeconds, p.Message));
+        });
+
+        try
+        {
+            _uiStabilityEvents.Clear();
+            Func<string, CancellationToken, Task>? pageAction = Window.GetWindow(this) is AOI_Monitor.MainWindow shell
+                ? shell.ExerciseUiNavigationForStabilityAsync
+                : null;
+            var result = await UiNavigationSoakTestService.RunAsync(options, pageAction, progress, cts.Token);
+            foreach (var item in result.Events.TakeLast(500))
+                _uiStabilityEvents.Add(item);
+
+            var export = UiNavigationSoakTestService.WriteReports(result);
+            if (Window.GetWindow(this) is AOI_Monitor.MainWindow restoreShell)
+                await restoreShell.ExerciseUiNavigationForStabilityAsync("Log & Export", CancellationToken.None);
+            UiStabilityStatsText.Text =
+                $"UI stability {result.Status}; cycles={result.CyclesCompleted}; slow={result.SlowNavigationCount}; " +
+                $"max load={result.MaxPageLoadMilliseconds} ms; memory={result.StartWorkingSetMegabytes:F1}/{result.EndWorkingSetMegabytes:F1}/{result.MaxWorkingSetMegabytes:F1} MB; " +
+                $"crashes={result.CrashCount}; open High/Critical issues={result.OpenHighCriticalIssues}. Report: {export.HtmlPath}";
+            WorkflowState.Instance.AddEvent("UI_STABILITY_TEST", $"UI stability {result.Status}: profile={result.Profile}; cycles={result.CyclesCompleted}; crashes={result.CrashCount}; report={Path.GetFileName(export.Folder)}.", relatedPath: export.Folder);
+            RefreshAfterExport($"UI stability {result.Status}. HTML: {export.HtmlPath}. PDF: {export.PdfPath}. JSON: {export.JsonPath}. CSV: {export.CsvPath}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("UI stability test failed", ex, "UI_STABILITY_TEST_ERROR");
+        }
+        finally
+        {
+            EndWork();
+        }
+    }
+
+    private UiNavigationSoakProfile SelectedUiStabilityProfile()
+        => (UiStabilityProfileCombo?.SelectedItem as ComboBoxItem)?.Tag is UiNavigationSoakProfile profile
+            ? profile
+            : UiNavigationSoakProfile.ThirtyMinuteLocalStability;
+
     private async void OnRunPerformanceBenchmarkClick(object sender, RoutedEventArgs e)
     {
         if (_workCts is not null)
@@ -1156,7 +1467,7 @@ public partial class ReportsView : UserControl
         if (pending.Count == 0)
         {
             MessageBox.Show("No pending MES spool items are ready for retry.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
-            LoadLogs();
+            _ = RefreshAsync(CancellationToken.None);
             return;
         }
 
@@ -1184,7 +1495,7 @@ public partial class ReportsView : UserControl
         if (!IsLoaded)
             return;
 
-        LoadLogs();
+        _ = RefreshAsync(CancellationToken.None);
     }
 
     private async void OnRunTraceabilityTestClick(object sender, RoutedEventArgs e)
@@ -1285,7 +1596,7 @@ public partial class ReportsView : UserControl
         if (pending.Count == 0)
         {
             MessageBox.Show("No pending central sync items are ready for retry.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
-            LoadLogs();
+            _ = RefreshAsync(CancellationToken.None);
             return;
         }
 
@@ -1522,8 +1833,7 @@ public partial class ReportsView : UserControl
 
     private void OnCancelWorkClick(object sender, RoutedEventArgs e)
     {
-        _workCts?.Cancel();
-        StatusText.Text = "Cancel requested. Finishing current file...";
+        CancelWork();
     }
 
     private void OnLockActiveRecipeClick(object sender, RoutedEventArgs e)
@@ -1567,6 +1877,11 @@ public partial class ReportsView : UserControl
                 var path = Path.Combine(folder, $"{Path.GetFileNameWithoutExtension(row.ImageName)}_{row.Verdict}_{row.Id}_overlay.png");
                 SavePng(bitmap, path);
                 exported++;
+                if (exported % 10 == 0)
+                {
+                    MemoryDiagnosticsService.RecordExportCheckpoint("Annotated overlay export", exported);
+                    ImageCacheService.ClearOnMemoryPressure();
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidOperationException)
             {
@@ -1622,15 +1937,7 @@ public partial class ReportsView : UserControl
     }
 
     private static BitmapSource LoadBitmap(string path)
-    {
-        var bmp = new BitmapImage();
-        bmp.BeginInit();
-        bmp.CacheOption = BitmapCacheOption.OnLoad;
-        bmp.UriSource = new Uri(path, UriKind.Absolute);
-        bmp.EndInit();
-        bmp.Freeze();
-        return bmp;
-    }
+        => ImageCacheService.LoadBitmap(path, cache: false);
 
     private static void SavePng(BitmapSource bitmap, string path)
     {
@@ -1642,7 +1949,7 @@ public partial class ReportsView : UserControl
 
     private void RefreshAfterExport(string message)
     {
-        LoadLogs();
+        _ = RefreshAsync(CancellationToken.None);
         StatusText.Text = message;
         MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
     }
@@ -2209,6 +2516,9 @@ public partial class ReportsView : UserControl
         return $"Build/test evidence: {summary.Status} | {latest.Configuration} | commit {commit} | hygiene {latest.HygieneStatus}, restore {latest.RestoreStatus}, build {latest.BuildStatus}, test {latest.TestStatus}, publish {latest.PublishValidationStatus}";
     }
 
+    private static string StandardsTraceabilitySummaryFor(StandardsTraceabilityReport report)
+        => $"Standards traceability: {report.OverallStatus}; satisfied={report.SatisfiedCount}; partial={report.PartialCount}; missing={report.MissingCount}; not applicable={report.NotApplicableCount}; missing release blockers={report.ReleaseBlockerMissingCount}. Standards-aligned evidence only; not certification.";
+
     private static string FormatPercent(double value)
         => value.ToString("P1", CultureInfo.InvariantCulture);
 
@@ -2220,6 +2530,7 @@ public partial class ReportsView : UserControl
 
     private CancellationTokenSource BeginWork(string message)
     {
+        UiPerformanceMonitorService.RecordSlowOperation(message, 0, $"Long operation started: {message}");
         _workCts = new CancellationTokenSource();
         WorkProgressBar.Value = 0;
         CancelWorkButton.IsEnabled = true;
@@ -2246,9 +2557,17 @@ public partial class ReportsView : UserControl
         var message = ex is UnauthorizedAccessException
             ? $"{title}: export folder or database access was denied."
             : $"{title}: {ex.Message}";
+        var report = CrashReportService.WriteReport(new CrashReportRequest
+        {
+            Exception = ex,
+            OperationName = title,
+            CurrentPage = "Log & Export",
+            IsFatal = false,
+            IsUiThread = true,
+        });
         StatusText.Text = message;
-        WorkflowState.Instance.AddEvent(category, message);
-        MessageBox.Show(message, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        WorkflowState.Instance.AddEvent(category, message, relatedEntityType: "CrashReport", relatedPath: report.ReportPath);
+        MessageBox.Show($"{message}\n\n{report.OperatorMessage}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private static void LogErrors(string category, IReadOnlyList<string> errors)
@@ -2774,6 +3093,25 @@ public partial class ReportsView : UserControl
 
     private sealed record WorkProgress(int Completed, int Total, string Message);
 
+    private sealed record LogLoadSnapshot(
+        InspectionLogRow[] Inspections,
+        ReviewLogRow[] Reviews,
+        ExportHistoryRow[] Exports,
+        AuditLogRow[] Audits,
+        MesSpoolQueueRow[] MesSpool,
+        CentralSyncQueueRow[] CentralSync,
+        PilotIssueRow[] PilotIssues,
+        FactoryReadinessRow[] Readiness,
+        string ReadinessOverallStatus,
+        StandardsTraceabilityMatrix[] StandardsTraceabilityRows,
+        string StandardsTraceabilitySummary,
+        CompletionMatrixRow[] CompletionRows,
+        double CompletionOverallPercent,
+        IReadOnlyList<FactoryAcceptanceChecklistItem> FactoryAcceptanceRows,
+        PilotIssueSummary IssueSummary,
+        string BuildEvidenceSummary,
+        ManagementDashboardReport ManagementDashboardReport);
+
     private sealed record ExportOutcome(int Count, IReadOnlyList<string> Errors);
 
     private sealed record PackageOutcome(string PackageDir, string ReportPath, int OverlayCount, IReadOnlyList<string> Warnings);
@@ -2981,6 +3319,11 @@ public partial class ReportsView : UserControl
         public string Category { get; init; } = string.Empty;
         public string Severity { get; init; } = string.Empty;
         public string Status { get; init; } = string.Empty;
+        public string PageName { get; init; } = string.Empty;
+        public string ReproductionSteps { get; init; } = string.Empty;
+        public string ExpectedBehavior { get; init; } = string.Empty;
+        public string ActualBehavior { get; init; } = string.Empty;
+        public string ScreenshotPath { get; init; } = string.Empty;
         public string BoardModel { get; init; } = string.Empty;
         public string LotId { get; init; } = string.Empty;
         public string RelatedInspectionId { get; init; } = string.Empty;
@@ -2996,6 +3339,11 @@ public partial class ReportsView : UserControl
                 Category = issue.Category.ToString(),
                 Severity = issue.Severity,
                 Status = issue.Status.ToString(),
+                PageName = issue.PageName,
+                ReproductionSteps = issue.ReproductionSteps,
+                ExpectedBehavior = issue.ExpectedBehavior,
+                ActualBehavior = issue.ActualBehavior,
+                ScreenshotPath = issue.ScreenshotPath,
                 BoardModel = issue.BoardModel,
                 LotId = issue.LotId,
                 RelatedInspectionId = issue.RelatedInspectionId,

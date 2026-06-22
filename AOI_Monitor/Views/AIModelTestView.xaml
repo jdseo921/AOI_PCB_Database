@@ -38,7 +38,7 @@
 
   <Grid Margin="8">
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="2*"/>
       <RowDefinition Height="8"/>
       <RowDefinition Height="Auto"/>
       <RowDefinition Height="8"/>
@@ -54,7 +54,7 @@
           <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Stage 1 Customer Validation" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+          <TextBlock Text="Stage 1 Customer Validation" Style="{StaticResource HmiSectionHeaderText}"/>
         </Border>
         <Grid Grid.Row="1" Margin="8">
           <Grid.ColumnDefinitions>
@@ -66,27 +66,27 @@
           </Grid.ColumnDefinitions>
 
           <StackPanel Grid.Column="0">
-            <TextBlock Text="Test Image Folder" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <TextBlock Text="Test Image Folder" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <Grid>
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
-              <TextBox x:Name="FolderPathText" Style="{StaticResource ReadonlyInput}" Text="No folder selected"/>
+              <TextBox x:Name="FolderPathText" Style="{StaticResource ReadonlyInput}" Text="No folder selected" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
               <Button Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Select" Click="OnSelectFolderClick"/>
             </Grid>
           </StackPanel>
 
           <StackPanel Grid.Column="2">
-            <TextBlock Text="Ground Truth CSV (optional)" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
+            <TextBlock Text="Ground Truth CSV (optional)" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4" ToolTip="Ground truth is the reviewed answer used to compare model output."/>
             <Grid>
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
-              <TextBox x:Name="GroundTruthPathText" Style="{StaticResource ReadonlyInput}" Text="No CSV selected"/>
+              <TextBox x:Name="GroundTruthPathText" Style="{StaticResource ReadonlyInput}" Text="No CSV selected" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
               <Button Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Select" Click="OnSelectGroundTruthClick"/>
             </Grid>
           </StackPanel>
 
           <StackPanel Grid.Column="4">
-            <TextBlock Text="Engine" Foreground="#9AA6AF" FontSize="11" Margin="0,0,0,4"/>
-            <TextBox x:Name="EngineText" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference Prototype Engine"/>
-            <Button Style="{StaticResource ActionBtnBlue}" Content="Run Dataset Preflight" Margin="0,8,0,0" Click="OnRunDatasetPreflightClick"/>
+            <TextBlock Text="Engine" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4" ToolTip="ONNX is the supported machine-learning model file format for the production engine path."/>
+            <TextBox x:Name="EngineText" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference Prototype Engine" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Check Dataset Before Test" Margin="0,8,0,0" Click="OnRunDatasetPreflightClick" ToolTip="Checks image files, labels, golden images, and inspection-area metadata before running client validation."/>
             <Button Style="{StaticResource ActionBtn}" Content="Open Manifest Template" Margin="0,6,0,0" Click="OnOpenManifestTemplateClick"/>
             <Button Style="{StaticResource ActionBtnGreen}" Content="Run Batch Inspection" Margin="0,6,0,0" Click="OnRunBatchClick"/>
           </StackPanel>
@@ -94,60 +94,61 @@
       </Grid>
     </Border>
 
-    <StackPanel Grid.Row="2">
+    <ScrollViewer Grid.Row="2" Style="{StaticResource FactoryScrollablePage}" MinHeight="210">
+    <StackPanel>
       <UniformGrid Columns="4">
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+        <Border Style="{StaticResource HmiKpiCard}" Margin="0,0,6,0">
           <StackPanel>
-            <TextBlock Text="Accuracy" Foreground="#7F8C95" FontSize="10"/>
+            <TextBlock Text="Accuracy" Foreground="#7F8C95" FontSize="14"/>
             <TextBlock x:Name="AccuracyText" Text="--" FontWeight="Bold" FontSize="18"/>
           </StackPanel>
         </Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+        <Border Style="{StaticResource HmiKpiCard}" Margin="0,0,6,0">
           <StackPanel>
-            <TextBlock Text="Precision" Foreground="#7F8C95" FontSize="10"/>
+            <TextBlock Text="Precision" Foreground="#7F8C95" FontSize="14"/>
             <TextBlock x:Name="PrecisionText" Text="--" FontWeight="Bold" FontSize="18"/>
           </StackPanel>
         </Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+        <Border Style="{StaticResource HmiKpiCard}" Margin="0,0,6,0">
           <StackPanel>
-            <TextBlock Text="Recall" Foreground="#7F8C95" FontSize="10"/>
+            <TextBlock Text="Recall" Foreground="#7F8C95" FontSize="14"/>
             <TextBlock x:Name="RecallText" Text="--" FontWeight="Bold" FontSize="18"/>
           </StackPanel>
         </Border>
-        <Border Style="{StaticResource FieldBox}">
+        <Border Style="{StaticResource HmiKpiCard}">
           <StackPanel>
-            <TextBlock Text="False Call Rate" Foreground="#7F8C95" FontSize="10"/>
+            <TextBlock Text="Good Boards Marked Defect" Foreground="#7F8C95" FontSize="14" ToolTip="False Call: the system marked a good board as a defect."/>
             <TextBlock x:Name="FalseCallRateText" Text="--" FontWeight="Bold" FontSize="18"/>
           </StackPanel>
         </Border>
       </UniformGrid>
       <UniformGrid Columns="7" Margin="0,6,0,0">
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TP" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="TpText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TN" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="TnText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FP" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="FpText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FN" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="FnText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="OK" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="OkCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="NG" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="NgCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="REVIEW" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="ReviewCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TP" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="TpText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TN" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="TnText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FP" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="FpText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FN" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="FnText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="OK" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="OkCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="NG" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="NgCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="REVIEW" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="ReviewCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
       </UniformGrid>
       <UniformGrid Columns="4" Margin="0,6,0,0">
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="False Call" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="FalseCallText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Possible Escape" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="PossibleEscapeText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Verified NG" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="VerifiedNgText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Unknown / Unlabeled" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="UnknownText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Good Board Flagged" Foreground="#7F8C95" FontSize="14" ToolTip="False Call: the system marked a good board as a defect."/><TextBlock x:Name="FalseCallText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Possible Missed Defect" Foreground="#7F8C95" FontSize="14" ToolTip="Possible Escape: the system may have missed a real defect."/><TextBlock x:Name="PossibleEscapeText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Verified NG" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="VerifiedNgText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Unknown / Unlabeled" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="UnknownText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
       </UniformGrid>
       <UniformGrid Columns="4" Margin="0,6,0,0">
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Avg Time / Image" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="AverageTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Max Time" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="MaxTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Min Time" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="MinTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Over 1 Second" Foreground="#7F8C95" FontSize="10"/><TextBlock x:Name="OverOneSecondText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Avg Time / Image" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="AverageTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Max Time" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="MaxTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Min Time" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="MinTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Over 1 Second" Foreground="#7F8C95" FontSize="14"/><TextBlock x:Name="OverOneSecondText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
       </UniformGrid>
       <Border Style="{StaticResource FieldBox}" Margin="0,6,0,0">
         <StackPanel>
-          <TextBlock Text="Dataset Quality Gate" Foreground="#7F8C95" FontSize="10"/>
+          <TextBlock Text="Dataset Check" Foreground="#7F8C95" FontSize="14"/>
           <TextBlock x:Name="DatasetQualityText" Text="--" FontWeight="Bold" FontSize="14"/>
-          <TextBlock x:Name="DatasetPreflightText" Text="Preflight: not run" Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap"/>
-          <TextBlock x:Name="DatasetQualityWarningsText" Text="" Foreground="#9AA6AF" FontSize="10.5" TextWrapping="Wrap"/>
+          <TextBlock x:Name="DatasetPreflightText" Text="Preflight: not run" Foreground="#9AA6AF" FontSize="14" TextWrapping="Wrap"/>
+          <TextBlock x:Name="DatasetQualityWarningsText" Text="" Foreground="#9AA6AF" FontSize="14" TextWrapping="Wrap"/>
           <Grid Margin="0,6,0,0">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*"/>
@@ -155,11 +156,11 @@
               <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
-              <TextBlock Text="Blocking Failures" Foreground="#FFCDD0" FontWeight="Bold" FontSize="10.5" Margin="0,0,0,3"/>
+              <TextBlock Text="Blocking Failures" Foreground="#FFCDD0" FontWeight="Bold" FontSize="14" Margin="0,0,0,3"/>
               <ListBox x:Name="PreflightFailuresList" Height="62" Background="#151A1E" BorderBrush="#343D44" Foreground="#FFCDD0"/>
             </StackPanel>
             <StackPanel Grid.Column="2">
-              <TextBlock Text="Warnings" Foreground="#E1A334" FontWeight="Bold" FontSize="10.5" Margin="0,0,0,3"/>
+              <TextBlock Text="Warnings" Foreground="#E1A334" FontWeight="Bold" FontSize="14" Margin="0,0,0,3"/>
               <ListBox x:Name="PreflightWarningsList" Height="62" Background="#151A1E" BorderBrush="#343D44" Foreground="#FFE1A3"/>
             </StackPanel>
           </Grid>
@@ -170,28 +171,30 @@
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="92"/></Grid.RowDefinitions>
           <DockPanel>
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-              <ComboBox x:Name="FalseCallModeCombo" Width="190" SelectedIndex="1" Margin="0,0,6,0">
-                <ComboBoxItem Content="Minimize False Positives"/>
+              <ComboBox x:Name="FalseCallModeCombo" Width="210" SelectedIndex="1" Margin="0,0,6,0" ToolTip="False Call: good board marked defect. Possible Escape: real defect may be missed.">
+                <ComboBoxItem Content="Reduce Good-Board Flags"/>
                 <ComboBoxItem Content="Balanced"/>
-                <ComboBoxItem Content="Maximize Defect Recall"/>
+                <ComboBoxItem Content="Reduce Missed Defects"/>
               </ComboBox>
-              <Button Style="{StaticResource ActionBtnBlue}" Content="Analyze False Calls" Margin="0,0,6,0" Click="OnAnalyzeFalseCallsClick"/>
-              <Button x:Name="CreateThresholdProfileDraftButton" Style="{StaticResource ActionBtn}" Content="Create Threshold Profile Draft" IsEnabled="False" Margin="0,0,6,0" Click="OnCreateThresholdProfileDraftClick"/>
-              <Button x:Name="ApplyRecommendedThresholdButton" Style="{StaticResource ActionBtnAmber}" Content="Apply Recommended Threshold" IsEnabled="False" Click="OnApplyRecommendedThresholdClick"/>
+              <Button Style="{StaticResource ActionBtnBlue}" Content="Analyze Review Tradeoff" Margin="0,0,6,0" Click="OnAnalyzeFalseCallsClick"/>
+              <Button x:Name="CreateThresholdProfileDraftButton" Style="{StaticResource ActionBtn}" Content="Create Threshold Profile Draft" IsEnabled="False" Margin="0,0,6,0" Click="OnCreateThresholdProfileDraftClick" ToolTip="Threshold controls when a score becomes OK, REVIEW, or NG. Drafts still need review before use."/>
+              <Button x:Name="ApplyRecommendedThresholdButton" Style="{StaticResource ActionBtnAmber}" Content="Apply Recommended Threshold" IsEnabled="False" Click="OnApplyRecommendedThresholdClick" ToolTip="Applies the recommended threshold to the current draft; verify before production use."/>
             </StackPanel>
             <StackPanel>
-              <TextBlock Text="False Call Reduction / Labor Impact" Foreground="#DCE5EB" FontWeight="Bold" FontSize="11.5"/>
-              <TextBlock x:Name="FalseCallRecommendationText" Text="Run a batch, then analyze threshold candidates." Foreground="#9AA6AF" FontSize="11"/>
+              <TextBlock Text="Good-Board Flags / Review Labor" Style="{StaticResource HmiSectionHeaderText}"/>
+              <TextBlock Text="Shows where changing the review threshold may reduce unnecessary operator review without hiding likely defects."
+                         Style="{StaticResource HmiTechnicalHintText}"/>
+              <TextBlock x:Name="FalseCallRecommendationText" Text="Run a batch, then analyze threshold candidates." Foreground="#9AA6AF" FontSize="14"/>
             </StackPanel>
           </DockPanel>
-          <DataGrid Grid.Row="1" x:Name="FalseCallGrid" Margin="0,6,0,0" AutoGenerateColumns="False" HeadersVisibility="Column" CanUserAddRows="False" IsReadOnly="True">
+          <DataGrid Grid.Row="1" x:Name="FalseCallGrid" Margin="0,6,0,0" AutoGenerateColumns="False" HeadersVisibility="Column" CanUserAddRows="False" IsReadOnly="True" Style="{StaticResource HmiTable}" ToolTip="Threshold candidates show the tradeoff between good boards marked defect, possible missed defects, and manual review time.">
             <DataGrid.Columns>
               <DataGridTextColumn Header="Threshold" Binding="{Binding ConfidenceThreshold, StringFormat=F3}" Width="82"/>
               <DataGridTextColumn Header="Precision" Binding="{Binding Precision, StringFormat=P1}" Width="78"/>
               <DataGridTextColumn Header="Recall" Binding="{Binding Recall, StringFormat=P1}" Width="72"/>
               <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="52"/>
               <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="52"/>
-              <DataGridTextColumn Header="False Call" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="86"/>
+              <DataGridTextColumn Header="Good Board Flag" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="110"/>
               <DataGridTextColumn Header="Escape" Binding="{Binding PossibleEscapeRate, StringFormat=P1}" Width="78"/>
               <DataGridTextColumn Header="Review" Binding="{Binding ReviewRate, StringFormat=P1}" Width="78"/>
               <DataGridTextColumn Header="Manual Min" Binding="{Binding EstimatedManualReviewMinutes, StringFormat=F1}" Width="88"/>
@@ -201,9 +204,9 @@
         </Grid>
       </Border>
       <Border Style="{StaticResource FieldBox}" Margin="0,6,0,0">
-        <TabControl x:Name="BreakdownTabs" Height="150">
+        <TabControl x:Name="BreakdownTabs" MinHeight="150">
           <TabItem Header="Defect Class">
-            <DataGrid x:Name="DefectClassBreakdownGrid" AutoGenerateColumns="False" IsReadOnly="True">
+            <DataGrid x:Name="DefectClassBreakdownGrid" AutoGenerateColumns="False" IsReadOnly="True" Style="{StaticResource HmiTable}">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Class" Binding="{Binding DisplayName}" Width="*"/>
                 <DataGridTextColumn Header="TP" Binding="{Binding TruePositive}" Width="46"/>
@@ -215,19 +218,19 @@
             </DataGrid>
           </TabItem>
           <TabItem Header="Side/View">
-            <DataGrid x:Name="SideBreakdownGrid" AutoGenerateColumns="False" IsReadOnly="True">
+            <DataGrid x:Name="SideBreakdownGrid" AutoGenerateColumns="False" IsReadOnly="True" Style="{StaticResource HmiTable}">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Side" Binding="{Binding DisplayName}" Width="*"/>
                 <DataGridTextColumn Header="TP" Binding="{Binding TruePositive}" Width="46"/>
                 <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="46"/>
                 <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="46"/>
                 <DataGridTextColumn Header="Wrong Side" Binding="{Binding WrongSide}" Width="80"/>
-                <DataGridTextColumn Header="False Call" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="82"/>
+                <DataGridTextColumn Header="Good Board Flag" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="110"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
           <TabItem Header="ROI">
-            <DataGrid x:Name="RoiBreakdownGrid" AutoGenerateColumns="False" IsReadOnly="True">
+            <DataGrid x:Name="RoiBreakdownGrid" AutoGenerateColumns="False" IsReadOnly="True" Style="{StaticResource HmiTable}" ToolTip="ROI means inspection area on the board image checked by the model.">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="ROI" Binding="{Binding DisplayName}" Width="*"/>
                 <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="58"/>
@@ -237,17 +240,17 @@
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
-          <TabItem Header="Worst False Calls">
-            <DataGrid x:Name="FalseCallSourcesGrid" AutoGenerateColumns="False" IsReadOnly="True">
+          <TabItem Header="Worst Good-Board Flags">
+            <DataGrid x:Name="FalseCallSourcesGrid" AutoGenerateColumns="False" IsReadOnly="True" Style="{StaticResource HmiTable}" ToolTip="False Call: the system marked a good board as a defect.">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Source" Binding="{Binding DisplayName}" Width="*"/>
                 <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="52"/>
-                <DataGridTextColumn Header="False Call" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="88"/>
+                <DataGridTextColumn Header="Good Board Flag" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="110"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
           <TabItem Header="Possible Escapes">
-            <DataGrid x:Name="EscapeSourcesGrid" AutoGenerateColumns="False" IsReadOnly="True">
+            <DataGrid x:Name="EscapeSourcesGrid" AutoGenerateColumns="False" IsReadOnly="True" Style="{StaticResource HmiTable}" ToolTip="Possible Escape: the system may have missed a real defect.">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Source" Binding="{Binding DisplayName}" Width="*"/>
                 <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="52"/>
@@ -258,14 +261,15 @@
         </TabControl>
       </Border>
     </StackPanel>
+    </ScrollViewer>
 
     <Border Grid.Row="4" Style="{StaticResource Panel}">
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
-            <TextBlock x:Name="RunSummaryText" DockPanel.Dock="Right" Text="No batch run loaded" Foreground="#9AA6AF" FontSize="11"/>
-            <TextBlock Text="Batch Results" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="11.5"/>
+            <TextBlock x:Name="RunSummaryText" DockPanel.Dock="Right" Text="No batch run loaded" Foreground="#9AA6AF" FontSize="14"/>
+            <TextBlock Text="Batch Results" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </DockPanel>
         </Border>
         <DataGrid Grid.Row="1" x:Name="ResultsGrid" RowStyle="{StaticResource BatchResultRow}" SelectionChanged="OnResultSelectionChanged">
@@ -279,7 +283,7 @@
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>
                   <Border Style="{StaticResource ResultStatusChipBorder}" HorizontalAlignment="Left" Margin="0,1,0,1">
-                    <TextBlock Text="{Binding PassFail}" FontWeight="Bold" FontSize="9.5"/>
+                    <TextBlock Text="{Binding PassFail}" FontWeight="Bold" FontSize="14"/>
                   </Border>
                 </DataTemplate>
               </DataGridTemplateColumn.CellTemplate>
@@ -299,17 +303,18 @@
       <DockPanel Margin="8">
         <StackPanel VerticalAlignment="Center">
           <TextBlock x:Name="StatusText" Text="Select a folder to run Stage 1 validation." Foreground="#9AA6AF"/>
-          <TextBlock x:Name="ReportPathText" Text="Report: not generated" Foreground="#7F8C95" FontSize="11" TextTrimming="CharacterEllipsis"/>
+          <TextBlock x:Name="ReportPathText" Text="Report: not generated" Foreground="#7F8C95" FontSize="14" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
         </StackPanel>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+        <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
           <ProgressBar x:Name="WorkProgressBar" Width="140" Height="12" Minimum="0" Maximum="100" Value="0" Margin="0,0,8,0" VerticalAlignment="Center"/>
           <Button x:Name="CancelWorkButton" Style="{StaticResource ActionBtn}" Content="Cancel" Margin="0,0,6,0" IsEnabled="False" Click="OnCancelWorkClick"/>
           <Button Style="{StaticResource ActionBtn}" Content="Preview Selected" Margin="0,0,6,0" Click="OnPreviewSelectedClick"/>
           <Button Style="{StaticResource ActionBtnGreen}" Content="Export CSV" Margin="0,0,6,0" Click="OnExportCsvClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Export Annotated Images" Margin="0,0,6,0" Click="OnExportAnnotatedImagesClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Export Validation Package" Click="OnGenerateReportClick"/>
-        </StackPanel>
+        </WrapPanel>
       </DockPanel>
     </Border>
   </Grid>
 </UserControl>
+

@@ -50,11 +50,16 @@
     <Border Grid.Row="0" Style="{StaticResource Panel}">
       <Grid>
         <Grid.RowDefinitions>
-          <RowDefinition Height="25"/>
+          <RowDefinition Height="Auto" MinHeight="32"/>
           <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Stage 1 Customer Validation" Style="{StaticResource HmiSectionHeaderText}"/>
+          <DockPanel>
+            <Border DockPanel.Dock="Right" Style="{StaticResource HmiEvidenceSampleData}" Padding="8,3">
+              <TextBlock Text="Prototype / sample evidence only" Foreground="#FFE0A7" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+            </Border>
+            <TextBlock Text="Stage 1 Customer Validation" Style="{StaticResource HmiSectionHeaderText}"/>
+          </DockPanel>
         </Border>
         <Grid Grid.Row="1" Margin="8">
           <Grid.ColumnDefinitions>
@@ -187,18 +192,18 @@
               <TextBlock x:Name="FalseCallRecommendationText" Text="Run a batch, then analyze threshold candidates." Foreground="#9AA6AF" FontSize="14"/>
             </StackPanel>
           </DockPanel>
-          <DataGrid Grid.Row="1" x:Name="FalseCallGrid" Margin="0,6,0,0" AutoGenerateColumns="False" HeadersVisibility="Column" CanUserAddRows="False" IsReadOnly="True" Style="{StaticResource HmiTable}" ToolTip="Threshold candidates show the tradeoff between good boards marked defect, possible missed defects, and manual review time.">
+          <DataGrid Grid.Row="1" x:Name="FalseCallGrid" Margin="0,6,0,0" AutoGenerateColumns="False" HeadersVisibility="Column" CanUserAddRows="False" IsReadOnly="True" Style="{StaticResource HmiDenseTable}" MinWidth="0" ToolTip="Threshold candidates show the tradeoff between good boards marked defect, possible missed defects, and manual review time.">
             <DataGrid.Columns>
-              <DataGridTextColumn Header="Threshold" Binding="{Binding ConfidenceThreshold, StringFormat=F3}" Width="82"/>
-              <DataGridTextColumn Header="Precision" Binding="{Binding Precision, StringFormat=P1}" Width="78"/>
-              <DataGridTextColumn Header="Recall" Binding="{Binding Recall, StringFormat=P1}" Width="72"/>
-              <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="52"/>
-              <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="52"/>
-              <DataGridTextColumn Header="Good Board Flag" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="110"/>
-              <DataGridTextColumn Header="Escape" Binding="{Binding PossibleEscapeRate, StringFormat=P1}" Width="78"/>
-              <DataGridTextColumn Header="Review" Binding="{Binding ReviewRate, StringFormat=P1}" Width="78"/>
-              <DataGridTextColumn Header="Manual Min" Binding="{Binding EstimatedManualReviewMinutes, StringFormat=F1}" Width="88"/>
-              <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="*"/>
+              <DataGridTextColumn Header="Threshold" Binding="{Binding ConfidenceThreshold, StringFormat=F3}" Width="100" MinWidth="100"/>
+              <DataGridTextColumn Header="Precision" Binding="{Binding Precision, StringFormat=P1}" Width="96" MinWidth="96"/>
+              <DataGridTextColumn Header="Recall" Binding="{Binding Recall, StringFormat=P1}" Width="90" MinWidth="90"/>
+              <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="64" MinWidth="64"/>
+              <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="64" MinWidth="64"/>
+              <DataGridTextColumn Header="Good Flag" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="116" MinWidth="116"/>
+              <DataGridTextColumn Header="Escape" Binding="{Binding PossibleEscapeRate, StringFormat=P1}" Width="90" MinWidth="90"/>
+              <DataGridTextColumn Header="Review" Binding="{Binding ReviewRate, StringFormat=P1}" Width="90" MinWidth="90"/>
+              <DataGridTextColumn Header="Manual Min" Binding="{Binding EstimatedManualReviewMinutes, StringFormat=F1}" Width="108" MinWidth="108"/>
+              <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="220" MinWidth="220"/>
             </DataGrid.Columns>
           </DataGrid>
         </Grid>
@@ -209,11 +214,11 @@
             <DataGrid x:Name="DefectClassBreakdownGrid" AutoGenerateColumns="False" IsReadOnly="True" Style="{StaticResource HmiTable}">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Class" Binding="{Binding DisplayName}" Width="*"/>
-                <DataGridTextColumn Header="TP" Binding="{Binding TruePositive}" Width="46"/>
-                <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="46"/>
-                <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="46"/>
-                <DataGridTextColumn Header="Wrong" Binding="{Binding WrongDefectClass}" Width="58"/>
-                <DataGridTextColumn Header="Recall" Binding="{Binding Recall, StringFormat=P1}" Width="70"/>
+                <DataGridTextColumn Header="TP" Binding="{Binding TruePositive}" Width="64" MinWidth="64"/>
+                <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="64" MinWidth="64"/>
+                <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="64" MinWidth="64"/>
+                <DataGridTextColumn Header="Wrong" Binding="{Binding WrongDefectClass}" Width="76" MinWidth="76"/>
+                <DataGridTextColumn Header="Recall" Binding="{Binding Recall, StringFormat=P1}" Width="84" MinWidth="84"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -221,11 +226,11 @@
             <DataGrid x:Name="SideBreakdownGrid" AutoGenerateColumns="False" IsReadOnly="True" Style="{StaticResource HmiTable}">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Side" Binding="{Binding DisplayName}" Width="*"/>
-                <DataGridTextColumn Header="TP" Binding="{Binding TruePositive}" Width="46"/>
-                <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="46"/>
-                <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="46"/>
-                <DataGridTextColumn Header="Wrong Side" Binding="{Binding WrongSide}" Width="80"/>
-                <DataGridTextColumn Header="Good Board Flag" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="110"/>
+                <DataGridTextColumn Header="TP" Binding="{Binding TruePositive}" Width="64" MinWidth="64"/>
+                <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="64" MinWidth="64"/>
+                <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="64" MinWidth="64"/>
+                <DataGridTextColumn Header="Wrong Side" Binding="{Binding WrongSide}" Width="100" MinWidth="100"/>
+                <DataGridTextColumn Header="Good Flag" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="116" MinWidth="116"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -233,10 +238,10 @@
             <DataGrid x:Name="RoiBreakdownGrid" AutoGenerateColumns="False" IsReadOnly="True" Style="{StaticResource HmiTable}" ToolTip="ROI means inspection area on the board image checked by the model.">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="ROI" Binding="{Binding DisplayName}" Width="*"/>
-                <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="58"/>
-                <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="46"/>
-                <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="46"/>
-                <DataGridTextColumn Header="Recall" Binding="{Binding Recall, StringFormat=P1}" Width="70"/>
+                <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="72" MinWidth="72"/>
+                <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="64" MinWidth="64"/>
+                <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="64" MinWidth="64"/>
+                <DataGridTextColumn Header="Recall" Binding="{Binding Recall, StringFormat=P1}" Width="84" MinWidth="84"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -244,8 +249,8 @@
             <DataGrid x:Name="FalseCallSourcesGrid" AutoGenerateColumns="False" IsReadOnly="True" Style="{StaticResource HmiTable}" ToolTip="False Call: the system marked a good board as a defect.">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Source" Binding="{Binding DisplayName}" Width="*"/>
-                <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="52"/>
-                <DataGridTextColumn Header="Good Board Flag" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="110"/>
+                <DataGridTextColumn Header="FP" Binding="{Binding FalsePositive}" Width="64" MinWidth="64"/>
+                <DataGridTextColumn Header="Good Flag" Binding="{Binding FalseCallRate, StringFormat=P1}" Width="116" MinWidth="116"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -253,8 +258,8 @@
             <DataGrid x:Name="EscapeSourcesGrid" AutoGenerateColumns="False" IsReadOnly="True" Style="{StaticResource HmiTable}" ToolTip="Possible Escape: the system may have missed a real defect.">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Source" Binding="{Binding DisplayName}" Width="*"/>
-                <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="52"/>
-                <DataGridTextColumn Header="Recall" Binding="{Binding Recall, StringFormat=P1}" Width="78"/>
+                <DataGridTextColumn Header="FN" Binding="{Binding FalseNegative}" Width="64" MinWidth="64"/>
+                <DataGridTextColumn Header="Recall" Binding="{Binding Recall, StringFormat=P1}" Width="84" MinWidth="84"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -265,21 +270,21 @@
 
     <Border Grid.Row="4" Style="{StaticResource Panel}">
       <Grid>
-        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
             <TextBlock x:Name="RunSummaryText" DockPanel.Dock="Right" Text="No batch run loaded" Foreground="#9AA6AF" FontSize="14"/>
             <TextBlock Text="Batch Results" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </DockPanel>
         </Border>
-        <DataGrid Grid.Row="1" x:Name="ResultsGrid" RowStyle="{StaticResource BatchResultRow}" SelectionChanged="OnResultSelectionChanged">
+        <DataGrid Grid.Row="1" x:Name="ResultsGrid" RowStyle="{StaticResource BatchResultRow}" SelectionChanged="OnResultSelectionChanged" Style="{StaticResource HmiDenseTable}" MinWidth="0" ToolTip="AI means inspection result. GT means ground truth.">
           <DataGrid.Columns>
-            <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="*"/>
-            <DataGridTextColumn Header="Ground Truth" Binding="{Binding GroundTruth}" Width="110"/>
-            <DataGridTextColumn Header="AI/Engine Result" Binding="{Binding EngineResult}" Width="120"/>
-            <DataGridTextColumn Header="Score" Binding="{Binding ScoreDisplay}" Width="70"/>
-            <DataGridTextColumn Header="Time" Binding="{Binding TotalTimeDisplay}" Width="80"/>
-            <DataGridTemplateColumn Header="Pass/Fail" Width="90">
+            <DataGridTextColumn Header="Image" Binding="{Binding Image}" Width="220" MinWidth="220"/>
+            <DataGridTextColumn Header="GT" Binding="{Binding GroundTruth}" Width="96" MinWidth="96" HeaderTemplate="{StaticResource HmiHeaderGroundTruthTemplate}"/>
+            <DataGridTextColumn Header="AI" Binding="{Binding EngineResult}" Width="120" MinWidth="120" HeaderTemplate="{StaticResource HmiHeaderInspectionResultTemplate}"/>
+            <DataGridTextColumn Header="Score" Binding="{Binding ScoreDisplay}" Width="84" MinWidth="84"/>
+            <DataGridTextColumn Header="Time" Binding="{Binding TotalTimeDisplay}" Width="90" MinWidth="90"/>
+            <DataGridTemplateColumn Header="Verdict" Width="108" MinWidth="108">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>
                   <Border Style="{StaticResource ResultStatusChipBorder}" HorizontalAlignment="Left" Margin="0,1,0,1">
@@ -288,12 +293,12 @@
                 </DataTemplate>
               </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Defect / Hotspot" Binding="{Binding DefectType}" Width="140"/>
-            <DataGridTextColumn Header="Side" Binding="{Binding Side}" Width="70"/>
-            <DataGridTextColumn Header="RefDes" Binding="{Binding RefDes}" Width="90"/>
-            <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100"/>
-            <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="110"/>
-            <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="160"/>
+            <DataGridTextColumn Header="Defect" Binding="{Binding DefectType}" Width="160" MinWidth="160"/>
+            <DataGridTextColumn Header="Side" Binding="{Binding Side}" Width="84" MinWidth="84"/>
+            <DataGridTextColumn Header="RefDes" Binding="{Binding RefDes}" Width="96" MinWidth="96" HeaderTemplate="{StaticResource HmiHeaderRefDesTemplate}"/>
+            <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="110" MinWidth="110"/>
+            <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="120" MinWidth="120"/>
+            <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="220" MinWidth="220"/>
           </DataGrid.Columns>
         </DataGrid>
       </Grid>

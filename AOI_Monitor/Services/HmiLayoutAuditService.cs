@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using AOI_Monitor.ViewModels;
@@ -76,10 +77,32 @@ public static class HmiLayoutAuditService
 {
     private const double ClipTolerance = 3.0;
     private const double MinimumReadableFontDip = 18.6667;
+    private const double LightBackgroundLuminanceThreshold = 0.82;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = true,
+    };
+
+    public static IReadOnlyList<string> EnforcedRuleTypes { get; } = new[]
+    {
+        "MissingRequiredControl",
+        "UnreachableRequiredControl",
+        "ZeroSizeControl",
+        "ClippedText",
+        "SmallPrimaryButton",
+        "ClippedButton",
+        "LongTextNoWrapOrTooltip",
+        "FixedHeaderRow",
+        "CrowdedTabsNoScroll",
+        "InputTextClippingRisk",
+        "DataGridHeaderTooNarrow",
+        "DataGridHeaderMayWrapInsideWord",
+        "DataGridHeaderSingleCharacterLines",
+        "LightBackgroundInDarkHmi",
+        "ShellChromeTooTall",
+        "ExpandedEmptyAlarmPanel",
+        "CrowdedWorkflowToolbar",
     };
 
     public static HmiLayoutAuditReport RunAudit(HmiLayoutAuditOptions? options = null)
@@ -121,6 +144,12 @@ public static class HmiLayoutAuditService
                     AddTextIssues(definition, element, dpiScale, issues);
                     AddButtonIssues(definition, element, dpiScale, issues);
                     AddLongTextIssues(definition, element, dpiScale, issues);
+                    AddFixedHeaderRowIssues(definition, element, dpiScale, issues);
+                    AddTabControlIssues(definition, element, dpiScale, issues);
+                    AddInputControlTextIssues(definition, element, dpiScale, issues);
+                    AddDataGridHeaderIssues(definition, element, dpiScale, issues);
+                    AddLightBackgroundIssues(definition, element, dpiScale, issues);
+                    AddShellIssues(definition, element, dpiScale, issues);
                 }
                 catch (Exception ex)
                 {
@@ -179,15 +208,33 @@ public static class HmiLayoutAuditService
     {
         return new HmiViewAuditDefinition[]
         {
+            new("shell-home", "Shell - Home", () => CreateShellRoute("home"), false, ShellRequiredControls),
+            new("shell-board-images", "Shell - Board & Images", () => CreateShellRoute("library"), false, ShellRequiredControls),
+            new("shell-run-inspection", "Shell - Run Inspection", () => CreateShellRoute("monitor"), false, ShellRequiredControls),
+            new("shell-golden-compare", "Shell - Golden Compare", () => CreateShellRoute("compare"), false, ShellRequiredControls),
+            new("shell-defect-review", "Shell - Defect Review", () => CreateShellRoute("review"), false, ShellRequiredControls),
+            new("shell-recipe-rules", "Shell - Recipe Rules", () => CreateShellRoute("recipe"), false, ShellRequiredControls),
+            new("shell-ai-models", "Shell - AI / Models", () => CreateShellRoute("modeltest"), false, ShellRequiredControls),
+            new("shell-yield-analytics", "Shell - Yield Analytics", () => CreateShellRoute("spc"), false, ShellRequiredControls),
+            new("shell-export-trace", "Shell - Export & Trace", () => CreateShellRoute("reports"), false, ShellRequiredControls),
+            new("shell-calibration", "Shell - Calibration", () => CreateShellRoute("calibration"), false, ShellRequiredControls),
+            new("shell-3d-profile", "Shell - 3D Profile", () => CreateShellRoute("profile"), false, ShellRequiredControls),
+            new("shell-hardware-readiness", "Shell - Hardware Readiness", () => CreateShellRoute("pilot"), false, ShellRequiredControls),
+            new("shell-system-settings", "Shell - System Settings", () => CreateShellRoute("settings"), false, ShellRequiredControls),
             new("home", "AOI Defect Console Home", () => new HomeView { DataContext = new MainViewModel() }, true, new[] { "HomeModuleItems" }),
             new("board-image-library", "Board & Image Library", () => new LibraryView(), false, new[] { "RecordsGrid", "SchemaGrid", "ImportStatusText", "CancelImportButton" }),
-            new("main-inspection", "Main Inspection", () => new MonitorView(), false, new[] { "StartInspectionButton", "StopInspectionButton", "NextBoardButton", "SaveResultButton" }),
+            new("main-inspection", "Main Inspection", () => new MonitorView(), false, new[] { "StartInspectionButton", "StopInspectionButton", "NextBoardButton", "SaveResultButton", "DefectGrid", "CalibrationProfileCombo" }),
             new("golden-compare", "Golden Template Compare", () => new CompareView(), false, new[] { "FindingsGrid", "DiffScoreText", "DefectCanvasViewbox", "GoldenCanvasViewbox" }),
             new("defect-review", "Defect Review", () => new ReviewView(), false, new[] { "QueueGrid", "ReviewCanvasViewbox" }),
-            new("recipe-editor", "Recipe Editor", () => new RecipeView(), false, new[] { "RecipeNameText", "RoiGrid", "ViewportCanvas" }),
+            new("recipe-editor", "Recipe Editor", () => new RecipeView(), false, new[] { "RecipeNameText", "RoiGrid", "ViewportCanvas", "RecipeEmptyStateCard" }),
             new("ai-model-test", "AI Model Test", () => new AIModelTestView(), true, new[] { "CancelWorkButton", "ResultsGrid", "FolderPathText", "GroundTruthPathText" }),
             new("yield-analytics", "Yield Analytics", () => new SpcView(), false, new[] { "InspectionCountText", "VerdictBreakdownText", "YieldText", "DbHealthGrid" }),
             new("export-trace", "Export & Trace", () => SelectReportsTab(new ReportsView(), "Export History"), true, new[] { "ExportGrid", "CancelWorkButton" }),
+            new("reports-inspection-history", "Reports - Inspection History", () => SelectReportsTab(new ReportsView(), "Inspection History"), true, new[] { "InspectionGrid" }),
+            new("reports-review-events", "Reports - Review Events", () => SelectReportsTab(new ReportsView(), "Review / Disposition Events"), true, new[] { "ReviewGrid" }),
+            new("reports-audit-trail", "Reports - Audit Trail", () => SelectReportsTab(new ReportsView(), "Audit Trail"), true, new[] { "AuditGrid" }),
+            new("reports-ui-stability", "Reports - UI Stability Test", () => SelectReportsTab(new ReportsView(), "UI Stability Test"), true, new[] { "UiStabilityEventsGrid" }),
+            new("reports-pilot-issues", "Reports - Pilot Issues", () => SelectReportsTab(new ReportsView(), "Pilot Issues"), true, new[] { "PilotIssuesGrid" }),
             new("settings-basics", "Settings - Basics", () => SelectSettingsTab(new SettingsView(new MainViewModel()), "Basics"), true, new[] { "ApplyBtn", "CancelBtn", "ResolutionCombo", "ThemeCombo", "LangCombo", "StorageRootText" }),
             new("settings-qol", "Settings - QOL", () => SelectSettingsTab(new SettingsView(new MainViewModel()), "QOL"), true, new[] { "ApplyBtn", "CancelBtn", "ReviewDefaultText", "DetectionPriorityCombo" }),
             new("settings-ai", "Settings - AI", () => SelectSettingsTab(new SettingsView(new MainViewModel()), "AI"), true, new[] { "InspectionEngineCombo", "ModelRegistryGrid", "ThresholdProfilesGrid", "TestModelBtn" }),
@@ -195,8 +242,8 @@ public static class HmiLayoutAuditService
             new("settings-traceability", "Settings - Traceability", () => SelectSettingsTab(new SettingsView(new MainViewModel()), "Traceability"), true, new[] { "MesModeCombo", "CentralSyncModeCombo", "TestMesRestBtn" }),
             new("settings-evidence", "Settings - Evidence", () => SelectSettingsTab(new SettingsView(new MainViewModel()), "Evidence"), true, new[] { "OpenInstallNotesBtn", "OpenGuideBtn", "ExportDiagnosticsBtn", "BackupConfigurationBtn", "ExportSupportBundleBtn", "TrainingStatusText" }),
             new("calibration", "Calibration", () => new CalibrationView(), false, new[] { "PointsGrid", "ProfileCombo", "SampleImagePathText" }),
-            new("profile-3d", "3D Profile Viewer", () => new ProfileView(), false, new[] { "RunAcceptanceButton", "CancelAcceptanceButton", "ProfileSourceCombo" }),
-            new("hardware-readiness", "Hardware Readiness", () => new PilotWizardView(), false, new[] { "ProfileCombo", "StepsGrid", "StatusText" }),
+            new("profile-3d", "3D Profile Viewer", () => new ProfileView(), false, new[] { "RunAcceptanceButton", "CancelAcceptanceButton", "ProfileSourceCombo", "ProfileSourceBadgeText", "ProfileConnectionBadgeText" }),
+            new("hardware-readiness", "Hardware Readiness", () => new PilotWizardView(), false, new[] { "ProfileCombo", "StepsGrid", "StatusText", "CurrentStepText", "BlockersText", "NextActionText" }),
             new("factory-readiness", "Factory Readiness", () => SelectReportsTab(new ReportsView(), "Factory Readiness"), true, new[] { "FactoryReadinessGrid" }),
             new("standards-quality-checklist", "Standards & Quality Checklist", () => SelectReportsTab(new ReportsView(), "Standards & Quality Checklist"), true, new[] { "StandardsTraceabilityGrid", "StandardsTraceabilitySummaryText" }),
             new("management-dashboard", "Management Dashboard", () => SelectReportsTab(new ReportsView(), "Management Dashboard"), true, new[] { "ManagementDefectGrid", "ManagementRoiGrid", "ManagementModelTrendGrid" }),
@@ -208,6 +255,97 @@ public static class HmiLayoutAuditService
             new("installation-notes", "Installation Notes", () => new InstallView(), true, new[] { "RuntimeGrid", "BoundaryGrid" }),
             new("guide", "Guide", () => new GuideView(), true, new[] { "StepsGrid" }),
         };
+    }
+
+    public static IReadOnlyList<HmiLayoutIssue> RunElementAuditForTests(FrameworkElement element, double width = 900, double height = 360, double dpiScale = 1.0)
+    {
+        EnsureApplicationResources();
+        MeasureElement(element, width, height);
+        var definition = new HmiViewAuditDefinition("test-element", "Test Element", () => element, false, Array.Empty<string>());
+        var issues = new List<HmiLayoutIssue>();
+        AddTextIssues(definition, element, dpiScale, issues);
+        AddButtonIssues(definition, element, dpiScale, issues);
+        AddLongTextIssues(definition, element, dpiScale, issues);
+        AddInputControlTextIssues(definition, element, dpiScale, issues);
+        AddDataGridHeaderIssues(definition, element, dpiScale, issues);
+        AddLightBackgroundIssues(definition, element, dpiScale, issues);
+        return issues;
+    }
+
+    private static readonly string[] ShellRequiredControls =
+    {
+        "BrandTitleText",
+        "HeaderUserText",
+        "HeaderRoleText",
+        "HeaderEngineText",
+        "ActiveAlarmsExpander",
+        "ActiveAlarmHeaderText",
+        "TopLevelNavItems",
+        "TopLevelNavScrollViewer",
+        "PageTitleText",
+        "WorkflowToolbarPanel",
+        "WorkflowSampleText",
+        "WorkflowGoldenText",
+        "WorkflowScoreText",
+        "WorkflowVerdictText",
+        "RefreshPageBtn",
+        "LockRecipeBtn",
+        "ExportBtn",
+        "FooterStationText",
+    };
+
+    private static FrameworkElement CreateShellRoute(string route)
+    {
+        var window = new MainWindow();
+        if (window.DataContext is MainViewModel viewModel)
+            viewModel.CurrentPage = route;
+
+        SetText(window, "BrandTitleText", "PCBA AOI REVIEW CONSOLE - CUSTOMER VALIDATION LINE WITH LONG PROGRAM TITLE");
+        SetText(window, "StationNameText", "AOI-LIB-LINE-02-STATION-WEST-REVIEW-CELL-WITH-LONG-NAME");
+        SetText(window, "StationSubtitleText", "local review console / prototype / customer validation workstation / long subtitle");
+        SetText(window, "HeaderUserText", "Engineer01.CustomerValidationShiftLeadWithLongName");
+        SetText(window, "HeaderRoleText", "Admin / Shift Lead");
+        SetText(window, "HeaderEngineText", "Pixel Difference Prototype Engine With ONNX Candidate Adapter Boundary");
+        SetText(window, "InspectionEngineStatusText", "Pixel Difference Prototype Engine With ONNX Candidate Adapter Boundary");
+        SetText(window, "DatabaseStatusText", "Connected via local SQLite evidence cache");
+        SetText(window, "ImageVaultStatusText", "Available with managed long-path image vault");
+        SetText(window, "CameraStatusText", "Not Connected / Stage 2 Camera Pilot Boundary");
+        SetText(window, "LightingStatusText", "Not Connected / Lighting Boundary");
+        SetText(window, "RobotStatusText", "Not Connected / Robot Cell Boundary");
+        SetText(window, "MesStatusText", "Not Connected / MES Traceability Boundary");
+        SetText(window, "EmergencyStopStatusText", "Not Connected / Safety Boundary");
+        SetText(window, "PageTitleText", $"SHELL ROUTE CHECK / {route.ToUpperInvariant()} / LONG LOCALIZED PAGE TITLE");
+        SetText(window, "WorkflowSampleText", "sample_customer_board_revision_A_panel_000123_top_side_long_filename.png");
+        SetText(window, "WorkflowGoldenText", "golden_reference_customer_board_revision_A_approved_baseline_long_filename.png");
+        SetText(window, "WorkflowScoreText", "99.999%");
+        SetText(window, "WorkflowVerdictText", "REVIEW - LONG STATUS");
+        SetText(window, "ActiveAlarmHeaderText", "none");
+        SetText(window, "ActiveAlarmSummaryText", "No active alarms.");
+        SetText(window, "FooterStationText", "AOI-LIB-LINE-02-STATION-WEST");
+        SetText(window, "FooterIndexText", "Images OK / Long Index Status");
+        SetText(window, "FooterDbUpdatedText", "06-23 12:30");
+        if (FindByName(window, "ActiveAlarmsExpander") is Expander expander)
+            expander.IsExpanded = false;
+
+        if (window.Content is FrameworkElement root)
+        {
+            if (root.DataContext is null)
+                root.DataContext = window.DataContext;
+            window.Content = null;
+            window.Close();
+            return root;
+        }
+
+        return window;
+    }
+
+    private static void SetText(FrameworkElement root, string name, string value)
+    {
+        if (FindByName(root, name) is TextBlock textBlock)
+        {
+            textBlock.Text = value;
+            textBlock.ToolTip = value;
+        }
     }
 
     private static FrameworkElement SelectSettingsTab(SettingsView view, string header)
@@ -280,6 +418,8 @@ public static class HmiLayoutAuditService
                 continue;
             if (!IsEffectivelyVisible(element) || element is not (TextBlock or Button or Label or TextBox or ComboBox or DataGrid))
                 continue;
+            if (element is TextBlock textBlock && string.IsNullOrWhiteSpace(textBlock.Text))
+                continue;
             if (element.ActualWidth > 0 && element.ActualHeight > 0)
                 continue;
 
@@ -350,6 +490,8 @@ public static class HmiLayoutAuditService
             {
                 TextBlock textBlock => textBlock.Text,
                 TextBox textBox => textBox.Text,
+                ComboBox comboBox => comboBox.SelectionBoxItem?.ToString() ?? comboBox.Text,
+                DatePicker datePicker => datePicker.Text,
                 _ => string.Empty,
             };
             if (string.IsNullOrWhiteSpace(text) || text.Length < 32)
@@ -367,6 +509,171 @@ public static class HmiLayoutAuditService
 
             issues.Add(CreateIssue(definition, dpiScale, "LongTextNoWrapOrTooltip", Describe(element), HmiLayoutIssueSeverity.Warn,
                 "Long path/model/message text should wrap, trim with tooltip, or expose a tooltip."));
+        }
+    }
+
+    private static void AddFixedHeaderRowIssues(HmiViewAuditDefinition definition, FrameworkElement root, double dpiScale, ICollection<HmiLayoutIssue> issues)
+    {
+        foreach (var grid in DescendantsAndSelf(root).OfType<Grid>())
+        {
+            for (var index = 0; index < grid.RowDefinitions.Count; index++)
+            {
+                var row = grid.RowDefinitions[index];
+                if (!row.Height.IsAbsolute || row.Height.Value > 25 || row.MinHeight >= 32)
+                    continue;
+
+                var headerText = grid.Children
+                    .OfType<FrameworkElement>()
+                    .Where(child => Grid.GetRow(child) == index && IsEffectivelyVisible(child))
+                    .SelectMany(DescendantsAndSelf)
+                    .OfType<TextBlock>()
+                    .FirstOrDefault(textBlock =>
+                        IsEffectivelyVisible(textBlock) &&
+                        !string.IsNullOrWhiteSpace(textBlock.Text) &&
+                        textBlock.FontSize >= 14);
+                if (headerText is null)
+                    continue;
+
+                issues.Add(CreateIssue(definition, dpiScale, "FixedHeaderRow", Describe(headerText), HmiLayoutIssueSeverity.Fail,
+                    $"Panel header row is fixed at {row.Height.Value:N0}px with readable text. Use Auto + MinHeight so DPI/localized text cannot clip."));
+            }
+        }
+    }
+
+    private static void AddTabControlIssues(HmiViewAuditDefinition definition, FrameworkElement root, double dpiScale, ICollection<HmiLayoutIssue> issues)
+    {
+        foreach (var tabControl in DescendantsAndSelf(root).OfType<TabControl>())
+        {
+            if (!IsEffectivelyVisible(tabControl))
+                continue;
+            if (tabControl.Items.Count <= 6)
+                continue;
+
+            var hasHorizontalScroll = Descendants(tabControl)
+                .OfType<ScrollViewer>()
+                .Any(scrollViewer => scrollViewer.HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled);
+            var hasWrapping = Descendants(tabControl).OfType<WrapPanel>().Any();
+            if (hasHorizontalScroll || hasWrapping)
+                continue;
+
+            issues.Add(CreateIssue(definition, dpiScale, "CrowdedTabsNoScroll", Describe(tabControl), HmiLayoutIssueSeverity.Fail,
+                $"TabControl has {tabControl.Items.Count} tabs but no visible wrapping or horizontal scrolling strategy."));
+        }
+    }
+
+    private static void AddInputControlTextIssues(HmiViewAuditDefinition definition, FrameworkElement root, double dpiScale, ICollection<HmiLayoutIssue> issues)
+    {
+        foreach (var element in Descendants(root).OfType<FrameworkElement>())
+        {
+            if (!IsEffectivelyVisible(element) || element.ActualWidth <= 0 || element.ActualHeight <= 0)
+                continue;
+
+            var text = InputText(element);
+            if (string.IsNullOrWhiteSpace(text))
+                continue;
+
+            var availableWidth = Math.Max(0, element.ActualWidth - HorizontalTextChrome(element));
+            var desiredWidth = MeasurePlainText(text, element).Width;
+            if (desiredWidth <= availableWidth + ClipTolerance)
+                continue;
+
+            var hasPolicy = element.ToolTip is not null ||
+                element is TextBox { TextWrapping: not TextWrapping.NoWrap };
+            if (hasPolicy)
+                continue;
+
+            var severity = IsCriticalTextValue(element, text) ? HmiLayoutIssueSeverity.Fail : HmiLayoutIssueSeverity.Warn;
+            issues.Add(CreateIssue(definition, dpiScale, "InputTextClippingRisk", Describe(element), severity,
+                $"Input text can exceed visible width without a wrap/trim/tooltip policy. Desired={desiredWidth:N0}; available={availableWidth:N0}."));
+        }
+    }
+
+    private static void AddDataGridHeaderIssues(HmiViewAuditDefinition definition, FrameworkElement root, double dpiScale, ICollection<HmiLayoutIssue> issues)
+    {
+        foreach (var header in Descendants(root).OfType<DataGridColumnHeader>())
+        {
+            if (!IsEffectivelyVisible(header) || header.ActualWidth <= 0)
+                continue;
+
+            var text = HeaderText(header);
+            if (string.IsNullOrWhiteSpace(text))
+                continue;
+
+            if (text.Length > 3 && header.ActualWidth < 54)
+            {
+                issues.Add(CreateIssue(definition, dpiScale, "DataGridHeaderTooNarrow", Describe(header), HmiLayoutIssueSeverity.Fail,
+                    $"DataGrid header '{text}' is narrower than the shared minimum and may wrap into unreadable fragments. Actual width={header.ActualWidth:N0}."));
+            }
+
+            foreach (var textBlock in HeaderTextBlocks(header))
+            {
+                if (!IsEffectivelyVisible(textBlock) || textBlock.TextWrapping == TextWrapping.NoWrap)
+                    continue;
+                var longestWordWidth = LongestWordWidth(textBlock.Text, textBlock);
+                if (longestWordWidth <= textBlock.ActualWidth + ClipTolerance)
+                    continue;
+
+                issues.Add(CreateIssue(definition, dpiScale, "DataGridHeaderMayWrapInsideWord", Describe(textBlock), HmiLayoutIssueSeverity.Fail,
+                    "DataGrid header can wrap inside a word in a column too narrow for its longest token. Use a wider column, an abbreviated header with tooltip, or the shared HMI header style."));
+
+                var singleCharacterWidth = MeasurePlainText("M", textBlock).Width;
+                if (textBlock.ActualWidth <= singleCharacterWidth * 2.35)
+                {
+                    issues.Add(CreateIssue(definition, dpiScale, "DataGridHeaderSingleCharacterLines", Describe(textBlock), HmiLayoutIssueSeverity.Fail,
+                        "DataGrid header appears to render as one-character-per-line. Use a wider column, an abbreviated header with tooltip, or the shared HMI header style."));
+                }
+            }
+        }
+    }
+
+    private static void AddLightBackgroundIssues(HmiViewAuditDefinition definition, FrameworkElement root, double dpiScale, ICollection<HmiLayoutIssue> issues)
+    {
+        foreach (var element in DescendantsAndSelf(root).OfType<FrameworkElement>())
+        {
+            if (!IsEffectivelyVisible(element))
+                continue;
+            if (element is TextBlock or System.Windows.Shapes.Path or ScrollBar)
+                continue;
+
+            var brush = BackgroundBrush(element);
+            if (brush is not SolidColorBrush solid || solid.Opacity < 0.25 || solid.Color.A < 64)
+                continue;
+            if (RelativeLuminance(solid.Color) < LightBackgroundLuminanceThreshold)
+                continue;
+
+            issues.Add(CreateIssue(definition, dpiScale, "LightBackgroundInDarkHmi", DescribeWithAncestry(element), HmiLayoutIssueSeverity.Fail,
+                $"Visible control uses a light/default background ({solid.Color}). Dark HMI pages must use shared high-contrast dark styles."));
+        }
+    }
+
+    private static void AddShellIssues(HmiViewAuditDefinition definition, FrameworkElement root, double dpiScale, ICollection<HmiLayoutIssue> issues)
+    {
+        if (!definition.Key.StartsWith("shell-", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (FindByName(root, "PageContent") is FrameworkElement pageContent)
+        {
+            var pageContentTop = pageContent.TransformToAncestor(root).Transform(new Point(0, 0)).Y;
+            if (pageContentTop > 260)
+            {
+                issues.Add(CreateIssue(definition, dpiScale, "ShellChromeTooTall", "PageContent", HmiLayoutIssueSeverity.Fail,
+                    $"Shell chrome consumes too much vertical space before workflow content. Page content starts at Y={pageContentTop:N0}; limit=260."));
+            }
+        }
+
+        if (FindByName(root, "ActiveAlarmsExpander") is Expander { IsExpanded: true } &&
+            FindByName(root, "ActiveAlarmHeaderText") is TextBlock header &&
+            header.Text.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            issues.Add(CreateIssue(definition, dpiScale, "ExpandedEmptyAlarmPanel", "ActiveAlarmsExpander", HmiLayoutIssueSeverity.Fail,
+                "Active Alarms must stay compact/collapsed when no actionable alarm is present."));
+        }
+
+        if (FindByName(root, "WorkflowToolbarPanel") is FrameworkElement toolbar &&
+            toolbar.ActualHeight > 92)
+        {
+            issues.Add(CreateIssue(definition, dpiScale, "CrowdedWorkflowToolbar", "WorkflowToolbarPanel", HmiLayoutIssueSeverity.Warn,
+                $"Workflow toolbar wrapped too tall. Actual height={toolbar.ActualHeight:N0}; review chip widths and action placement."));
         }
     }
 
@@ -388,6 +695,41 @@ public static class HmiLayoutAuditService
         };
         clone.Measure(new Size(width, double.PositiveInfinity));
         return clone.DesiredSize;
+    }
+
+    private static Size MeasurePlainText(string text, FrameworkElement source)
+    {
+        var clone = new TextBlock
+        {
+            Text = text,
+            FontFamily = source is Control control ? control.FontFamily : new FontFamily("Segoe UI"),
+            FontSize = source is Control controlWithFont ? controlWithFont.FontSize : 14,
+            FontWeight = source is Control controlWithWeight ? controlWithWeight.FontWeight : FontWeights.Normal,
+            FontStyle = source is Control controlWithStyle ? controlWithStyle.FontStyle : FontStyles.Normal,
+            TextWrapping = TextWrapping.NoWrap,
+            TextTrimming = TextTrimming.None,
+        };
+        clone.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        return clone.DesiredSize;
+    }
+
+    private static double LongestWordWidth(string text, TextBlock source)
+    {
+        var longestWord = text
+            .Split(new[] { ' ', '/', '\\', '-', '_', '.', ':' }, StringSplitOptions.RemoveEmptyEntries)
+            .OrderByDescending(word => word.Length)
+            .FirstOrDefault() ?? text;
+        var clone = new TextBlock
+        {
+            Text = longestWord,
+            FontFamily = source.FontFamily,
+            FontSize = source.FontSize,
+            FontWeight = source.FontWeight,
+            FontStyle = source.FontStyle,
+            TextWrapping = TextWrapping.NoWrap,
+        };
+        clone.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        return clone.DesiredSize.Width;
     }
 
     private static Size MeasureButton(Button source)
@@ -434,6 +776,80 @@ public static class HmiLayoutAuditService
             content.Contains("Generate", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static string InputText(FrameworkElement element)
+        => element switch
+        {
+            TextBox textBox when !IsTemplateInternal(textBox) => textBox.Text,
+            ComboBox comboBox => comboBox.SelectionBoxItem?.ToString() ?? comboBox.Text,
+            DatePicker datePicker => datePicker.Text,
+            _ => string.Empty,
+        };
+
+    private static double HorizontalTextChrome(FrameworkElement element)
+        => element switch
+        {
+            TextBox textBox => textBox.Padding.Left + textBox.Padding.Right + 10,
+            ComboBox => 48,
+            DatePicker => 48,
+            _ => 16,
+        };
+
+    private static string HeaderText(DataGridColumnHeader header)
+        => header.Column?.Header switch
+        {
+            TextBlock textBlock => textBlock.Text,
+            { } value => value.ToString() ?? string.Empty,
+            _ => header.Content switch
+            {
+                TextBlock textBlock => textBlock.Text,
+                { } value => value.ToString() ?? string.Empty,
+                _ => string.Empty,
+            },
+        };
+
+    private static IEnumerable<TextBlock> HeaderTextBlocks(DataGridColumnHeader header)
+    {
+        foreach (var textBlock in Descendants(header).OfType<TextBlock>())
+            yield return textBlock;
+
+        if (header.Content is TextBlock directTextBlock)
+            yield return directTextBlock;
+    }
+
+    private static Brush? BackgroundBrush(FrameworkElement element)
+        => element switch
+        {
+            Control control => control.Background,
+            Panel panel => panel.Background,
+            Border border => border.Background,
+            _ => null,
+        };
+
+    private static double RelativeLuminance(Color color)
+    {
+        static double Convert(byte value)
+        {
+            var channel = value / 255.0;
+            return channel <= 0.03928
+                ? channel / 12.92
+                : Math.Pow((channel + 0.055) / 1.055, 2.4);
+        }
+
+        return 0.2126 * Convert(color.R) + 0.7152 * Convert(color.G) + 0.0722 * Convert(color.B);
+    }
+
+    private static bool IsCriticalTextValue(FrameworkElement element, string text)
+    {
+        var name = element.Name ?? string.Empty;
+        return name.Contains("Status", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Alarm", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Verdict", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("ALARM", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("WARNING", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("NG", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("FAIL", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool IsTemplateInternal(FrameworkElement element)
         => element.TemplatedParent is not null ||
            (!string.IsNullOrWhiteSpace(element.Name) && element.Name.StartsWith("PART_", StringComparison.Ordinal));
@@ -444,9 +860,28 @@ public static class HmiLayoutAuditService
         {
             if (current is UIElement { Visibility: not Visibility.Visible })
                 return false;
+            if (current is Expander { IsExpanded: false } expander &&
+                !ReferenceEquals(element, expander) &&
+                !IsInsideExpanderHeader(element, expander))
+            {
+                return false;
+            }
         }
 
         return true;
+    }
+
+    private static bool IsInsideExpanderHeader(DependencyObject element, Expander expander)
+    {
+        if (expander.Header is not DependencyObject headerRoot)
+            return false;
+        for (DependencyObject? current = element; current is not null; current = ParentOf(current))
+        {
+            if (ReferenceEquals(current, headerRoot))
+                return true;
+        }
+
+        return false;
     }
 
     private static DependencyObject? ParentOf(DependencyObject element)
@@ -519,6 +954,13 @@ public static class HmiLayoutAuditService
         }
     }
 
+    private static IEnumerable<DependencyObject> DescendantsAndSelf(DependencyObject root)
+    {
+        yield return root;
+        foreach (var descendant in Descendants(root))
+            yield return descendant;
+    }
+
     private static string Describe(FrameworkElement element)
     {
         var name = string.IsNullOrWhiteSpace(element.Name) ? element.GetType().Name : $"{element.GetType().Name}#{element.Name}";
@@ -529,6 +971,20 @@ public static class HmiLayoutAuditService
             TextBox { Text.Length: > 0 } textBox => $"{name} \"{Trim(textBox.Text)}\"",
             _ => name,
         };
+    }
+
+    private static string DescribeWithAncestry(FrameworkElement element)
+    {
+        var parts = new List<string> { Describe(element) };
+        var parent = VisualTreeHelper.GetParent(element);
+        while (parent is not null && parts.Count < 5)
+        {
+            if (parent is FrameworkElement frameworkElement)
+                parts.Add(Describe(frameworkElement));
+            parent = VisualTreeHelper.GetParent(parent);
+        }
+
+        return string.Join(" <- ", parts);
     }
 
     private static HmiLayoutIssue CreateIssue(HmiViewAuditDefinition definition, double dpiScale, string issueType, string target, HmiLayoutIssueSeverity severity, string message)

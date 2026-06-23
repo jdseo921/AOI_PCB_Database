@@ -21,8 +21,8 @@ public sealed class MainWindowLoadingOverlayTests
             try
             {
                 var lifecycleTask = InvokeRunPageLifecycleAsync(window, new FastAsyncPage());
-                Assert.True(lifecycleTask.Wait(TimeSpan.FromSeconds(2)), "Fast page navigation lifecycle did not complete.");
-                Thread.Sleep(250);
+                WaitForDispatcherTask(lifecycleTask, TimeSpan.FromSeconds(2), "Fast page navigation lifecycle did not complete.");
+                PumpDispatcher(TimeSpan.FromMilliseconds(250));
 
                 var overlay = GetNamedElement<FrameworkElement>(window, "LoadingOverlay");
                 Assert.Equal(Visibility.Collapsed, overlay.Visibility);
@@ -116,6 +116,33 @@ public sealed class MainWindowLoadingOverlayTests
             ?? throw new InvalidOperationException("RunPageLifecycleAsync was not found.");
         return (Task?)method.Invoke(window, new object[] { "monitor", page, CancellationToken.None })
             ?? throw new InvalidOperationException("RunPageLifecycleAsync did not return a task.");
+    }
+
+    private static void WaitForDispatcherTask(Task task, TimeSpan timeout, string timeoutMessage)
+    {
+        if (!task.IsCompleted)
+        {
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            var frame = new DispatcherFrame();
+            _ = Task.Delay(timeout).ContinueWith(_ =>
+                dispatcher.BeginInvoke(new Action(() => frame.Continue = false)), TaskScheduler.Default);
+            task.ContinueWith(_ => frame.Continue = false, TaskScheduler.Default);
+            Dispatcher.PushFrame(frame);
+        }
+
+        if (!task.IsCompleted)
+            throw new TimeoutException(timeoutMessage);
+
+        task.GetAwaiter().GetResult();
+    }
+
+    private static void PumpDispatcher(TimeSpan duration)
+    {
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        var frame = new DispatcherFrame();
+        _ = Task.Delay(duration).ContinueWith(_ =>
+            dispatcher.BeginInvoke(new Action(() => frame.Continue = false)), TaskScheduler.Default);
+        Dispatcher.PushFrame(frame);
     }
 
     private static T GetNamedElement<T>(MainWindow window, string fieldName)

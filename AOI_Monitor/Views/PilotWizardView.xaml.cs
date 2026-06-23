@@ -11,26 +11,42 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class PilotWizardView : UserControl
+public partial class PilotWizardView : UserControl, IAsyncNavigationPage
 {
     private readonly ObservableCollection<PilotStepRow> _steps = new();
     private CustomerPilotSnapshot? _snapshot;
+    private CancellationTokenSource? _refreshCancellation;
 
     public PilotWizardView()
     {
         InitializeComponent();
         StepsGrid.ItemsSource = _steps;
         PopulateProfiles();
-        ResumeLatest(showMessage: false);
     }
 
-    public void RefreshFromState()
+    public Task OnNavigatedToAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
+
+    public async Task RefreshAsync(CancellationToken cancellationToken)
     {
+        _refreshCancellation?.Cancel();
+        _refreshCancellation?.Dispose();
+        _refreshCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var token = _refreshCancellation.Token;
         if (_snapshot is not null)
-            LoadSnapshot(CustomerPilotWizardService.Load(_snapshot.Session.Id));
+        {
+            var snapshot = await Task.Run(() => CustomerPilotWizardService.Load(_snapshot.Session.Id), token);
+            token.ThrowIfCancellationRequested();
+            LoadSnapshot(snapshot);
+        }
         else
-            ResumeLatest(showMessage: false);
+        {
+            await ResumeLatestAsync(showMessage: false, token);
+        }
     }
+
+    public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);
+
+    public void CancelWork() => _refreshCancellation?.Cancel();
 
     private void PopulateProfiles()
     {
@@ -65,22 +81,35 @@ public partial class PilotWizardView : UserControl
         }
     }
 
-    private void OnResumeClick(object sender, RoutedEventArgs e) => ResumeLatest(showMessage: true);
+    private async void OnResumeClick(object sender, RoutedEventArgs e)
+        => await ResumeLatestAsync(showMessage: true, CancellationToken.None);
 
-    private void ResumeLatest(bool showMessage)
+    private async Task ResumeLatestAsync(bool showMessage, CancellationToken cancellationToken)
     {
         try
         {
-            var latest = AoiDatabase.GetLatestIncompleteCustomerPilotSession();
-            if (latest is null)
+            var result = await Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var latest = AoiDatabase.GetLatestIncompleteCustomerPilotSession();
+                return latest is null
+                    ? null
+                    : new ResumePilotResult(latest.SessionId, CustomerPilotWizardService.Load(latest.Id));
+            }, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (result is null)
             {
                 if (showMessage)
                     StatusText.Text = "No incomplete customer pilot session exists.";
                 return;
             }
 
-            LoadSnapshot(CustomerPilotWizardService.Load(latest.Id));
-            StatusText.Text = $"Resumed pilot session {latest.SessionId}.";
+            LoadSnapshot(result.Snapshot);
+            StatusText.Text = $"Resumed pilot session {result.SessionId}.";
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
         {
@@ -232,8 +261,30 @@ public partial class PilotWizardView : UserControl
         if (ProfileCombo.SelectedIndex != profileIndex)
             ProfileCombo.SelectedIndex = profileIndex;
         SessionSummaryText.Text = $"Session {snapshot.Session.SessionId} / {snapshot.Session.DeploymentProfile} / {snapshot.Session.Status} / Dataset: {ShortPath(snapshot.Session.DatasetFolder)}";
+        var orderedSteps = snapshot.Steps.OrderBy(item => item.StepOrder).ToArray();
+        var currentStep = orderedSteps.FirstOrDefault(step => !step.Waived && step.Status != CustomerPilotStepStatus.Passed);
+        var blockers = orderedSteps.Count(step => !step.Waived && step.Status == CustomerPilotStepStatus.Failed);
+        var conditional = orderedSteps.Count(step => !step.Waived && step.Status == CustomerPilotStepStatus.Conditional);
+        var waived = orderedSteps.Count(step => step.Waived);
+        CurrentStepText.Text = currentStep is null ? "All defined steps complete" : $"{currentStep.StepOrder}. {CustomerPilotWizardService.DisplayName(currentStep.StepKey)}";
+        BlockersText.Text = blockers > 0
+            ? $"{blockers} failed gate(s) require action"
+            : conditional > 0
+                ? $"{conditional} conditional gate(s) need review"
+                : "No failed gates";
+        EvidenceRequiredText.Text = currentStep is null
+            ? "Export readiness bundle and keep evidence with client package."
+            : string.IsNullOrWhiteSpace(currentStep.EvidencePath)
+                ? "Evidence not attached for the current step."
+                : ShortPath(currentStep.EvidencePath);
+        NextActionText.Text = blockers > 0
+            ? "Resolve failed gates before client demo packaging."
+            : currentStep is null
+                ? "Export Bundle or Readiness Export."
+                : $"Run step {currentStep.StepOrder} or attach required evidence.";
+        WaivedStatusText.Text = waived == 0 ? "0 waived steps" : $"{waived} waived step(s) - audited exceptions";
         _steps.Clear();
-        foreach (var step in snapshot.Steps.OrderBy(item => item.StepOrder))
+        foreach (var step in orderedSteps)
             _steps.Add(PilotStepRow.FromRecord(step));
     }
 
@@ -277,4 +328,6 @@ public partial class PilotWizardView : UserControl
                 },
             };
     }
+
+    private sealed record ResumePilotResult(string SessionId, CustomerPilotSnapshot Snapshot);
 }

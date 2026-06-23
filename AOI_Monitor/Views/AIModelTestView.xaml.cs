@@ -14,7 +14,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class AIModelTestView : UserControl
+public partial class AIModelTestView : UserControl, IAsyncNavigationPage
 {
     private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -45,6 +45,7 @@ public partial class AIModelTestView : UserControl
     private DatasetQualitySummary? _currentDatasetQuality;
     private CustomerDatasetPreflightResult? _currentPreflightResult;
     private CancellationTokenSource? _workCts;
+    private CancellationTokenSource? _refreshCts;
 
     public AIModelTestView()
     {
@@ -59,13 +60,23 @@ public partial class AIModelTestView : UserControl
         InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
         Unloaded += (_, _) => InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
         RefreshEngineText();
-        LoadLatestRun();
+    }
+
+    public Task OnNavigatedToAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
+
+    public async Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        _refreshCts?.Cancel();
+        _refreshCts?.Dispose();
+        _refreshCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var token = _refreshCts.Token;
+        RefreshEngineText();
+        await LoadLatestRunAsync(token);
     }
 
     public void RefreshFromState()
     {
-        RefreshEngineText();
-        LoadLatestRun();
+        _ = RefreshAsync(CancellationToken.None);
     }
 
     public void ExportResults()
@@ -534,8 +545,14 @@ public partial class AIModelTestView : UserControl
 
     private void OnCancelWorkClick(object sender, RoutedEventArgs e)
     {
-        _workCts?.Cancel();
+        CancelWork();
         StatusText.Text = "Cancel requested. Finishing current file...";
+    }
+
+    public void CancelWork()
+    {
+        _workCts?.Cancel();
+        _refreshCts?.Cancel();
     }
 
     private void OnAnalyzeFalseCallsClick(object sender, RoutedEventArgs e)
@@ -800,56 +817,81 @@ public partial class AIModelTestView : UserControl
         };
     }
 
-    private void LoadLatestRun()
+    private async Task LoadLatestRunAsync(CancellationToken cancellationToken)
     {
+        try
+        {
+            var snapshot = await Task.Run(() => LoadLatestRunSnapshot(cancellationToken), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (snapshot is null)
+            {
+                StatusText.Text = "No persisted Stage 1 validation run is available.";
+                return;
+            }
+
+            var run = snapshot.Run;
+            _currentRunId = run.Id;
+            _currentRunCreatedAtUtc = run.CreatedAtUtc;
+            _currentEngineDisplay = $"{run.EngineName} / {run.ModelVersion}";
+            _selectedFolder = run.ImageFolder;
+            _groundTruthCsvPath = run.GroundTruthCsvPath;
+            _currentRunUsedFormalManifest = snapshot.UsedFormalManifest;
+            _lastReportPath = string.Empty;
+            ReportPathText.Text = "Report: not generated";
+            FolderPathText.Text = run.ImageFolder;
+            GroundTruthPathText.Text = string.IsNullOrWhiteSpace(run.GroundTruthCsvPath)
+                ? "No CSV selected"
+                : run.GroundTruthCsvPath;
+
+            Replace(_rows, snapshot.Rows);
+            ApplyMetrics(snapshot.Metrics);
+            _currentDatasetQuality = snapshot.DatasetQuality;
+            ApplyDatasetQuality(_currentDatasetQuality);
+            RunSummaryText.Text = $"{run.TotalImages} images / {run.FailedCount} failed / run {run.Id}";
+            StatusText.Text = $"Loaded latest persisted Stage 1 validation run: {run.Id}.";
+            _currentFalseCallRun = snapshot.FalseCallRun;
+            _falseCallPoints.Clear();
+            if (_currentFalseCallRun is not null)
+            {
+                foreach (var candidate in _currentFalseCallRun.Points.OrderBy(point => point.ConfidenceThreshold))
+                    _falseCallPoints.Add(candidate);
+
+                FalseCallRecommendationText.Text = _currentFalseCallRun.Recommendation.Point is { } selectedPoint
+                    ? $"{_currentFalseCallRun.Recommendation.Status}: mode {_currentFalseCallRun.Recommendation.Mode}, threshold {selectedPoint.ConfidenceThreshold:F3}, false call {selectedPoint.FalseCallRate:P1}, possible escapes {selectedPoint.FalseNegative}."
+                    : $"{_currentFalseCallRun.Recommendation.Status}: no applied candidate.";
+                ApplyRecommendedThresholdButton.IsEnabled = string.Equals(_currentFalseCallRun.Recommendation.Status, "VALID", StringComparison.OrdinalIgnoreCase) &&
+                    RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole);
+                CreateThresholdProfileDraftButton.IsEnabled = _currentFalseCallRun.Recommendation.Point is not null &&
+                    !string.Equals(_currentFalseCallRun.Recommendation.Status, "INVALID", StringComparison.OrdinalIgnoreCase) &&
+                    RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole);
+            }
+            else
+            {
+                FalseCallRecommendationText.Text = "Batch loaded. Analyze false calls to generate threshold candidates.";
+                CreateThresholdProfileDraftButton.IsEnabled = false;
+                ApplyRecommendedThresholdButton.IsEnabled = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+    }
+
+    private static LatestBatchRunSnapshot? LoadLatestRunSnapshot(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var run = AoiDatabase.GetLatestBatchTestRun();
         if (run is null)
-            return;
+            return null;
 
-        _currentRunId = run.Id;
-        _currentRunCreatedAtUtc = run.CreatedAtUtc;
-        _currentEngineDisplay = $"{run.EngineName} / {run.ModelVersion}";
-        _selectedFolder = run.ImageFolder;
-        _groundTruthCsvPath = run.GroundTruthCsvPath;
-        _currentRunUsedFormalManifest = TryLoadFormalManifestFlag(run.GroundTruthCsvPath, run.ImageFolder);
-        _lastReportPath = string.Empty;
-        ReportPathText.Text = "Report: not generated";
-        FolderPathText.Text = run.ImageFolder;
-        GroundTruthPathText.Text = string.IsNullOrWhiteSpace(run.GroundTruthCsvPath)
-            ? "No CSV selected"
-            : run.GroundTruthCsvPath;
-
-        _rows.Clear();
-        foreach (var result in AoiDatabase.GetBatchTestResults(run.Id))
-            _rows.Add(BatchTestRow.FromRecord(result));
-
-        ApplyMetrics(BatchValidationService.CalculateMetrics(_rows));
-        _currentDatasetQuality = DatasetQualityService.Analyze(_rows, TryLoadManifest(run.GroundTruthCsvPath, run.ImageFolder));
-        ApplyDatasetQuality(_currentDatasetQuality);
-        RunSummaryText.Text = $"{run.TotalImages} images / {run.FailedCount} failed / run {run.Id}";
-        StatusText.Text = $"Loaded latest persisted Stage 1 validation run: {run.Id}.";
-        _currentFalseCallRun = AoiDatabase.GetLatestFalseCallReductionRun(run.Id);
-        _falseCallPoints.Clear();
-        if (_currentFalseCallRun is not null)
-        {
-            foreach (var candidate in _currentFalseCallRun.Points.OrderBy(point => point.ConfidenceThreshold))
-                _falseCallPoints.Add(candidate);
-
-            FalseCallRecommendationText.Text = _currentFalseCallRun.Recommendation.Point is { } selectedPoint
-                ? $"{_currentFalseCallRun.Recommendation.Status}: mode {_currentFalseCallRun.Recommendation.Mode}, threshold {selectedPoint.ConfidenceThreshold:F3}, false call {selectedPoint.FalseCallRate:P1}, possible escapes {selectedPoint.FalseNegative}."
-                : $"{_currentFalseCallRun.Recommendation.Status}: no applied candidate.";
-            ApplyRecommendedThresholdButton.IsEnabled = string.Equals(_currentFalseCallRun.Recommendation.Status, "VALID", StringComparison.OrdinalIgnoreCase) &&
-                RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole);
-            CreateThresholdProfileDraftButton.IsEnabled = _currentFalseCallRun.Recommendation.Point is not null &&
-                !string.Equals(_currentFalseCallRun.Recommendation.Status, "INVALID", StringComparison.OrdinalIgnoreCase) &&
-                RoleAuthorization.CanChangeThresholds(WorkflowState.Instance.CurrentRole);
-        }
-        else
-        {
-            FalseCallRecommendationText.Text = "Batch loaded. Analyze false calls to generate threshold candidates.";
-            CreateThresholdProfileDraftButton.IsEnabled = false;
-            ApplyRecommendedThresholdButton.IsEnabled = false;
-        }
+        var rows = AoiDatabase.GetBatchTestResults(run.Id).Select(BatchTestRow.FromRecord).ToArray();
+        var manifest = TryLoadManifest(run.GroundTruthCsvPath, run.ImageFolder);
+        var metrics = BatchValidationService.CalculateMetrics(rows);
+        var datasetQuality = DatasetQualityService.Analyze(rows, manifest);
+        var falseCallRun = AoiDatabase.GetLatestFalseCallReductionRun(run.Id);
+        var usedFormalManifest = TryLoadFormalManifestFlag(run.GroundTruthCsvPath, run.ImageFolder);
+        return new LatestBatchRunSnapshot(run, rows, metrics, datasetQuality, falseCallRun, usedFormalManifest);
     }
 
     private FalseCallReductionMode GetSelectedFalseCallMode()
@@ -1313,6 +1355,14 @@ public partial class AIModelTestView : UserControl
     private sealed record WorkProgress(int Completed, int Total, string Message);
 
     private sealed record ExportOutcome(int Count, IReadOnlyList<string> Errors);
+
+    private sealed record LatestBatchRunSnapshot(
+        BatchTestRunRecord Run,
+        BatchTestRow[] Rows,
+        BatchMetrics Metrics,
+        DatasetQualitySummary DatasetQuality,
+        FalseCallReductionRun? FalseCallRun,
+        bool UsedFormalManifest);
 
     private sealed record BatchRunOutcome(
         IReadOnlyList<BatchTestRow> Rows,

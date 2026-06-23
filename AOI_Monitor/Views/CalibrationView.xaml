@@ -19,11 +19,18 @@
           <TextBlock Text="2D Calibration Profile / Stage 2 Preparation" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           <TextBlock Text="Define image-to-board point pairs for planning camera/robot coordinate mapping. This is approximate 2D profile data only; no real camera or robot calibration is claimed."
                      Foreground="#8B969E" FontSize="14" TextWrapping="Wrap" Margin="0,3,0,0"/>
+          <Border Style="{StaticResource HmiEvidenceBoundaryOnly}" Margin="0,8,12,0" MaxWidth="720">
+            <TextBlock Text="Stage 2 preparation only - not live camera/robot calibration"
+                       Foreground="#FFE0A7"
+                       FontSize="14"
+                       FontWeight="ExtraBold"
+                       TextWrapping="Wrap"/>
+          </Border>
         </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Reload Profiles" Margin="0,0,6,0" Click="OnReloadProfilesClick"/>
-          <Button Style="{StaticResource ActionBtnGreen}" Content="Save Profile" Click="OnSaveProfileClick"/>
-        </StackPanel>
+        <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Reload Profiles" Margin="0,0,6,6" Click="OnReloadProfilesClick"/>
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Save Profile" Margin="0,0,0,6" Click="OnSaveProfileClick"/>
+        </WrapPanel>
       </Grid>
     </Border>
 
@@ -37,7 +44,7 @@
       <Border Grid.Column="0" Style="{StaticResource Panel}">
         <Grid>
           <Grid.RowDefinitions>
-            <RowDefinition Height="25"/>
+            <RowDefinition Height="Auto" MinHeight="32"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="8"/>
             <RowDefinition Height="*"/>
@@ -50,7 +57,7 @@
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
               <TextBlock Text="Saved Profile" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
-              <ComboBox x:Name="ProfileCombo" Grid.Column="1" MinHeight="34" DisplayMemberPath="DisplayName" SelectionChanged="OnProfileSelectionChanged"/>
+              <ComboBox x:Name="ProfileCombo" Grid.Column="1" MinHeight="34" DisplayMemberPath="DisplayName" SelectionChanged="OnProfileSelectionChanged" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=SelectionBoxItem}"/>
             </Grid>
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -74,7 +81,7 @@
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
               <TextBlock Text="Sample Image" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
-              <TextBox x:Name="SampleImagePathText" Grid.Column="1" MinHeight="34"/>
+              <TextBox x:Name="SampleImagePathText" Grid.Column="1" MinHeight="34" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
               <Button Style="{StaticResource MiniBtn}" Grid.Column="2" Content="Browse" Margin="6,0,0,0" Click="OnBrowseSampleImageClick"/>
             </Grid>
 
@@ -116,7 +123,7 @@
       <Border Grid.Column="2" Style="{StaticResource Panel}">
         <Grid>
           <Grid.RowDefinitions>
-            <RowDefinition Height="25"/>
+            <RowDefinition Height="Auto" MinHeight="32"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="8"/>
             <RowDefinition Height="160"/>
@@ -124,13 +131,13 @@
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <TextBlock Text="Calibration Points" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
-          <DataGrid Grid.Row="1" x:Name="PointsGrid" AutoGenerateColumns="False" Margin="0,0,0,0">
+          <DataGrid Grid.Row="1" x:Name="PointsGrid" AutoGenerateColumns="False" Margin="0,0,0,0" Style="{StaticResource HmiTable}" MinWidth="560">
             <DataGrid.Columns>
-              <DataGridTextColumn Header="#" Binding="{Binding No}" Width="42"/>
-              <DataGridTextColumn Header="Image X" Binding="{Binding ImageXDisplay}" Width="*"/>
-              <DataGridTextColumn Header="Image Y" Binding="{Binding ImageYDisplay}" Width="*"/>
-              <DataGridTextColumn Header="Board X mm" Binding="{Binding BoardXDisplay}" Width="*"/>
-              <DataGridTextColumn Header="Board Y mm" Binding="{Binding BoardYDisplay}" Width="*"/>
+              <DataGridTextColumn Header="#" Binding="{Binding No}" Width="56" MinWidth="56"/>
+              <DataGridTextColumn Header="Image X" Binding="{Binding ImageXDisplay}" Width="120" MinWidth="120"/>
+              <DataGridTextColumn Header="Image Y" Binding="{Binding ImageYDisplay}" Width="120" MinWidth="120"/>
+              <DataGridTextColumn Header="Board X" Binding="{Binding BoardXDisplay}" Width="130" MinWidth="130"/>
+              <DataGridTextColumn Header="Board Y" Binding="{Binding BoardYDisplay}" Width="130" MinWidth="130"/>
             </DataGrid.Columns>
           </DataGrid>
           <Border Grid.Row="3" Style="{StaticResource FieldBox}" Margin="8">

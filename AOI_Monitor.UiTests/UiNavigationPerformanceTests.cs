@@ -1,8 +1,11 @@
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Threading;
 using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
@@ -120,6 +123,123 @@ public sealed class UiNavigationPerformanceTests : IDisposable
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
+    [Fact]
+    public void RapidShellNavigationLeavesNoOverlayAndKeepsRouteStateStable()
+    {
+        var result = RunOnSta(() =>
+        {
+            EnsureApplicationResources();
+            UiPerformanceMonitorService.ClearForTests();
+            var shell = new MainWindow();
+            try
+            {
+                shell.Show();
+                PumpDispatcher(TimeSpan.FromMilliseconds(350));
+                WaitForDispatcherTask(InvokeSwitchPage(shell, "home"));
+
+                var viewModel = Assert.IsType<MainViewModel>(shell.DataContext);
+                var routes = FocusedWorkflowRoutes;
+                var switchResults = new List<UiNavigationSwitchResult>();
+
+                for (var pass = 1; pass <= 2; pass++)
+                {
+                    foreach (var route in routes)
+                    {
+                        var stopwatch = Stopwatch.StartNew();
+                        var navigationTask = InvokeSwitchPage(shell, route);
+                        WaitUntil(
+                            () => string.Equals(GetPrivateField<string>(shell, "_activePageKey"), route, StringComparison.OrdinalIgnoreCase),
+                            TimeSpan.FromSeconds(8),
+                            route);
+                        stopwatch.Stop();
+                        WaitForDispatcherTask(navigationTask);
+                        viewModel.CurrentPage = route;
+                        PumpDispatcher(TimeSpan.FromMilliseconds(35));
+
+                        var overlay = GetPrivateField<FrameworkElement>(shell, "LoadingOverlay");
+                        var pageTitle = GetPrivateField<TextBlock>(shell, "PageTitleText").Text;
+                        var activeNav = viewModel.NavPages.Single(page => page.Key == route);
+                        var content = GetPrivateField<ContentControl>(shell, "PageContent").Content;
+
+                        Assert.Equal(Visibility.Collapsed, overlay.Visibility);
+                        Assert.True(activeNav.IsActive, $"Active nav state was not set for {route}.");
+                        Assert.Equal(ExpectedPageTitles[route], pageTitle);
+                        Assert.NotNull(content);
+                        switchResults.Add(new UiNavigationSwitchResult(route, pass, stopwatch.ElapsedMilliseconds, route));
+                    }
+                }
+
+                var cacheBeforeDuplicate = GetPrivateField<Dictionary<string, UserControl>>(shell, "_pageCache").Count;
+                var firstDuplicate = InvokeSwitchPage(shell, "settings");
+                var secondDuplicate = InvokeSwitchPage(shell, "settings");
+                WaitForDispatcherTask(firstDuplicate);
+                WaitForDispatcherTask(secondDuplicate);
+                PumpDispatcher(TimeSpan.FromMilliseconds(250));
+
+                var finalOverlay = GetPrivateField<FrameworkElement>(shell, "LoadingOverlay");
+                var cacheAfterDuplicate = GetPrivateField<Dictionary<string, UserControl>>(shell, "_pageCache").Count;
+                var activePage = GetPrivateField<string>(shell, "_activePageKey");
+                var duplicateIgnoredEvents = UiPerformanceMonitorService.RecentEvents.Count(item =>
+                    item.Category.Equals("NAVIGATION_DUPLICATE_IGNORED", StringComparison.OrdinalIgnoreCase));
+                var averageSwitchMs = switchResults.Count == 0 ? 0 : switchResults.Average(item => item.DispatcherSwitchMilliseconds);
+
+                return new RapidNavigationResult(
+                    activePage,
+                    finalOverlay.Visibility,
+                    cacheBeforeDuplicate,
+                    cacheAfterDuplicate,
+                    duplicateIgnoredEvents,
+                    averageSwitchMs);
+            }
+            finally
+            {
+                shell.Close();
+            }
+        });
+
+        Assert.Equal("settings", result.ActivePage);
+        Assert.Equal(Visibility.Collapsed, result.LoadingOverlayVisibility);
+        Assert.Equal(result.CacheBeforeDuplicate, result.CacheAfterDuplicate);
+        Assert.True(result.DuplicateIgnoredEvents > 0, "Duplicate route navigation should be ignored and recorded.");
+        Assert.True(
+            result.AverageSwitchMilliseconds <= UiPerformanceMonitorService.CachedPageSwitchWarningMilliseconds,
+            $"Average route switch was {result.AverageSwitchMilliseconds:F1} ms, above threshold {UiPerformanceMonitorService.CachedPageSwitchWarningMilliseconds} ms.");
+    }
+
+    private static readonly string[] FocusedWorkflowRoutes =
+    [
+        "home",
+        "library",
+        "monitor",
+        "compare",
+        "review",
+        "recipe",
+        "modeltest",
+        "spc",
+        "reports",
+        "calibration",
+        "profile",
+        "pilot",
+        "settings",
+    ];
+
+    private static readonly IReadOnlyDictionary<string, string> ExpectedPageTitles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["home"] = "AOI DEFECT CONSOLE / HOME",
+        ["library"] = "BOARD & IMAGE MANAGEMENT / IMAGE LIBRARY",
+        ["monitor"] = "RUN INSPECTION / LOT EXECUTION",
+        ["compare"] = "DEFECT REVIEW / GOLDEN TEMPLATE COMPARE",
+        ["review"] = "DEFECT REVIEW / EVIDENCE & DISPOSITION",
+        ["recipe"] = "RECIPE RULES / ROI, MASKS, TOLERANCES",
+        ["modeltest"] = "AI / MODEL EVIDENCE AND FALSE-CALL CONTROL",
+        ["spc"] = "YIELD ANALYTICS / SPC, PARETO, TRENDS",
+        ["reports"] = "EXPORT & TRACE / PACKAGE, AUDIT, MES",
+        ["calibration"] = "CALIBRATION / 2D TRANSFORM AND STAGE 2 PREP",
+        ["profile"] = "3D PROFILE VIEWER / SAMPLE DATA MODE",
+        ["pilot"] = "CUSTOMER PILOT WIZARD / STAGE 1-2 EVIDENCE",
+        ["settings"] = "SYSTEM SETTINGS / DISPLAY, STORAGE, SECURITY",
+    };
+
     private static void EnsureApplicationResources()
     {
         if (Application.Current is not null)
@@ -138,6 +258,87 @@ public sealed class UiNavigationPerformanceTests : IDisposable
         element.UpdateLayout();
     }
 
+    private static Task InvokeSwitchPage(MainWindow shell, string route)
+    {
+        var method = typeof(MainWindow).GetMethod("SwitchPageAsync", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("SwitchPageAsync was not found.");
+        return (Task?)method.Invoke(shell, new object[] { route })
+            ?? throw new InvalidOperationException("SwitchPageAsync did not return a task.");
+    }
+
+    private static T GetPrivateField<T>(object instance, string name)
+    {
+        var field = instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+            ?? throw new InvalidOperationException($"{name} was not found.");
+        return (T)field.GetValue(instance)!;
+    }
+
+    private static void WaitForDispatcherTask(Task task)
+    {
+        if (task.IsCompleted)
+        {
+            task.GetAwaiter().GetResult();
+            return;
+        }
+
+        var timedOut = false;
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+        timer.Tick += (_, _) =>
+        {
+            timedOut = true;
+            frame.Continue = false;
+        };
+        task.ContinueWith(_ => frame.Continue = false, TaskScheduler.Default);
+        timer.Start();
+        Dispatcher.PushFrame(frame);
+        timer.Stop();
+
+        if (timedOut)
+            throw new TimeoutException("Shell navigation task did not complete.");
+
+        task.GetAwaiter().GetResult();
+    }
+
+    private static void PumpDispatcher(TimeSpan duration)
+    {
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer { Interval = duration };
+        timer.Tick += (_, _) => frame.Continue = false;
+        timer.Start();
+        Dispatcher.PushFrame(frame);
+        timer.Stop();
+    }
+
+    private static void WaitUntil(Func<bool> condition, TimeSpan timeout, string route)
+    {
+        if (condition())
+            return;
+
+        var timedOut = false;
+        var frame = new DispatcherFrame();
+        var timeoutTimer = new DispatcherTimer { Interval = timeout };
+        var pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
+        timeoutTimer.Tick += (_, _) =>
+        {
+            timedOut = true;
+            frame.Continue = false;
+        };
+        pollTimer.Tick += (_, _) =>
+        {
+            if (condition())
+                frame.Continue = false;
+        };
+        timeoutTimer.Start();
+        pollTimer.Start();
+        Dispatcher.PushFrame(frame);
+        pollTimer.Stop();
+        timeoutTimer.Stop();
+
+        if (timedOut)
+            throw new TimeoutException($"Shell route '{route}' did not become active before the timeout.");
+    }
+
     private static T RunOnSta<T>(Func<T> action)
     {
         T? result = default;
@@ -146,6 +347,7 @@ public sealed class UiNavigationPerformanceTests : IDisposable
         {
             try
             {
+                SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
                 result = action();
             }
             catch (Exception ex)
@@ -217,4 +419,12 @@ public sealed class UiNavigationPerformanceTests : IDisposable
         int Pass,
         long DispatcherSwitchMilliseconds,
         string ActivePage);
+
+    private sealed record RapidNavigationResult(
+        string ActivePage,
+        Visibility LoadingOverlayVisibility,
+        int CacheBeforeDuplicate,
+        int CacheAfterDuplicate,
+        int DuplicateIgnoredEvents,
+        double AverageSwitchMilliseconds);
 }

@@ -36,7 +36,8 @@
     <Border Grid.Row="2" Style="{StaticResource Panel}">
       <Grid>
         <Grid.RowDefinitions>
-          <RowDefinition Height="28"/>
+          <RowDefinition Height="Auto" MinHeight="32"/>
+          <RowDefinition Height="Auto"/>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
@@ -56,7 +57,40 @@
           <Button Style="{StaticResource ActionBtnGreen}" Content="10 Readiness Export" Margin="0,0,6,6" MinWidth="154" Click="OnReadinessClick"/>
           <Button Style="{StaticResource ActionBtnAmber}" Content="Waive Selected" Margin="0,0,6,6" MinWidth="126" Click="OnWaiveSelectedClick"/>
         </WrapPanel>
-        <DataGrid Grid.Row="2" x:Name="StepsGrid" CanUserSortColumns="False" AutoGenerateColumns="False" Margin="8,0,8,8">
+        <UniformGrid Grid.Row="2" Columns="5" Margin="8,0,8,8">
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+            <StackPanel>
+              <TextBlock Text="Current Step" Foreground="#9AA6AF" FontSize="14"/>
+              <TextBlock x:Name="CurrentStepText" Text="No session" Foreground="#DCE5EB" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+            <StackPanel>
+              <TextBlock Text="Blockers" Foreground="#9AA6AF" FontSize="14"/>
+              <TextBlock x:Name="BlockersText" Text="Start or resume a pilot" Foreground="#FFCDD0" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+            <StackPanel>
+              <TextBlock Text="Evidence Required" Foreground="#9AA6AF" FontSize="14"/>
+              <TextBlock x:Name="EvidenceRequiredText" Text="Profile, diagnostics, dataset, preflight, batch evidence" Foreground="#DCE5EB" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+            <StackPanel>
+              <TextBlock Text="Next Action" Foreground="#9AA6AF" FontSize="14"/>
+              <TextBlock x:Name="NextActionText" Text="Start New Pilot or Resume Latest" Foreground="#FFE0A7" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource FieldBox}">
+            <StackPanel>
+              <TextBlock Text="Waived" Foreground="#9AA6AF" FontSize="14"/>
+              <TextBlock x:Name="WaivedStatusText" Text="0 waived steps" Foreground="#DCE5EB" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Border>
+        </UniformGrid>
+        <DataGrid Grid.Row="3" x:Name="StepsGrid" CanUserSortColumns="False" AutoGenerateColumns="False" Margin="8,0,8,8" Style="{StaticResource HmiDenseTable}" MinWidth="0"
+                  ToolTip="Each row is a readiness gate. Waived items require audited engineering justification and do not imply production readiness.">
           <DataGrid.RowStyle>
             <Style TargetType="DataGridRow">
               <Setter Property="Background" Value="{Binding StatusBrush}"/>
@@ -64,12 +98,12 @@
             </Style>
           </DataGrid.RowStyle>
           <DataGrid.Columns>
-            <DataGridTextColumn Header="#" Binding="{Binding StepOrder}" Width="46"/>
-            <DataGridTextColumn Header="Step" Binding="{Binding StepName}" Width="220"/>
-            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="105"/>
-            <DataGridTextColumn Header="Evidence" Binding="{Binding EvidencePath}" Width="260"/>
-            <DataGridTextColumn Header="Messages" Binding="{Binding MessagesDisplay}" Width="*"/>
-            <DataGridCheckBoxColumn Header="Waived" Binding="{Binding Waived}" Width="70"/>
+            <DataGridTextColumn Header="#" Binding="{Binding StepOrder}" Width="60" MinWidth="60"/>
+            <DataGridTextColumn Header="Step" Binding="{Binding StepName}" Width="240" MinWidth="240"/>
+            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="120" MinWidth="120"/>
+            <DataGridTextColumn Header="Evidence" Binding="{Binding EvidencePath}" Width="300" MinWidth="300"/>
+            <DataGridTextColumn Header="Messages" Binding="{Binding MessagesDisplay}" Width="360" MinWidth="360"/>
+            <DataGridCheckBoxColumn Header="Waived" Binding="{Binding Waived}" Width="96" MinWidth="96"/>
           </DataGrid.Columns>
         </DataGrid>
       </Grid>

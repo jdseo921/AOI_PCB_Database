@@ -169,11 +169,84 @@
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="FontFamily"    Value="Segoe UI"/>
       <Setter Property="FontSize"      Value="14"/>
+      <Setter Property="ToolTip"       Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <Border x:Name="TextBoxBorder"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    SnapsToDevicePixels="True">
+              <ScrollViewer x:Name="PART_ContentHost"
+                            Focusable="False"
+                            HorizontalScrollBarVisibility="Hidden"
+                            VerticalScrollBarVisibility="Hidden"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource BlueBrush}"/>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource BlueBrush}"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="TextBoxBorder" Property="Background" Value="{DynamicResource Frame2Bg}"/>
+                <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource DimBrush}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style x:Key="ReadonlyInput" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
       <Setter Property="Foreground"  Value="#99A4AB"/>
       <Setter Property="Background"  Value="{DynamicResource Frame2Bg}"/>
       <Setter Property="IsReadOnly"  Value="True"/>
+    </Style>
+
+    <Style TargetType="PasswordBox">
+      <Setter Property="Background"    Value="{DynamicResource CellBg}"/>
+      <Setter Property="BorderBrush"   Value="{DynamicResource LineBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Foreground"    Value="{DynamicResource TextBrush}"/>
+      <Setter Property="CaretBrush"    Value="{DynamicResource TextBrush}"/>
+      <Setter Property="SelectionBrush" Value="#5CA0D3"/>
+      <Setter Property="MinHeight"     Value="36"/>
+      <Setter Property="Padding"       Value="8,5"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="FontFamily"    Value="Segoe UI"/>
+      <Setter Property="FontSize"      Value="14"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="PasswordBox">
+            <Border x:Name="PasswordBorder"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    SnapsToDevicePixels="True">
+              <ScrollViewer x:Name="PART_ContentHost"
+                            Focusable="False"
+                            HorizontalScrollBarVisibility="Hidden"
+                            VerticalScrollBarVisibility="Hidden"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter TargetName="PasswordBorder" Property="BorderBrush" Value="{DynamicResource BlueBrush}"/>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="PasswordBorder" Property="BorderBrush" Value="{DynamicResource BlueBrush}"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="PasswordBorder" Property="Background" Value="{DynamicResource Frame2Bg}"/>
+                <Setter TargetName="PasswordBorder" Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource DimBrush}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <!-- Combo boxes -->
@@ -187,6 +260,7 @@
       <Setter Property="FontFamily"    Value="Segoe UI"/>
       <Setter Property="FontSize"      Value="14"/>
       <Setter Property="MaxDropDownHeight" Value="360"/>
+      <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=SelectionBoxItem}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ComboBox">
@@ -244,13 +318,13 @@
                                 IsHitTestVisible="False"
                                 Margin="10,0,38,0"
                                 RecognizesAccessKey="True"
-                                TextElement.Foreground="{TemplateBinding Foreground}"
+                                TextElement.Foreground="{DynamicResource TextBrush}"
                                 VerticalAlignment="Center"/>
 
               <TextBox x:Name="PART_EditableTextBox"
                        Background="Transparent"
                        BorderThickness="0"
-                       Foreground="{TemplateBinding Foreground}"
+                       Foreground="{DynamicResource TextBrush}"
                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
                        IsReadOnly="{TemplateBinding IsReadOnly}"
                        Margin="10,0,38,0"
@@ -263,7 +337,7 @@
                      Focusable="False"
                      IsOpen="{TemplateBinding IsDropDownOpen}"
                      Placement="Bottom"
-                     PopupAnimation="Fade">
+                     PopupAnimation="None">
                 <Grid MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
                   <Border Background="{DynamicResource CellBg}"
                           BorderBrush="{DynamicResource BlueBrush}"
@@ -337,32 +411,14 @@
       <Setter Property="CanUserReorderColumns"   Value="False"/>
       <Setter Property="IsReadOnly"              Value="True"/>
       <Setter Property="SelectionMode"           Value="Single"/>
+      <Setter Property="MinColumnWidth"          Value="84"/>
+      <Setter Property="EnableRowVirtualization" Value="True"/>
+      <Setter Property="EnableColumnVirtualization" Value="True"/>
       <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
       <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+      <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
     </Style>
-    <Style TargetType="DataGridColumnHeader">
-      <Setter Property="Background"    Value="{DynamicResource Frame2Bg}"/>
-      <Setter Property="Foreground"    Value="{DynamicResource TextBrush}"/>
-      <Setter Property="FontWeight"    Value="ExtraBold"/>
-      <Setter Property="FontSize"      Value="14"/>
-      <Setter Property="Padding"       Value="8,5"/>
-      <Setter Property="MinHeight"     Value="44"/>
-      <Setter Property="BorderBrush"   Value="#343D44"/>
-      <Setter Property="BorderThickness" Value="0,0,1,1"/>
-      <Setter Property="SeparatorBrush" Value="#343D44"/>
-      <Setter Property="ContentTemplate">
-        <Setter.Value>
-          <DataTemplate>
-            <TextBlock Text="{Binding}"
-                       TextWrapping="Wrap"
-                       TextTrimming="None"
-                       LineHeight="17"
-                       FontWeight="ExtraBold"
-                       Foreground="#C9D2D8"/>
-          </DataTemplate>
-        </Setter.Value>
-      </Setter>
-    </Style>
+    <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource HmiDataGridColumnHeader}"/>
     <Style TargetType="DataGridRow">
       <Setter Property="Background" Value="Transparent"/>
       <Style.Triggers>
@@ -374,20 +430,7 @@
         </Trigger>
       </Style.Triggers>
     </Style>
-    <Style TargetType="DataGridCell">
-      <Setter Property="BorderBrush"   Value="#343D44"/>
-      <Setter Property="BorderThickness" Value="0,0,1,0"/>
-      <Setter Property="Padding"       Value="7,5"/>
-      <Setter Property="Background"    Value="Transparent"/>
-      <Setter Property="Foreground"    Value="#C3CCD3"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-      <Style.Triggers>
-        <Trigger Property="IsSelected" Value="True">
-          <Setter Property="Background" Value="#273642"/>
-          <Setter Property="Foreground" Value="#FFFFFF"/>
-        </Trigger>
-      </Style.Triggers>
-    </Style>
+    <Style TargetType="DataGridCell" BasedOn="{StaticResource HmiDataGridCell}"/>
 
     <!-- Progress bars -->
     <Style x:Key="BarTrack" TargetType="ProgressBar">
@@ -413,7 +456,7 @@
     </Style>
 
     <!-- Scroll bars -->
-    <Style TargetType="ScrollBar">
+    <Style TargetType="ScrollBar" BasedOn="{StaticResource HmiScrollBar}">
       <Setter Property="Background" Value="#0F1316"/>
     </Style>
 

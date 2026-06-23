@@ -14,7 +14,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class RecipeView : UserControl, IReleasablePageResources
+public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncNavigationPage
 {
     private const double MinRoiPixels = 8;
     private readonly ObservableCollection<RecipeRoiRow> _rois = new();
@@ -30,6 +30,7 @@ public partial class RecipeView : UserControl, IReleasablePageResources
     private bool _isRightPanning;
     private Point _panStart;
     private Point _panOrigin;
+    private CancellationTokenSource? _refreshCancellation;
 
     public RecipeView()
     {
@@ -39,7 +40,18 @@ public partial class RecipeView : UserControl, IReleasablePageResources
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         Unloaded += (_, _) => WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         RefreshFromState();
-        LoadLatestRecipe();
+    }
+
+    public Task OnNavigatedToAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
+
+    public async Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        _refreshCancellation?.Cancel();
+        _refreshCancellation?.Dispose();
+        _refreshCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var token = _refreshCancellation.Token;
+        RefreshFromState();
+        await LoadLatestRecipeAsync(token);
     }
 
     public void RefreshFromState()
@@ -56,29 +68,26 @@ public partial class RecipeView : UserControl, IReleasablePageResources
         UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshFromState);
     }
 
-    private void LoadLatestRecipe()
+    private async Task LoadLatestRecipeAsync(CancellationToken cancellationToken)
     {
         var state = WorkflowState.Instance;
-        var revision = AoiDatabase.GetLatestRecipeRevision(state.BoardProgram);
-        if (revision is null || string.IsNullOrWhiteSpace(revision.RecipeJson))
-        {
-            RecipeStatusText.Text = "No saved recipe revision found. Load a PCB image to start.";
-            return;
-        }
-
         try
         {
-            var doc = JsonSerializer.Deserialize<RecipeDocument>(revision.RecipeJson);
-            if (doc is null)
+            var snapshot = await Task.Run(() => LoadLatestRecipeSnapshot(state.BoardProgram, cancellationToken), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (snapshot is null)
+            {
+                RecipeStatusText.Text = "No saved recipe revision found. Load a PCB image to start.";
                 return;
+            }
 
-            RecipeNameText.Text = doc.RecipeName;
-            _backgroundImagePath = doc.BackgroundImagePath;
-            if (File.Exists(_backgroundImagePath))
-                LoadBackground(_backgroundImagePath);
+            RecipeNameText.Text = snapshot.Document.RecipeName;
+            _backgroundImagePath = snapshot.Document.BackgroundImagePath;
+            if (snapshot.BackgroundBitmap is not null)
+                ApplyBackground(snapshot.Document.BackgroundImagePath, snapshot.BackgroundBitmap);
 
             _rois.Clear();
-            foreach (var roi in doc.Rois)
+            foreach (var roi in snapshot.Document.Rois)
             {
                 _rois.Add(RecipeRoiRow.FromDocument(roi, isSaved: true));
             }
@@ -87,13 +96,35 @@ public partial class RecipeView : UserControl, IReleasablePageResources
             RoiGrid.SelectedItem = _activeRoi;
             UpdateFieldPanel();
             RenderRois();
-            RevisionText.Text = $"Loaded revision {revision.Revision} saved {ToLocalDisplay(revision.CreatedAtUtc)} by {revision.OperatorId}.";
-            RecipeStatusText.Text = $"Loaded {revision.RecipeName} with {_rois.Count} ROI(s).";
+            RevisionText.Text = $"Loaded revision {snapshot.Revision.Revision} saved {ToLocalDisplay(snapshot.Revision.CreatedAtUtc)} by {snapshot.Revision.OperatorId}.";
+            RecipeStatusText.Text = $"Loaded {snapshot.Revision.RecipeName} with {_rois.Count} ROI(s).";
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             RecipeStatusText.Text = $"Recipe load failed: {ex.Message}";
         }
+    }
+
+    private static RecipeLoadSnapshot? LoadLatestRecipeSnapshot(string boardProgram, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var revision = AoiDatabase.GetLatestRecipeRevision(boardProgram);
+        if (revision is null || string.IsNullOrWhiteSpace(revision.RecipeJson))
+            return null;
+
+        var doc = JsonSerializer.Deserialize<RecipeDocument>(revision.RecipeJson);
+        if (doc is null)
+            return null;
+
+        BitmapSource? bitmap = null;
+        if (!string.IsNullOrWhiteSpace(doc.BackgroundImagePath) && File.Exists(doc.BackgroundImagePath))
+            bitmap = ImageCacheService.LoadBitmap(doc.BackgroundImagePath, decodePixelWidth: 1600);
+
+        return new RecipeLoadSnapshot(revision, doc, bitmap);
     }
 
     private void OnLoadImageClick(object sender, RoutedEventArgs e)
@@ -118,7 +149,11 @@ public partial class RecipeView : UserControl, IReleasablePageResources
     private void LoadBackground(string path)
     {
         var bmp = ImageCacheService.LoadBitmap(path, decodePixelWidth: 1600);
+        ApplyBackground(path, bmp);
+    }
 
+    private void ApplyBackground(string path, BitmapSource bmp)
+    {
         _backgroundImagePath = path;
         _backgroundBitmap = bmp;
         RecipeImage.Source = bmp;
@@ -128,6 +163,7 @@ public partial class RecipeView : UserControl, IReleasablePageResources
         ViewportCanvas.Height = bmp.PixelHeight;
         RoiCanvas.Width = bmp.PixelWidth;
         RoiCanvas.Height = bmp.PixelHeight;
+        RecipeEmptyStateCard.Visibility = Visibility.Collapsed;
 
         FitToView();
         RenderRois();
@@ -135,11 +171,15 @@ public partial class RecipeView : UserControl, IReleasablePageResources
 
     public void ReleasePageResources()
     {
+        _refreshCancellation?.Cancel();
         _backgroundBitmap = null;
         RecipeImage.Source = null;
+        RecipeEmptyStateCard.Visibility = Visibility.Visible;
         RoiCanvas.Children.Clear();
         ImageCacheService.ClearOnPageUnload();
     }
+
+    public void CancelWork() => _refreshCancellation?.Cancel();
 
     private void OnCanvasLeftDown(object sender, MouseButtonEventArgs e)
     {
@@ -622,4 +662,9 @@ public partial class RecipeView : UserControl, IReleasablePageResources
             };
         }
     }
+
+    private sealed record RecipeLoadSnapshot(
+        RecipeRevisionRecord Revision,
+        RecipeDocument Document,
+        BitmapSource? BackgroundBitmap);
 }

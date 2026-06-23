@@ -6,7 +6,6 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using AOI_Monitor.Data;
 using AOI_Monitor.Models;
@@ -25,6 +24,10 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _footerCts;
     private MainViewModel _vm = null!;
     private string _activePageKey = string.Empty;
+    private string _pendingNavigationKey = string.Empty;
+    private int _navigationSequence;
+    private bool _operatorOpenedAlarmPanel;
+    private bool _updatingAlarmExpansion;
     public string CurrentPageKey => _vm?.CurrentPage ?? "home";
 
     private static readonly Dictionary<string, string> PageTitles = new()
@@ -160,9 +163,27 @@ public partial class MainWindow : Window
 
     private async Task SwitchPageAsync(string key)
     {
+        key = string.IsNullOrWhiteSpace(key) ? "home" : key.Trim();
+        if (string.Equals(_activePageKey, key, StringComparison.OrdinalIgnoreCase) &&
+            PageContent.Content is not null)
+        {
+            HideLoadingOverlay();
+            RefreshActiveRouteChrome(key);
+            UiPerformanceMonitorService.Record("NAVIGATION_DUPLICATE_IGNORED", key, 0, $"Duplicate navigation ignored: {key}.");
+            return;
+        }
+
+        if (string.Equals(_pendingNavigationKey, key, StringComparison.OrdinalIgnoreCase))
+        {
+            UiPerformanceMonitorService.Record("NAVIGATION_DUPLICATE_IGNORED", key, 0, $"Duplicate navigation ignored while page is loading: {key}.");
+            return;
+        }
+
         if (!EnsurePageAccess(key))
             return;
 
+        _pendingNavigationKey = key;
+        var navigationId = Interlocked.Increment(ref _navigationSequence);
         _navigationCts?.Cancel();
         _navigationCts?.Dispose();
         _navigationCts = new CancellationTokenSource();
@@ -185,12 +206,15 @@ public partial class MainWindow : Window
                 MemoryDiagnosticsService.SetPageCacheCount(_pageCache.Count);
             }
 
+            if (!IsCurrentNavigation(navigationId, cancellationToken))
+                return;
+
             PageContent.Content = page;
             _activePageKey = key;
             PageTitleText.Text = PageTitles.TryGetValue(key, out var t) ? t : key.ToUpperInvariant();
             PageTitleText.Text = LocalizedPageTitle(key);
             UiPreferencesService.ApplyLocalization(page);
-            PlayNavigationTransition();
+            BringActiveNavItemIntoView();
             visualResponseStopwatch.Stop();
             UiPerformanceMonitorService.RecordNavigationVisualResponse(key, visualResponseStopwatch.ElapsedMilliseconds);
             UiPerformanceMonitorService.RecordCachedPageSwitch(key, navigationScope.ElapsedMilliseconds);
@@ -201,21 +225,42 @@ public partial class MainWindow : Window
             if (page is IAsyncNavigationPage asyncPage)
                 await RunPageLifecycleAsync(key, asyncPage, cancellationToken);
 
-            UiPreferencesService.ApplyLocalization(page);
+            if (IsCurrentNavigation(navigationId, cancellationToken))
+                UiPreferencesService.ApplyLocalization(page);
         }
         catch (OperationCanceledException)
         {
+            HideLoadingOverlay();
             UiPerformanceMonitorService.Record("NAVIGATION", key, navigationScope.ElapsedMilliseconds, $"Navigation to {key} was cancelled.");
         }
         catch (Exception ex)
         {
+            if (!IsCurrentNavigation(navigationId, CancellationToken.None))
+                return;
+
             HideLoadingOverlay();
             PageContent.Content = previousPage;
             _activePageKey = previousKey;
             PageTitleText.Text = previousTitle;
             ShowRecoverablePageError(key, "navigation", ex);
         }
+        finally
+        {
+            if (string.Equals(_pendingNavigationKey, key, StringComparison.OrdinalIgnoreCase))
+                _pendingNavigationKey = string.Empty;
+        }
     }
+
+    private void RefreshActiveRouteChrome(string key)
+    {
+        PageTitleText.Text = LocalizedPageTitle(key);
+        if (PageContent.Content is FrameworkElement page)
+            UiPreferencesService.ApplyLocalization(page);
+        BringActiveNavItemIntoView();
+    }
+
+    private bool IsCurrentNavigation(int navigationId, CancellationToken cancellationToken)
+        => !cancellationToken.IsCancellationRequested && navigationId == Volatile.Read(ref _navigationSequence);
 
     public async Task ExerciseUiNavigationForStabilityAsync(string pageName, CancellationToken cancellationToken)
     {
@@ -405,6 +450,13 @@ public partial class MainWindow : Window
         ActiveAlarmSummaryText.Text = allActive.Count == 0
             ? "No active alarms."
             : $"{critical} Critical / {alarmLevel} Alarm / {warnings} Warning active.";
+        ActiveAlarmHeaderText.Text = allActive.Count == 0
+            ? "none"
+            : critical > 0
+                ? $"{critical} CRITICAL"
+                : alarmLevel > 0
+                    ? $"{alarmLevel} alarm"
+                    : $"{warnings} warning";
         ActiveAlarmSummaryText.Foreground = critical > 0
             ? Brushes.LightCoral
             : alarmLevel > 0
@@ -412,6 +464,32 @@ public partial class MainWindow : Window
                 : warnings > 0
                     ? Brushes.Gold
                     : Brushes.LightGreen;
+        ActiveAlarmHeaderText.Foreground = ActiveAlarmSummaryText.Foreground;
+
+        if (ActiveAlarmsExpander is not null)
+        {
+            _updatingAlarmExpansion = true;
+            try
+            {
+                ActiveAlarmsExpander.IsExpanded = allActive.Count > 0 || _operatorOpenedAlarmPanel;
+            }
+            finally
+            {
+                _updatingAlarmExpansion = false;
+            }
+        }
+    }
+
+    private void OnActiveAlarmsExpanded(object sender, RoutedEventArgs e)
+    {
+        if (!_updatingAlarmExpansion)
+            _operatorOpenedAlarmPanel = true;
+    }
+
+    private void OnActiveAlarmsCollapsed(object sender, RoutedEventArgs e)
+    {
+        if (!_updatingAlarmExpansion)
+            _operatorOpenedAlarmPanel = false;
     }
 
     private void OnAcknowledgeAlarmClick(object sender, RoutedEventArgs e)
@@ -517,28 +595,40 @@ public partial class MainWindow : Window
         HideLoadingOverlay();
     }
 
-    private void PlayNavigationTransition()
+    private void BringActiveNavItemIntoView()
     {
-        // Subtle transition to reduce abrupt page swaps.
-        PageContent.Opacity = 0;
-        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180))
+        if (!Dispatcher.CheckAccess())
         {
-            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
-        };
-
-        if (PageContent.RenderTransform is not TranslateTransform translate)
-        {
-            translate = new TranslateTransform();
-            PageContent.RenderTransform = translate;
+            Dispatcher.BeginInvoke(new Action(BringActiveNavItemIntoView));
+            return;
         }
 
-        var slide = new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(180))
+        Dispatcher.BeginInvoke(new Action(() =>
         {
-            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
-        };
+            foreach (var button in VisualDescendants<Button>(TopLevelNavItems))
+            {
+                if (button.DataContext is NavPage { IsActive: true })
+                {
+                    button.BringIntoView();
+                    break;
+                }
+            }
+        }), System.Windows.Threading.DispatcherPriority.Background);
+    }
 
-        PageContent.BeginAnimation(OpacityProperty, fade);
-        translate.BeginAnimation(TranslateTransform.YProperty, slide);
+    private static IEnumerable<T> VisualDescendants<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+                yield return match;
+
+            foreach (var descendant in VisualDescendants<T>(child))
+                yield return descendant;
+        }
     }
 
     private async void OnRefreshClick(object sender, RoutedEventArgs e)
@@ -798,6 +888,9 @@ public partial class MainWindow : Window
         BrandTitleText.Text = preferences.ConsoleTitle;
         StationNameText.Text = preferences.StationDisplayName;
         StationSubtitleText.Text = preferences.StationSubtitle;
+        BrandTitleText.ToolTip = preferences.ConsoleTitle;
+        StationNameText.ToolTip = preferences.StationDisplayName;
+        StationSubtitleText.ToolTip = preferences.StationSubtitle;
         StationBadgeBorder.BorderBrush = UiPreferencesService.AccentBrush(preferences);
         BrandTitleText.Foreground = UiPreferencesService.AccentBrush(preferences);
         BrandAccentDot.Fill = UiPreferencesService.AccentBrush(preferences);
@@ -1294,15 +1387,23 @@ public partial class MainWindow : Window
         WorkflowSampleText.Text = string.IsNullOrWhiteSpace(state.SampleImagePath)
             ? "none"
             : Path.GetFileName(state.SampleImagePath);
+        WorkflowSampleText.ToolTip = string.IsNullOrWhiteSpace(state.SampleImagePath)
+            ? "No sample image selected."
+            : state.SampleImagePath;
 
         WorkflowGoldenText.Text = string.IsNullOrWhiteSpace(state.GoldenImagePath)
             ? "none"
             : Path.GetFileName(state.GoldenImagePath);
+        WorkflowGoldenText.ToolTip = string.IsNullOrWhiteSpace(state.GoldenImagePath)
+            ? "No golden reference selected."
+            : state.GoldenImagePath;
 
         if (state.LastAnalysis is null)
         {
             WorkflowScoreText.Text = "--";
+            WorkflowScoreText.ToolTip = "No score is available yet.";
             WorkflowVerdictText.Text = "REVIEW";
+            WorkflowVerdictText.ToolTip = "No current analysis is available; default workflow state is REVIEW.";
             WorkflowVerdictText.Foreground = Brushes.LightGray;
             WorkflowVerdictBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2A2E31"));
             WorkflowVerdictBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#555E66"));
@@ -1310,7 +1411,9 @@ public partial class MainWindow : Window
         }
 
         WorkflowScoreText.Text = $"{state.LastAnalysis.DifferenceScore:F1}%";
+        WorkflowScoreText.ToolTip = $"Difference score: {state.LastAnalysis.DifferenceScore:F1}%.";
         WorkflowVerdictText.Text = state.LastAnalysis.Verdict;
+        WorkflowVerdictText.ToolTip = $"Inspection verdict: {state.LastAnalysis.Verdict}.";
 
         if (state.LastAnalysis.Verdict == "NG")
         {

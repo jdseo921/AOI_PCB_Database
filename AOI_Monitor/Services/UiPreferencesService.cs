@@ -514,7 +514,7 @@ public static class UiPreferencesService
         if (!visited.Add(root))
             return;
 
-        if (root is TextBlock textBlock)
+        if (root is TextBlock textBlock && textBlock.Name != "PageTitleText")
         {
             var original = GetOrStore(textBlock, OriginalTextProperty, textBlock.Text);
             textBlock.Text = Translate(original, language);

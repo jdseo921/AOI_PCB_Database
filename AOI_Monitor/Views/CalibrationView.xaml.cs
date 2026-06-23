@@ -12,11 +12,12 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class CalibrationView : UserControl, IReleasablePageResources
+public partial class CalibrationView : UserControl, IReleasablePageResources, IAsyncNavigationPage
 {
     private readonly ObservableCollection<CalibrationPointRow> _points = new();
     private bool _loadingProfile;
     private BitmapSource? _sampleBitmap;
+    private CancellationTokenSource? _refreshCancellation;
 
     public CalibrationView()
     {
@@ -24,19 +25,49 @@ public partial class CalibrationView : UserControl, IReleasablePageResources
         PointsGrid.ItemsSource = _points;
         ProfileNameText.Text = $"{WorkflowState.Instance.BoardProgram} 2D Top Calibration";
         BoardModelText.Text = WorkflowState.Instance.BoardProgram;
-        ReloadProfiles();
         UpdateTransformStatus();
     }
 
-    public void RefreshFromState()
+    public Task OnNavigatedToAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
+
+    public async Task RefreshAsync(CancellationToken cancellationToken)
     {
+        _refreshCancellation?.Cancel();
+        _refreshCancellation?.Dispose();
+        _refreshCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var token = _refreshCancellation.Token;
         if (string.IsNullOrWhiteSpace(BoardModelText.Text))
             BoardModelText.Text = WorkflowState.Instance.BoardProgram;
 
-        ReloadProfiles();
+        await ReloadProfilesAsync(null, token);
     }
 
-    private void OnReloadProfilesClick(object sender, RoutedEventArgs e) => ReloadProfiles();
+    public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);
+
+    public void CancelWork()
+    {
+        _refreshCancellation?.Cancel();
+    }
+
+    private void RefreshHeaderFromState()
+    {
+        if (string.IsNullOrWhiteSpace(BoardModelText.Text))
+            BoardModelText.Text = WorkflowState.Instance.BoardProgram;
+    }
+
+    private async void OnReloadProfilesClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            RefreshHeaderFromState();
+            await ReloadProfilesAsync(null, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            TransformStatusText.Text = $"Calibration profiles could not be reloaded: {ex.Message}";
+            WorkflowState.Instance.AddEvent("CALIBRATION_ERROR", TransformStatusText.Text);
+        }
+    }
 
     private void OnBrowseSampleImageClick(object sender, RoutedEventArgs e)
     {
@@ -104,7 +135,7 @@ public partial class CalibrationView : UserControl, IReleasablePageResources
         UpdateTransformStatus();
     }
 
-    private void OnSaveProfileClick(object sender, RoutedEventArgs e)
+    private async void OnSaveProfileClick(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
         if (!state.TryAuthorize(RoleAuthorization.CanEditCalibration, "Saving calibration profile", out var message))
@@ -134,7 +165,7 @@ public partial class CalibrationView : UserControl, IReleasablePageResources
                     point.BoardYMillimeters)).ToArray());
 
             state.AddEvent("CALIBRATION", $"2D calibration profile saved: {ProfileNameText.Text}, id {profileId}, points {_points.Count}. Stage 2 preparation only.");
-            ReloadProfiles(profileId);
+            await ReloadProfilesAsync(profileId, CancellationToken.None);
             MessageBox.Show("2D calibration profile saved to SQLite.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
@@ -152,16 +183,21 @@ public partial class CalibrationView : UserControl, IReleasablePageResources
         LoadProfile(profile);
     }
 
-    private void ReloadProfiles(long? selectedProfileId = null)
+    private async Task ReloadProfilesAsync(long? selectedProfileId, CancellationToken cancellationToken)
     {
         try
         {
             _loadingProfile = true;
-            var profiles = AoiDatabase.GetCalibrationProfiles();
-            ProfileCombo.ItemsSource = profiles;
-            ProfileCombo.SelectedItem = selectedProfileId is null
-                ? profiles.FirstOrDefault()
-                : profiles.FirstOrDefault(profile => profile.Id == selectedProfileId.Value) ?? profiles.FirstOrDefault();
+            var snapshot = await Task.Run(() => LoadCalibrationProfileSnapshot(selectedProfileId, cancellationToken), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            ProfileCombo.ItemsSource = snapshot.Profiles;
+            ProfileCombo.SelectedItem = snapshot.SelectedProfile;
+            if (snapshot.SelectedProfile is not null)
+                LoadProfile(snapshot.SelectedProfile, snapshot.SampleBitmap, snapshot.SampleImageMessage);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -172,12 +208,29 @@ public partial class CalibrationView : UserControl, IReleasablePageResources
         {
             _loadingProfile = false;
         }
-
-        if (ProfileCombo.SelectedItem is CalibrationProfileRecord selected)
-            LoadProfile(selected);
     }
 
-    private void LoadProfile(CalibrationProfileRecord profile)
+    private static CalibrationProfileRefreshSnapshot LoadCalibrationProfileSnapshot(long? selectedProfileId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var profiles = AoiDatabase.GetCalibrationProfiles();
+        var selected = selectedProfileId is null
+            ? profiles.FirstOrDefault()
+            : profiles.FirstOrDefault(profile => profile.Id == selectedProfileId.Value) ?? profiles.FirstOrDefault();
+        BitmapSource? bitmap = null;
+        string? imageMessage = null;
+        if (selected is not null)
+        {
+            if (File.Exists(selected.SampleImagePath))
+                bitmap = ImageCacheService.LoadBitmap(selected.SampleImagePath, decodePixelWidth: 1600);
+            else
+                imageMessage = selected.SampleImagePath.Length == 0 ? "No sample image path saved with this profile." : "Saved calibration image is missing.";
+        }
+
+        return new CalibrationProfileRefreshSnapshot(profiles, selected, bitmap, imageMessage);
+    }
+
+    private void LoadProfile(CalibrationProfileRecord profile, BitmapSource? preloadedBitmap = null, string? sampleImageMessage = null)
     {
         _loadingProfile = true;
         try
@@ -198,10 +251,12 @@ public partial class CalibrationView : UserControl, IReleasablePageResources
                     point.BoardYMillimeters));
             }
 
-            if (File.Exists(profile.SampleImagePath))
+            if (preloadedBitmap is not null)
+                ApplyCalibrationImage(preloadedBitmap);
+            else if (File.Exists(profile.SampleImagePath))
                 LoadCalibrationImage(profile.SampleImagePath);
             else
-                ClearCalibrationImage(profile.SampleImagePath.Length == 0 ? "No sample image path saved with this profile." : "Saved calibration image is missing.");
+                ClearCalibrationImage(sampleImageMessage ?? (profile.SampleImagePath.Length == 0 ? "No sample image path saved with this profile." : "Saved calibration image is missing."));
 
             SavedProfileText.Text = string.Join(Environment.NewLine,
                 $"Profile: {profile.DisplayName}",
@@ -251,10 +306,7 @@ public partial class CalibrationView : UserControl, IReleasablePageResources
         try
         {
             var bitmap = ImageCacheService.LoadBitmap(imagePath, decodePixelWidth: 1600);
-
-            _sampleBitmap = bitmap;
-            CalibrationImage.Source = bitmap;
-            EmptyImageText.Visibility = Visibility.Collapsed;
+            ApplyCalibrationImage(bitmap);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -272,8 +324,16 @@ public partial class CalibrationView : UserControl, IReleasablePageResources
 
     public void ReleasePageResources()
     {
+        _refreshCancellation?.Cancel();
         ClearCalibrationImage("Calibration image released to reduce memory use. Reload an image to continue.");
         ImageCacheService.ClearOnPageUnload();
+    }
+
+    private void ApplyCalibrationImage(BitmapSource bitmap)
+    {
+        _sampleBitmap = bitmap;
+        CalibrationImage.Source = bitmap;
+        EmptyImageText.Visibility = Visibility.Collapsed;
     }
 
     private void RenumberPoints()
@@ -326,4 +386,10 @@ public partial class CalibrationView : UserControl, IReleasablePageResources
         public string BoardXDisplay => BoardXMillimeters.ToString("F3", CultureInfo.InvariantCulture);
         public string BoardYDisplay => BoardYMillimeters.ToString("F3", CultureInfo.InvariantCulture);
     }
+
+    private sealed record CalibrationProfileRefreshSnapshot(
+        IReadOnlyList<CalibrationProfileRecord> Profiles,
+        CalibrationProfileRecord? SelectedProfile,
+        BitmapSource? SampleBitmap,
+        string? SampleImageMessage);
 }

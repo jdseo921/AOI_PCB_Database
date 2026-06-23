@@ -14,7 +14,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class MonitorView : UserControl, IReleasablePageResources
+public partial class MonitorView : UserControl, IReleasablePageResources, IAsyncNavigationPage
 {
     private readonly ObservableCollection<DefectRow> _defects = new();
     private readonly ObservableCollection<AlarmRow> _alarms = new();
@@ -30,6 +30,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources
     private bool _currentResultSaved;
     private bool _updatingCalibrationProfiles;
     private CancellationTokenSource? _robotCycleCancellation;
+    private CancellationTokenSource? _refreshCancellation;
     private int _importedQueueIndex = -1;
     private string? _currentImagePath;
     private string _currentBoardModel = "TBOX-MAIN";
@@ -61,9 +62,6 @@ public partial class MonitorView : UserControl, IReleasablePageResources
         InspectionModelConfigurationService.ConfigurationChanged += OnEngineConfigurationChanged;
         LightingSettingsService.SettingsChanged += OnLightingSettingsChanged;
         Unloaded += OnUnloaded;
-        ReloadImportedQueue();
-        RefreshCalibrationProfiles();
-        RefreshHeader();
         UpdateRobotSimulationStatus();
         LogEvent("ROBOT SIM", "Robot/handler simulation is available. No real robot hardware is connected.");
         LogEvent("READY", "Main Inspection ready. Use folder simulation or Image Library imported images.");
@@ -77,16 +75,75 @@ public partial class MonitorView : UserControl, IReleasablePageResources
         _robotCycleService.StateChanged -= OnRobotCycleStateChanged;
         _robotCycleCancellation?.Cancel();
         _robotCycleCancellation?.Dispose();
+        _refreshCancellation?.Cancel();
+        _refreshCancellation?.Dispose();
         if (ReferenceEquals(IntegrationBoundaryRegistry.RobotController, _robotController))
             IntegrationBoundaryRegistry.RobotController = new NullRobotController();
         if (ReferenceEquals(IntegrationBoundaryRegistry.EmergencyStopMonitor, _emergencyStopMonitor))
             IntegrationBoundaryRegistry.EmergencyStopMonitor = new NullEmergencyStopMonitor();
     }
 
-    private void OnWorkflowStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshFromState);
+    private void OnWorkflowStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, () => _ = RefreshAsync(CancellationToken.None));
     private void OnEngineConfigurationChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshHeader);
     private void OnLightingSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshHeader);
     private void OnRobotCycleStateChanged(RobotCycleState state) => UiDispatcher.InvokeIfAvailable(Dispatcher, UpdateRobotSimulationStatus);
+
+    public Task OnNavigatedToAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
+
+    public async Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        _refreshCancellation?.Cancel();
+        _refreshCancellation?.Dispose();
+        _refreshCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var token = _refreshCancellation.Token;
+        var selectedProfileId = _selectedCalibrationProfile?.Id;
+        var samplePath = WorkflowState.Instance.SampleImagePath;
+
+        var snapshot = await Task.Run(() =>
+        {
+            token.ThrowIfCancellationRequested();
+            var imported = AoiDatabase.GetImportedImages()
+                .Where(image => File.Exists(image.VaultPath))
+                .ToArray();
+            var profileItems = AoiDatabase.GetCalibrationProfiles()
+                .Select(profile => new CalibrationProfileListItem(profile.DisplayName, profile))
+                .ToList();
+            profileItems.Insert(0, new CalibrationProfileListItem("No 2D profile (Stage 2 prep)", null));
+            var latestAcceptance = AoiDatabase.GetLatestRobotAcceptanceRun();
+            var sampleExists = !string.IsNullOrWhiteSpace(samplePath) && File.Exists(samplePath);
+            return new MonitorRefreshSnapshot(imported, profileItems, latestAcceptance, samplePath ?? string.Empty, sampleExists);
+        }, token);
+
+        token.ThrowIfCancellationRequested();
+        _importedQueue.Clear();
+        _importedQueue.AddRange(snapshot.ImportedImages);
+        ApplyCalibrationProfiles(snapshot.CalibrationProfiles, selectedProfileId);
+        _lastRobotAcceptanceRun = snapshot.LatestRobotAcceptance;
+        RefreshHeader();
+
+        if (_currentImagePath is null && snapshot.SampleExists && !string.IsNullOrWhiteSpace(snapshot.SamplePath))
+        {
+            _currentImagePath = snapshot.SamplePath;
+            LoadImage(snapshot.SamplePath);
+        }
+
+        var state = WorkflowState.Instance;
+        if (state.LastAnalysis is not null && !ReferenceEquals(state.LastAnalysis, _currentAnalysis))
+        {
+            _currentAnalysis = state.LastAnalysis;
+            _currentResultSaved = true;
+            RefreshDefectRows();
+            RenderOverlay();
+            UpdateTimingDisplay(state.LastAnalysis.Timing);
+            SetResultStatus(state.LastAnalysis.Verdict);
+        }
+    }
+
+    public void CancelWork()
+    {
+        _refreshCancellation?.Cancel();
+        _robotCycleCancellation?.Cancel();
+    }
 
     private void OnOpenDispositionClick(object sender, RoutedEventArgs e) => Navigate("review");
     private void OnOpenCompareClick(object sender, RoutedEventArgs e) => Navigate("compare");
@@ -122,18 +179,26 @@ public partial class MonitorView : UserControl, IReleasablePageResources
         LogEvent("CAMERA SOURCE", $"Configured simulated {viewType} folder: {dialog.FolderName}.");
     }
 
-    private void OnStartClick(object sender, RoutedEventArgs e)
+    private async void OnStartClick(object sender, RoutedEventArgs e)
     {
-        _isRunning = true;
-        _cameraSource.SelectedView = SelectedCameraView();
-        SynchronizeLightingForSelectedView();
-        _cameraSource.StartAcquisition();
-        ModeText.Text = "RUNNING";
-        ModeText.Foreground = Brushes.LightGreen;
-        LogEvent("START", $"Simulated inspection mode started. Camera status: {CameraStatusText()}.");
+        try
+        {
+            _isRunning = true;
+            _cameraSource.SelectedView = SelectedCameraView();
+            await SynchronizeLightingForSelectedViewAsync(CancellationToken.None);
+            _cameraSource.StartAcquisition();
+            ModeText.Text = "RUNNING";
+            ModeText.Foreground = Brushes.LightGreen;
+            LogEvent("START", $"Simulated inspection mode started. Camera status: {CameraStatusText()}.");
 
-        if (_currentImagePath is null)
-            LoadNextBoard();
+            if (_currentImagePath is null)
+                await LoadNextBoardAsync();
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            LogEvent("ERROR", $"Start inspection failed safely: {ex.Message}");
+            MessageBox.Show($"Start inspection failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OnStopClick(object sender, RoutedEventArgs e)
@@ -145,12 +210,20 @@ public partial class MonitorView : UserControl, IReleasablePageResources
         LogEvent("STOP", "Simulated inspection mode paused.");
     }
 
-    private void OnNextBoardClick(object sender, RoutedEventArgs e)
+    private async void OnNextBoardClick(object sender, RoutedEventArgs e)
     {
-        if (!_isRunning)
-            LogEvent("NEXT BOARD", "Manual next-board inspection requested while simulated mode is paused.");
+        try
+        {
+            if (!_isRunning)
+                LogEvent("NEXT BOARD", "Manual next-board inspection requested while simulated mode is paused.");
 
-        LoadNextBoard();
+            await LoadNextBoardAsync();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            LogEvent("ERROR", $"Next board failed safely: {ex.Message}");
+            MessageBox.Show($"Next board failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OnSaveResultClick(object sender, RoutedEventArgs e)
@@ -196,7 +269,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources
         try
         {
             if (!_robotController.IsBoardLoaded)
-                LoadNextBoard(runInspection: false);
+                await LoadNextBoardAsync(runInspection: false, token);
 
             if (string.IsNullOrWhiteSpace(_currentImagePath))
             {
@@ -453,11 +526,11 @@ public partial class MonitorView : UserControl, IReleasablePageResources
             LogEvent("CALIBRATION", $"Selected 2D calibration profile '{_selectedCalibrationProfile.ProfileName}' for approximate board-mm display. Stage 2 preparation only.");
     }
 
-    private void LoadNextBoard(bool runInspection = true)
+    private async Task LoadNextBoardAsync(bool runInspection = true, CancellationToken cancellationToken = default)
     {
         try
         {
-            var nextBoard = GetNextBoard();
+            var nextBoard = await GetNextBoardAsync(cancellationToken);
             if (nextBoard is null || string.IsNullOrWhiteSpace(nextBoard.ImagePath) || !File.Exists(nextBoard.ImagePath))
             {
                 LogEvent("ERROR", "No simulated board image is available. Select a folder or import an image first.");
@@ -498,10 +571,10 @@ public partial class MonitorView : UserControl, IReleasablePageResources
         }
     }
 
-    private BoardImageContext? GetNextBoard()
+    private async Task<BoardImageContext?> GetNextBoardAsync(CancellationToken cancellationToken)
     {
         _cameraSource.SelectedView = SelectedCameraView();
-        SynchronizeLightingForSelectedView();
+        await SynchronizeLightingForSelectedViewAsync(cancellationToken);
         if (!_cameraSource.IsAcquiring)
             _cameraSource.StartAcquisition();
 
@@ -652,27 +725,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources
         return analysis;
     }
 
-    private void RefreshFromState()
-    {
-        RefreshCalibrationProfiles(_selectedCalibrationProfile?.Id);
-        RefreshHeader();
-        var state = WorkflowState.Instance;
-        if (_currentImagePath is null && !string.IsNullOrWhiteSpace(state.SampleImagePath) && File.Exists(state.SampleImagePath))
-        {
-            _currentImagePath = state.SampleImagePath;
-            LoadImage(state.SampleImagePath);
-        }
-
-        if (state.LastAnalysis is not null && !ReferenceEquals(state.LastAnalysis, _currentAnalysis))
-        {
-            _currentAnalysis = state.LastAnalysis;
-            _currentResultSaved = true;
-            RefreshDefectRows();
-            RenderOverlay();
-            UpdateTimingDisplay(state.LastAnalysis.Timing);
-            SetResultStatus(state.LastAnalysis.Verdict);
-        }
-    }
+    public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);
 
     private void RefreshHeader()
     {
@@ -718,14 +771,30 @@ public partial class MonitorView : UserControl, IReleasablePageResources
                 .ToList();
 
             profileItems.Insert(0, new CalibrationProfileListItem("No 2D profile (Stage 2 prep)", null));
-            CalibrationProfileCombo.ItemsSource = profileItems;
-            CalibrationProfileCombo.SelectedItem = profileItems.FirstOrDefault(item => item.Profile?.Id == selectedId) ?? profileItems[0];
-            _selectedCalibrationProfile = (CalibrationProfileCombo.SelectedItem as CalibrationProfileListItem)?.Profile;
+            ApplyCalibrationProfiles(profileItems, selectedId);
         }
         catch (Exception ex)
         {
             _selectedCalibrationProfile = null;
             LogEvent("CALIBRATION ERROR", $"Could not load calibration profiles: {ex.Message}");
+        }
+        finally
+        {
+            _updatingCalibrationProfiles = false;
+        }
+    }
+
+    private void ApplyCalibrationProfiles(IReadOnlyList<CalibrationProfileListItem> profileItems, long? selectedId)
+    {
+        _updatingCalibrationProfiles = true;
+        try
+        {
+            var items = profileItems.Count == 0
+                ? new List<CalibrationProfileListItem> { new("No 2D profile (Stage 2 prep)", null) }
+                : profileItems.ToList();
+            CalibrationProfileCombo.ItemsSource = items;
+            CalibrationProfileCombo.SelectedItem = items.FirstOrDefault(item => item.Profile?.Id == selectedId) ?? items[0];
+            _selectedCalibrationProfile = (CalibrationProfileCombo.SelectedItem as CalibrationProfileListItem)?.Profile;
         }
         finally
         {
@@ -966,7 +1035,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources
                 return;
             }
 
-            LoadNextBoard(runInspection: false);
+            await LoadNextBoardAsync(runInspection: false, cancellationToken);
             if (string.IsNullOrWhiteSpace(_currentImagePath))
             {
                 LogEvent("ROBOT CYCLE", "Cycle stopped because no simulated board image is available.");
@@ -1073,7 +1142,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources
             ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9AA6AF"))
             : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F27777"));
 
-        var latestAcceptance = _lastRobotAcceptanceRun ?? AoiDatabase.GetLatestRobotAcceptanceRun();
+        var latestAcceptance = _lastRobotAcceptanceRun;
         RobotAcceptanceStatusText.Text = latestAcceptance is null
             ? "Robot acceptance: not validated"
             : BuildRobotAcceptanceStatus(latestAcceptance);
@@ -1135,7 +1204,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources
             _ => "Not Connected",
         };
 
-    private IntegrationCommandResult SynchronizeLightingForSelectedView()
+    private async Task<IntegrationCommandResult> SynchronizeLightingForSelectedViewAsync(CancellationToken cancellationToken)
     {
         var settings = LightingSettingsService.Load();
         var controller = LightingControllerFactory.Create(settings);
@@ -1143,10 +1212,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources
 
         var view = SelectedView();
         var program = LightingCommandFormatter.ProgramForView(settings, view);
-        var result = LightingSynchronizationService
-            .SynchronizeAsync(controller, settings, view)
-            .GetAwaiter()
-            .GetResult();
+        var result = await LightingSynchronizationService.SynchronizeAsync(controller, settings, view, cancellationToken);
 
         _lastLightingResult = FormatLightingResult(controller, view, program, result);
         LightingSyncText.Text = _lastLightingResult;
@@ -1243,5 +1309,15 @@ public partial class MonitorView : UserControl, IReleasablePageResources
         bool IsSimulatedSource,
         string FrameMetadata);
 
-    private sealed record CalibrationProfileListItem(string DisplayName, CalibrationProfileRecord? Profile);
+    private sealed record CalibrationProfileListItem(string DisplayName, CalibrationProfileRecord? Profile)
+    {
+        public override string ToString() => DisplayName;
+    }
+
+    private sealed record MonitorRefreshSnapshot(
+        ImportedImage[] ImportedImages,
+        IReadOnlyList<CalibrationProfileListItem> CalibrationProfiles,
+        RobotAcceptanceRun? LatestRobotAcceptance,
+        string SamplePath,
+        bool SampleExists);
 }

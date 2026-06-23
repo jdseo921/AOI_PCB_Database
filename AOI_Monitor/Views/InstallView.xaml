@@ -12,7 +12,7 @@
       <!-- Runtime table -->
       <Border Grid.Column="0" Style="{StaticResource Panel}">
         <Grid>
-          <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <TextBlock Text="Prototype Runtime Notes" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
@@ -34,7 +34,7 @@
       <!-- GUI role -->
       <Border Grid.Column="2" Style="{StaticResource Panel}">
         <Grid>
-          <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <TextBlock Text="GUI Role" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
@@ -51,7 +51,7 @@
     <!-- Installation boundary -->
     <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
       <Grid>
-        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <TextBlock Text="Documentation Boundary" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
         </Border>

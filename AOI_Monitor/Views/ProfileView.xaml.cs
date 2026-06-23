@@ -30,6 +30,7 @@ public partial class ProfileView : UserControl, IReleasablePageResources
     public ProfileView()
     {
         InitializeComponent();
+        UpdateSourceEvidenceBadges();
     }
 
     private void OnLoadCsvClick(object sender, RoutedEventArgs e)
@@ -86,6 +87,7 @@ public partial class ProfileView : UserControl, IReleasablePageResources
         RefreshSelectionUi();
         DrawProfileLine();
         StatusText.Text = "Sample height-map loaded. Sample Data Mode only; 3D Camera Not Connected.";
+        UpdateSourceEvidenceBadges();
     }
 
     private void OnProfileSourceChanged(object sender, SelectionChangedEventArgs e)
@@ -93,14 +95,42 @@ public partial class ProfileView : UserControl, IReleasablePageResources
         if (!IsLoaded)
             return;
 
-        StatusText.Text = GetSelectedSourceMode() switch
+        var mode = GetSelectedSourceMode();
+        UpdateSourceEvidenceBadges();
+        StatusText.Text = mode switch
         {
             "Sample CSV" => string.IsNullOrWhiteSpace(_currentCsvPath)
                 ? "Sample CSV source selected. Load a height-map CSV before running 3D acceptance."
                 : "Sample CSV source selected. This is simulation/sample evidence only.",
-            "Generic 3D Adapter" => "Generic 3D Adapter selected. No vendor SDK is configured; this does not validate real 3D hardware.",
+            "Pilot Hardware Adapter" => "Pilot hardware adapter selected. No vendor SDK is configured; this does not validate real 3D hardware.",
             _ => "No 3D profile source selected.",
         };
+    }
+
+    private void UpdateSourceEvidenceBadges()
+    {
+        var mode = GetSelectedSourceMode();
+        switch (mode)
+        {
+            case "Sample CSV":
+                ProfileSourceBadge.Style = (Style)FindResource("HmiEvidenceSampleData");
+                ProfileSourceBadgeText.Text = string.IsNullOrWhiteSpace(_currentCsvPath) ? "Sample CSV" : "Sample CSV Loaded";
+                ProfileConnectionBadge.Style = (Style)FindResource("HmiEvidenceNotConnected");
+                ProfileConnectionBadgeText.Text = "Not Connected";
+                break;
+            case "Pilot Hardware Adapter":
+                ProfileSourceBadge.Style = (Style)FindResource("HmiEvidencePilot");
+                ProfileSourceBadgeText.Text = "Pilot Hardware";
+                ProfileConnectionBadge.Style = (Style)FindResource("HmiEvidenceNotValidated");
+                ProfileConnectionBadgeText.Text = "Not Validated";
+                break;
+            default:
+                ProfileSourceBadge.Style = (Style)FindResource("HmiEvidenceNotConnected");
+                ProfileSourceBadgeText.Text = "No Source";
+                ProfileConnectionBadge.Style = (Style)FindResource("HmiEvidenceNotConnected");
+                ProfileConnectionBadgeText.Text = "Not Connected";
+                break;
+        }
     }
 
     private async void OnRunAcceptanceClick(object sender, RoutedEventArgs e)
@@ -193,7 +223,7 @@ public partial class ProfileView : UserControl, IReleasablePageResources
         => GetSelectedSourceMode() switch
         {
             "Sample CSV" => new CsvProfile3DSource(_currentCsvPath),
-            "Generic 3D Adapter" => new GenericProfile3DAdapter(),
+            "Pilot Hardware Adapter" => new GenericProfile3DAdapter(),
             _ => new NullProfile3DSource(),
         };
 

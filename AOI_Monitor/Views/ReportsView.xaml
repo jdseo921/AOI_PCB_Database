@@ -14,19 +14,19 @@
 
     <Border Grid.Row="0" Style="{StaticResource Panel}">
       <Grid>
-        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <TextBlock Text="Log Filters" Style="{StaticResource HmiSectionHeaderText}"/>
         </Border>
         <ScrollViewer Grid.Row="1" Margin="8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="128">
           <WrapPanel>
-          <StackPanel Width="132" Margin="0,0,8,8">
+          <StackPanel Width="180" Margin="0,0,8,8">
             <TextBlock Text="From" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
-            <DatePicker x:Name="FromDatePicker"/>
+            <DatePicker x:Name="FromDatePicker" Style="{StaticResource HmiFieldDatePicker}"/>
           </StackPanel>
-          <StackPanel Width="132" Margin="0,0,8,8">
+          <StackPanel Width="180" Margin="0,0,8,8">
             <TextBlock Text="To" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
-            <DatePicker x:Name="ToDatePicker"/>
+            <DatePicker x:Name="ToDatePicker" Style="{StaticResource HmiFieldDatePicker}"/>
           </StackPanel>
           <StackPanel Width="170" Margin="0,0,8,8">
             <TextBlock Text="Model / Board" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
@@ -74,7 +74,7 @@
 
     <Border Grid.Row="2" Style="{StaticResource Panel}">
       <Grid>
-        <Grid.RowDefinitions><RowDefinition Height="25"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
             <TextBlock x:Name="LogSummaryText" DockPanel.Dock="Right" Text="No records loaded" Foreground="#9AA6AF" FontSize="14"/>
@@ -83,56 +83,56 @@
         </Border>
         <TabControl Grid.Row="1" Background="#151A1E" BorderBrush="#343D44">
           <TabItem Header="Inspection History">
-            <DataGrid x:Name="InspectionGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
+            <DataGrid x:Name="InspectionGrid" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="1160">
               <DataGrid.Columns>
-                <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
-                <DataGridTextColumn Header="Board" Binding="{Binding BoardProgram}" Width="110"/>
-                <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="90"/>
-                <DataGridTextColumn Header="Result" Binding="{Binding Verdict}" Width="70"/>
-                <DataGridTextColumn Header="Score" Binding="{Binding ScoreDisplay}" SortMemberPath="DifferenceScore" Width="65"/>
-                <DataGridTextColumn Header="Confidence" Binding="{Binding ConfidenceDisplay}" SortMemberPath="Confidence" Width="82"/>
-                <DataGridTextColumn Header="Engine" Binding="{Binding InspectionEngine}" Width="140"/>
-                <DataGridTextColumn Header="Defect" Binding="{Binding SuggestedDefect}" Width="150"/>
-                <DataGridTextColumn Header="Image" Binding="{Binding ImageName}" Width="*"/>
+                <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="CreatedAtUtc" Width="130" MinWidth="130"/>
+                <DataGridTextColumn Header="Board" Binding="{Binding BoardProgram}" Width="120" MinWidth="120"/>
+                <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="110" MinWidth="110"/>
+                <DataGridTextColumn Header="Result" Binding="{Binding Verdict}" Width="90" MinWidth="90"/>
+                <DataGridTextColumn Header="Score" Binding="{Binding ScoreDisplay}" SortMemberPath="DifferenceScore" Width="84" MinWidth="84"/>
+                <DataGridTextColumn Header="Confidence" Binding="{Binding ConfidenceDisplay}" SortMemberPath="Confidence" Width="110" MinWidth="110"/>
+                <DataGridTextColumn Header="Engine" Binding="{Binding InspectionEngine}" Width="170" MinWidth="170"/>
+                <DataGridTextColumn Header="Defect" Binding="{Binding SuggestedDefect}" Width="160" MinWidth="160"/>
+                <DataGridTextColumn Header="Image" Binding="{Binding ImageName}" Width="280" MinWidth="280"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
-          <TabItem Header="Review / Disposition Events">
-            <DataGrid x:Name="ReviewGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
+          <TabItem Header="Review / Disposition Events" ToolTip="Operator review and disposition events">
+            <DataGrid x:Name="ReviewGrid" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="780">
               <DataGrid.Columns>
-                <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="EventTimeUtc" Width="125"/>
-                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="105"/>
-                <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="90"/>
-                <DataGridTextColumn Header="Disposition" Binding="{Binding Disposition}" Width="110"/>
-                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="EventTimeUtc" Width="130" MinWidth="130"/>
+                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="120" MinWidth="120"/>
+                <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="110" MinWidth="110"/>
+                <DataGridTextColumn Header="Disposition" Binding="{Binding Disposition}" Width="130" MinWidth="130"/>
+                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="290" MinWidth="290"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
           <TabItem Header="Export History">
-            <DataGrid x:Name="ExportGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="Export file paths are available through row/cell hover when truncated.">
+            <DataGrid x:Name="ExportGrid" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="1140" ToolTip="Export file paths are available through row/cell hover when truncated.">
               <DataGrid.Columns>
-                <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
-                <DataGridTextColumn Header="Type" Binding="{Binding ExportType}" Width="160"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="70"/>
-                <DataGridTextColumn Header="Verify" Binding="{Binding VerificationStatus}" Width="70"/>
-                <DataGridTextColumn Header="SHA-256" Binding="{Binding VerificationShaDisplay}" Width="100"/>
-                <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="130"/>
-                <DataGridTextColumn Header="Audit ID" Binding="{Binding AuditEventDisplay}" Width="80"/>
-                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*"/>
+                <DataGridTextColumn Header="Time" Binding="{Binding TimestampLocal}" SortMemberPath="CreatedAtUtc" Width="130" MinWidth="130"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding ExportType}" Width="160" MinWidth="160"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="96" MinWidth="96"/>
+                <DataGridTextColumn Header="Verified" Binding="{Binding VerificationStatus}" Width="110" MinWidth="110"/>
+                <DataGridTextColumn Header="SHA-256" Binding="{Binding VerificationShaDisplay}" Width="124" MinWidth="124"/>
+                <DataGridTextColumn Header="Operator" Binding="{Binding OperatorId}" Width="130" MinWidth="130"/>
+                <DataGridTextColumn Header="Audit ID" Binding="{Binding AuditEventDisplay}" Width="100" MinWidth="100"/>
+                <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="290" MinWidth="290"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
           <TabItem Header="Audit Trail">
-            <DataGrid x:Name="AuditGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="Traceability means the audit path from user, board, result, export, and upload event.">
+            <DataGrid x:Name="AuditGrid" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="1160" ToolTip="Traceability means the audit path from user, board, result, export, and upload event.">
               <DataGrid.Columns>
-                <DataGridTextColumn Header="UTC Time" Binding="{Binding TimestampUtcDisplay}" SortMemberPath="TimestampUtc" Width="140"/>
-                <DataGridTextColumn Header="Local Time" Binding="{Binding LocalTimestampDisplay}" Width="140"/>
-                <DataGridTextColumn Header="User" Binding="{Binding UserId}" Width="105"/>
-                <DataGridTextColumn Header="Role" Binding="{Binding UserRole}" Width="80"/>
-                <DataGridTextColumn Header="Station" Binding="{Binding StationId}" Width="95"/>
-                <DataGridTextColumn Header="Action" Binding="{Binding ActionCategory}" Width="140"/>
-                <DataGridTextColumn Header="Related ID" Binding="{Binding RelatedEntityDisplay}" Width="145"/>
-                <DataGridTextColumn Header="Detail" Binding="{Binding ActionDetail}" Width="*"/>
+                <DataGridTextColumn Header="UTC Time" Binding="{Binding TimestampUtcDisplay}" SortMemberPath="TimestampUtc" Width="145" MinWidth="145"/>
+                <DataGridTextColumn Header="Local Time" Binding="{Binding LocalTimestampDisplay}" Width="145" MinWidth="145"/>
+                <DataGridTextColumn Header="User" Binding="{Binding UserId}" Width="120" MinWidth="120"/>
+                <DataGridTextColumn Header="Role" Binding="{Binding UserRole}" Width="90" MinWidth="90"/>
+                <DataGridTextColumn Header="Station" Binding="{Binding StationId}" Width="120" MinWidth="120"/>
+                <DataGridTextColumn Header="Action" Binding="{Binding ActionCategory}" Width="150" MinWidth="150"/>
+                <DataGridTextColumn Header="Related ID" Binding="{Binding RelatedEntityDisplay}" Width="150" MinWidth="150"/>
+                <DataGridTextColumn Header="Detail" Binding="{Binding ActionDetail}" Width="240" MinWidth="240"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -148,32 +148,32 @@
                   <ComboBoxItem Content="Abandoned"/>
                 </ComboBox>
               </StackPanel>
-              <DataGrid x:Name="MesSpoolGrid" CanUserSortColumns="True" SelectionMode="Extended" Style="{StaticResource HmiTable}" ToolTip="Endpoint and last-error text may be long; hover the row/cell to inspect the full value.">
+              <DataGrid x:Name="MesSpoolGrid" CanUserSortColumns="True" SelectionMode="Extended" Style="{StaticResource HmiDenseTable}" MinWidth="1120" ToolTip="Endpoint and last-error text may be long; hover the row/cell to inspect the full value.">
                 <DataGrid.Columns>
-                  <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
-                  <DataGridTextColumn Header="Type" Binding="{Binding PayloadType}" Width="135"/>
-                  <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100"/>
-                  <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
-                  <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="70"/>
-                  <DataGridTextColumn Header="Endpoint" Binding="{Binding EndpointUrl}" Width="150"/>
-                  <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="75"/>
-                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
-                  <DataGridTextColumn Header="Last Error" Binding="{Binding LastError}" Width="*"/>
+                  <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="130" MinWidth="130"/>
+                  <DataGridTextColumn Header="Type" Binding="{Binding PayloadType}" Width="140" MinWidth="140"/>
+                  <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="105" MinWidth="105"/>
+                  <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="115" MinWidth="115"/>
+                  <DataGridTextColumn Header="Result" Binding="{Binding Result}" Width="90" MinWidth="90"/>
+                  <DataGridTextColumn Header="Endpoint" Binding="{Binding EndpointUrl}" Width="190" MinWidth="190"/>
+                  <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="90" MinWidth="90"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="96" MinWidth="96"/>
+                  <DataGridTextColumn Header="Last Error" Binding="{Binding LastError}" Width="260" MinWidth="260"/>
                 </DataGrid.Columns>
               </DataGrid>
             </DockPanel>
           </TabItem>
           <TabItem Header="Central Evidence Sync" ToolTip="Central Sync copies selected evidence to a configured folder or service. It does not approve factory readiness by itself.">
-            <DataGrid x:Name="CentralSyncGrid" CanUserSortColumns="True" SelectionMode="Extended" Style="{StaticResource HmiTable}" ToolTip="Endpoint/folder summaries are intentionally compact; hover to inspect the full path or endpoint.">
+            <DataGrid x:Name="CentralSyncGrid" CanUserSortColumns="True" SelectionMode="Extended" Style="{StaticResource HmiDenseTable}" MinWidth="1080" ToolTip="Endpoint/folder summaries are intentionally compact; hover to inspect the full path or endpoint.">
               <DataGrid.Columns>
-                <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
-                <DataGridTextColumn Header="Item Type" Binding="{Binding ItemType}" Width="145"/>
-                <DataGridTextColumn Header="Item ID" Binding="{Binding ItemId}" Width="85"/>
-                <DataGridTextColumn Header="Station" Binding="{Binding StationId}" Width="115"/>
-                <DataGridTextColumn Header="Endpoint/Folder" Binding="{Binding EndpointOrFolder}" Width="150"/>
-                <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="75"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
-                <DataGridTextColumn Header="Last Error" Binding="{Binding LastError}" Width="*"/>
+                <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="130" MinWidth="130"/>
+                <DataGridTextColumn Header="Item Type" Binding="{Binding ItemType}" Width="145" MinWidth="145"/>
+                <DataGridTextColumn Header="Item ID" Binding="{Binding ItemId}" Width="100" MinWidth="100"/>
+                <DataGridTextColumn Header="Station" Binding="{Binding StationId}" Width="120" MinWidth="120"/>
+                <DataGridTextColumn Header="Endpoint" Binding="{Binding EndpointOrFolder}" Width="220" MinWidth="220"/>
+                <DataGridTextColumn Header="Retries" Binding="{Binding RetryDisplay}" Width="90" MinWidth="90"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="96" MinWidth="96"/>
+                <DataGridTextColumn Header="Last Error" Binding="{Binding LastError}" Width="240" MinWidth="240"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -203,23 +203,23 @@
                 <Button Style="{StaticResource ActionBtn}" Content="Export Issue Report" Click="OnExportPilotIssueReportClick"/>
                 <TextBlock x:Name="PilotIssueSummaryText" Text="Pilot issues not loaded." Foreground="#DCE5EB" VerticalAlignment="Center" Margin="12,0,0,0"/>
               </WrapPanel>
-              <DataGrid x:Name="PilotIssuesGrid" Grid.Row="1" CanUserSortColumns="True" SelectionMode="Single" Style="{StaticResource HmiTable}" ToolTip="Use this list to close manual test findings before a client demo. False Call means a good board was marked defect. Possible Escape means a real defect may have been missed.">
+              <DataGrid x:Name="PilotIssuesGrid" Grid.Row="1" CanUserSortColumns="True" SelectionMode="Single" Style="{StaticResource HmiDenseTable}" MinWidth="1900" ToolTip="Use this list to close manual test findings before a client demo. False Call means a good board was marked defect. Possible Escape means a real defect may have been missed.">
                 <DataGrid.Columns>
-                  <DataGridTextColumn Header="ID" Binding="{Binding IssueId}" Width="135"/>
-                  <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="125"/>
-                  <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="115"/>
-                  <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="80"/>
-                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
-                  <DataGridTextColumn Header="Page" Binding="{Binding PageName}" Width="135"/>
-                  <DataGridTextColumn Header="Steps" Binding="{Binding ReproductionSteps}" Width="190"/>
-                  <DataGridTextColumn Header="Expected" Binding="{Binding ExpectedBehavior}" Width="180"/>
-                  <DataGridTextColumn Header="Actual" Binding="{Binding ActualBehavior}" Width="180"/>
-                  <DataGridTextColumn Header="Evidence" Binding="{Binding ScreenshotPath}" Width="160"/>
-                  <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
-                  <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="95"/>
-                  <DataGridTextColumn Header="Inspection" Binding="{Binding RelatedInspectionId}" Width="90"/>
-                  <DataGridTextColumn Header="Owner" Binding="{Binding Owner}" Width="110"/>
-                  <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*"/>
+                  <DataGridTextColumn Header="ID" Binding="{Binding IssueId}" Width="140" MinWidth="140"/>
+                  <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" SortMemberPath="CreatedAtUtc" Width="130" MinWidth="130"/>
+                  <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="125" MinWidth="125"/>
+                  <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="110" MinWidth="110"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="110" MinWidth="110"/>
+                  <DataGridTextColumn Header="Page" Binding="{Binding PageName}" Width="140" MinWidth="140"/>
+                  <DataGridTextColumn Header="Steps" Binding="{Binding ReproductionSteps}" Width="210" MinWidth="210"/>
+                  <DataGridTextColumn Header="Expected" Binding="{Binding ExpectedBehavior}" Width="190" MinWidth="190"/>
+                  <DataGridTextColumn Header="Actual" Binding="{Binding ActualBehavior}" Width="190" MinWidth="190"/>
+                  <DataGridTextColumn Header="Evidence" Binding="{Binding ScreenshotPath}" Width="200" MinWidth="200"/>
+                  <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="115" MinWidth="115"/>
+                  <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100" MinWidth="100"/>
+                  <DataGridTextColumn Header="Inspection" Binding="{Binding RelatedInspectionId}" Width="110" MinWidth="110"/>
+                  <DataGridTextColumn Header="Owner" Binding="{Binding Owner}" Width="120" MinWidth="120"/>
+                  <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="220" MinWidth="220"/>
                 </DataGrid.Columns>
               </DataGrid>
             </Grid>
@@ -245,16 +245,16 @@
               <TextBlock Grid.Row="1" x:Name="UiStabilityStatsText"
                          Text="UI stability not run. Use 30-minute or better PASS evidence before client demo export."
                          Foreground="#DCE5EB" FontSize="14" TextWrapping="Wrap" Margin="0,0,0,8"/>
-              <DataGrid Grid.Row="2" x:Name="UiStabilityEventsGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
+              <DataGrid Grid.Row="2" x:Name="UiStabilityEventsGrid" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="980">
                 <DataGrid.Columns>
-                  <DataGridTextColumn Header="UTC" Binding="{Binding TimestampUtc}" Width="145"/>
-                  <DataGridTextColumn Header="Cycle" Binding="{Binding Cycle}" Width="65"/>
-                  <DataGridTextColumn Header="Page" Binding="{Binding PageName}" Width="170"/>
-                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="75"/>
-                  <DataGridTextColumn Header="Load ms" Binding="{Binding PageLoadMilliseconds}" Width="85"/>
-                  <DataGridTextColumn Header="Heartbeat ms" Binding="{Binding HeartbeatMilliseconds}" Width="105"/>
-                  <DataGridTextColumn Header="Memory MB" Binding="{Binding WorkingSetMegabytes}" Width="95"/>
-                  <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                  <DataGridTextColumn Header="UTC" Binding="{Binding TimestampUtc}" Width="150" MinWidth="150"/>
+                  <DataGridTextColumn Header="Cycle" Binding="{Binding Cycle}" Width="80" MinWidth="80"/>
+                  <DataGridTextColumn Header="Page" Binding="{Binding PageName}" Width="180" MinWidth="180"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="96" MinWidth="96"/>
+                  <DataGridTextColumn Header="Load ms" Binding="{Binding PageLoadMilliseconds}" Width="100" MinWidth="100"/>
+                  <DataGridTextColumn Header="Heartbeat" Binding="{Binding HeartbeatMilliseconds}" Width="110" MinWidth="110"/>
+                  <DataGridTextColumn Header="Memory MB" Binding="{Binding WorkingSetMegabytes}" Width="110" MinWidth="110"/>
+                  <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="240" MinWidth="240"/>
                 </DataGrid.Columns>
               </DataGrid>
             </Grid>
@@ -311,55 +311,55 @@
                   <RowDefinition Height="8"/>
                   <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <DataGrid x:Name="ManagementDefectGrid" Grid.Row="0" Grid.Column="0" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="False calls are OK boards flagged for review or NG. Escapes are known NG boards that may be missed.">
+                <DataGrid x:Name="ManagementDefectGrid" Grid.Row="0" Grid.Column="0" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="560" ToolTip="False calls are OK boards flagged for review or NG. Escapes are known NG boards that may be missed.">
                   <DataGrid.Columns>
-                    <DataGridTextColumn Header="Defect Class" Binding="{Binding Name}" Width="*"/>
-                    <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="70"/>
-                    <DataGridTextColumn Header="False Calls" Binding="{Binding FalseCalls}" Width="90"/>
-                    <DataGridTextColumn Header="Escapes" Binding="{Binding PossibleEscapes}" Width="80"/>
-                    <DataGridTextColumn Header="Reviews" Binding="{Binding Reviews}" Width="80"/>
+                    <DataGridTextColumn Header="Defect Class" Binding="{Binding Name}" Width="170" MinWidth="170"/>
+                    <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="86" MinWidth="86"/>
+                    <DataGridTextColumn Header="False Calls" Binding="{Binding FalseCalls}" Width="112" MinWidth="112"/>
+                    <DataGridTextColumn Header="Escapes" Binding="{Binding PossibleEscapes}" Width="96" MinWidth="96"/>
+                    <DataGridTextColumn Header="Reviews" Binding="{Binding Reviews}" Width="96" MinWidth="96"/>
                   </DataGrid.Columns>
                 </DataGrid>
-                <DataGrid x:Name="ManagementRoiGrid" Grid.Row="0" Grid.Column="2" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="ROI means region of interest: the board image area checked for a defect.">
+                <DataGrid x:Name="ManagementRoiGrid" Grid.Row="0" Grid.Column="2" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="560" ToolTip="ROI means region of interest: the board image area checked for a defect.">
                   <DataGrid.Columns>
-                    <DataGridTextColumn Header="ROI / RefDes" Binding="{Binding Name}" Width="*"/>
-                    <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="70"/>
-                    <DataGridTextColumn Header="False Calls" Binding="{Binding FalseCalls}" Width="90"/>
-                    <DataGridTextColumn Header="Escapes" Binding="{Binding PossibleEscapes}" Width="80"/>
-                    <DataGridTextColumn Header="Reviews" Binding="{Binding Reviews}" Width="80"/>
+                    <DataGridTextColumn Header="ROI / RefDes" Binding="{Binding Name}" Width="170" MinWidth="170"/>
+                    <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="86" MinWidth="86"/>
+                    <DataGridTextColumn Header="False Calls" Binding="{Binding FalseCalls}" Width="112" MinWidth="112"/>
+                    <DataGridTextColumn Header="Escapes" Binding="{Binding PossibleEscapes}" Width="96" MinWidth="96"/>
+                    <DataGridTextColumn Header="Reviews" Binding="{Binding Reviews}" Width="96" MinWidth="96"/>
                   </DataGrid.Columns>
                 </DataGrid>
-                <DataGrid x:Name="ManagementModelTrendGrid" Grid.Row="2" Grid.Column="0" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
+                <DataGrid x:Name="ManagementModelTrendGrid" Grid.Row="2" Grid.Column="0" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="590">
                   <DataGrid.Columns>
-                    <DataGridTextColumn Header="Model Version" Binding="{Binding ModelVersion}" Width="*"/>
-                    <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="70"/>
-                    <DataGridTextColumn Header="OK" Binding="{Binding Ok}" Width="60"/>
-                    <DataGridTextColumn Header="NG" Binding="{Binding Ng}" Width="60"/>
-                    <DataGridTextColumn Header="Review" Binding="{Binding Review}" Width="70"/>
-                    <DataGridTextColumn Header="Avg ms" Binding="{Binding AverageInspectionTimeMs}" Width="80"/>
+                    <DataGridTextColumn Header="Model" Binding="{Binding ModelVersion}" Width="170" MinWidth="170"/>
+                    <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="80" MinWidth="80"/>
+                    <DataGridTextColumn Header="OK" Binding="{Binding Ok}" Width="72" MinWidth="72"/>
+                    <DataGridTextColumn Header="NG" Binding="{Binding Ng}" Width="72" MinWidth="72"/>
+                    <DataGridTextColumn Header="Review" Binding="{Binding Review}" Width="90" MinWidth="90"/>
+                    <DataGridTextColumn Header="Avg ms" Binding="{Binding AverageInspectionTimeMs}" Width="90" MinWidth="90"/>
                   </DataGrid.Columns>
                 </DataGrid>
-                <DataGrid x:Name="ManagementLotModelGrid" Grid.Row="2" Grid.Column="2" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="False-call rate and possible escapes are review signals, not automatic production release decisions.">
+                <DataGrid x:Name="ManagementLotModelGrid" Grid.Row="2" Grid.Column="2" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="780" ToolTip="False-call rate and possible escapes are review signals, not automatic production release decisions.">
                   <DataGrid.Columns>
-                    <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="95"/>
-                    <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="105"/>
-                    <DataGridTextColumn Header="Model" Binding="{Binding ModelVersion}" Width="*"/>
-                    <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="65"/>
-                    <DataGridTextColumn Header="False Calls" Binding="{Binding FalseCalls}" Width="90"/>
-                    <DataGridTextColumn Header="Escapes" Binding="{Binding PossibleEscapes}" Width="80"/>
-                    <DataGridTextColumn Header="False-call Rate" Binding="{Binding FalseCallRate}" Width="105"/>
+                    <DataGridTextColumn Header="Lot" Binding="{Binding LotId}" Width="100" MinWidth="100"/>
+                    <DataGridTextColumn Header="Board" Binding="{Binding BoardModel}" Width="115" MinWidth="115"/>
+                    <DataGridTextColumn Header="Model" Binding="{Binding ModelVersion}" Width="160" MinWidth="160"/>
+                    <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="80" MinWidth="80"/>
+                    <DataGridTextColumn Header="False Calls" Binding="{Binding FalseCalls}" Width="112" MinWidth="112"/>
+                    <DataGridTextColumn Header="Escapes" Binding="{Binding PossibleEscapes}" Width="96" MinWidth="96"/>
+                    <DataGridTextColumn Header="False-call Rate" Binding="{Binding FalseCallRate}" Width="120" MinWidth="120"/>
                   </DataGrid.Columns>
                 </DataGrid>
               </Grid>
             </Grid>
           </TabItem>
           <TabItem Header="Factory Readiness" ToolTip="Shows what evidence is present, what is missing, and why it matters. Acceptance rows are evidence checks, not final certification.">
-            <DataGrid x:Name="FactoryReadinessGrid" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
+            <DataGrid x:Name="FactoryReadinessGrid" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="900">
               <DataGrid.Columns>
-                <DataGridTextColumn Header="Category" Binding="{Binding Name}" Width="180"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="95"/>
-                <DataGridTextColumn Header="Evidence" Binding="{Binding Evidence}" Width="*"/>
-                <DataGridTextColumn Header="Next Action" Binding="{Binding NextAction}" Width="240"/>
+                <DataGridTextColumn Header="Category" Binding="{Binding Name}" Width="190" MinWidth="190"/>
+                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="110" MinWidth="110"/>
+                <DataGridTextColumn Header="Evidence" Binding="{Binding Evidence}" Width="330" MinWidth="330"/>
+                <DataGridTextColumn Header="Next Action" Binding="{Binding NextAction}" Width="270" MinWidth="270"/>
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
@@ -382,16 +382,16 @@
                            VerticalAlignment="Center"
                            Margin="0,0,12,0"/>
               </DockPanel>
-              <DataGrid x:Name="StandardsTraceabilityGrid" Grid.Row="1" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="Long evidence paths and notes are available through hover when truncated.">
+              <DataGrid x:Name="StandardsTraceabilityGrid" Grid.Row="1" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="1500" ToolTip="Long evidence paths and notes are available through hover when truncated.">
                 <DataGrid.Columns>
-                  <DataGridTextColumn Header="Source" Binding="{Binding StandardOrSource}" Width="170"/>
-                  <DataGridTextColumn Header="Requirement / Principle" Binding="{Binding PrincipleOrRequirement}" Width="260"/>
-                  <DataGridTextColumn Header="ID" Binding="{Binding ProjectRequirementId}" Width="95"/>
-                  <DataGridTextColumn Header="Evidence Type" Binding="{Binding EvidenceType}" Width="155"/>
-                  <DataGridTextColumn Header="Evidence Path" Binding="{Binding EvidencePath}" Width="240"/>
-                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="105"/>
-                  <DataGridTextColumn Header="Blocking" Binding="{Binding BlockingLevel}" Width="115"/>
-                  <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*"/>
+                  <DataGridTextColumn Header="Source" Binding="{Binding StandardOrSource}" Width="180" MinWidth="180"/>
+                  <DataGridTextColumn Header="Requirement" Binding="{Binding PrincipleOrRequirement}" Width="300" MinWidth="300"/>
+                  <DataGridTextColumn Header="ID" Binding="{Binding ProjectRequirementId}" Width="110" MinWidth="110"/>
+                  <DataGridTextColumn Header="Evidence Type" Binding="{Binding EvidenceType}" Width="170" MinWidth="170"/>
+                  <DataGridTextColumn Header="Evidence Path" Binding="{Binding EvidencePath}" Width="280" MinWidth="280"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="120" MinWidth="120"/>
+                  <DataGridTextColumn Header="Blocking" Binding="{Binding BlockingLevel}" Width="130" MinWidth="130"/>
+                  <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="310" MinWidth="310"/>
                 </DataGrid.Columns>
               </DataGrid>
             </Grid>
@@ -406,13 +406,13 @@
                 <Button Style="{StaticResource ActionBtnBlue}" Content="Refresh Evidence List" Click="OnRefreshCompletionMatrixClick"/>
                 <TextBlock x:Name="CompletionMatrixSummaryText" Text="Evidence list not loaded." Foreground="#DCE5EB" FontSize="14" VerticalAlignment="Center" TextWrapping="Wrap" Margin="12,0,0,0"/>
               </StackPanel>
-              <DataGrid x:Name="CompletionMatrixGrid" Grid.Row="1" CanUserSortColumns="True" Style="{StaticResource HmiTable}">
+              <DataGrid x:Name="CompletionMatrixGrid" Grid.Row="1" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="1360">
                 <DataGrid.Columns>
-                  <DataGridTextColumn Header="Stage" Binding="{Binding Stage}" Width="210"/>
-                  <DataGridTextColumn Header="Complete" Binding="{Binding PercentDisplay}" Width="90"/>
-                  <DataGridTextColumn Header="Evidence Score" Binding="{Binding EvidenceSummary}" Width="300"/>
-                  <DataGridTextColumn Header="What Is Missing" Binding="{Binding MissingEvidenceDisplay}" Width="*"/>
-                  <DataGridTextColumn Header="What To Do Next" Binding="{Binding NextActionsDisplay}" Width="320"/>
+                  <DataGridTextColumn Header="Stage" Binding="{Binding Stage}" Width="220" MinWidth="220"/>
+                  <DataGridTextColumn Header="Complete" Binding="{Binding PercentDisplay}" Width="110" MinWidth="110"/>
+                  <DataGridTextColumn Header="Evidence Score" Binding="{Binding EvidenceSummary}" Width="310" MinWidth="310"/>
+                  <DataGridTextColumn Header="Missing" Binding="{Binding MissingEvidenceDisplay}" Width="360" MinWidth="360"/>
+                  <DataGridTextColumn Header="Next Action" Binding="{Binding NextActionsDisplay}" Width="360" MinWidth="360"/>
                 </DataGrid.Columns>
               </DataGrid>
             </Grid>
@@ -429,16 +429,16 @@
                 <Button Style="{StaticResource ActionBtnBlue}" Content="Generate Checklist" Margin="8,0,0,0" Click="OnGenerateFactoryAcceptanceChecklistClick"/>
                 <Button Style="{StaticResource ActionBtnAmber}" Content="Export FAT Package" Margin="8,0,0,0" Click="OnExportFactoryAcceptanceChecklistClick"/>
               </StackPanel>
-              <DataGrid x:Name="FactoryAcceptanceGrid" Grid.Row="1" CanUserSortColumns="True" Style="{StaticResource HmiTable}" ToolTip="Evidence paths and notes may be long; hover cells to inspect full values.">
+              <DataGrid x:Name="FactoryAcceptanceGrid" Grid.Row="1" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="1480" ToolTip="Evidence paths and notes may be long; hover cells to inspect full values.">
                 <DataGrid.Columns>
-                  <DataGridTextColumn Header="ID" Binding="{Binding RequirementId}" Width="95"/>
-                  <DataGridTextColumn Header="Requirement" Binding="{Binding RequirementText}" Width="220"/>
-                  <DataGridTextColumn Header="Required Evidence" Binding="{Binding RequiredEvidence}" Width="240"/>
-                  <DataGridTextColumn Header="Evidence Path" Binding="{Binding CurrentEvidencePath}" Width="190"/>
-                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="105"/>
-                  <DataGridTextColumn Header="Signoff Role" Binding="{Binding SignoffRole}" Width="105"/>
-                  <DataGridTextColumn Header="Signed By" Binding="{Binding SignedBy}" Width="105"/>
-                  <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*"/>
+                  <DataGridTextColumn Header="ID" Binding="{Binding RequirementId}" Width="110" MinWidth="110"/>
+                  <DataGridTextColumn Header="Requirement" Binding="{Binding RequirementText}" Width="260" MinWidth="260"/>
+                  <DataGridTextColumn Header="Required Evidence" Binding="{Binding RequiredEvidence}" Width="270" MinWidth="270"/>
+                  <DataGridTextColumn Header="Evidence Path" Binding="{Binding CurrentEvidencePath}" Width="260" MinWidth="260"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="120" MinWidth="120"/>
+                  <DataGridTextColumn Header="Signoff Role" Binding="{Binding SignoffRole}" Width="130" MinWidth="130"/>
+                  <DataGridTextColumn Header="Signed By" Binding="{Binding SignedBy}" Width="120" MinWidth="120"/>
+                  <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="310" MinWidth="310"/>
                 </DataGrid.Columns>
               </DataGrid>
             </Grid>

@@ -12,7 +12,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class LibraryView : UserControl
+public partial class LibraryView : UserControl, IAsyncNavigationPage
 {
     private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -46,13 +46,18 @@ public partial class LibraryView : UserControl
     {
         InitializeComponent();
         SchemaGrid.ItemsSource = SchemaRows;
-        LoadRecordsFromDatabase();
     }
 
-    public void RefreshFromState()
+    public Task OnNavigatedToAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
+
+    public async Task RefreshAsync(CancellationToken cancellationToken)
+        => await LoadRecordsFromDatabaseAsync(null, cancellationToken);
+
+    public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);
+
+    public void CancelWork()
     {
-        LoadRecordsFromDatabase();
-        SchemaGrid.Items.Refresh();
+        _importCts?.Cancel();
     }
 
     public void ExportSelectedRecord()
@@ -60,7 +65,7 @@ public partial class LibraryView : UserControl
         OnExportSelectedClick(this, new RoutedEventArgs());
     }
 
-    private void OnOpenRecordClick(object sender, RoutedEventArgs e)
+    private async void OnOpenRecordClick(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
         {
@@ -70,8 +75,19 @@ public partial class LibraryView : UserControl
 
         if (dialog.ShowDialog() != true) return;
 
-        var result = ImportOne(dialog.FileName, "sample");
-        LoadRecordsFromDatabase(result.Image?.Id);
+        ImageImportResult result;
+        try
+        {
+            result = await Task.Run(() => ImportOne(dialog.FileName, "sample"));
+            await LoadRecordsFromDatabaseAsync(result.Image?.Id, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            ImportStatusText.Text = "Single image import failed. The app is still usable.";
+            WorkflowState.Instance.AddEvent("IMPORT_ERROR", $"Single image import failed: {ex.Message}");
+            MessageBox.Show($"Single image import failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
         if (result.Image is { } image && File.Exists(image.VaultPath))
         {
@@ -107,7 +123,7 @@ public partial class LibraryView : UserControl
         {
             var results = await Task.Run(() => ImportFolder(dialog.FolderName, cts.Token, progress).ToArray(), cts.Token);
             var newestId = results.FirstOrDefault(r => r.Imported)?.Image?.Id;
-            LoadRecordsFromDatabase(newestId);
+            await LoadRecordsFromDatabaseAsync(newestId, cts.Token);
             ShowImportStatus(results, $"Batch import from {dialog.FolderName}");
             LogImportIssues(results);
         }
@@ -287,38 +303,46 @@ public partial class LibraryView : UserControl
             : $"Selected {record.Sample}, but the vaulted image file is missing.";
     }
 
-    private void LoadRecordsFromDatabase(long? selectedImageId = null)
+    private async Task LoadRecordsFromDatabaseAsync(long? selectedImageId, CancellationToken cancellationToken)
     {
-        var images = AoiDatabase.GetImportedImages();
-        var records = images.Select(ToLibraryRecord).ToArray();
-        var mode = OperatingModeSettingsService.Load();
-        var showDemoRows = OperatingModePolicyService.ShouldShowDemoRows(records.Length, mode);
+        var snapshot = await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var images = AoiDatabase.GetImportedImages();
+            var records = images.Select(ToLibraryRecord).ToArray();
+            var mode = OperatingModeSettingsService.Load();
+            var showDemoRows = OperatingModePolicyService.ShouldShowDemoRows(records.Length, mode);
+            return new LibraryRecordsSnapshot(records, mode, showDemoRows);
+        }, cancellationToken);
 
-        RecordsGrid.ItemsSource = records.Length > 0 ? records : showDemoRows ? DemoRecords : Array.Empty<ImageLibraryRecord>();
-        RecordsSourceText.Text = records.Length > 0
+        RecordsGrid.ItemsSource = snapshot.Records.Length > 0 ? snapshot.Records : snapshot.ShowDemoRows ? DemoRecords : Array.Empty<ImageLibraryRecord>();
+        RecordsSourceText.Text = snapshot.Records.Length > 0
             ? "SQLite Records"
-            : showDemoRows
+            : snapshot.ShowDemoRows
                 ? "Demo Data"
-                : $"{mode} Mode: Demo Hidden";
-        var statusColor = records.Length > 0 ? "#C6FFD0" : showDemoRows ? "#FFE0A7" : "#FFBFC1";
-        var backgroundColor = records.Length > 0 ? "#14311D" : showDemoRows ? "#372914" : "#35191B";
-        var borderColor = records.Length > 0 ? "#377849" : showDemoRows ? "#8C6C35" : "#9A393E";
+                : $"{snapshot.Mode} Mode: Demo Hidden";
+        var statusColor = snapshot.Records.Length > 0 ? "#C6FFD0" : snapshot.ShowDemoRows ? "#FFE0A7" : "#FFBFC1";
+        var backgroundColor = snapshot.Records.Length > 0 ? "#14311D" : snapshot.ShowDemoRows ? "#372914" : "#35191B";
+        var borderColor = snapshot.Records.Length > 0 ? "#377849" : snapshot.ShowDemoRows ? "#8C6C35" : "#9A393E";
         RecordsSourceText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(statusColor));
         RecordsSourceChip.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(backgroundColor));
         RecordsSourceChip.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(borderColor));
 
         if (selectedImageId is not null)
-            RecordsGrid.SelectedItem = records.FirstOrDefault(r => r.ImageLink == selectedImageId.Value.ToString());
+            RecordsGrid.SelectedItem = snapshot.Records.FirstOrDefault(r => r.ImageLink == selectedImageId.Value.ToString());
 
         if (RecordsGrid.SelectedIndex < 0 && RecordsGrid.Items.Count > 0)
             RecordsGrid.SelectedIndex = 0;
 
-        ImportStatusText.Text = records.Length > 0
-            ? $"{records.Length} imported image record(s) loaded from SQLite."
-            : showDemoRows
-                ? "No imported images yet. Showing demo records until the SQLite image table has data."
-                : $"{mode} Mode hides demo rows. Import or select a customer dataset before pilot/production review.";
+        SchemaGrid.Items.Refresh();
+        ImportStatusText.Text = snapshot.Records.Length > 0
+            ? $"{snapshot.Records.Length} imported image record(s) loaded from SQLite."
+            : snapshot.ShowDemoRows
+                ? "No imported images yet. Use Batch Import to add PNG/JPG board images; demo rows remain visible until SQLite has customer records."
+                : $"{snapshot.Mode} Mode hides demo rows. Use Batch Import or select a customer dataset before pilot/production review.";
     }
+
+    private sealed record LibraryRecordsSnapshot(ImageLibraryRecord[] Records, OperatingMode Mode, bool ShowDemoRows);
 
     private static ImageLibraryRecord ToLibraryRecord(ImportedImage image)
     {

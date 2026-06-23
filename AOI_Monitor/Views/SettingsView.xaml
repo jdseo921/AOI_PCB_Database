@@ -48,7 +48,7 @@
       <Setter Property="Background" Value="{DynamicResource CellBg}"/>
     </Style>
 
-    <Style x:Key="SettingsPasswordBox" TargetType="PasswordBox">
+    <Style x:Key="SettingsPasswordBox" TargetType="PasswordBox" BasedOn="{StaticResource {x:Type PasswordBox}}">
       <Setter Property="Background" Value="{DynamicResource CellBg}"/>
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
@@ -70,9 +70,10 @@
         <Setter.Value>
           <DataTemplate>
             <TextBlock Text="{Binding}"
-                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                       Foreground="{DynamicResource TextBrush}"
                        TextWrapping="NoWrap"
-                       TextTrimming="None"
+                       TextTrimming="CharacterEllipsis"
+                       ToolTip="{Binding}"
                        MinHeight="20"
                        VerticalAlignment="Center"/>
           </DataTemplate>
@@ -145,7 +146,7 @@
       </Grid>
     </Border>
 
-    <TabControl x:Name="SettingsCategoryTabs" Grid.Row="2">
+    <TabControl x:Name="SettingsCategoryTabs" Grid.Row="2" Background="{DynamicResource Bg}" BorderBrush="{DynamicResource LineBrush}">
       <TabItem Header="Basics">
         <ScrollViewer Style="{StaticResource FactoryScrollablePage}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
           <Grid Margin="10">

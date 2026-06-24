@@ -4,7 +4,7 @@ This checklist is for the current local WPF prototype. It separates features tha
 
 ## Test Setup
 
-- [ ] Build succeeds with `dotnet build AOI_Monitor\AOI_Monitor.csproj`.
+- [ ] Build succeeds with `dotnet build AOI_PCB_Database.slnx --configuration Release`.
 - [ ] App launches on Windows with WPF desktop support.
 - [ ] Readiness panel shows:
   - Database: `Connected`
@@ -14,21 +14,40 @@ This checklist is for the current local WPF prototype. It separates features tha
   - Robot: `Simulated Robot / Not Connected`
   - MES / ERP: `Mock MES / Not Connected`
 - [ ] Demo images are available locally. See [SampleData/README.md](../SampleData/README.md).
+- [ ] Optional service-level smoke succeeds with `pwsh Scripts/run-stage1-readiness-smoke.ps1`.
+
+## Run Stage 1 Demo in 10 Minutes
+
+Use this route for a management or customer software walkthrough with synthetic, non-confidential data:
+
+1. Generate sample data: `pwsh SampleData/demo_dataset_generator.ps1`.
+2. Launch AOI Monitor.
+3. Open `AI / Models`.
+4. Select `SampleData/DemoSet_Quick/images`.
+5. Select `SampleData/DemoSet_Quick/customer_validation_manifest.csv`.
+6. Click `Run Dataset Preflight`.
+7. Click `Run Batch Inspection`.
+8. Review rows, OK/NG/REVIEW counts, false calls, possible escapes, timing, and selected-row preview.
+9. Export CSV and annotated images if needed.
+10. Click `Export Stage 1 Validation Package`.
+11. Open `Export & Trace > Performance Benchmark` and benchmark `SampleData/DemoSet_Quick/images`.
+12. Open `Export & Trace > Stage 1 Readiness`, click `Refresh`, then `Export Report`.
+13. Review `stage1_readiness_report.html`, `stage1_readiness_report.pdf`, `stage1_readiness_report.json`, `validation_summary.html`, `customer_validation_report.html`, `benchmark_report.html`, `benchmark_results.csv`, and `limitations.txt`.
+14. Confirm every report keeps the claim scoped to Stage 1 uploaded-image validation and does not claim real camera, lighting, robot, MES, safety, or full factory automation readiness.
 
 ## Implemented Stage 1 Checks
 
 ### Image Import
 
-- [ ] Open `Main Inspection`.
-- [ ] Open `Image Library`.
+- [ ] Open `Board & Images`.
 - [ ] Click `Open Record`.
 - [ ] Select a PNG/JPG/JPEG PCB sample image.
 - [ ] Confirm the image is copied into `%LOCALAPPDATA%\AOI_Monitor\image_vault\`.
-- [ ] Confirm the imported image appears in the Image Library grid after refresh or re-open.
+- [ ] Confirm the imported image appears in the Board & Images grid after refresh or re-open.
 
 ### Batch Import
 
-- [ ] Open `Image Library`.
+- [ ] Open `Board & Images`.
 - [ ] Click `Batch Import`.
 - [ ] Select a folder containing small demo PNG/JPG/JPEG images.
 - [ ] Confirm the import summary reports imported, duplicate, unsupported, missing, or invalid files.
@@ -40,12 +59,12 @@ This checklist is for the current local WPF prototype. It separates features tha
 - [ ] Close and restart the app.
 - [ ] Confirm the imported image record reloads from SQLite.
 - [ ] Run one comparison or recipe test run.
-- [ ] Open `Log & Export`.
+- [ ] Open `Export & Trace`.
 - [ ] Confirm inspection history and/or review events are loaded from SQLite.
 
 ### Pixel Difference Prototype Engine
 
-- [ ] In `Image Library`, select or import a sample image.
+- [ ] In `Board & Images`, select or import a sample image.
 - [ ] Click `Compare Golden`.
 - [ ] Select a golden/reference image.
 - [ ] Confirm analysis completes with an `OK`, `REVIEW`, or `NG` verdict.
@@ -61,7 +80,7 @@ This checklist is for the current local WPF prototype. It separates features tha
 
 ### Review Disposition
 
-- [ ] Open `Disposition`.
+- [ ] Open `Defect Review`.
 - [ ] Confirm current analysis details are visible when an inspection result exists.
 - [ ] Try `Confirm NG`, `Mark False Call`, `Mark Possible Escape`, `Queue Candidate`, and `Hold for 2nd Review` as appropriate.
 - [ ] Confirm guardrails display a warning when confidence policy blocks an action.
@@ -69,7 +88,7 @@ This checklist is for the current local WPF prototype. It separates features tha
 
 ### CSV Export
 
-- [ ] Open `Log & Export`.
+- [ ] Open `Export & Trace`.
 - [ ] Apply a date/result/operator/board filter if useful.
 - [ ] Click `Inspection History CSV`.
 - [ ] Confirm the export confirmation dialog appears.
@@ -79,7 +98,7 @@ This checklist is for the current local WPF prototype. It separates features tha
 
 ### Annotated Image Export
 
-- [ ] Open `Log & Export`.
+- [ ] Open `Export & Trace`.
 - [ ] Ensure filtered inspection rows include accessible sample image paths.
 - [ ] Click `Annotated Overlays`.
 - [ ] Confirm the export confirmation dialog appears.
@@ -89,17 +108,20 @@ This checklist is for the current local WPF prototype. It separates features tha
 
 ### Customer Validation Batch Test
 
-- [ ] Open `AI Model Test`.
+- [ ] Open `AI / Models`.
 - [ ] Select a folder containing small demo PCB images.
-- [ ] Optionally select a ground-truth CSV if available.
+- [ ] Select a ground-truth CSV or customer validation manifest if available.
+- [ ] Click `Run Dataset Preflight` and resolve blocking failures.
 - [ ] Click `Run Batch Inspection`.
 - [ ] Confirm accuracy/precision/recall/false-call metrics update.
 - [ ] Export CSV and annotated images if needed.
-- [ ] Open `Log & Export` and create a `Customer Package` using filtered logs.
+- [ ] Click `Export Stage 1 Validation Package`.
+- [ ] Open `Export & Trace > Performance Benchmark` and run a benchmark against the same image folder.
+- [ ] Open `Export & Trace > Stage 1 Readiness` and export the Stage 1 readiness report.
 
 ### 3D Profile Sample Data
 
-- [ ] Open `3D Profile Viewer`.
+- [ ] Open `3D Profile`.
 - [ ] Confirm the page clearly shows `Sample Data Mode` and `3D Camera Not Connected`.
 - [ ] Load a CSV with columns `x,y,height`.
 - [ ] Confirm the 2D height map, height legend, min/max height, selected point height, and slice/profile line update.
@@ -129,3 +151,5 @@ These are not implemented in Stage 1 and should remain clearly labeled as planne
 - Exported review CSV.
 - Annotated overlay PNG.
 - Customer validation package folder contents.
+- Stage 1 readiness report folder with HTML/PDF/JSON.
+- Benchmark report folder with p95 and over-one-second evidence.

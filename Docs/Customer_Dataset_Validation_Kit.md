@@ -81,7 +81,7 @@ Avoid spaces, customer secrets, operator names, and timestamps that can identify
 
 ## Run Dataset Preflight
 
-1. Open `AI Model Test`.
+1. Open `AI / Models`.
 2. Select the customer dataset `images/` folder.
 3. Select `customer_validation_manifest.csv`.
 4. Click `Run Dataset Preflight`.
@@ -96,7 +96,7 @@ The AI Model Test screen shows a preflight result card:
 - `CONDITIONAL`: no blocking failures, but warnings require management/customer review.
 - `FAIL`: blocking failures must be fixed before acceptance evidence can be considered repeatable.
 
-Use `Open Manifest Template` on the AI Model Test screen to open `SampleData/customer_validation_manifest_template.csv`.
+Use `Open Manifest Template` on the AI / Models screen to open `SampleData/customer_validation_manifest_template.csv`.
 
 ## Run AI Model Test
 
@@ -116,6 +116,16 @@ Stage 1 can use the Pixel Difference prototype engine. That does not claim produ
 
 Threshold changes are Stage 1 labeled-data evidence only. They do not prove production readiness across new cameras, lighting, boards, or factories.
 
+## Run Performance Benchmark
+
+1. Open `Export & Trace`.
+2. Open `Performance Benchmark`.
+3. Select `Image folder`.
+4. Choose the same `images/` folder used for Stage 1 validation.
+5. Run the benchmark and review p50, p95, p99, max frame-to-overlay, images-per-minute, and over-one-second count.
+
+The benchmark is required for a Stage 1 readiness PASS. It is timing evidence for the local image-folder workflow and does not validate live camera acquisition, lighting control, robot motion, PLC safety, MES writeback, or factory cycle time.
+
 ## Run Model Acceptance
 
 1. In `Settings`, register and validate the ONNX model.
@@ -130,7 +140,7 @@ Model acceptance is scoped to the supplied dataset and criteria.
 
 ## Export Customer Package
 
-From `AI Model Test`, click the validation package export action after a successful batch run. The package includes:
+From `AI / Models`, click `Export Stage 1 Validation Package` after a successful batch run. The package includes:
 
 - `validation_manifest.json`
 - `validation_summary.html`
@@ -155,6 +165,24 @@ Management review should check:
 - `validation_manifest.json` for package ID, run ID, dataset preflight status, acceptance status, criteria, included files, and limitations.
 - `customer_validation_report.html` or PDF for the human-readable preflight, dataset quality, false-call, and acceptance summaries.
 - `validation_results.csv` and `validation_breakdown.csv` for row-level and class/side/ROI evidence.
+
+## Export Stage 1 Readiness Report
+
+After preflight, batch validation, false-call review, validation package export, and benchmark:
+
+1. Open `Export & Trace`.
+2. Open `Stage 1 Readiness`.
+3. Click `Refresh`.
+4. Confirm the overall status, missing evidence list, preflight summary, latest batch run, benchmark p95 and over-one-second count, latest package path, and next recommended action.
+5. Click `Export Report`.
+
+The readiness export writes:
+
+- `stage1_readiness_report.html`
+- `stage1_readiness_report.pdf`
+- `stage1_readiness_report.json`
+
+The report must identify what was tested, what data was used, row counts, false calls, possible escapes, p95 timing, over-one-second count, reports generated, missing evidence, limitations, and remaining Stage 2/3/4 work.
 
 ## Interpreting Status
 

@@ -32,6 +32,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
     private readonly ObservableCollection<CentralSyncQueueRow> _centralSyncRows = new();
     private readonly ObservableCollection<PilotIssueRow> _pilotIssueRows = new();
     private readonly ObservableCollection<FactoryReadinessRow> _factoryReadinessRows = new();
+    private readonly ObservableCollection<Stage1ReadinessRow> _stage1ReadinessRows = new();
     private readonly ObservableCollection<StandardsTraceabilityMatrix> _standardsTraceabilityRows = new();
     private readonly ObservableCollection<CompletionMatrixRow> _completionMatrixRows = new();
     private readonly ObservableCollection<FactoryAcceptanceChecklistItem> _factoryAcceptanceRows = new();
@@ -41,6 +42,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
     private readonly ObservableCollection<ManagementDashboardTrendPoint> _managementTrendRows = new();
     private readonly ObservableCollection<ManagementDashboardBreakdown> _managementBreakdownRows = new();
     private ManagementDashboardReport? _managementDashboardReport;
+    private Stage1ReadinessReport? _latestStage1ReadinessReport;
     private CancellationTokenSource? _workCts;
     private CancellationTokenSource? _refreshCts;
 
@@ -55,6 +57,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
         CentralSyncGrid.ItemsSource = _centralSyncRows;
         PilotIssuesGrid.ItemsSource = _pilotIssueRows;
         FactoryReadinessGrid.ItemsSource = _factoryReadinessRows;
+        Stage1ReadinessGrid.ItemsSource = _stage1ReadinessRows;
         StandardsTraceabilityGrid.ItemsSource = _standardsTraceabilityRows;
         CompletionMatrixGrid.ItemsSource = _completionMatrixRows;
         FactoryAcceptanceGrid.ItemsSource = _factoryAcceptanceRows;
@@ -228,6 +231,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
             var pilotIssues = AoiDatabase.GetPilotIssues(pilotIssueFilter).Select(PilotIssueRow.FromIssue).ToArray();
             var readinessReport = await FactoryReadinessService.EvaluateAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             var readiness = readinessReport.Categories.Select(FactoryReadinessRow.FromCategory).ToArray();
+            var stage1Readiness = Stage1ReadinessGateService.Evaluate();
             var standardsReport = StandardsTraceabilityService.Evaluate();
             var standardsRows = standardsReport.Items.ToArray();
             var completionReport = await CompletionAssessmentService.AssessAsync(cancellationToken).ConfigureAwait(false);
@@ -247,6 +251,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
                 pilotIssues,
                 readiness,
                 readinessReport.OverallStatus,
+                stage1Readiness,
                 standardsRows,
                 StandardsTraceabilitySummaryFor(standardsReport),
                 completionRows,
@@ -265,6 +270,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
         ReplaceRows(_centralSyncRows, snapshot.CentralSync);
         ReplaceRows(_pilotIssueRows, snapshot.PilotIssues);
         ReplaceRows(_factoryReadinessRows, snapshot.Readiness);
+        ApplyStage1Readiness(snapshot.Stage1Readiness);
         ReplaceRows(_standardsTraceabilityRows, snapshot.StandardsTraceabilityRows);
         ReplaceRows(_completionMatrixRows, snapshot.CompletionRows);
         if (_factoryAcceptanceRows.Count == 0)
@@ -323,6 +329,104 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
             _ => Brushes.Orange,
         };
         ClientDemoGateText.ToolTip = string.Join(Environment.NewLine, report.Checks.Select(check => $"{check.Name}: {check.Status} - {check.Evidence}"));
+    }
+
+    private void ApplyStage1Readiness(Stage1ReadinessReport report)
+    {
+        _latestStage1ReadinessReport = report;
+        ReplaceRows(_stage1ReadinessRows, report.Checks.Select(Stage1ReadinessRow.FromCheck));
+        Stage1ReadinessStatusText.Text = report.OverallStatus;
+        Stage1ReadinessStatusText.Foreground = report.OverallStatus switch
+        {
+            Stage1ReadinessGateService.Pass => Brushes.LightGreen,
+            Stage1ReadinessGateService.Fail => Brushes.LightCoral,
+            _ => Brushes.Orange,
+        };
+        Stage1ReadinessSummaryText.Text =
+            $"Stage 1 readiness {report.OverallStatus}; checks={report.Checks.Count}; missing or conditional={report.MissingEvidence.Count}; " +
+            $"images={report.TotalImages}; false calls={report.FalseCallCount}; possible escapes={report.PossibleEscapeCount}; over1s={report.OverOneSecondCount}.";
+        Stage1PreflightText.Text = report.LatestPreflightStatus;
+        Stage1BatchText.Text = report.LatestBatchRunSummary;
+        Stage1BenchmarkText.Text = report.LatestBenchmarkSummary;
+        Stage1PackageText.Text = string.IsNullOrWhiteSpace(report.LatestValidationPackagePath)
+            ? "No Stage 1 validation package exported."
+            : report.LatestValidationPackagePath;
+        Stage1PackageText.ToolTip = Stage1PackageText.Text;
+        Stage1MissingEvidenceList.Items.Clear();
+        foreach (var item in report.MissingEvidence.Take(40))
+            Stage1MissingEvidenceList.Items.Add(item);
+        if (Stage1MissingEvidenceList.Items.Count == 0)
+            Stage1MissingEvidenceList.Items.Add("None.");
+        Stage1NextActionText.Text = report.NextRecommendedAction;
+    }
+
+    private async void OnRefreshStage1ReadinessClick(object sender, RoutedEventArgs e)
+    {
+        var button = sender as Button;
+        await ErrorBoundaryService.SafeAsyncCommand(
+            "Refresh Stage 1 readiness",
+            "Export & Trace",
+            async token =>
+            {
+                var report = await Task.Run(() => Stage1ReadinessGateService.Evaluate(), token);
+                token.ThrowIfCancellationRequested();
+                ApplyStage1Readiness(report);
+                StatusText.Text = $"Stage 1 readiness refreshed: {report.OverallStatus}. Next: {report.NextRecommendedAction}";
+            },
+            running =>
+            {
+                if (button is not null)
+                    button.IsEnabled = !running;
+            },
+            message =>
+            {
+                Stage1ReadinessSummaryText.Text = "Stage 1 readiness refresh failed safely. Review diagnostics.";
+                StatusText.Text = message;
+            });
+    }
+
+    private void OnExportStage1ReadinessReportClick(object sender, RoutedEventArgs e)
+    {
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanExportLogs, "Exporting Stage 1 readiness report", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            var export = Stage1ReadinessGateService.ExportReport();
+            ApplyStage1Readiness(export.Report);
+            WorkflowState.Instance.AddEvent("STAGE1_READINESS_EXPORT", $"Stage 1 readiness report exported: {export.Report.OverallStatus}; folder={Path.GetFileName(export.Folder)}.", relatedPath: export.Folder);
+            RefreshAfterExport($"Stage 1 readiness report exported: {export.Folder}. HTML: {export.HtmlPath}; PDF: {export.PdfPath}; JSON: {export.JsonPath}. Status: {export.Report.OverallStatus}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            HandleWorkError("Stage 1 readiness report export failed", ex, "STAGE1_READINESS_EXPORT_ERROR");
+        }
+    }
+
+    private void OnOpenSampleDatasetGuideClick(object sender, RoutedEventArgs e)
+    {
+        var guide = Path.Combine(FindRepositoryRootForDocs(), "Docs", "Sample_Dataset_Performance_Demo.md");
+        OpenPathOrWarn(guide, "Sample Dataset Guide");
+    }
+
+    private void OnOpenLatestValidationPackageClick(object sender, RoutedEventArgs e)
+    {
+        var path = _latestStage1ReadinessReport?.LatestValidationPackagePath ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(path))
+            path = AoiDatabase.GetValidationPackages(1).FirstOrDefault()?.PackagePath ?? string.Empty;
+        OpenPathOrWarn(path, "Latest Stage 1 Validation Package");
+    }
+
+    private void OnOpenLatestBenchmarkReportClick(object sender, RoutedEventArgs e)
+    {
+        var latest = BenchmarkInspectionService.GetLatestBenchmark();
+        var path = latest is null
+            ? string.Empty
+            : File.Exists(latest.HtmlPath) ? latest.HtmlPath : latest.ReportFolder;
+        OpenPathOrWarn(path, "Latest Benchmark Report");
     }
 
     private async void OnRefreshStandardsTraceabilityClick(object sender, RoutedEventArgs e)
@@ -2497,6 +2601,49 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
             target.Add(row);
     }
 
+    private static string FindRepositoryRootForDocs()
+    {
+        foreach (var seed in new[] { Environment.CurrentDirectory, AppContext.BaseDirectory })
+        {
+            var directory = new DirectoryInfo(seed);
+            while (directory is not null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "AOI_PCB_Database.slnx")) ||
+                    Directory.Exists(Path.Combine(directory.FullName, "Docs")))
+                    return directory.FullName;
+                directory = directory.Parent;
+            }
+        }
+
+        return Environment.CurrentDirectory;
+    }
+
+    private void OpenPathOrWarn(string path, string title)
+    {
+        if (string.IsNullOrWhiteSpace(path) || (!File.Exists(path) && !Directory.Exists(path)))
+        {
+            MessageBox.Show(
+                $"{title} is not available yet.\n\nExpected path: {path}",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
+        {
+            MessageBox.Show(
+                $"{title} could not be opened:\n{ex.Message}",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
     private static string? NullIfBlank(string value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
@@ -3103,6 +3250,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
         PilotIssueRow[] PilotIssues,
         FactoryReadinessRow[] Readiness,
         string ReadinessOverallStatus,
+        Stage1ReadinessReport Stage1Readiness,
         StandardsTraceabilityMatrix[] StandardsTraceabilityRows,
         string StandardsTraceabilitySummary,
         CompletionMatrixRow[] CompletionRows,
@@ -3367,6 +3515,23 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
                 Status = category.Status,
                 Evidence = category.Evidence,
                 NextAction = category.NextAction,
+            };
+    }
+
+    public sealed class Stage1ReadinessRow
+    {
+        public string Name { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public string Evidence { get; init; } = string.Empty;
+        public string NextAction { get; init; } = string.Empty;
+
+        public static Stage1ReadinessRow FromCheck(Stage1ReadinessCheck check)
+            => new()
+            {
+                Name = check.Name,
+                Status = check.Status,
+                Evidence = check.Evidence,
+                NextAction = check.NextAction,
             };
     }
 

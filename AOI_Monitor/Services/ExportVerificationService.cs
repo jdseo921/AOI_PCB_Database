@@ -381,6 +381,16 @@ public static class ExportVerificationService
     private static IReadOnlyList<string> RequiredCsvColumns(string exportType, string path)
     {
         var fileName = Path.GetFileName(path);
+        if (fileName.Equals("customer_validation_manifest.csv", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("customer_validation_manifest_template.csv", StringComparison.OrdinalIgnoreCase))
+            return CustomerDatasetPreflightService.RequiredManifestColumns;
+
+        if (fileName.Equals("validation_breakdown.csv", StringComparison.OrdinalIgnoreCase))
+            return new[] { "Breakdown Type", "Key", "Display Name", "Total", "TP", "TN", "FP", "FN", "False Call Rate" };
+
+        if (fileName.Equals("benchmark_results.csv", StringComparison.OrdinalIgnoreCase))
+            return Array.Empty<string>();
+
         if (exportType.Contains("ReviewDispositionLog", StringComparison.OrdinalIgnoreCase) ||
             fileName.Contains("review_disposition", StringComparison.OrdinalIgnoreCase))
             return new[] { "TimestampUtc", "StationId", "OperatorId", "Sample", "Golden", "Verdict", "Action" };

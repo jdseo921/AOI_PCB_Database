@@ -12,9 +12,9 @@ A client test package should contain:
 - `RUN_RELEASE.md` with package generation notes.
 - `CLIENT_HANDOFF_README.md` with the shortest launch path.
 - `Docs/` with user, installation, quality-gate, traceability, and acceptance documents.
-- `SampleData/customer_validation_manifest_template.csv` when prepared as a customer validation kit.
+- `SampleData/README.md`, `SampleData/customer_validation_manifest_template.csv`, and `SampleData/demo_dataset_generator.ps1` when prepared as a customer validation kit.
 
-The package intentionally does not include customer images, local SQLite databases, image vaults, generated exports, model files, secrets, MES credentials, or production hardware adapters.
+The package intentionally does not include customer images, generated demo images, local SQLite databases, image vaults, generated exports, model files, secrets, MES credentials, or production hardware adapters.
 
 ## Client PC Requirements
 
@@ -40,6 +40,27 @@ Expected first-run state:
 - Pixel Difference Prototype Engine is available by default.
 - Real camera, robot, lighting, live 3D camera, and production MES are not validated unless the customer separately installed/configured accepted adapters and ran acceptance tests.
 
+## Run Stage 1 Demo in 10 Minutes
+
+Use this route for a quick software workflow evaluation with synthetic, non-confidential data:
+
+1. Open PowerShell in the package folder.
+2. Run `pwsh .\SampleData\demo_dataset_generator.ps1 -OutputRoot "$PWD\SampleData\DemoSet_Quick"`.
+3. Open `app\AOI_Monitor.exe`.
+4. Open `AI / Models`.
+5. Select `SampleData\DemoSet_Quick\images`.
+6. Select `SampleData\DemoSet_Quick\customer_validation_manifest.csv`.
+7. Click `Run Dataset Preflight`.
+8. Click `Run Batch Inspection`.
+9. Review rows, OK/NG/REVIEW counts, false calls, possible escapes, timing, and selected-row preview.
+10. Export CSV and annotated images if requested.
+11. Click `Export Stage 1 Validation Package`.
+12. Open `Export & Trace > Performance Benchmark` and benchmark `SampleData\DemoSet_Quick\images`.
+13. Open `Export & Trace > Stage 1 Readiness`, click `Refresh`, then `Export Report`.
+14. Review `stage1_readiness_report.html`, `stage1_readiness_report.pdf`, `stage1_readiness_report.json`, `validation_summary.html`, `customer_validation_report.html`, `benchmark_report.html`, `benchmark_results.csv`, and `limitations.txt`.
+
+This demo can produce Stage 1 uploaded-image validation evidence. It does not validate real camera, lighting, robot, PLC safety, production MES, ERP, cybersecurity, or full factory automation.
+
 ## Suggested Independent Test Flow
 
 Use small, non-confidential images. Keep customer/private datasets outside the application package and import them locally during the test.
@@ -55,7 +76,7 @@ Use small, non-confidential images. Keep customer/private datasets outside the a
 
 ### 2. Image Import
 
-- Open `Image Library`.
+- Open `Board & Images`.
 - Click `Open Record`.
 - Select a PNG/JPG/JPEG sample image.
 - Confirm the record appears in the grid.
@@ -71,32 +92,35 @@ Use small, non-confidential images. Keep customer/private datasets outside the a
 
 ### 4. Review Disposition
 
-- Open `Disposition`.
+- Open `Defect Review`.
 - Record one review action, such as `Confirm NG`, `Mark False Call`, `Mark Possible Escape`, or `Hold for 2nd Review`.
 - Confirm the action appears in logs.
 
-### 5. AI Model Test / Batch Validation
+### 5. AI / Models Batch Validation
 
-- Open `AI Model Test`.
+- Open `AI / Models`.
 - Select a folder with three to ten small demo images.
 - Optionally select a ground-truth CSV.
-- Run batch inspection.
+- Run `Run Dataset Preflight`.
+- Run `Run Batch Inspection`.
 - Confirm metrics and result rows are visible.
-- Export CSV/HTML/PDF evidence where available.
+- Export CSV, annotated images, and a Stage 1 validation package where available.
 
 ### 6. 3D Profile Sample CSV
 
-- Open `3D Profile Viewer`.
+- Open `3D Profile`.
 - Load `SampleData/profile_height_map_sample.csv` or another non-confidential CSV with `x,y,height` columns.
 - Confirm the page labels sample data / not live 3D camera mode.
 - Confirm the height map, selected point, and slice/profile evidence update.
 
 ### 7. Logs, Exports, And Evidence
 
-- Open `Log & Export`.
+- Open `Export & Trace`.
 - Export inspection history CSV.
 - Export review log CSV.
 - Export annotated overlays if inspection image paths are available.
+- Run Performance Benchmark for image-folder evidence when evaluating Stage 1.
+- Export the Stage 1 Readiness report.
 - Export the Factory Readiness Go/No-Go package.
 - Export the Standards Traceability Matrix from `Standards & Quality Checklist`.
 - Export the Client Demo Readiness gate.
@@ -108,6 +132,8 @@ Expected exported evidence includes readable HTML/JSON/PDF/CSV/PNG where applica
 Ask the client to return:
 
 - Screenshots of the readiness panel and any warning/alarm panels.
+- The exported Stage 1 readiness report folder.
+- The exported Stage 1 validation package folder.
 - The exported Factory Readiness package.
 - The exported Standards Traceability Matrix.
 - Any exported client demo readiness gate report.

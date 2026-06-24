@@ -224,14 +224,15 @@ It is not customer production evidence and it is not live camera evidence.
 Use AI / Models:
 1. Test Image Folder: $imagesDir
 2. Ground Truth CSV: $manifestPath
-3. Check Dataset Before Test
+3. Run Dataset Preflight
 4. Run Batch Inspection
-5. Export CSV or Export Validation Package
+5. Export CSV, annotated images, or Export Stage 1 Validation Package
 
 Use Export & Trace:
 1. Performance Benchmark
 2. Source: Image folder
 3. Image folder: $imagesDir
+4. Stage 1 Readiness: refresh and export the readiness report after benchmark/package evidence exists
 
 Use Run Inspection folder-camera simulation:
 - Top Folder: $cameraTop

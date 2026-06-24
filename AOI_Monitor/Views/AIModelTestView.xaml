@@ -91,7 +91,7 @@
           <StackPanel Grid.Column="4">
             <TextBlock Text="Engine" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4" ToolTip="ONNX is the supported machine-learning model file format for the production engine path."/>
             <TextBox x:Name="EngineText" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference Prototype Engine" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-            <Button Style="{StaticResource ActionBtnBlue}" Content="Check Dataset Before Test" Margin="0,8,0,0" Click="OnRunDatasetPreflightClick" ToolTip="Checks image files, labels, golden images, and inspection-area metadata before running client validation."/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Run Dataset Preflight" Margin="0,8,0,0" Click="OnRunDatasetPreflightClick" ToolTip="Checks image files, labels, golden images, and inspection-area metadata before running client validation."/>
             <Button Style="{StaticResource ActionBtn}" Content="Open Manifest Template" Margin="0,6,0,0" Click="OnOpenManifestTemplateClick"/>
             <Button Style="{StaticResource ActionBtnGreen}" Content="Run Batch Inspection" Margin="0,6,0,0" Click="OnRunBatchClick"/>
           </StackPanel>
@@ -316,7 +316,7 @@
           <Button Style="{StaticResource ActionBtn}" Content="Preview Selected" Margin="0,0,6,0" Click="OnPreviewSelectedClick"/>
           <Button Style="{StaticResource ActionBtnGreen}" Content="Export CSV" Margin="0,0,6,0" Click="OnExportCsvClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Export Annotated Images" Margin="0,0,6,0" Click="OnExportAnnotatedImagesClick"/>
-          <Button Style="{StaticResource ActionBtnAmber}" Content="Export Validation Package" Click="OnGenerateReportClick"/>
+          <Button Style="{StaticResource ActionBtnAmber}" Content="Export Stage 1 Validation Package" Click="OnGenerateReportClick" ToolTip="Exports the complete Stage 1 package with manifest, preflight, reports, benchmark evidence, limitations, CSV, and annotated image samples."/>
         </WrapPanel>
       </DockPanel>
     </Border>

@@ -363,6 +363,104 @@
               </DataGrid.Columns>
             </DataGrid>
           </TabItem>
+          <TabItem Header="Stage 1 Readiness" ToolTip="Independent Stage 1 customer-validation readiness. This does not require or claim real hardware readiness.">
+            <Grid Margin="8">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <DockPanel Margin="0,0,0,8">
+                <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+                  <Button Style="{StaticResource ActionBtnBlue}" Content="Refresh Stage 1 Readiness" Margin="0,0,6,6" Click="OnRefreshStage1ReadinessClick"/>
+                  <Button Style="{StaticResource ActionBtnAmber}" Content="Export Stage 1 Readiness Report" Margin="0,0,6,6" Click="OnExportStage1ReadinessReportClick"/>
+                  <Button Style="{StaticResource ActionBtn}" Content="Open Sample Dataset Guide" Margin="0,0,6,6" Click="OnOpenSampleDatasetGuideClick"/>
+                  <Button Style="{StaticResource ActionBtn}" Content="Open Latest Validation Package" Margin="0,0,6,6" Click="OnOpenLatestValidationPackageClick"/>
+                  <Button Style="{StaticResource ActionBtn}" Content="Open Latest Benchmark Report" Margin="0,0,0,6" Click="OnOpenLatestBenchmarkReportClick"/>
+                </WrapPanel>
+                <StackPanel Margin="0,0,12,0">
+                  <TextBlock Text="Stage 1 Readiness" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock x:Name="Stage1ReadinessSummaryText"
+                             Text="Stage 1 readiness not evaluated."
+                             Foreground="#DCE5EB"
+                             FontSize="14"
+                             TextWrapping="Wrap"/>
+                  <TextBlock Text="Stage 1 PASS is scoped to local image-validation evidence. Real camera, lighting, robot, PLC safety, production MES, ERP, and full factory automation remain not validated unless their own evidence exists."
+                             Style="{StaticResource HmiTechnicalHintText}"
+                             TextWrapping="Wrap"/>
+                </StackPanel>
+              </DockPanel>
+              <UniformGrid Grid.Row="1" Columns="5" Margin="0,0,0,8">
+                <Border x:Name="Stage1ReadinessStatusCard" Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+                  <StackPanel>
+                    <TextBlock Text="Status" Foreground="#9AA6AF" FontSize="14"/>
+                    <TextBlock x:Name="Stage1ReadinessStatusText" Text="NOT RUN" FontWeight="Bold" FontSize="18" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+                <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+                  <StackPanel>
+                    <TextBlock Text="Preflight" Foreground="#9AA6AF" FontSize="14"/>
+                    <TextBlock x:Name="Stage1PreflightText" Text="--" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+                <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+                  <StackPanel>
+                    <TextBlock Text="Batch Run" Foreground="#9AA6AF" FontSize="14"/>
+                    <TextBlock x:Name="Stage1BatchText" Text="--" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+                <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+                  <StackPanel>
+                    <TextBlock Text="Benchmark" Foreground="#9AA6AF" FontSize="14"/>
+                    <TextBlock x:Name="Stage1BenchmarkText" Text="--" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+                <Border Style="{StaticResource FieldBox}">
+                  <StackPanel>
+                    <TextBlock Text="Validation Package" Foreground="#9AA6AF" FontSize="14"/>
+                    <TextBlock x:Name="Stage1PackageText" Text="--" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                  </StackPanel>
+                </Border>
+              </UniformGrid>
+              <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="2*"/>
+                  <ColumnDefinition Width="8"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <DataGrid x:Name="Stage1ReadinessGrid" CanUserSortColumns="True" Style="{StaticResource HmiDenseTable}" MinWidth="900" ToolTip="Stage 1 readiness checks are independent from full factory/hardware readiness.">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Check" Binding="{Binding Name}" Width="220" MinWidth="220"/>
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="120" MinWidth="120"/>
+                    <DataGridTextColumn Header="Evidence" Binding="{Binding Evidence}" Width="360" MinWidth="360"/>
+                    <DataGridTextColumn Header="Next Action" Binding="{Binding NextAction}" Width="300" MinWidth="300"/>
+                  </DataGrid.Columns>
+                </DataGrid>
+                <Border Grid.Column="2" Style="{StaticResource FieldBox}">
+                  <Grid>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto"/>
+                      <RowDefinition Height="*"/>
+                      <RowDefinition Height="Auto"/>
+                      <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Missing Evidence" Style="{StaticResource HmiSectionHeaderText}" Margin="0,0,0,6"/>
+                    <ListBox x:Name="Stage1MissingEvidenceList"
+                             Grid.Row="1"
+                             MinHeight="120"
+                             Background="#151A1E"
+                             BorderBrush="#343D44"
+                             Foreground="#FFE1A3"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                    <TextBlock Grid.Row="2" Text="Next Recommended Action" Style="{StaticResource HmiSectionHeaderText}" Margin="0,10,0,6"/>
+                    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                      <TextBlock x:Name="Stage1NextActionText" Text="Run the Stage 1 validation workflow." Foreground="#DCE5EB" FontSize="14" TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                  </Grid>
+                </Border>
+              </Grid>
+            </Grid>
+          </TabItem>
           <TabItem Header="Standards &amp; Quality Checklist" ToolTip="Maps project HMI/software-quality expectations to concrete evidence. This is standards-aligned evidence, not certification.">
             <Grid>
               <Grid.RowDefinitions>

@@ -21,6 +21,8 @@ $solutionPath = Join-Path $repoRoot "AOI_PCB_Database.slnx"
 $docsPath = Join-Path $repoRoot "Docs"
 $templatesPath = Join-Path $repoRoot "Templates"
 $sampleManifestTemplatePath = Join-Path $repoRoot "SampleData\customer_validation_manifest_template.csv"
+$sampleDataReadmePath = Join-Path $repoRoot "SampleData\README.md"
+$sampleDataGeneratorPath = Join-Path $repoRoot "SampleData\demo_dataset_generator.ps1"
 $featureDocPath = Join-Path $repoRoot "IMPLEMENTED_FEATURES.md"
 $rootReadmePath = Join-Path $repoRoot "README.md"
 $releaseRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
@@ -62,7 +64,7 @@ Write-Host "Mode:       $(if ($SelfContained) { 'self-contained' } else { 'frame
 Write-Host "Validation: $(if ($ValidationOnly) { 'yes' } else { 'no' })"
 Write-Host "Docs:       $(if ($IncludeDocs -or !$ValidationOnly) { 'include' } else { 'skip for validation-only package' })"
 Write-Host "Templates:  $(if ($IncludeTemplates) { 'include adapter templates' } else { 'skip' })"
-Write-Host "Sample manifest template: $(if ($IncludeSampleManifestTemplate) { 'include' } else { 'skip' })"
+Write-Host "Sample validation kit: $(if ($IncludeSampleManifestTemplate) { 'include manifest template, README, and generator' } else { 'skip' })"
 Write-Host "Restore:    $(if ($NoRestore) { 'skip; use existing restore assets' } else { 'allow dotnet commands to restore as needed' })"
 Write-Host "Client demo gate: $(if ($ClientDemoGate) { 'required' } else { 'not required' })"
 
@@ -174,10 +176,18 @@ if ($IncludeSampleManifestTemplate) {
     if (!(Test-Path $sampleManifestTemplatePath)) {
         throw "Sample manifest template was requested but not found: $sampleManifestTemplatePath"
     }
+    if (!(Test-Path $sampleDataReadmePath)) {
+        throw "SampleData README was requested but not found: $sampleDataReadmePath"
+    }
+    if (!(Test-Path $sampleDataGeneratorPath)) {
+        throw "Demo dataset generator was requested but not found: $sampleDataGeneratorPath"
+    }
 
-    Write-Host "Copying customer validation manifest template..."
+    Write-Host "Copying customer validation sample-data kit..."
     New-Item -ItemType Directory -Force -Path $releaseSampleDataDir | Out-Null
     Copy-Item -LiteralPath $sampleManifestTemplatePath -Destination (Join-Path $releaseSampleDataDir "customer_validation_manifest_template.csv") -Force
+    Copy-Item -LiteralPath $sampleDataReadmePath -Destination (Join-Path $releaseSampleDataDir "README.md") -Force
+    Copy-Item -LiteralPath $sampleDataGeneratorPath -Destination (Join-Path $releaseSampleDataDir "demo_dataset_generator.ps1") -Force
 }
 
 $releaseReadme = @"
@@ -199,14 +209,14 @@ Publish mode: $(if ($SelfContained) { "Self-contained" } else { "Framework-depen
 2. Open Docs/Client_Test_Kit_Guide.md.
 3. Use small non-confidential PNG/JPG/JPEG images for evaluation.
 4. Confirm simulated/mock/not-connected readiness states are visible.
-5. Export Factory Readiness, Client Demo Readiness, and Standards Traceability reports after testing.
+5. Export Stage 1 Readiness, Factory Readiness, Client Demo Readiness, and Standards Traceability reports after testing.
 
 ## Included
 
 - app/ - Published Windows desktop application files.
 $(if ($IncludeDocs -or !$ValidationOnly) { "- Docs/ - Installation guide, deployment package guide, user manual, stage mapping, integration boundaries, and acceptance checklist.`n- README.md - Repository-level overview and operating notes.`n- IMPLEMENTED_FEATURES.md - Current PoC feature inventory." } else { "- Docs were skipped for this validation-only package. Pass -IncludeDocs to include them." })
 $(if ($IncludeTemplates) { "- Templates/ - Fake/no-op adapter template source projects for camera, lighting, and robot integrations." } else { "- Adapter templates were not included. Pass -IncludeTemplates for developer handoff packages." })
-$(if ($IncludeSampleManifestTemplate) { "- SampleData/customer_validation_manifest_template.csv - Empty customer validation manifest template only; no customer images are included." } else { "- Sample manifest template was not included. Pass -IncludeSampleManifestTemplate when preparing customer validation kits." })
+$(if ($IncludeSampleManifestTemplate) { "- SampleData/README.md - Safe sample-data operating notes.`n- SampleData/customer_validation_manifest_template.csv - Empty customer validation manifest template.`n- SampleData/demo_dataset_generator.ps1 - Synthetic Stage 1 demo dataset generator; generated images are not prepacked." } else { "- Sample validation kit was not included. Pass -IncludeSampleManifestTemplate when preparing customer validation kits." })
 
 ## Not Included
 

@@ -246,6 +246,7 @@ public static class HmiLayoutAuditService
             new("profile-3d", "3D Profile Viewer", () => new ProfileView(), false, new[] { "RunAcceptanceButton", "CancelAcceptanceButton", "ProfileSourceCombo", "ProfileSourceBadgeText", "ProfileConnectionBadgeText" }),
             new("hardware-readiness", "Hardware Readiness", () => new PilotWizardView(), false, new[] { "ProfileCombo", "StepsGrid", "StatusText", "CurrentStepText", "BlockersText", "NextActionText" }),
             new("factory-readiness", "Factory Readiness", () => SelectReportsTab(new ReportsView(), "Factory Readiness"), true, new[] { "FactoryReadinessGrid" }),
+            new("stage1-readiness", "Stage 1 Readiness", () => SelectReportsTab(new ReportsView(), "Stage 1 Readiness"), true, new[] { "Stage1ReadinessGrid", "Stage1ReadinessStatusText", "Stage1MissingEvidenceList", "Stage1NextActionText" }),
             new("standards-quality-checklist", "Standards & Quality Checklist", () => SelectReportsTab(new ReportsView(), "Standards & Quality Checklist"), true, new[] { "StandardsTraceabilityGrid", "StandardsTraceabilitySummaryText" }),
             new("management-dashboard", "Management Dashboard", () => SelectReportsTab(new ReportsView(), "Management Dashboard"), true, new[] { "ManagementDefectGrid", "ManagementRoiGrid", "ManagementModelTrendGrid" }),
             new("model-registry-acceptance", "Model Registry / Model Acceptance", () => SelectSettingsTab(new SettingsView(new MainViewModel()), "AI"), true, new[] { "ModelRegistryGrid", "ModelAcceptanceRunsGrid" }),

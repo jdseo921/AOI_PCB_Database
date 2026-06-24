@@ -86,18 +86,38 @@ This folder is ready for client software evaluation.
 4. Use Admin or Engineer role for setup, import, validation, and export tests.
 5. Follow `Docs/Client_Test_Kit_Guide.md`.
 
+## Run Stage 1 Demo in 10 Minutes
+
+1. Open PowerShell in this package folder.
+2. Generate synthetic demo data:
+   `pwsh .\SampleData\demo_dataset_generator.ps1 -OutputRoot "$PWD\SampleData\DemoSet_Quick"`
+3. Launch `app\AOI_Monitor.exe`.
+4. Open `AI / Models`.
+5. Select `SampleData\DemoSet_Quick\images`.
+6. Select `SampleData\DemoSet_Quick\customer_validation_manifest.csv`.
+7. Click `Run Dataset Preflight`.
+8. Click `Run Batch Inspection`.
+9. Export CSV and annotated images if requested.
+10. Click `Export Stage 1 Validation Package`.
+11. Open `Export & Trace > Performance Benchmark` and run against `SampleData\DemoSet_Quick\images`.
+12. Open `Export & Trace > Stage 1 Readiness`, click `Refresh`, then `Export Report`.
+13. Review `stage1_readiness_report.html`, `stage1_readiness_report.pdf`, `stage1_readiness_report.json`, `validation_summary.html`, `customer_validation_report.html`, `benchmark_report.html`, `benchmark_results.csv`, and `limitations.txt`.
+
 ## Suggested First Tests
 
 1. Confirm the readiness panel labels simulated/mock/not-connected features.
-2. Import a small non-confidential PCB image.
-3. Compare it with a golden/reference image.
-4. Record one disposition.
-5. Run a small AI Model Test batch.
-6. Export inspection/review CSV evidence.
-7. Export Factory Readiness, Client Demo Readiness, and Standards Traceability reports.
+2. Run the Stage 1 demo route above with synthetic data.
+3. Import a small non-confidential PCB image.
+4. Compare it with a golden/reference image.
+5. Record one disposition.
+6. Run a small customer dataset batch with client-supplied non-confidential data if available.
+7. Export inspection/review CSV evidence.
+8. Export Stage 1 Readiness, Factory Readiness, Client Demo Readiness, and Standards Traceability reports.
 
 ## Evidence To Return
 
+- Stage 1 readiness report folder.
+- Stage 1 validation package folder.
 - Factory readiness package.
 - Standards traceability matrix export.
 - Client demo readiness gate export.

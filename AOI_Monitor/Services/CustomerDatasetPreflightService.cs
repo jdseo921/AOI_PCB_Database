@@ -60,21 +60,24 @@ public static class CustomerDatasetPreflightService
         CustomerDatasetPreflightCriteria? criteria = null)
     {
         criteria ??= new CustomerDatasetPreflightCriteria();
+        var selectedFolder = datasetFolder?.Trim() ?? string.Empty;
+        var resolvedDatasetFolder = ResolveDatasetRoot(selectedFolder);
         var result = new CustomerDatasetPreflightResult
         {
-            DatasetFolder = datasetFolder?.Trim() ?? string.Empty,
+            DatasetFolder = resolvedDatasetFolder,
             ManifestPath = manifestPath?.Trim() ?? string.Empty,
         };
 
-        if (string.IsNullOrWhiteSpace(datasetFolder) || !Directory.Exists(datasetFolder))
+        if (string.IsNullOrWhiteSpace(selectedFolder) || !Directory.Exists(selectedFolder))
         {
             result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
-                $"The dataset folder was not found: {datasetFolder}",
+                $"The dataset folder was not found: {selectedFolder}",
                 "The customer image set cannot be checked.",
                 "Choose a readable dataset folder before running preflight."));
             return Finalize(result);
         }
 
+        datasetFolder = resolvedDatasetFolder;
         if (criteria.RequireImagesSubfolder && !Directory.Exists(Path.Combine(datasetFolder, "images")))
             result.BlockingFailures.Add(PlainLanguageGlossaryService.EvidenceMissing(
                 "The dataset folder has no images/ subfolder.",
@@ -197,6 +200,33 @@ public static class CustomerDatasetPreflightService
         }
 
         return Finalize(result);
+    }
+
+    private static string ResolveDatasetRoot(string selectedFolder)
+    {
+        if (string.IsNullOrWhiteSpace(selectedFolder))
+            return string.Empty;
+
+        try
+        {
+            var fullPath = Path.GetFullPath(selectedFolder);
+            if (Directory.Exists(Path.Combine(fullPath, "images")))
+                return fullPath;
+
+            var trimmed = fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (string.Equals(Path.GetFileName(trimmed), "images", StringComparison.OrdinalIgnoreCase))
+            {
+                var parent = Directory.GetParent(trimmed);
+                if (parent is not null && Directory.Exists(Path.Combine(parent.FullName, "images")))
+                    return parent.FullName;
+            }
+
+            return fullPath;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return selectedFolder.Trim();
+        }
     }
 
     private static void ValidateColumns(CustomerDatasetPreflightResult result, string manifestPath)

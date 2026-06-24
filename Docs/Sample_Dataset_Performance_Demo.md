@@ -25,6 +25,20 @@ The manifest columns are:
 image,ground_truth,golden_image,defect_type,side,refdes,roi_id,roi_type,lot_id,board_model,notes
 ```
 
+## Quick Demo Checklist
+
+Use this short pass before a customer walkthrough:
+
+- Generate sample data with `pwsh SampleData/demo_dataset_generator.ps1`.
+- Confirm `SampleData/DemoSet_Quick/images`, `golden`, and `customer_validation_manifest.csv` exist.
+- Confirm `folder_camera/top`, `folder_camera/side`, and `folder_camera/bottom` exist for Folder Camera Simulation.
+- Open `AI / Models`, select the generated `images` folder and manifest, then run `Check Dataset Before Test`.
+- Run `Run Batch Inspection` and confirm rows, OK/NG/REVIEW counts, false calls, possible escapes, and preview update.
+- Run `Export & Trace > Performance Benchmark` against the generated `images` folder.
+- Export the validation package from `AI / Models`.
+- Open `validation_summary.html`, `customer_validation_report.html`, `benchmark_report.html`, and `limitations.txt`.
+- Confirm every report describes the data as synthetic/demo Stage 1 evidence and does not claim real camera, lighting, robot, MES, production model, or factory validation.
+
 ## Run Stage 1 Batch Validation
 
 1. Launch `AOI_Monitor`.

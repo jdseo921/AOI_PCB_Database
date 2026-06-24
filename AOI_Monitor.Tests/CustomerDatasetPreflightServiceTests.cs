@@ -108,6 +108,22 @@ public sealed class CustomerDatasetPreflightServiceTests : IDisposable
     }
 
     [Fact]
+    public void GeneratedDemoImagesFolderPassesPreflightAgainstDatasetManifest()
+    {
+        var dataset = CreateDataset();
+        var manifest = WriteBalancedManifest(dataset, okCount: 20, bridgeCount: 15, missingCount: 15);
+        var selectedImagesFolder = Path.Combine(dataset, "images");
+
+        var result = CustomerDatasetPreflightService.Validate(selectedImagesFolder, manifest);
+
+        Assert.Equal("PASS", result.Status);
+        Assert.Equal(Path.GetFullPath(dataset), Path.GetFullPath(result.DatasetFolder));
+        Assert.Equal(50, result.ManifestRows);
+        Assert.Equal(20, result.OkCount);
+        Assert.Equal(30, result.NgCount);
+    }
+
+    [Fact]
     public void DuplicateFileHashesFailPreflight()
     {
         var dataset = CreateDataset();

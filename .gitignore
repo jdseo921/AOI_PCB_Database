@@ -74,6 +74,7 @@ appsettings.Development.json
 
 # Sample/customer image data
 # Keep README/instructions in SampleData, but do not commit image payloads by default.
+SampleData/DemoSet_Quick/
 SampleData/**/*.png
 SampleData/**/*.jpg
 SampleData/**/*.jpeg

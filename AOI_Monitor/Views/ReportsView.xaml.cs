@@ -1344,7 +1344,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
         {
             var result = await Task.Run(() => BenchmarkInspectionService.Run(dialog.Options, progress, cts.Token), cts.Token);
             WorkflowState.Instance.AddEvent("PERFORMANCE_BENCHMARK", $"Benchmark {result.Status}: count={result.CompletedCount}; p95={result.P95FrameToOverlayMs:F0} ms; realCamera={result.IsRealCameraSource}.", relatedPath: result.ReportFolder);
-            RefreshAfterExport($"Performance benchmark {result.Status}. Count={result.CompletedCount}; p95={result.P95FrameToOverlayMs:F0} ms; p99={result.P99FrameToOverlayMs:F0} ms; over1s={result.OverOneSecondCount}; throughput={result.ThroughputImagesPerMinute:F1}/min. HTML: {result.HtmlPath}. JSON: {result.JsonPath}. CSV: {result.CsvPath}. PDF: {result.PdfPath}.");
+            RefreshAfterExport($"Performance benchmark {result.Status}. Count={result.CompletedCount}; p50={result.P50FrameToOverlayMs:F0} ms; p95={result.P95FrameToOverlayMs:F0} ms; max={result.MaxFrameToOverlayMs:F0} ms; over1s={result.OverOneSecondCount}; throughput={result.ThroughputImagesPerMinute:F1}/min. HTML: {result.HtmlPath}. JSON: {result.JsonPath}. CSV: {result.CsvPath}. PDF: {result.PdfPath}.");
         }
         catch (OperationCanceledException)
         {

@@ -133,11 +133,16 @@ Model acceptance is scoped to the supplied dataset and criteria.
 From `AI Model Test`, click the validation package export action after a successful batch run. The package includes:
 
 - `validation_manifest.json`
+- `validation_summary.html`
+- `validation_summary.pdf`
 - `dataset_preflight_summary.json`
 - `validation_results.csv`
 - `validation_breakdown.csv`
+- `benchmark_results.csv`
+- `customer_validation_manifest.csv` when a manifest was selected
 - `customer_validation_report.html`
 - `customer_validation_report.pdf`
+- `limitations.txt`
 - annotated image samples when available
 - package README and print instructions
 
@@ -145,6 +150,7 @@ The package is intended for management review and customer evidence. It keeps pr
 
 Management review should check:
 
+- `validation_summary.html` for the non-technical summary, p95 timing evidence, false calls, possible escapes, and limitations.
 - `dataset_preflight_summary.json` for preflight status, blocking failures, warnings, duplicate hashes, and metadata coverage.
 - `validation_manifest.json` for package ID, run ID, dataset preflight status, acceptance status, criteria, included files, and limitations.
 - `customer_validation_report.html` or PDF for the human-readable preflight, dataset quality, false-call, and acceptance summaries.

@@ -169,7 +169,7 @@ AI Model Test is restricted to Engineer and Admin roles.
 8. Export annotated images if needed.
 9. Generate a customer validation report.
 
-The customer validation report export creates a browser-readable HTML report, a small folder of sample annotated images, and a text file explaining how to print the HTML report to PDF. The report includes project/station information, operator role, model configuration, validation metrics, inspection performance summary, confusion matrix, failed samples, prototype limitations, and a signature/approval section.
+The customer validation package export creates a concise `validation_summary.html`/PDF, the full customer validation report, CSV result files, benchmark CSV evidence when available, the source manifest copy when selected, a limitations file, and a small folder of sample annotated images. The report includes project/station information, operator role, model configuration, validation metrics, inspection performance summary, confusion matrix, failed samples, prototype limitations, and a signature/approval section.
 
 The richer manifest format supports:
 

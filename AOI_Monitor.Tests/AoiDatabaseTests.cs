@@ -1442,6 +1442,11 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.True(File.Exists(result.ManifestPath));
         Assert.True(File.Exists(Path.Combine(result.PackageFolder, "README.txt")));
         Assert.True(File.Exists(Path.Combine(result.PackageFolder, "print_to_pdf_instructions.txt")));
+        Assert.True(File.Exists(Path.Combine(result.PackageFolder, "validation_summary.html")));
+        Assert.True(File.Exists(Path.Combine(result.PackageFolder, "validation_summary.pdf")));
+        Assert.True(File.Exists(Path.Combine(result.PackageFolder, "benchmark_results.csv")));
+        Assert.True(File.Exists(Path.Combine(result.PackageFolder, "customer_validation_manifest.csv")));
+        Assert.True(File.Exists(Path.Combine(result.PackageFolder, "limitations.txt")));
         Assert.True(Directory.Exists(result.AnnotatedImagesFolder));
         Assert.Equal("FAIL", result.Acceptance.Status);
         Assert.Equal("FAIL", result.Acceptance.DatasetQualityStatus);
@@ -1461,9 +1466,16 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.True(root.GetProperty("datasetPreflightFailures").GetArrayLength() > 0);
         var included = root.GetProperty("includedFiles").EnumerateArray().ToArray();
         Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "validation_results.csv");
+        Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "validation_summary.html");
+        Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "benchmark_results.csv");
+        Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "customer_validation_manifest.csv");
+        Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "limitations.txt");
         Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "customer_validation_report.html");
         Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "validation_manifest.json");
         Assert.Contains(included, file => file.GetProperty("relativePath").GetString() == "dataset_preflight_summary.json");
+        var summaryHtml = File.ReadAllText(Path.Combine(result.PackageFolder, "validation_summary.html"));
+        Assert.Contains("P95 frame-to-overlay", summaryHtml);
+        Assert.Contains("Stage 1", summaryHtml);
         var reportHtml = File.ReadAllText(result.ReportPath);
         Assert.Contains("Dataset Preflight Gate", reportHtml);
         Assert.Contains("Dataset preflight has blocking failures", reportHtml);

@@ -3,3 +3,5 @@ images/tbox_lot07_0001_top_ok.png,OK,golden/tbox_ref_top.png,OK,top,U1,ROI-U1,co
 images/tbox_lot07_0002_bottom_ok.png,OK,golden/tbox_ref_bottom.png,OK,bottom,J1,ROI-J1,connector,LOT-EXAMPLE,TBOX,known-good bottom view
 images/tbox_lot07_0042_top_solder_bridge.png,NG,golden/tbox_ref_top.png,solder_bridge,top,U2,ROI-U2,pad,LOT-EXAMPLE,TBOX,example bridge defect
 images/tbox_lot07_0057_bottom_missing_component.png,NG,golden/tbox_ref_bottom.png,missing_component,bottom,R12,ROI-R12,component,LOT-EXAMPLE,TBOX,example missing component defect
+images/tbox_lot07_0061_top_polarity_error.png,NG,golden/tbox_ref_top.png,polarity_error,top,D5,ROI-D5,marking,LOT-EXAMPLE,TBOX,example reversed polarity marking
+images/tbox_lot07_0068_side_height_anomaly.png,NG,golden/tbox_ref_side.png,height_anomaly,side,U9,ROI-U9,body,LOT-EXAMPLE,TBOX,example height/anomaly evidence for supported engines

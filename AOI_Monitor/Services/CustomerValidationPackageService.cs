@@ -187,6 +187,11 @@ public static class CustomerValidationPackageService
         var breakdownCsvPath = Path.Combine(packageFolder, "validation_breakdown.csv");
         var reportPath = Path.Combine(packageFolder, "customer_validation_report.html");
         var reportPdfPath = Path.Combine(packageFolder, "customer_validation_report.pdf");
+        var summaryHtmlPath = Path.Combine(packageFolder, "validation_summary.html");
+        var summaryPdfPath = Path.Combine(packageFolder, "validation_summary.pdf");
+        var benchmarkCsvPath = Path.Combine(packageFolder, "benchmark_results.csv");
+        var sourceManifestCopyPath = Path.Combine(packageFolder, "customer_validation_manifest.csv");
+        var limitationsPath = Path.Combine(packageFolder, "limitations.txt");
         var instructionsPath = Path.Combine(packageFolder, "print_to_pdf_instructions.txt");
         var readmePath = Path.Combine(packageFolder, "README.txt");
         var manifestPath = Path.Combine(packageFolder, "validation_manifest.json");
@@ -240,7 +245,13 @@ public static class CustomerValidationPackageService
             "annotated_images",
             maxCount: 25,
             cancellationToken);
+        var latestBenchmark = BenchmarkInspectionService.GetLatestBenchmark();
+        var packageWarnings = new List<string>();
+        CopyLatestBenchmarkCsv(latestBenchmark, benchmarkCsvPath, packageWarnings);
+        CopySourceManifest(request.GroundTruthCsvPath, sourceManifestCopyPath, packageWarnings);
+        File.WriteAllText(limitationsPath, BuildLimitationsText(), Encoding.UTF8);
         var warnings = request.Warnings
+            .Concat(packageWarnings)
             .Concat(preflight.Warnings)
             .Concat(preflight.BlockingFailures.Select(failure => $"Dataset preflight FAIL: {failure}"))
             .Concat(assetResult.Warnings)
@@ -293,6 +304,8 @@ public static class CustomerValidationPackageService
             LatencySummary = latencySummary,
         };
 
+        File.WriteAllText(summaryHtmlPath, BuildValidationSummaryHtml(reportContext, acceptance, latestBenchmark), Encoding.UTF8);
+        PdfExportService.ExportHtmlFileToPdf(summaryHtmlPath, summaryPdfPath, "Validation Summary");
         File.WriteAllText(reportPath, CustomerValidationReportService.BuildHtml(reportContext), Encoding.UTF8);
         PdfExportService.ExportHtmlFileToPdf(reportPath, reportPdfPath, "Customer Validation Report");
         File.WriteAllText(instructionsPath, CustomerValidationReportService.BuildPrintToPdfInstructions(reportPath), Encoding.UTF8);
@@ -425,6 +438,59 @@ public static class CustomerValidationPackageService
         return CustomerDatasetPreflightService.Validate(request.DatasetFolder, request.GroundTruthCsvPath);
     }
 
+    private static void CopyLatestBenchmarkCsv(
+        BenchmarkInspectionResult? latestBenchmark,
+        string benchmarkCsvPath,
+        IList<string> warnings)
+    {
+        if (latestBenchmark is not null &&
+            !string.IsNullOrWhiteSpace(latestBenchmark.CsvPath) &&
+            File.Exists(latestBenchmark.CsvPath))
+        {
+            try
+            {
+                File.Copy(latestBenchmark.CsvPath, benchmarkCsvPath, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or PathTooLongException)
+            {
+                warnings.Add($"Latest benchmark CSV could not be copied into the validation package ({ex.GetType().Name}); a NOT_RUN placeholder was written.");
+            }
+        }
+        else
+        {
+            warnings.Add("No recent benchmark_results.csv was available; run Export & Trace > Performance Benchmark before package export to attach benchmark evidence.");
+        }
+
+        File.WriteAllText(
+            benchmarkCsvPath,
+            "Metric,Value" + Environment.NewLine +
+            "Status,NOT_RUN" + Environment.NewLine +
+            "\"Message\",\"No recent performance benchmark CSV was available when this validation package was generated.\"" + Environment.NewLine,
+            Encoding.UTF8);
+    }
+
+    private static void CopySourceManifest(
+        string groundTruthCsvPath,
+        string sourceManifestCopyPath,
+        IList<string> warnings)
+    {
+        if (string.IsNullOrWhiteSpace(groundTruthCsvPath) || !File.Exists(groundTruthCsvPath))
+        {
+            warnings.Add("No source customer validation manifest CSV was available to copy into the package.");
+            return;
+        }
+
+        try
+        {
+            File.Copy(groundTruthCsvPath, sourceManifestCopyPath, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or PathTooLongException)
+        {
+            warnings.Add($"Source customer validation manifest could not be copied into the package ({ex.GetType().Name}).");
+        }
+    }
+
     private static IEnumerable<ValidationIncludedFile> EnumerateIncludedFiles(string packageFolder)
     {
         return Directory.EnumerateFiles(packageFolder, "*", SearchOption.AllDirectories)
@@ -443,14 +509,28 @@ public static class CustomerValidationPackageService
         var fileName = Path.GetFileName(path);
         if (string.Equals(fileName, "validation_manifest.json", StringComparison.OrdinalIgnoreCase))
             return "Manifest";
+        if (string.Equals(fileName, "customer_validation_manifest.csv", StringComparison.OrdinalIgnoreCase))
+            return "CSV source manifest";
         if (string.Equals(fileName, "validation_results.csv", StringComparison.OrdinalIgnoreCase))
             return "CSV results";
         if (string.Equals(fileName, "validation_breakdown.csv", StringComparison.OrdinalIgnoreCase))
             return "CSV validation breakdown";
+        if (string.Equals(fileName, "benchmark_results.csv", StringComparison.OrdinalIgnoreCase))
+            return "CSV performance benchmark";
+        if (string.Equals(fileName, "validation_summary.html", StringComparison.OrdinalIgnoreCase))
+            return "HTML validation summary";
+        if (string.Equals(fileName, "validation_summary.pdf", StringComparison.OrdinalIgnoreCase))
+            return "PDF validation summary";
         if (string.Equals(fileName, "customer_validation_report.html", StringComparison.OrdinalIgnoreCase))
             return "HTML report";
         if (string.Equals(fileName, "customer_validation_report.pdf", StringComparison.OrdinalIgnoreCase))
             return "PDF report";
+        if (string.Equals(fileName, "dataset_preflight_summary.json", StringComparison.OrdinalIgnoreCase))
+            return "Dataset preflight summary";
+        if (string.Equals(fileName, "pilot_issue_summary.json", StringComparison.OrdinalIgnoreCase))
+            return "Pilot issue summary";
+        if (string.Equals(fileName, "limitations.txt", StringComparison.OrdinalIgnoreCase))
+            return "Limitations";
         if (string.Equals(fileName, "print_to_pdf_instructions.txt", StringComparison.OrdinalIgnoreCase))
             return "Print-to-PDF instructions";
         if (string.Equals(fileName, "README.txt", StringComparison.OrdinalIgnoreCase))
@@ -483,18 +563,24 @@ public static class CustomerValidationPackageService
 
         Contents:
         - validation_manifest.json: versioned manifest and acceptance summary.
+        - validation_summary.html: concise client-readable summary with metrics, p95 timing evidence, and limitations.
+        - validation_summary.pdf: native PDF rendering of the concise summary.
         - validation_results.csv: per-image validation results exported from the batch run.
         - validation_breakdown.csv: per-class, per-side, and per-ROI validation breakdown.
+        - benchmark_results.csv: latest performance benchmark CSV when available, or a NOT_RUN placeholder.
+        - customer_validation_manifest.csv: copy of the selected source manifest when available.
         - pilot_issue_summary.json: open customer pilot issue counts and non-image issue details for this board/lot.
         - customer_validation_report.html: browser-readable customer validation report.
         - customer_validation_report.pdf: native PDF rendering of the customer validation report.
+        - limitations.txt: plain-language Stage 1 prototype and integration limitations.
         - print_to_pdf_instructions.txt: browser print-to-PDF workflow.
         - annotated_images/: generated overlays only. Raw source customer datasets are not copied into this package.
 
         How to inspect:
         1. Open validation_manifest.json and confirm packageId, runId, acceptanceStatus, criteria, and includedFiles.
-        2. Open customer_validation_report.html to review metrics, acceptance notes, limitations, and sample overlays.
-        3. Open validation_results.csv to audit row-level results against the ground-truth manifest.
+        2. Open validation_summary.html for the non-technical summary.
+        3. Open customer_validation_report.html to review metrics, acceptance notes, limitations, and sample overlays.
+        4. Open validation_results.csv to audit row-level results against the ground-truth manifest.
 
         Prototype limitations:
         {string.Join(Environment.NewLine, CustomerValidationReportContext.DefaultPrototypeLimitations.Select(item => $"- {item}"))}
@@ -503,6 +589,95 @@ public static class CustomerValidationPackageService
         {warningText}
 
         """;
+    }
+
+    private static string BuildValidationSummaryHtml(
+        CustomerValidationReportContext context,
+        ValidationAcceptanceSummary acceptance,
+        BenchmarkInspectionResult? benchmark)
+    {
+        var rows = context.Rows.ToArray();
+        var benchmarkAvailable = benchmark is { CompletedCount: > 0 };
+        var overOneSecond = benchmarkAvailable
+            ? benchmark!.OverOneSecondCount.ToString(CultureInfo.InvariantCulture)
+            : context.LatencySummary.OverOneSecondCount.ToString(CultureInfo.InvariantCulture);
+        var p95 = benchmarkAvailable
+            ? FormatMilliseconds(benchmark!.P95FrameToOverlayMs)
+            : context.LatencySummary.TraceCount > 0
+                ? $"{FormatMilliseconds(context.LatencySummary.P95FrameToOverlayMs)} batch latency"
+                : "Not available";
+
+        var sb = new StringBuilder();
+        sb.AppendLine("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Validation Summary</title>");
+        sb.AppendLine("<style>body{font-family:Segoe UI,Arial,sans-serif;margin:28px;color:#1d252c;line-height:1.45}h1{margin-bottom:4px}.notice{border-left:5px solid #d9951b;background:#fff8e8;padding:10px 12px;margin:16px 0}table{border-collapse:collapse;width:100%;margin:12px 0 20px}td,th{border:1px solid #c4cdd3;padding:8px;text-align:left;vertical-align:top}th{background:#edf2f5}.k{width:260px;font-weight:700;background:#f7fafb}</style>");
+        sb.AppendLine("</head><body>");
+        sb.AppendLine("<h1>Stage 1 Validation Summary</h1>");
+        sb.AppendLine($"<p>Generated {Html(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))} for package review.</p>");
+        sb.AppendLine("<div class=\"notice\"><strong>Prototype boundary:</strong> This package documents local Stage 1 image-validation evidence only. It does not prove live camera, lighting, robot, PLC, production MES, safety, or production model readiness.</div>");
+        sb.AppendLine("<table><tr><th colspan=\"2\">Result Overview</th></tr>");
+        AppendSummaryRow("Acceptance status", acceptance.Status);
+        AppendSummaryRow("Total images", rows.Length.ToString(CultureInfo.InvariantCulture));
+        AppendSummaryRow("OK / NG / REVIEW", $"{context.Metrics.OkCount} / {context.Metrics.NgCount} / {context.Metrics.ReviewCount}");
+        AppendSummaryRow("Accuracy", FormatPercent(context.Metrics.Accuracy));
+        AppendSummaryRow("Precision", FormatPercent(context.Metrics.Precision));
+        AppendSummaryRow("Recall", FormatPercent(context.Metrics.Recall));
+        AppendSummaryRow("False calls / possible escapes", $"{context.Metrics.FalseCall} / {context.Metrics.PossibleEscape}");
+        AppendSummaryRow("Engine / model", $"{context.EngineName} / {context.ModelVersion}");
+        AppendSummaryRow("Dataset folder", context.DatasetFolder);
+        AppendSummaryRow("Ground-truth manifest", context.GroundTruthFile);
+        sb.AppendLine("</table>");
+
+        sb.AppendLine("<table><tr><th colspan=\"2\">Performance Evidence</th></tr>");
+        AppendSummaryRow("Latest benchmark status", benchmarkAvailable ? $"{benchmark!.Status} ({benchmark.SourceKind})" : "Not attached");
+        AppendSummaryRow("P50 frame-to-overlay", benchmarkAvailable ? FormatMilliseconds(benchmark!.P50FrameToOverlayMs) : "Not available");
+        AppendSummaryRow("P95 frame-to-overlay", p95);
+        AppendSummaryRow("Max frame-to-overlay", benchmarkAvailable ? FormatMilliseconds(benchmark!.MaxFrameToOverlayMs) : FormatMilliseconds(context.LatencySummary.MaxFrameToOverlayMs));
+        AppendSummaryRow("Images per minute", benchmarkAvailable ? benchmark!.ThroughputImagesPerMinute.ToString("F1", CultureInfo.InvariantCulture) : "Not available");
+        AppendSummaryRow("Over 1 second", overOneSecond);
+        AppendSummaryRow(
+            "P95 load/preprocess/inference/overlay/persist",
+            benchmarkAvailable
+                ? $"{FormatMilliseconds(benchmark!.P95LoadMs)} / {FormatMilliseconds(benchmark.P95PreprocessingMs)} / {FormatMilliseconds(benchmark.P95InferenceMs)} / {FormatMilliseconds(benchmark.P95OverlayMs)} / {FormatMilliseconds(benchmark.P95PersistenceMs)}"
+                : "Not available");
+        sb.AppendLine("</table>");
+
+        sb.AppendLine("<h2>Acceptance Notes</h2>");
+        AppendSummaryList(acceptance.Messages);
+        sb.AppendLine("<h2>Limitations</h2>");
+        AppendSummaryList(context.PrototypeLimitations);
+        sb.AppendLine("</body></html>");
+        return sb.ToString();
+
+        void AppendSummaryRow(string label, string value)
+        {
+            sb.AppendLine($"<tr><td class=\"k\">{Html(label)}</td><td>{Html(value)}</td></tr>");
+        }
+
+        void AppendSummaryList(IReadOnlyList<string> values)
+        {
+            if (values.Count == 0)
+            {
+                sb.AppendLine("<p>None recorded.</p>");
+                return;
+            }
+
+            sb.AppendLine("<ul>");
+            foreach (var value in values)
+                sb.AppendLine($"<li>{Html(value)}</li>");
+            sb.AppendLine("</ul>");
+        }
+    }
+
+    private static string BuildLimitationsText()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("AOI Monitor Stage 1 Prototype Limitations");
+        sb.AppendLine();
+        foreach (var limitation in CustomerValidationReportContext.DefaultPrototypeLimitations)
+            sb.AppendLine($"- {limitation}");
+        sb.AppendLine();
+        sb.AppendLine("Generated sample datasets and Folder Camera Simulation are not real camera, lighting, robot, PLC, MES, ERP, safety, cybersecurity, or factory acceptance evidence.");
+        return sb.ToString();
     }
 
     private static string BuildDatabaseSummary(
@@ -514,6 +689,12 @@ public static class CustomerValidationPackageService
             CultureInfo.InvariantCulture,
             $"status={acceptance.Status}; accuracy={metrics.Accuracy:P1}; precision={metrics.Precision:P1}; recall={metrics.Recall:P1}; falseCallRate={metrics.FalseCallRate:P1}; overOneSecond={performance.CountOverOneSecond}");
     }
+
+    private static string FormatMilliseconds(double value)
+        => value <= 0 ? "Not available" : $"{value:F1} ms";
+
+    private static string Html(string value)
+        => System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
 
     private static DateTime ToReportTimestamp(DateTime? runCreatedAtUtc, DateTime generatedAtUtc)
     {

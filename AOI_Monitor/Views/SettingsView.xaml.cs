@@ -204,6 +204,7 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
             return;
 
         UiPreferencesService.Save(newUiPreferences);
+        UiPreferencesService.ApplyToApplication(newUiPreferences, resizeWindowToPreset: true);
         ApplyLanguageVisuals();
         if (!ApplyStorageRoot(newStorageRoot, storageRootChanged))
             return;

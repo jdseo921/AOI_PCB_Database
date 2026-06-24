@@ -89,6 +89,7 @@ public static class UiPreferencesService
         ["module map"] = "모듈 맵",
         ["Run Inspection"] = "검사 실행",
         ["board execution"] = "보드 실행",
+        ["embedded run, large image view"] = "내장 실행, 큰 이미지 보기",
         ["Review Defects"] = "결함 검토",
         ["evidence and disposition"] = "증빙 및 처분",
         ["Analyze Yield"] = "수율 분석",
@@ -103,6 +104,7 @@ public static class UiPreferencesService
         ["library, folders, golden refs"] = "라이브러리, 폴더, 기준 이미지",
         ["Golden Compare"] = "기준 비교",
         ["template match, difference score"] = "템플릿 매칭, 차이 점수",
+        ["embedded compare, large image view"] = "내장 비교, 큰 이미지 보기",
         ["Defect Review"] = "결함 검토",
         ["queue, evidence, disposition"] = "대기열, 증빙, 처분",
         ["Recipe Rules"] = "레시피 규칙",
@@ -154,7 +156,7 @@ public static class UiPreferencesService
         ["Inspection Basis"] = "검사 기준",
         ["Image validation PoC"] = "이미지 검증 PoC",
         ["Primary Modules"] = "주요 모듈",
-        ["Focused Workflow Windows"] = "집중 워크플로 창",
+        ["Focused Workflow Menus"] = "집중 워크플로 메뉴",
         ["AOI Inspection Pipeline"] = "AOI 검사 파이프라인",
         ["Input"] = "입력",
         ["PNG/JPG, AOI files, golden images"] = "PNG/JPG, AOI 파일, 기준 이미지",
@@ -168,12 +170,12 @@ public static class UiPreferencesService
         ["Critical defects"] = "치명 결함",
         ["Capabilities represented in the redesigned workflow"] = "재설계 워크플로에 반영된 기능",
         ["Capability groups"] = "기능 그룹",
-        ["Board and image management, defect detection algorithms, processing and tolerance rules, and output traceability are split into dedicated windows so dense inspection work does not crowd the main review screen."] = "보드/이미지 관리, 결함 검출 알고리즘, 처리/공차 규칙, 출력 추적성을 전용 창으로 분리하여 복잡한 검사 작업이 메인 검토 화면을 혼잡하게 만들지 않도록 합니다.",
+        ["Board and image management, defect detection algorithms, processing and tolerance rules, and output traceability are split into focused menus so dense inspection work does not crowd the main review screen. Image-heavy panels provide a separate large-image viewer when operators need more detail."] = "보드/이미지 관리, 결함 검출 알고리즘, 처리/공차 규칙, 출력 추적성을 집중 메뉴로 분리하여 복잡한 검사 작업이 메인 검토 화면을 혼잡하게 만들지 않도록 합니다. 자세한 확인이 필요한 이미지 중심 패널은 별도의 큰 이미지 보기를 제공합니다.",
         ["Recent Jobs"] = "최근 작업",
         ["Current Evidence Boundary"] = "현재 증빙 경계",
         ["Stage 1 image-validation evidence is visible and usable. Real camera, lighting, robot, and MES readiness must be validated through Hardware Readiness evidence before it can be represented as production hardware readiness."] = "1단계 이미지 검증 증빙은 표시되고 사용할 수 있습니다. 실제 카메라, 조명, 로봇, MES 준비성은 운영 하드웨어 준비성으로 표현하기 전에 하드웨어 준비성 증빙으로 검증되어야 합니다.",
-        ["Separated-window design rule"] = "분리 창 설계 규칙",
-        ["Use the home map to enter the narrow window needed for the task. New features should become a focused page, tab, or dialog when they would crowd inspection, review, settings, or export workflows."] = "홈 맵에서 작업에 필요한 좁은 범위의 창으로 이동하십시오. 새 기능이 검사, 검토, 설정 또는 내보내기 워크플로를 혼잡하게 만들 경우 집중 페이지, 탭 또는 대화 상자로 분리해야 합니다.",
+        ["Focused workflow design rule"] = "집중 워크플로 설계 규칙",
+        ["Use the home map to enter the focused menu needed for the task. New features should become a focused page, tab, or image viewer dialog when they would crowd inspection, review, settings, or export workflows."] = "홈 맵에서 작업에 필요한 집중 메뉴로 이동하십시오. 새 기능이 검사, 검토, 설정 또는 내보내기 워크플로를 혼잡하게 만들 경우 집중 페이지, 탭 또는 이미지 보기 대화 상자로 분리해야 합니다.",
         ["Operator Guardrails"] = "작업자 보호 규칙",
         ["Operator comfort defaults that do not hide audit or hardware boundary information."] = "감사 또는 하드웨어 경계 정보를 숨기지 않는 작업자 편의 기본값입니다.",
         ["Comfort settings cannot suppress critical alarms, hide simulated hardware banners, remove export verification, or bypass audit evidence."] = "편의 설정은 치명 알람 억제, 시뮬레이션 하드웨어 배너 숨김, 내보내기 검증 제거, 감사 증빙 우회를 허용하지 않습니다.",
@@ -390,7 +392,7 @@ public static class UiPreferencesService
             string.Equals(left.BrandLogoPath, right.BrandLogoPath, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static void ApplyToApplication(UiPreferences? preferences = null)
+    public static void ApplyToApplication(UiPreferences? preferences = null, bool resizeWindowToPreset = false)
     {
         var current = preferences ?? Load();
         var culture = current.Language == UiLanguage.Korean ? new CultureInfo("ko-KR") : new CultureInfo("en-US");
@@ -405,7 +407,7 @@ public static class UiPreferencesService
         {
             try
             {
-                app.Dispatcher.BeginInvoke(() => ApplyWindowPreferences(current, culture));
+                app.Dispatcher.BeginInvoke(() => ApplyWindowPreferences(current, culture, resizeWindowToPreset));
             }
             catch (Exception ex)
             {
@@ -415,10 +417,10 @@ public static class UiPreferencesService
             return;
         }
 
-        ApplyWindowPreferences(current, culture);
+        ApplyWindowPreferences(current, culture, resizeWindowToPreset);
     }
 
-    private static void ApplyWindowPreferences(UiPreferences current, CultureInfo culture)
+    private static void ApplyWindowPreferences(UiPreferences current, CultureInfo culture, bool resizeWindowToPreset)
     {
         ApplyThemeResources(current.Theme);
 
@@ -447,12 +449,20 @@ public static class UiPreferencesService
             _ => (1920d, 1080d),
         };
 
-        mainWindow.MinWidth = 1600;
-        mainWindow.MinHeight = 900;
+        mainWindow.MinWidth = 1180;
+        mainWindow.MinHeight = 720;
         if (mainWindow.WindowState == WindowState.Normal)
         {
-            mainWindow.Width = Math.Max(mainWindow.Width, Math.Min(width, SystemParameters.WorkArea.Width));
-            mainWindow.Height = Math.Max(mainWindow.Height, Math.Min(height, SystemParameters.WorkArea.Height));
+            if (resizeWindowToPreset)
+            {
+                mainWindow.Width = Math.Min(width, SystemParameters.WorkArea.Width);
+                mainWindow.Height = Math.Min(height, SystemParameters.WorkArea.Height);
+            }
+            else
+            {
+                mainWindow.Width = Math.Min(mainWindow.Width, SystemParameters.WorkArea.Width);
+                mainWindow.Height = Math.Min(mainWindow.Height, SystemParameters.WorkArea.Height);
+            }
         }
 
         ApplyLocalization(mainWindow, current.Language);

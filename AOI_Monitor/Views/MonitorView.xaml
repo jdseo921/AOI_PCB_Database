@@ -21,6 +21,7 @@
       <Setter Property="Margin" Value="0,4,0,4"/>
     </Style>
   </UserControl.Resources>
+  <ScrollViewer Style="{StaticResource FactoryScrollablePage}">
   <Grid Margin="8">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
@@ -84,7 +85,14 @@
           </Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
-              <TextBlock x:Name="ImageStatusText" DockPanel.Dock="Right" Text="No image loaded" Foreground="#9AA6AF" FontSize="14"/>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock x:Name="ImageStatusText" Text="No image loaded" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <Button x:Name="OpenInspectionImageViewerButton"
+                        Style="{StaticResource MiniBtn}"
+                        Content="Large Image"
+                        MinWidth="112"
+                        Click="OnOpenImageViewerClick"/>
+              </StackPanel>
               <TextBlock Text="Image / Simulated Live Feed" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
             </DockPanel>
           </Border>
@@ -140,7 +148,7 @@
             </Grid>
           </Border>
 
-          <Border Grid.Row="3" Margin="8,0,8,8" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
+          <Border x:Name="InspectionImageViewport" Grid.Row="3" Margin="8,0,8,8" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
             <Grid ClipToBounds="True">
               <TextBlock x:Name="EmptyImageText" Text="Select a folder or load an image from Image Library, then press Start / Next Board."
                          Foreground="#68757D" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
@@ -288,11 +296,12 @@
           <DataGrid.Columns>
             <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="96" MinWidth="96"/>
             <DataGridTextColumn Header="Event" Binding="{Binding Event}" Width="150" MinWidth="150"/>
-            <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+            <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" MinWidth="900" ElementStyle="{StaticResource HmiDataGridCellText}"/>
           </DataGrid.Columns>
         </DataGrid>
       </Grid>
     </Border>
   </Grid>
+  </ScrollViewer>
 </UserControl>
 

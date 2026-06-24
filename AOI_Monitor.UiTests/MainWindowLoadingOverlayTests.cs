@@ -35,44 +35,41 @@ public sealed class MainWindowLoadingOverlayTests
     }
 
     [Fact]
-    public void ShellKeepsSimplifiedTopLevelNavigationItemsInOnePanel()
+    public void HomeKeepsWorkflowNavigationItemsInLargeModuleMap()
     {
         RunOnSta(() =>
         {
             EnsureApplicationResources();
-            var window = new MainWindow();
-            try
-            {
-                var navItems = GetNamedElement<ItemsControl>(window, "TopLevelNavItems");
-                var panel = Assert.IsType<StackPanel>(navItems.ItemsPanel.LoadContent());
+            var viewModel = new MainViewModel();
+            var home = new AOI_Monitor.Views.HomeView { DataContext = viewModel };
+            home.Measure(new Size(1920, 1080));
+            home.Arrange(new Rect(0, 0, 1920, 1080));
+            home.UpdateLayout();
 
-                var keys = navItems.Items.OfType<NavPage>().Select(page => page.Key).ToArray();
+            var navItems = GetNamedElement<ItemsControl>(home, "HomeModuleItems");
+            var panel = Assert.IsType<UniformGrid>(navItems.ItemsPanel.LoadContent());
+            var keys = viewModel.NavPages.Select(page => page.Key).ToArray();
 
-                Assert.Equal(13, navItems.Items.Count);
-                Assert.Equal(Orientation.Vertical, panel.Orientation);
-                Assert.Equal(
-                    new[]
-                    {
-                        "home",
-                        "library",
-                        "monitor",
-                        "compare",
-                        "review",
-                        "recipe",
-                        "modeltest",
-                        "spc",
-                        "reports",
-                        "calibration",
-                        "profile",
-                        "pilot",
-                        "settings",
-                    },
-                    keys);
-            }
-            finally
-            {
-                window.Close();
-            }
+            Assert.Equal(13, viewModel.NavPages.Count);
+            Assert.Equal(4, panel.Columns);
+            Assert.Equal(
+                new[]
+                {
+                    "home",
+                    "library",
+                    "monitor",
+                    "compare",
+                    "review",
+                    "recipe",
+                    "modeltest",
+                    "spc",
+                    "reports",
+                    "calibration",
+                    "profile",
+                    "pilot",
+                    "settings",
+                },
+                keys);
         });
     }
 
@@ -102,6 +99,33 @@ public sealed class MainWindowLoadingOverlayTests
                     var page = Assert.IsAssignableFrom<UserControl>(createPage.Invoke(window, new object[] { key }));
                     Assert.NotNull(page);
                 }
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void ShellHomeButtonReturnsWorkflowToHome()
+    {
+        RunOnSta(() =>
+        {
+            EnsureApplicationResources();
+            var window = new MainWindow();
+            try
+            {
+                var viewModel = Assert.IsType<MainViewModel>(window.DataContext);
+                var viewModelField = typeof(MainWindow).GetField("_vm", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?? throw new InvalidOperationException("_vm field was not found.");
+                viewModelField.SetValue(window, viewModel);
+                viewModel.CurrentPage = "compare";
+
+                var homeButton = GetNamedElement<Button>(window, "HomeNavBtn");
+                homeButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+
+                Assert.Equal("home", viewModel.CurrentPage);
             }
             finally
             {
@@ -151,6 +175,13 @@ public sealed class MainWindowLoadingOverlayTests
         var field = typeof(MainWindow).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
             ?? throw new InvalidOperationException($"{fieldName} was not found.");
         return (T)field.GetValue(window)!;
+    }
+
+    private static T GetNamedElement<T>(FrameworkElement root, string name)
+        where T : FrameworkElement
+    {
+        return (T)(root.FindName(name)
+            ?? throw new InvalidOperationException($"{name} was not found."));
     }
 
     private static void RunOnSta(Action action)

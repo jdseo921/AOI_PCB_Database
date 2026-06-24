@@ -163,7 +163,7 @@
         <DataGrid Grid.Row="1" x:Name="SchemaGrid" MaxHeight="170" Style="{StaticResource HmiDenseTable}" MinWidth="720">
           <DataGrid.Columns>
             <DataGridTextColumn Header="Table"   Binding="{Binding Table}"   Width="150" MinWidth="150"/>
-            <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" Width="470" MinWidth="470"/>
+            <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" Width="470" MinWidth="470" ElementStyle="{StaticResource HmiDataGridCellText}"/>
             <DataGridTextColumn Header="Status"  Binding="{Binding Status}"  Width="96" MinWidth="96"/>
           </DataGrid.Columns>
         </DataGrid>

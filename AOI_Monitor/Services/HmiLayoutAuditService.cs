@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using AOI_Monitor.ViewModels;
 using AOI_Monitor.Views;
@@ -102,7 +103,6 @@ public static class HmiLayoutAuditService
         "LightBackgroundInDarkHmi",
         "ShellChromeTooTall",
         "ExpandedEmptyAlarmPanel",
-        "CrowdedWorkflowToolbar",
     };
 
     public static HmiLayoutAuditReport RunAudit(HmiLayoutAuditOptions? options = null)
@@ -221,10 +221,11 @@ public static class HmiLayoutAuditService
             new("shell-3d-profile", "Shell - 3D Profile", () => CreateShellRoute("profile"), false, ShellRequiredControls),
             new("shell-hardware-readiness", "Shell - Hardware Readiness", () => CreateShellRoute("pilot"), false, ShellRequiredControls),
             new("shell-system-settings", "Shell - System Settings", () => CreateShellRoute("settings"), false, ShellRequiredControls),
-            new("home", "AOI Defect Console Home", () => new HomeView { DataContext = new MainViewModel() }, true, new[] { "HomeModuleItems" }),
+            new("image-viewer-window", "Image Viewer Window", () => CreateImageViewerRoute(), false, new[] { "ViewerTitleText", "ViewerCriticalText", "ViewerScrollHost", "ImageViewportHost", "ViewerImage", "FitImageButton", "ActualSizeButton", "ZoomOutButton", "ZoomInButton", "SaveImageButton", "CloseViewerButton" }),
+            new("home", "AOI Defect Console Home", () => new HomeView { DataContext = new MainViewModel() }, true, new[] { "HomeModuleItems", "HomeDatabaseStatusText", "HomeEngineStatusText", "HomeCameraStatusText", "HomeMesStatusText", "HomeVerdictText", "HomeAlarmSummaryText" }),
             new("board-image-library", "Board & Image Library", () => new LibraryView(), false, new[] { "RecordsGrid", "SchemaGrid", "ImportStatusText", "CancelImportButton" }),
-            new("main-inspection", "Main Inspection", () => new MonitorView(), false, new[] { "StartInspectionButton", "StopInspectionButton", "NextBoardButton", "SaveResultButton", "DefectGrid", "CalibrationProfileCombo" }),
-            new("golden-compare", "Golden Template Compare", () => new CompareView(), false, new[] { "FindingsGrid", "DiffScoreText", "DefectCanvasViewbox", "GoldenCanvasViewbox" }),
+            new("main-inspection", "Main Inspection", () => new MonitorView(), false, new[] { "StartInspectionButton", "StopInspectionButton", "NextBoardButton", "SaveResultButton", "OpenInspectionImageViewerButton", "InspectionImageViewport", "DefectGrid", "CalibrationProfileCombo" }),
+            new("golden-compare", "Golden Template Compare", () => new CompareView(), false, new[] { "FindingsGrid", "DiffScoreText", "OpenDefectImageViewerButton", "OpenGoldenImageViewerButton", "DefectImageViewport", "GoldenImageViewport", "DefectCanvasViewbox", "GoldenCanvasViewbox" }),
             new("defect-review", "Defect Review", () => new ReviewView(), false, new[] { "QueueGrid", "ReviewCanvasViewbox" }),
             new("recipe-editor", "Recipe Editor", () => new RecipeView(), false, new[] { "RecipeNameText", "RoiGrid", "ViewportCanvas", "RecipeEmptyStateCard" }),
             new("ai-model-test", "AI Model Test", () => new AIModelTestView(), true, new[] { "CancelWorkButton", "ResultsGrid", "FolderPathText", "GroundTruthPathText" }),
@@ -275,22 +276,20 @@ public static class HmiLayoutAuditService
     private static readonly string[] ShellRequiredControls =
     {
         "BrandTitleText",
+        "StationNameText",
         "HeaderUserText",
         "HeaderRoleText",
         "HeaderEngineText",
-        "ActiveAlarmsExpander",
+        "HomeNavBtn",
+        "OperatingModeBannerText",
+        "DeploymentProfileBannerText",
+        "ActiveAlarmsButton",
+        "AccessPanelButton",
         "ActiveAlarmHeaderText",
-        "TopLevelNavItems",
-        "TopLevelNavScrollViewer",
-        "PageTitleText",
-        "WorkflowToolbarPanel",
-        "WorkflowSampleText",
-        "WorkflowGoldenText",
-        "WorkflowScoreText",
-        "WorkflowVerdictText",
-        "RefreshPageBtn",
-        "LockRecipeBtn",
-        "ExportBtn",
+        "PageContent",
+        "FooterRecordCountText",
+        "FooterImageLinkText",
+        "FooterDbRevText",
         "FooterStationText",
     };
 
@@ -306,26 +305,18 @@ public static class HmiLayoutAuditService
         SetText(window, "HeaderUserText", "Engineer01.CustomerValidationShiftLeadWithLongName");
         SetText(window, "HeaderRoleText", "Admin / Shift Lead");
         SetText(window, "HeaderEngineText", "Pixel Difference Prototype Engine With ONNX Candidate Adapter Boundary");
-        SetText(window, "InspectionEngineStatusText", "Pixel Difference Prototype Engine With ONNX Candidate Adapter Boundary");
-        SetText(window, "DatabaseStatusText", "Connected via local SQLite evidence cache");
-        SetText(window, "ImageVaultStatusText", "Available with managed long-path image vault");
-        SetText(window, "CameraStatusText", "Not Connected / Stage 2 Camera Pilot Boundary");
-        SetText(window, "LightingStatusText", "Not Connected / Lighting Boundary");
-        SetText(window, "RobotStatusText", "Not Connected / Robot Cell Boundary");
-        SetText(window, "MesStatusText", "Not Connected / MES Traceability Boundary");
-        SetText(window, "EmergencyStopStatusText", "Not Connected / Safety Boundary");
-        SetText(window, "PageTitleText", $"SHELL ROUTE CHECK / {route.ToUpperInvariant()} / LONG LOCALIZED PAGE TITLE");
-        SetText(window, "WorkflowSampleText", "sample_customer_board_revision_A_panel_000123_top_side_long_filename.png");
-        SetText(window, "WorkflowGoldenText", "golden_reference_customer_board_revision_A_approved_baseline_long_filename.png");
-        SetText(window, "WorkflowScoreText", "99.999%");
-        SetText(window, "WorkflowVerdictText", "REVIEW - LONG STATUS");
         SetText(window, "ActiveAlarmHeaderText", "none");
         SetText(window, "ActiveAlarmSummaryText", "No active alarms.");
+        SetText(window, "FooterRecordCountText", "123456");
+        SetText(window, "FooterImageLinkText", "123456/123456");
+        SetText(window, "FooterDbRevText", "SQLite local revision");
         SetText(window, "FooterStationText", "AOI-LIB-LINE-02-STATION-WEST");
         SetText(window, "FooterIndexText", "Images OK / Long Index Status");
         SetText(window, "FooterDbUpdatedText", "06-23 12:30");
-        if (FindByName(window, "ActiveAlarmsExpander") is Expander expander)
-            expander.IsExpanded = false;
+        if (FindByName(window, "ActiveAlarmsPopup") is Popup alarmPopup)
+            alarmPopup.IsOpen = false;
+        if (FindByName(window, "AccessPanelPopup") is Popup accessPopup)
+            accessPopup.IsOpen = false;
 
         if (window.Content is FrameworkElement root)
         {
@@ -337,6 +328,33 @@ public static class HmiLayoutAuditService
         }
 
         return window;
+    }
+
+    private static FrameworkElement CreateImageViewerRoute()
+    {
+        var visual = new DrawingVisual();
+        using (var context = visual.RenderOpen())
+        {
+            context.DrawRectangle(new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0E1214")), null, new Rect(0, 0, 900, 560));
+            context.DrawRectangle(new SolidColorBrush((Color)ColorConverter.ConvertFromString("#164321")), new Pen(new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5A8C59")), 3), new Rect(90, 70, 680, 390));
+            context.DrawRectangle(Brushes.Transparent, new Pen(new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334")), 4), new Rect(320, 220, 190, 120));
+            context.DrawText(
+                new FormattedText(
+                    "AOI image viewer audit snapshot",
+                    CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface("Segoe UI"),
+                    28,
+                    new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E8EEF2")),
+                    1.0),
+                new Point(120, 480));
+        }
+
+        var bitmap = new RenderTargetBitmap(900, 560, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        if (bitmap.CanFreeze)
+            bitmap.Freeze();
+        return new AOI_Monitor.ImageViewerWindow("AOI Image Viewer / Audit Snapshot", bitmap);
     }
 
     private static void SetText(FrameworkElement root, string name, string value)
@@ -661,20 +679,14 @@ public static class HmiLayoutAuditService
             }
         }
 
-        if (FindByName(root, "ActiveAlarmsExpander") is Expander { IsExpanded: true } &&
+        if (FindByName(root, "ActiveAlarmsPopup") is Popup { IsOpen: true } &&
             FindByName(root, "ActiveAlarmHeaderText") is TextBlock header &&
             header.Text.Equals("none", StringComparison.OrdinalIgnoreCase))
         {
-            issues.Add(CreateIssue(definition, dpiScale, "ExpandedEmptyAlarmPanel", "ActiveAlarmsExpander", HmiLayoutIssueSeverity.Fail,
-                "Active Alarms must stay compact/collapsed when no actionable alarm is present."));
+            issues.Add(CreateIssue(definition, dpiScale, "ExpandedEmptyAlarmPanel", "ActiveAlarmsPopup", HmiLayoutIssueSeverity.Fail,
+                "Active Alarms detail must stay in the flyout and remain closed when no actionable alarm is present."));
         }
 
-        if (FindByName(root, "WorkflowToolbarPanel") is FrameworkElement toolbar &&
-            toolbar.ActualHeight > 92)
-        {
-            issues.Add(CreateIssue(definition, dpiScale, "CrowdedWorkflowToolbar", "WorkflowToolbarPanel", HmiLayoutIssueSeverity.Warn,
-                $"Workflow toolbar wrapped too tall. Actual height={toolbar.ActualHeight:N0}; review chip widths and action placement."));
-        }
     }
 
     private static Size MeasureTextBlock(TextBlock source, double width)
@@ -922,6 +934,20 @@ public static class HmiLayoutAuditService
 
     private static void MeasureElement(FrameworkElement element, double width, double height)
     {
+        if (element is Window { Content: FrameworkElement content })
+        {
+            element.Width = width;
+            element.Height = height;
+            element.Visibility = Visibility.Visible;
+            content.Width = width;
+            content.Height = height;
+            content.Measure(new Size(width, height));
+            content.Arrange(new Rect(0, 0, width, height));
+            content.UpdateLayout();
+            element.UpdateLayout();
+            return;
+        }
+
         element.Width = width;
         element.Height = height;
         element.Measure(new Size(width, height));
@@ -943,15 +969,40 @@ public static class HmiLayoutAuditService
     }
 
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+        => Descendants(root, new HashSet<DependencyObject>());
+
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject root, ISet<DependencyObject> visited)
     {
-        var count = VisualTreeHelper.GetChildrenCount(root);
+        var count = root is Visual or Visual3D
+            ? VisualTreeHelper.GetChildrenCount(root)
+            : 0;
         for (var i = 0; i < count; i++)
         {
             var child = VisualTreeHelper.GetChild(root, i);
+            if (!visited.Add(child))
+                continue;
+
             yield return child;
-            foreach (var descendant in Descendants(child))
+            foreach (var descendant in Descendants(child, visited))
                 yield return descendant;
         }
+
+        foreach (var child in LogicalChildren(root))
+        {
+            if (!visited.Add(child))
+                continue;
+
+            yield return child;
+            foreach (var descendant in Descendants(child, visited))
+                yield return descendant;
+        }
+    }
+
+    private static IEnumerable<DependencyObject> LogicalChildren(DependencyObject root)
+    {
+        if (root is Window { Content: DependencyObject windowContent })
+            yield return windowContent;
+
     }
 
     private static IEnumerable<DependencyObject> DescendantsAndSelf(DependencyObject root)

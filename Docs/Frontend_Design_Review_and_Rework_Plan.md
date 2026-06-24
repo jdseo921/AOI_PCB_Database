@@ -12,19 +12,22 @@ The remaining design risk is mainly enforcement and follow-through:
 
 - Several legacy pages still contain local styling and fixed columns that should continue moving toward shared HMI components.
 - Reports and Settings have been split into clearer categories, but their tabs must remain audited because they own many evidence and integration workflows.
-- The shell now uses focused workflow windows instead of squeezing all features into one overloaded screen; future additions must not reverse that by making any page dense again.
+- The shell now uses focused workflow menus instead of squeezing all features into one overloaded screen; future additions must not reverse that by making any page dense again.
 - Some pages remain acceptable at 1920x1080 but should keep improving under long strings, Korean labels, and DPI scaling.
 
 This pass raises the baseline and documents the larger rework path.
 
 ## Changes Applied In This Pass
 
-- Default window size was moved to 1920x1080, matching the operator-display target.
-- Shell minimum size was raised to reduce accidental cramped layouts.
+- Default startup size now opens below 1920x1080 so operators can immediately locate the Windows minimize, maximize, and close controls; 1920x1080 remains the operator-display and audit target.
+- Shell minimum size was adjusted for locateable startup while HMI layout audit continues to verify the 1920x1080 operator target.
 - Default button, text box, combo box, table, tab, checkbox, status badge, and date picker sizing was increased.
 - Page-level explicit font sizes below 14 pt were normalized to 14 pt.
-- The shell navigation was remodeled into thirteen focused workflow windows: Home, Board & Images, Run Inspection, Golden Compare, Defect Review, Recipe Rules, AI / Models, Yield Analytics, Export & Trace, Calibration, 3D Profile, Hardware Readiness, and System Settings.
-- Persistent status strip, alarm panel, workflow chips, footer, and title bar text were enlarged.
+- The shell navigation was remodeled into thirteen focused workflow menus: Home, Board & Images, Run Inspection, Golden Compare, Defect Review, Recipe Rules, AI / Models, Yield Analytics, Export & Trace, Calibration, 3D Profile, Hardware Readiness, and System Settings.
+- Normal navigation, readiness states, and workflow chips were consolidated onto Home; workflow pages now fill the workspace between the persistent top banner and bottom evidence footer.
+- The persistent top banner was compacted into a single instrument strip and Home's workflow map was tightened to four columns so more AOI menus are visible at startup without scrolling.
+- Run Inspection and Golden Compare now remain embedded in the main shell like the other workflow menus, with separate large-image viewer windows available from image-heavy panels for zoomed inspection and PNG snapshot save.
+- Active critical/alarm status remains available in the persistent top banner. The bottom footer prioritizes record count, image link health, database revision/update, and station.
 - Setup wizard buttons now meet the primary button sizing rule.
 - PR quality checks now fail future XAML additions that explicitly set sub-14 pt font sizes or tiny minimum heights.
 - Shell access/user-management controls were collapsed into an explicit Access panel so normal production navigation remains focused while the existing authentication backend and handlers remain intact.
@@ -34,8 +37,10 @@ This pass raises the baseline and documents the larger rework path.
 
 ## Current Strengths
 
-- The shell exposes mode, profile, simulation warning, user/role, engine/source state, readiness strip, active alarms, page title, workflow status, and export/support actions.
-- The focused workflow-window structure matches the design contract and keeps overloaded functions out of a single crowded screen.
+- The shell exposes mode, profile, simulation warning, user/role, engine/source state, active critical/alarm status, and the concise evidence footer in compact form.
+- Home exposes the four-column workflow menu map plus normal readiness and current workflow status, avoiding duplicated status chrome on every page.
+- Image-heavy inspection and comparison workflows keep their primary controls embedded while offering large-image viewer pop-ups only for detailed visual review.
+- The focused workflow-menu structure matches the design contract and keeps overloaded functions out of a single crowded screen.
 - Major evidence surfaces exist in Export & Trace: export history, Factory Readiness, Standards & Quality Checklist, Management Dashboard, MES queue, Central Sync, Factory Acceptance, and Evidence Completion.
 - Simulation/mock/demo states are mostly labeled and use purple styling.
 - Shared HMI resources exist and can become the single design system layer.
@@ -101,20 +106,21 @@ Remaining rework: every adapter boundary, sample-data workflow, and generated ev
 
 Strengths:
 
-- Persistent banner and readiness strip are appropriate for an industrial HMI.
-- Thirteen focused workflow windows are reachable through the left rail and Home module map.
-- Active alarms remain visible outside page content.
+- Persistent banner keeps operator/user, role, engine, deployment truthfulness, simulation warning, and active critical/alarm access visible.
+- Thirteen focused workflow menus are reachable through the large Home module map.
+- Workflow pages now use the full shell workspace between the persistent top and bottom bars.
+- Run Inspection and Golden Compare routes open directly in the shell and expose Large Image viewer actions for their camera/screening/comparison image panels.
 
 Risks:
 
-- Authentication and local user controls still compete with the top menu bar.
-- The shell contains both navigation and administrative controls, which can distract production operators.
-- Some workflow chips may become noisy when long file names are loaded.
+- Authentication and local user controls still exist in the collapsed Utilities / Access panel and should continue moving toward System Settings.
+- Home now carries normal navigation and noncritical readiness status, so future pages must not recreate a competing route rail or duplicate readiness strip.
 
 Recommended rework:
 
-- Continue moving user management toward System Settings. The current interim state collapses those controls into an Access panel so the shell no longer displays every administrative control by default.
-- Replace file/generic toolbar wording with task-oriented commands.
+- Continue moving user management toward System Settings. The current interim state collapses those controls into a Utilities / Access panel so the shell no longer displays every administrative control by default.
+- Keep page-specific refresh/export actions inside the owning workflow instead of adding another persistent toolbar.
+- Keep separate pop-up windows limited to image viewing or short focused dialogs unless another workflow has the same display-space need and audit coverage is added.
 - Add a shell screenshot regression test or image-based layout smoke test if feasible.
 
 ### Main Inspection
@@ -131,7 +137,7 @@ Risks:
 
 Recommended rework:
 
-- Keep inspection image, verdict, defect list, and disposition as the primary screen.
+- Keep inspection image, verdict, defect list, and disposition as the primary screen inside the embedded Run Inspection workflow.
 - Move robot simulation/acceptance controls into a secondary tab or collapsible engineering panel.
 - Add a top-level current-board state strip with sample, recipe, engine, verdict, and next action.
 
@@ -298,8 +304,8 @@ Recommended rework:
 
 - Move local user management from shell toolbar to System Settings.
 - Keep only user/role/session summary and Access/Login command in the shell.
-- Make active alarms and readiness the dominant persistent shell information.
-- Keep the focused workflow-window map in sync across Home, shell navigation, route handling, role authorization, HMI audit, and navigation smoke tests.
+- Keep active critical/alarm status as the dominant persistent shell information.
+- Keep the focused workflow-window map in sync across Home, shell route handling, role authorization, HMI audit, and navigation smoke tests.
 
 ### Phase 3: Page Decomposition
 
@@ -325,7 +331,7 @@ A frontend change should not be considered ready unless:
 
 - Text does not clip at 1920x1080 and common DPI scales.
 - Dense pages scroll or adapt.
-- All focused workflow windows remain reachable and the Home module map matches the shell route map.
+- All focused workflow menus remain reachable and the Home module map matches the shell route map.
 - Shell status remains readable.
 - Primary actions are obvious and large enough.
 - Simulation and real-hardware evidence are visually distinct.

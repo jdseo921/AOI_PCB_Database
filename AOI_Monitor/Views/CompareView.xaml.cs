@@ -97,6 +97,12 @@ public partial class CompareView : UserControl
 
     private void OnStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshFromState);
 
+    private void OnOpenDefectImageViewerClick(object sender, RoutedEventArgs e)
+        => AOI_Monitor.ImageViewerWindow.ShowFromVisual(this, "Defect Sample Image / Overlay", DefectImageViewport);
+
+    private void OnOpenGoldenImageViewerClick(object sender, RoutedEventArgs e)
+        => AOI_Monitor.ImageViewerWindow.ShowFromVisual(this, "Golden Reference Image / Overlay", GoldenImageViewport);
+
     private void OnSyncZoomClick(object sender, RoutedEventArgs e)
     {
         _zoomed = !_zoomed;

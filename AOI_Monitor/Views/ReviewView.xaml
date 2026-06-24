@@ -73,13 +73,11 @@
                     Style="{StaticResource HmiDenseTable}"
                     ToolTip="AI means inspection result. GT means ground truth. RefDes means reference designator.">
               <DataGrid.Columns>
-                <DataGridTextColumn Header="#"      Binding="{Binding Priority}"    Width="54" MinWidth="54"/>
-                <DataGridTextColumn Header="Sample" Binding="{Binding Sample}"      Width="118" MinWidth="118"/>
-                <DataGridTextColumn Header="AI"     Binding="{Binding AiResult}"    Width="76" MinWidth="76" HeaderTemplate="{StaticResource HmiHeaderInspectionResultTemplate}"/>
-                <DataGridTextColumn Header="GT"     Binding="{Binding GroundTruth}" Width="76" MinWidth="76" HeaderTemplate="{StaticResource HmiHeaderGroundTruthTemplate}"/>
-                <DataGridTextColumn Header="Defect" Binding="{Binding Defect}"      Width="150" MinWidth="150"/>
-                <DataGridTextColumn Header="RefDes" Binding="{Binding RefDes}"      Width="96" MinWidth="96" HeaderTemplate="{StaticResource HmiHeaderRefDesTemplate}"/>
-                <DataGridTemplateColumn Header="Risk" Width="150" MinWidth="150">
+                <DataGridTextColumn Header="#"      Binding="{Binding Priority}"    Width="38" MinWidth="38"/>
+                <DataGridTextColumn Header="Sample" Binding="{Binding Sample}"      Width="104" MinWidth="104"/>
+                <DataGridTextColumn Header="AI"     Binding="{Binding AiResult}"    Width="54" MinWidth="54" HeaderTemplate="{StaticResource HmiHeaderInspectionResultTemplate}"/>
+                <DataGridTextColumn Header="GT"     Binding="{Binding GroundTruth}" Width="54" MinWidth="54" HeaderTemplate="{StaticResource HmiHeaderGroundTruthTemplate}"/>
+                <DataGridTemplateColumn Header="Risk" Width="*" MinWidth="86">
                   <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
                       <Border Style="{StaticResource RiskChipBorder}" HorizontalAlignment="Left" Margin="0,1,0,1">
@@ -154,7 +152,7 @@
       <Grid>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" MinHeight="32"/>
-          <RowDefinition Height="34"/>
+          <RowDefinition Height="Auto" MinHeight="46"/>
           <RowDefinition Height="*"/>
           <RowDefinition Height="110"/>
         </Grid.RowDefinitions>

@@ -62,6 +62,13 @@ public sealed class HmiLayoutAuditTests : IDisposable
 
         Assert.True(failures.Length == 0, string.Join(Environment.NewLine, failures));
 
+        var clippingWarnings = report.Issues
+            .Where(issue => issue.Severity == HmiLayoutIssueSeverity.Warn && !issue.Approved && IsClippingPolicyIssue(issue.IssueType))
+            .Select(issue => $"{issue.ViewName} {issue.DpiScale:P0} {issue.IssueType} {issue.Target}: {issue.Message}")
+            .ToArray();
+
+        Assert.True(clippingWarnings.Length == 0, string.Join(Environment.NewLine, clippingWarnings));
+
         var shellRoutes = report.Views
             .Where(view => view.Key.StartsWith("shell-", StringComparison.OrdinalIgnoreCase))
             .Select(view => view.Key)
@@ -81,10 +88,15 @@ public sealed class HmiLayoutAuditTests : IDisposable
             "LongTextNoWrapOrTooltip",
             "SmallPrimaryButton",
             "ClippedText",
+            "ClippedButton",
         };
         foreach (var rule in requiredRules)
             Assert.Contains(rule, HmiLayoutAuditService.EnforcedRuleTypes);
     }
+
+    private static bool IsClippingPolicyIssue(string issueType)
+        => issueType is "ClippedText" or "ClippedButton" or "InputTextClippingRisk" or "LongTextNoWrapOrTooltip"
+            || issueType.StartsWith("DataGridHeader", StringComparison.OrdinalIgnoreCase);
 
     private static void AssertSharedHmiStylesAreRegistered()
     {
@@ -146,7 +158,12 @@ public sealed class HmiLayoutAuditTests : IDisposable
         AssertDefinitionRequires(definitions, "yield-analytics", "DbHealthGrid");
         AssertDefinitionRequires(definitions, "main-inspection", "DefectGrid");
         AssertDefinitionRequires(definitions, "main-inspection", "CalibrationProfileCombo");
+        AssertDefinitionRequires(definitions, "main-inspection", "OpenInspectionImageViewerButton");
         AssertDefinitionRequires(definitions, "golden-compare", "FindingsGrid");
+        AssertDefinitionRequires(definitions, "golden-compare", "OpenDefectImageViewerButton");
+        AssertDefinitionRequires(definitions, "golden-compare", "OpenGoldenImageViewerButton");
+        AssertDefinitionRequires(definitions, "image-viewer-window", "ViewerImage");
+        AssertDefinitionRequires(definitions, "image-viewer-window", "SaveImageButton");
         AssertDefinitionRequires(definitions, "recipe-editor", "RecipeEmptyStateCard");
         AssertDefinitionRequires(definitions, "profile-3d", "ProfileSourceBadgeText");
         AssertDefinitionRequires(definitions, "hardware-readiness", "CurrentStepText");

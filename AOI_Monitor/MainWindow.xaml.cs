@@ -27,7 +27,7 @@ public partial class MainWindow : Window
     private string _pendingNavigationKey = string.Empty;
     private int _navigationSequence;
     private bool _operatorOpenedAlarmPanel;
-    private bool _updatingAlarmExpansion;
+    private bool _updatingAlarmFlyout;
     public string CurrentPageKey => _vm?.CurrentPage ?? "home";
 
     private static readonly Dictionary<string, string> PageTitles = new()
@@ -453,9 +453,9 @@ public partial class MainWindow : Window
         ActiveAlarmHeaderText.Text = allActive.Count == 0
             ? "none"
             : critical > 0
-                ? $"{critical} CRITICAL"
+                ? $"{critical} critical / {alarmLevel} alarm"
                 : alarmLevel > 0
-                    ? $"{alarmLevel} alarm"
+                    ? $"{alarmLevel} alarm / {warnings} warning"
                     : $"{warnings} warning";
         ActiveAlarmSummaryText.Foreground = critical > 0
             ? Brushes.LightCoral
@@ -465,32 +465,57 @@ public partial class MainWindow : Window
                     ? Brushes.Gold
                     : Brushes.LightGreen;
         ActiveAlarmHeaderText.Foreground = ActiveAlarmSummaryText.Foreground;
+        ActiveAlarmsButton.ToolTip = allActive.Count == 0
+            ? "No active alarms."
+            : $"{ActiveAlarmSummaryText.Text} Open active alarm list.";
+        ApplyAlarmButtonVisual(critical, alarmLevel, warnings);
 
-        if (ActiveAlarmsExpander is not null)
+        if (allActive.Count == 0 && !_operatorOpenedAlarmPanel)
+            SetActiveAlarmsFlyoutOpen(false, operatorInitiated: false);
+    }
+
+    private void OnActiveAlarmsButtonClick(object sender, RoutedEventArgs e)
+        => SetActiveAlarmsFlyoutOpen(!ActiveAlarmsPopup.IsOpen, operatorInitiated: true);
+
+    private void OnCloseActiveAlarmsClick(object sender, RoutedEventArgs e)
+        => SetActiveAlarmsFlyoutOpen(false, operatorInitiated: true);
+
+    private void OnActiveAlarmsPopupClosed(object? sender, EventArgs e)
+    {
+        if (!_updatingAlarmFlyout)
+            _operatorOpenedAlarmPanel = false;
+    }
+
+    private void SetActiveAlarmsFlyoutOpen(bool isOpen, bool operatorInitiated)
+    {
+        _updatingAlarmFlyout = true;
+        try
         {
-            _updatingAlarmExpansion = true;
-            try
-            {
-                ActiveAlarmsExpander.IsExpanded = allActive.Count > 0 || _operatorOpenedAlarmPanel;
-            }
-            finally
-            {
-                _updatingAlarmExpansion = false;
-            }
+            ActiveAlarmsPopup.IsOpen = isOpen;
+            if (operatorInitiated)
+                _operatorOpenedAlarmPanel = isOpen;
+        }
+        finally
+        {
+            _updatingAlarmFlyout = false;
         }
     }
 
-    private void OnActiveAlarmsExpanded(object sender, RoutedEventArgs e)
+    private void ApplyAlarmButtonVisual(int critical, int alarmLevel, int warnings)
     {
-        if (!_updatingAlarmExpansion)
-            _operatorOpenedAlarmPanel = true;
+        var (background, border) = critical > 0
+            ? ("#35191B", "#A13A3F")
+            : alarmLevel > 0
+                ? ("#3A1916", "#C64B3B")
+                : warnings > 0
+                    ? ("#372914", "#987538")
+                    : ("#141D24", "#3A4A55");
+        ActiveAlarmsButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(background));
+        ActiveAlarmsButton.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(border));
     }
 
-    private void OnActiveAlarmsCollapsed(object sender, RoutedEventArgs e)
-    {
-        if (!_updatingAlarmExpansion)
-            _operatorOpenedAlarmPanel = false;
-    }
+    private void OnAccessPanelButtonClick(object sender, RoutedEventArgs e)
+        => AccessPanelPopup.IsOpen = !AccessPanelPopup.IsOpen;
 
     private void OnAcknowledgeAlarmClick(object sender, RoutedEventArgs e)
     {
@@ -595,25 +620,10 @@ public partial class MainWindow : Window
         HideLoadingOverlay();
     }
 
-    private void BringActiveNavItemIntoView()
+    private static void BringActiveNavItemIntoView()
     {
-        if (!Dispatcher.CheckAccess())
-        {
-            Dispatcher.BeginInvoke(new Action(BringActiveNavItemIntoView));
-            return;
-        }
-
-        Dispatcher.BeginInvoke(new Action(() =>
-        {
-            foreach (var button in VisualDescendants<Button>(TopLevelNavItems))
-            {
-                if (button.DataContext is NavPage { IsActive: true })
-                {
-                    button.BringIntoView();
-                    break;
-                }
-            }
-        }), System.Windows.Threading.DispatcherPriority.Background);
+        // Normal workflow navigation is now owned by Home so non-Home pages can use
+        // the full workspace between the persistent top and bottom bars.
     }
 
     private static IEnumerable<T> VisualDescendants<T>(DependencyObject root)
@@ -688,6 +698,18 @@ public partial class MainWindow : Window
         {
             ShowRecoverablePageError(CurrentPageKey, "manual refresh", ex);
         }
+    }
+
+    private void OnHomeClick(object sender, RoutedEventArgs e)
+    {
+        PageErrorCard.Visibility = Visibility.Collapsed;
+        if (_vm.CurrentPage.Equals("home", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = SwitchPageAsync("home");
+            return;
+        }
+
+        _vm.CurrentPage = "home";
     }
 
     private void OnLayoutStressClick(object sender, RoutedEventArgs e)
@@ -872,6 +894,7 @@ public partial class MainWindow : Window
     private void ApplyShellLanguage()
     {
         FileMenuBtn.Content = UiPreferencesService.Text("File", "\uD30C\uC77C");
+        AccessPanelButton.Content = UiPreferencesService.Text("Access", "\uC811\uADFC");
         ReportIssueBtn.Content = UiPreferencesService.Text("Report Issue", "\uC774\uC288 \uBCF4\uACE0");
         LayoutStressBtn.Content = UiPreferencesService.Text("Layout Stress", "\uB808\uC774\uC544\uC6C3 \uC810\uAC80");
         SupportBundleBtn.Content = UiPreferencesService.Text("Support Bundle", "\uC9C0\uC6D0 \uBC88\uB4E4");
@@ -1349,8 +1372,8 @@ public partial class MainWindow : Window
 
         SimulationWarningBanner.Visibility = hasSimulatedSource ? Visibility.Visible : Visibility.Collapsed;
         SimulationWarningBannerText.Text = mode == OperatingMode.Demo
-            ? UiPreferencesService.Text("DEMO / SIMULATED SOURCES ACTIVE", "\uB370\uBAA8 / \uC2DC\uBBAC\uB808\uC774\uC158 \uC18C\uC2A4 \uD65C\uC131")
-            : UiPreferencesService.Text("SIMULATED / MOCK SOURCE ACTIVE", "\uC2DC\uBBAC\uB808\uC774\uC158 / \uBAA9 \uC18C\uC2A4 \uD65C\uC131");
+            ? UiPreferencesService.Text("DEMO / SIM ACTIVE", "\uB370\uBAA8 / \uC2DC\uBBAC \uD65C\uC131")
+            : UiPreferencesService.Text("SIM / MOCK ACTIVE", "\uC2DC\uBBAC / \uBAA9 \uD65C\uC131");
         SimulationWarningBanner.ToolTip = UiPreferencesService.Text(
             "Simulated or mock sources are active. Do not treat these results as production release evidence without review.",
             "\uC2DC\uBBAC\uB808\uC774\uC158 \uB610\uB294 \uBAA9 \uC18C\uC2A4\uAC00 \uD65C\uC131\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uAC80\uD1A0 \uC5C6\uC774 \uC0DD\uC0B0 \uCD9C\uC2DC \uC99D\uBE59\uC73C\uB85C \uC0AC\uC6A9\uD558\uC9C0 \uB9C8\uC2ED\uC2DC\uC624.");
@@ -1362,13 +1385,23 @@ public partial class MainWindow : Window
 
     private static string FormatDeploymentProfile(DeploymentProfile profile) => profile switch
     {
-        DeploymentProfile.Stage1ImageValidation => UiPreferencesService.Text("Stage 1 Image Validation", "1\uB2E8\uACC4 \uC774\uBBF8\uC9C0 \uAC80\uC99D"),
-        DeploymentProfile.Stage2CameraPilot => UiPreferencesService.Text("Stage 2 Camera Pilot", "2\uB2E8\uACC4 \uCE74\uBA54\uB77C \uD30C\uC77C\uB7FF"),
-        DeploymentProfile.Stage3RobotPilot => UiPreferencesService.Text("Stage 3 Robot Pilot", "3\uB2E8\uACC4 \uB85C\uBD07 \uD30C\uC77C\uB7FF"),
-        DeploymentProfile.Stage4MesPilot => UiPreferencesService.Text("Stage 4 MES Pilot", "4\uB2E8\uACC4 MES \uD30C\uC77C\uB7FF"),
-        DeploymentProfile.FullFactoryAutomation => UiPreferencesService.Text("Full Factory Automation", "\uC804\uCCB4 \uACF5\uC7A5 \uC790\uB3D9\uD654"),
+        DeploymentProfile.Stage1ImageValidation => UiPreferencesService.Text("Stage 1 Image", "1\uB2E8\uACC4 \uC774\uBBF8\uC9C0"),
+        DeploymentProfile.Stage2CameraPilot => UiPreferencesService.Text("Stage 2 Camera", "2\uB2E8\uACC4 \uCE74\uBA54\uB77C"),
+        DeploymentProfile.Stage3RobotPilot => UiPreferencesService.Text("Stage 3 Robot", "3\uB2E8\uACC4 \uB85C\uBD07"),
+        DeploymentProfile.Stage4MesPilot => UiPreferencesService.Text("Stage 4 MES", "4\uB2E8\uACC4 MES"),
+        DeploymentProfile.FullFactoryAutomation => UiPreferencesService.Text("Full Factory", "\uC804\uCCB4 \uACF5\uC7A5"),
         _ => profile.ToString(),
     };
+
+    private static string FormatHeaderEngineStatus(string statusText)
+        => statusText switch
+        {
+            "Pixel Difference Prototype Engine" => "Pixel Diff Prototype",
+            "ML Model Ready" => "ML Ready",
+            "ML Model Missing" => "ML Missing",
+            "ML Model Not Tested" => "ML Not Tested",
+            _ => statusText,
+        };
 
     private void OnLightingSettingsChanged()
     {
@@ -1523,7 +1556,8 @@ public partial class MainWindow : Window
         var status = InspectionModelConfigurationService.GetStatus();
         var statusText = InspectionModelConfigurationService.GetStatusText();
         InspectionEngineStatusText.Text = statusText;
-        HeaderEngineText.Text = statusText;
+        HeaderEngineText.Text = FormatHeaderEngineStatus(statusText);
+        HeaderEngineText.ToolTip = statusText;
         InspectionEngineStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
         {
             Models.InspectionEngineStatus.MlModelReady => "#50F56E",

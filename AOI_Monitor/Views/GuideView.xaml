@@ -36,7 +36,7 @@
         <DataGrid Grid.Row="1" x:Name="StepsGrid" MaxHeight="280">
           <DataGrid.Columns>
             <DataGridTextColumn Header="#"           Binding="{Binding Num}"      Width="38"/>
-            <DataGridTextColumn Header="Step"        Binding="{Binding Step}"     Width="*"/>
+            <DataGridTextColumn Header="Step"        Binding="{Binding Step}"     Width="*" ElementStyle="{StaticResource HmiDataGridCellText}"/>
             <DataGridTextColumn Header="Priority"    Binding="{Binding Priority}" Width="80"/>
           </DataGrid.Columns>
         </DataGrid>

@@ -60,17 +60,31 @@ Preferred wording:
 
 - Use `FactoryPageContainer` for page roots.
 - Use `FactoryScrollablePage` for dense settings, reports, dashboards, and acceptance pages.
+- Dense workflow page bodies that can exceed the center workspace must use vertical body scrolling inside the active page content area. The global top banner/navigation strip and bottom evidence footer remain fixed in `MainWindow` and must not be wrapped in a window-level `ScrollViewer`.
+- Do not rely on 1920x1080 fitting every row of logs, reports, settings, or inspection evidence. If a page is dense, make secondary body content reachable by scrolling while keeping critical verdicts, alarms, mode/profile labels, and primary actions readable and easy to reach.
+- Pages that already fit cleanly should remain unchanged; add page-level scrolling only when clipping or dense overflow risk is clear.
 - Use `FactoryCard` or `HmiKpiCard` for grouped status or metrics.
 - Use `HmiTable` for operator-visible `DataGrid` controls.
 - Use `HmiOperatorActionButton`, `ActionBtnGreen`, `ActionBtnBlue`, `ActionBtnAmber`, or `ActionBtnRed` consistently.
 - Place primary actions at the lower-right or in a clearly marked top action band. Keep destructive actions red and separated.
+- Keep normal workflow navigation and noncritical readiness summaries on Home. Keep the persistent top banner compact so Home can show the workflow menu map without unnecessary scrolling. Workflow pages should fill the workspace between the persistent top banner and bottom evidence footer; only active critical/alarm status and the Home return button stay persistent outside pages.
+- Keep image-heavy inspection and comparison workflows embedded in the main shell. Use separate image viewer windows only when an operator asks to enlarge a camera, screening, overlay, or comparison image; viewer windows must include zoom, fit, 100% view, PNG save, active critical/alarm status, and prototype/simulation boundary labels.
+
+## Clipping Prevention Gate
+
+- Every UI/layout change must pass the HMI layout audit before handoff: `dotnet test AOI_Monitor.UiTests\AOI_Monitor.UiTests.csproj --configuration Release --filter FullyQualifiedName~HmiLayoutAuditTests`.
+- Treat unapproved text, button, input, and table-header clipping as blocking for UI changes, including warning-severity clipping audit findings.
+- Secondary IDs and paths may trim only when they expose the full value through a tooltip. Critical verdicts, alarm counts, role/mode labels, and primary actions must wrap, resize, or move instead of trimming.
+- Review `hmi_layout_audit.json` and `hmi_layout_audit.html` after dense page changes. Add screenshot capture/manual screenshot review for new workflows, major shell changes, or any layout issue reported from the GUI; for small text/style fixes, the audit plus affected-file inspection is the default proportional check.
+- For page-body scroll changes, verify that mouse wheel/touchpad scrolling moves only the active page body and that the persistent shell top and bottom bars stay visible.
 
 ## Banner
 
-The persistent top banner must show:
+The persistent top banner must show these items in a compact instrument strip:
 
 - Operating mode.
 - Deployment profile.
 - Active engine/model status.
 - Role/user.
 - A purple simulation/mock warning whenever demo, simulated, or mock sources are active.
+- Active critical/alarm counts stay visible in the banner; the full alarm list, filters, acknowledgement, details, and export actions open from a flyout that must not increase banner height.

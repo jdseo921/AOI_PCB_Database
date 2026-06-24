@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:AOI_Monitor.ViewModels"
         Title="PCBA AOI Review Console"
-        Width="1920" Height="1080" MinWidth="1600" MinHeight="900"
+        Width="1440" Height="900" MinWidth="1180" MinHeight="720"
         Background="{DynamicResource Bg}"
         WindowStartupLocation="CenterScreen">
 
@@ -15,103 +15,208 @@
     <Grid>
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
         <RowDefinition Height="*"/>
         <RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
 
-      <Grid Grid.Row="0" Background="#0D2438" MinHeight="62">
+      <Grid Grid.Row="0" Background="#0D2438" MinHeight="44">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="84"/>
+          <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" BorderBrush="#2B4658" BorderThickness="0,0,1,0">
-          <TextBlock Text="{Binding ClockText}"
-                     FontFamily="Consolas"
-                     FontSize="18"
-                     FontWeight="SemiBold"
-                     Foreground="#F7FAFC"
-                     HorizontalAlignment="Center"
-                     VerticalAlignment="Center"/>
-        </Border>
+        <Grid Grid.Column="0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="72"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <Border Grid.Column="0" BorderBrush="#2B4658" BorderThickness="0,0,1,0">
+            <TextBlock Text="{Binding ClockText}"
+                       FontFamily="Consolas"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="#F7FAFC"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+          </Border>
+          <Button x:Name="HomeNavBtn"
+                  Grid.Column="1"
+                  Style="{StaticResource ActionBtnBlue}"
+                  Content="Home"
+                  MinWidth="120"
+                  MinHeight="40"
+                  Margin="6,2,4,2"
+                  Click="OnHomeClick"
+                  ToolTip="Return to the Home module map."/>
+        </Grid>
 
-        <Grid Grid.Column="1" Margin="14,6" MinWidth="0">
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-          </Grid.RowDefinitions>
-
-          <WrapPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+        <Grid Grid.Column="1" Margin="8,3" MinWidth="0" ClipToBounds="True">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
             <Image x:Name="BrandLogoImage"
-                   Width="26"
-                   Height="26"
+                   Width="20"
+                   Height="20"
                    Stretch="Uniform"
                    Visibility="Collapsed"
-                   Margin="0,0,10,0"/>
-            <Ellipse x:Name="BrandAccentDot" Width="18" Height="18" VerticalAlignment="Center" Fill="#1EA7A1"/>
+                   Margin="0,0,6,0"/>
+            <Ellipse x:Name="BrandAccentDot" Width="12" Height="12" VerticalAlignment="Center" Fill="#1EA7A1"/>
             <TextBlock x:Name="BrandTitleText"
-                       Text="PCBA AOI REVIEW CONSOLE"
+                       Text="AOI MONITOR"
                        Foreground="#FFFFFF"
-                       FontSize="19"
+                       FontSize="16"
                        FontWeight="ExtraBold"
                        VerticalAlignment="Center"
-                       Margin="10,0,12,0"
-                       MaxWidth="360"
+                       Margin="7,0,8,0"
+                       MaxWidth="160"
                        TextWrapping="NoWrap"
                        TextTrimming="CharacterEllipsis"
                        ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+            <Border Background="#14262E" BorderBrush="#4C6A7D" BorderThickness="1" Padding="7,3" Margin="0,0,4,0" MaxWidth="205" MinHeight="28">
+              <DockPanel LastChildFill="True">
+                <TextBlock Text="Station " Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
+                <TextBlock x:Name="StationNameText" Text="AOI-LIB" Foreground="#F7FAFC" FontSize="14" FontWeight="ExtraBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="130" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                <TextBlock x:Name="StationSubtitleText" Text="local review console / prototype" Visibility="Collapsed" Foreground="#9AA6AF" FontSize="14" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+              </DockPanel>
+            </Border>
             <Border x:Name="OperatingModeBanner" Style="{StaticResource HmiPersistentBanner}" Background="#2A1740" BorderBrush="#8F5FD1">
-              <TextBlock x:Name="OperatingModeBannerText" Text="Demo Mode" Foreground="#F1D8FF" FontSize="14" FontWeight="ExtraBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="150" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+              <TextBlock x:Name="OperatingModeBannerText" Text="Demo Mode" Foreground="#F1D8FF" FontSize="14" FontWeight="ExtraBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="92" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             </Border>
             <Border x:Name="DeploymentProfileBanner" Style="{StaticResource HmiPersistentBanner}" Background="#172A39" BorderBrush="#5CA0D3">
-              <StackPanel Orientation="Horizontal" MaxWidth="290">
+              <StackPanel Orientation="Horizontal" MaxWidth="190">
                 <TextBlock Text="Profile " Foreground="#B7C8D8" FontSize="14"/>
-                <TextBlock x:Name="DeploymentProfileBannerText" Text="Stage 1 Image Validation" Foreground="#E7F5FF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="220" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+                <TextBlock x:Name="DeploymentProfileBannerText" Text="Stage 1 Image" Foreground="#E7F5FF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="125" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
               </StackPanel>
             </Border>
             <Border x:Name="SimulationWarningBanner" Style="{StaticResource HmiPersistentBanner}" Background="#372914" BorderBrush="#E1A334">
-              <TextBlock x:Name="SimulationWarningBannerText" Text="SIMULATED / MOCK SOURCES ACTIVE" Foreground="#FFE0A7" FontSize="14" FontWeight="ExtraBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="270" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+              <TextBlock x:Name="SimulationWarningBannerText" Text="SIM / MOCK ACTIVE" Foreground="#FFE0A7" FontSize="14" FontWeight="ExtraBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="125" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             </Border>
-          </WrapPanel>
-
-          <TextBlock Grid.Row="1"
-                     Text="Navigation-first AOI console for image validation, defect review, recipe control, traceable exports, and staged hardware readiness."
-                     Foreground="#C9D8E4"
-                     FontSize="14"
-                     TextWrapping="NoWrap"
-                     TextTrimming="CharacterEllipsis"
-                     ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"
-                     Margin="0,2,0,0"/>
+          </StackPanel>
         </Grid>
 
-        <WrapPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="8,5,10,5" MaxWidth="780">
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="4,3,6,3">
           <Border Style="{StaticResource HmiPersistentBanner}" Background="#14262E" BorderBrush="#4C6A7D">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="User " Foreground="#AAB4BB" FontSize="14"/>
-              <TextBlock x:Name="HeaderUserText" Text="Engineer01" Foreground="#E8EEF2" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="170" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+              <TextBlock x:Name="HeaderUserText" Text="Engineer01" Foreground="#E8EEF2" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="112" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
               <TextBlock Text=" / " Foreground="#AAB4BB" FontSize="14"/>
-              <TextBlock x:Name="HeaderRoleText" Text="Admin" Foreground="#E8EEF2" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="92" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+              <TextBlock x:Name="HeaderRoleText" Text="Admin" Foreground="#E8EEF2" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="74" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             </StackPanel>
           </Border>
           <Border Style="{StaticResource HmiPersistentBanner}" Background="#14262E" BorderBrush="#4C6A7D">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="Engine " Foreground="#AAB4BB" FontSize="14"/>
-              <TextBlock x:Name="HeaderEngineText" Text="Pixel Difference Prototype Engine" Foreground="#E8EEF2" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="250" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+              <TextBlock x:Name="HeaderEngineText" Text="Pixel Diff Prototype" Foreground="#E8EEF2" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="165" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             </StackPanel>
           </Border>
-          <Expander Header="Utilities / Access"
-                    Foreground="#E8EEF2"
-                    Background="#102332"
-                    BorderBrush="#486171"
-                    BorderThickness="1"
-                    Padding="10,4"
-                    Margin="8,0,0,0"
-                    MinWidth="210"
-                    MaxWidth="720"
-                    IsExpanded="False">
-            <Border Background="#0F151A" BorderBrush="#384854" BorderThickness="1" Padding="10" Margin="0,6,0,0">
+          <Button x:Name="ActiveAlarmsButton"
+                  Style="{StaticResource MiniBtn}"
+                  MinWidth="238"
+                  MinHeight="34"
+                  Padding="8,3"
+                  Margin="4,0,0,0"
+                  Click="OnActiveAlarmsButtonClick"
+                  ToolTip="Open active alarm list.">
+            <Grid MinWidth="210">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="Alarms" Foreground="#F7FAFC" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+              <TextBlock x:Name="ActiveAlarmHeaderText"
+                         Grid.Column="1"
+                         Text="none"
+                         Foreground="#B9C4CC"
+                         FontSize="14"
+                         FontWeight="Bold"
+                         HorizontalAlignment="Right"
+                         TextWrapping="NoWrap"
+                         TextTrimming="CharacterEllipsis"
+                         MaxWidth="150"
+                         ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+            </Grid>
+          </Button>
+          <Popup x:Name="ActiveAlarmsPopup"
+                 Placement="Bottom"
+                 PlacementTarget="{Binding ElementName=ActiveAlarmsButton}"
+                 HorizontalOffset="-260"
+                 VerticalOffset="4"
+                 AllowsTransparency="True"
+                 StaysOpen="False"
+                 Closed="OnActiveAlarmsPopupClosed">
+            <Border Background="#0C0F11" BorderBrush="#3A4249" BorderThickness="1" Padding="10" Width="520" MaxHeight="430">
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="170"/>
+                  <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="ACTIVE ALARMS" Foreground="#F0A0A0" FontWeight="ExtraBold" FontSize="15"/>
+                  <Button Grid.Column="1" Style="{StaticResource MiniBtn}" MinWidth="86" Content="Close" Click="OnCloseActiveAlarmsClick"/>
+                </Grid>
+                <TextBlock Grid.Row="1" x:Name="ActiveAlarmSummaryText" Text="No active alarms." Foreground="#DCE5EB" FontSize="14" TextWrapping="Wrap" Margin="0,6,0,8"/>
+                <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+                  <ComboBox x:Name="AlarmSeverityFilterCombo" Width="154" MinHeight="34" Margin="0,0,6,6" SelectionChanged="OnAlarmFilterChanged">
+                    <ComboBoxItem Content="All severities" IsSelected="True"/>
+                    <ComboBoxItem Content="Info"/>
+                    <ComboBoxItem Content="Warning"/>
+                    <ComboBoxItem Content="Alarm"/>
+                    <ComboBoxItem Content="Critical"/>
+                  </ComboBox>
+                  <ComboBox x:Name="AlarmSortCombo" Width="178" MinHeight="34" Margin="0,0,6,6" SelectionChanged="OnAlarmFilterChanged">
+                    <ComboBoxItem Content="Severity high first" IsSelected="True"/>
+                    <ComboBoxItem Content="Newest first"/>
+                    <ComboBoxItem Content="Oldest first"/>
+                    <ComboBoxItem Content="Severity low first"/>
+                  </ComboBox>
+                  <TextBox x:Name="AlarmSourceFilterText" Width="150" MinHeight="34" Margin="0,0,0,6" TextChanged="OnAlarmSourceFilterTextChanged" ToolTip="Filter by alarm source."/>
+                </WrapPanel>
+                <ListBox x:Name="AlarmListBox"
+                         Grid.Row="3"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         Background="#090B0D"
+                         BorderBrush="#384149"
+                         Foreground="#E8EEF2">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Margin="4">
+                        <TextBlock Text="{Binding Summary}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding ActionSummary}" FontSize="14" Foreground="#B7C2CA" TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <WrapPanel Grid.Row="4" HorizontalAlignment="Right" Margin="0,10,0,0">
+                  <Button x:Name="AcknowledgeAlarmBtn" Style="{StaticResource MiniBtnAmber}" Content="Acknowledge" Margin="0,0,6,0" Click="OnAcknowledgeAlarmClick"/>
+                  <Button x:Name="AlarmDetailsBtn" Style="{StaticResource MiniBtn}" Content="Details" Margin="0,0,6,0" Click="OnAlarmDetailsClick"/>
+                  <Button x:Name="ExportAlarmLogBtn" Style="{StaticResource MiniBtnGreen}" Content="Export Log" Click="OnExportAlarmLogClick"/>
+                </WrapPanel>
+              </Grid>
+            </Border>
+          </Popup>
+          <Button x:Name="AccessPanelButton"
+                  Style="{StaticResource MiniBtn}"
+                  Content="Access"
+                  MinWidth="92"
+                  MinHeight="34"
+                  Margin="4,0,0,0"
+                  Click="OnAccessPanelButtonClick"
+                  ToolTip="Open access, login, and local user controls."/>
+          <Popup x:Name="AccessPanelPopup"
+                 Placement="Bottom"
+                 PlacementTarget="{Binding ElementName=AccessPanelButton}"
+                 HorizontalOffset="-628"
+                 VerticalOffset="4"
+                 AllowsTransparency="True"
+                 StaysOpen="False">
+            <Border Background="#0F151A" BorderBrush="#384854" BorderThickness="1" Padding="10" Width="720">
               <StackPanel>
                 <WrapPanel Orientation="Horizontal">
                   <Button x:Name="FileMenuBtn" Style="{StaticResource MiniBtn}" Content="File" Margin="0,0,6,6" Click="OnMenuFileClick"/>
@@ -177,306 +282,32 @@
                 </WrapPanel>
               </StackPanel>
             </Border>
-          </Expander>
-        </WrapPanel>
+          </Popup>
+        </StackPanel>
       </Grid>
 
-      <Border Grid.Row="1" Background="#101820" BorderBrush="#2E3D47" BorderThickness="0,0,0,1" Padding="10,6">
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="270"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-          </Grid.ColumnDefinitions>
-          <StackPanel>
-            <TextBlock x:Name="StationNameText" Text="AOI-LIB" Foreground="#F7FAFC" FontSize="18" FontWeight="ExtraBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-            <TextBlock x:Name="StationSubtitleText" Text="local review console / prototype" Foreground="#9AA6AF" FontSize="14" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" Margin="0,1,0,0"/>
-          </StackPanel>
-          <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-            <Border x:Name="StationBadgeBorder" Style="{StaticResource HmiShellCompactStatusBadge}" Background="#172A39" BorderBrush="#477CA5">
-              <TextBlock Text="Station Ready" Foreground="#D7F0FF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
-            </Border>
-            <Border Style="{StaticResource HmiShellCompactStatusBadge}" Background="#14311D" BorderBrush="#3C8D50">
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Database " Foreground="#BFECC8" FontSize="14"/>
-                <TextBlock x:Name="DatabaseStatusText" Text="Not Connected" Foreground="#FFFFFF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="115" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-              </StackPanel>
-            </Border>
-            <Border Style="{StaticResource HmiShellCompactStatusBadge}" Background="#14311D" BorderBrush="#3C8D50">
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Image Vault " Foreground="#BFECC8" FontSize="14"/>
-                <TextBlock x:Name="ImageVaultStatusText" Text="Not Available" Foreground="#FFFFFF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="110" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-              </StackPanel>
-            </Border>
-            <Border Style="{StaticResource HmiShellCompactStatusBadge}" Background="#372914" BorderBrush="#987538">
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Engine " Foreground="#FFE0A7" FontSize="14"/>
-                <TextBlock x:Name="InspectionEngineStatusText" Text="Pixel Difference Prototype Engine" Foreground="#FFFFFF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="180" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-              </StackPanel>
-            </Border>
-            <Border Style="{StaticResource HmiShellCompactStatusBadge}" Background="#35191B" BorderBrush="#A13A3F">
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Camera " Foreground="#FFD0D2" FontSize="14"/>
-                <TextBlock x:Name="CameraStatusText" Text="Not Connected" Foreground="#FFFFFF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="112" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-              </StackPanel>
-            </Border>
-            <Border Style="{StaticResource HmiShellCompactStatusBadge}" Background="#35191B" BorderBrush="#A13A3F">
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Lighting " Foreground="#FFD0D2" FontSize="14"/>
-                <TextBlock x:Name="LightingStatusText" Text="Not Connected" Foreground="#FFFFFF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="112" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-              </StackPanel>
-            </Border>
-            <Border Style="{StaticResource HmiShellCompactStatusBadge}" Background="#35191B" BorderBrush="#A13A3F">
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Robot " Foreground="#FFD0D2" FontSize="14"/>
-                <TextBlock x:Name="RobotStatusText" Text="Not Connected" Foreground="#FFFFFF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="112" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-              </StackPanel>
-            </Border>
-            <Border Style="{StaticResource HmiShellCompactStatusBadge}" Background="#35191B" BorderBrush="#A13A3F">
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="MES / Trace " Foreground="#FFD0D2" FontSize="14"/>
-                <TextBlock x:Name="MesStatusText" Text="Not Connected" Foreground="#FFFFFF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="112" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-              </StackPanel>
-            </Border>
-            <Border Style="{StaticResource HmiShellCompactStatusBadge}" Background="#35191B" BorderBrush="#A13A3F">
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Text="E-Stop " Foreground="#FFD0D2" FontSize="14"/>
-                <TextBlock x:Name="EmergencyStopStatusText" Text="Not Connected" Foreground="#FFFFFF" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="112" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-              </StackPanel>
-            </Border>
-          </WrapPanel>
-          <Expander x:Name="ActiveAlarmsExpander"
-                    Grid.Column="2"
-                    Foreground="#F7FAFC"
-                    Background="#141D24"
-                    BorderBrush="#3A4A55"
-                    BorderThickness="1"
-                    Padding="8,4"
-                    Margin="8,0,0,0"
-                    IsExpanded="False"
-                    HorizontalAlignment="Right"
-                    MinWidth="310"
-                    MaxWidth="470"
-                    Expanded="OnActiveAlarmsExpanded"
-                    Collapsed="OnActiveAlarmsCollapsed">
-            <Expander.Header>
-              <Grid MinWidth="260">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="Auto"/>
-                  <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="Active Alarms" Foreground="#F7FAFC" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                <TextBlock x:Name="ActiveAlarmHeaderText"
-                           Grid.Column="1"
-                           Text="none"
-                           Foreground="#B9C4CC"
-                           FontSize="14"
-                           FontWeight="Bold"
-                           HorizontalAlignment="Right"
-                           TextWrapping="NoWrap"
-                           TextTrimming="CharacterEllipsis"
-                           MaxWidth="160"
-                           ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-              </Grid>
-            </Expander.Header>
-            <Border Background="#0C0F11" BorderBrush="#3A4249" BorderThickness="1" Padding="8" Margin="0,8,0,0">
-              <Grid>
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="Auto"/>
-                  <RowDefinition Height="Auto"/>
-                  <RowDefinition Height="124"/>
-                  <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Text="ACTIVE ALARMS" Foreground="#F0A0A0" FontWeight="ExtraBold" FontSize="14"/>
-                <TextBlock Grid.Row="1" x:Name="ActiveAlarmSummaryText" Text="No active alarms." Foreground="#DCE5EB" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,6"/>
-                <StackPanel Grid.Row="2">
-                  <StackPanel Orientation="Horizontal">
-                    <ComboBox x:Name="AlarmSeverityFilterCombo" Width="150" MinHeight="34" SelectionChanged="OnAlarmFilterChanged">
-                      <ComboBoxItem Content="All severities" IsSelected="True"/>
-                      <ComboBoxItem Content="Info"/>
-                      <ComboBoxItem Content="Warning"/>
-                      <ComboBoxItem Content="Alarm"/>
-                      <ComboBoxItem Content="Critical"/>
-                    </ComboBox>
-                    <ComboBox x:Name="AlarmSortCombo" Width="170" MinHeight="34" Margin="6,0,0,0" SelectionChanged="OnAlarmFilterChanged">
-                      <ComboBoxItem Content="Severity high first" IsSelected="True"/>
-                      <ComboBoxItem Content="Newest first"/>
-                      <ComboBoxItem Content="Oldest first"/>
-                      <ComboBoxItem Content="Severity low first"/>
-                    </ComboBox>
-                  </StackPanel>
-                  <TextBox x:Name="AlarmSourceFilterText" MinHeight="34" Margin="0,6,0,6" TextChanged="OnAlarmSourceFilterTextChanged"/>
-                  <ListBox x:Name="AlarmListBox"
-                           Height="74"
-                           ScrollViewer.VerticalScrollBarVisibility="Auto"
-                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                           Background="#090B0D"
-                           BorderBrush="#384149"
-                           Foreground="#E8EEF2">
-                    <ListBox.ItemTemplate>
-                      <DataTemplate>
-                        <StackPanel Margin="4">
-                          <TextBlock Text="{Binding Summary}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                          <TextBlock Text="{Binding ActionSummary}" FontSize="14" Foreground="#B7C2CA" TextWrapping="Wrap"/>
-                        </StackPanel>
-                      </DataTemplate>
-                    </ListBox.ItemTemplate>
-                  </ListBox>
-                </StackPanel>
-                <WrapPanel Grid.Row="3" HorizontalAlignment="Right" Margin="0,8,0,0">
-                  <Button x:Name="AcknowledgeAlarmBtn" Style="{StaticResource MiniBtnAmber}" Content="Acknowledge" Margin="0,0,6,0" Click="OnAcknowledgeAlarmClick"/>
-                  <Button x:Name="AlarmDetailsBtn" Style="{StaticResource MiniBtn}" Content="Details" Margin="0,0,6,0" Click="OnAlarmDetailsClick"/>
-                  <Button x:Name="ExportAlarmLogBtn" Style="{StaticResource MiniBtnGreen}" Content="Export Log" Click="OnExportAlarmLogClick"/>
-                </WrapPanel>
-              </Grid>
-            </Border>
-          </Expander>
-        </Grid>
-      </Border>
+      <Grid x:Name="ShellHiddenStateHost" Visibility="Collapsed" IsHitTestVisible="False">
+        <Border x:Name="StationBadgeBorder"/>
+        <TextBlock x:Name="DatabaseStatusText" Text="Not Connected"/>
+        <TextBlock x:Name="ImageVaultStatusText" Text="Not Available"/>
+        <TextBlock x:Name="InspectionEngineStatusText" Text="Pixel Difference Prototype Engine"/>
+        <TextBlock x:Name="CameraStatusText" Text="Not Connected"/>
+        <TextBlock x:Name="LightingStatusText" Text="Not Connected"/>
+        <TextBlock x:Name="RobotStatusText" Text="Not Connected"/>
+        <TextBlock x:Name="MesStatusText" Text="Not Connected"/>
+        <TextBlock x:Name="EmergencyStopStatusText" Text="Not Connected"/>
+        <TextBlock x:Name="PageTitleText"/>
+        <TextBlock x:Name="WorkflowSampleText" Text="none"/>
+        <TextBlock x:Name="WorkflowGoldenText" Text="none"/>
+        <TextBlock x:Name="WorkflowScoreText" Text="--"/>
+        <Border x:Name="WorkflowVerdictBorder"/>
+        <TextBlock x:Name="WorkflowVerdictText" Text="REVIEW"/>
+        <Button x:Name="RefreshPageBtn" Click="OnRefreshClick"/>
+        <Button x:Name="LockRecipeBtn" Click="OnLockRecipeClick"/>
+        <Button x:Name="ExportBtn" Click="OnExportClick"/>
+      </Grid>
 
-      <Grid Grid.Row="2" Background="{DynamicResource Bg}">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="286"/>
-          <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
-
-        <Border Grid.Column="0" Background="{DynamicResource WindowBg}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0" Padding="12">
-          <Grid>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto"/>
-              <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <TextBlock Text="AOI Workflow" Foreground="#E8EEF2" FontSize="18" FontWeight="ExtraBold" Margin="2,0,0,12"/>
-            <ScrollViewer x:Name="TopLevelNavScrollViewer"
-                          Grid.Row="1"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
-              <ItemsControl x:Name="TopLevelNavItems" ItemsSource="{Binding NavPages}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate>
-                    <StackPanel/>
-                  </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <Button Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                            CommandParameter="{Binding Key}"
-                            IsEnabled="{Binding IsEnabled}"
-                            ToolTip="{Binding Subtitle}"
-                            Margin="0,0,0,8"
-                            MinHeight="68">
-                      <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource NavBtn}">
-                          <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                          <Setter Property="VerticalContentAlignment" Value="Stretch"/>
-                          <Setter Property="Padding" Value="0"/>
-                          <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsActive}" Value="True">
-                              <Setter Property="Background" Value="#21384A"/>
-                              <Setter Property="BorderBrush" Value="#79B8E2"/>
-                              <Setter Property="Foreground" Value="#F5F9FB"/>
-                            </DataTrigger>
-                          </Style.Triggers>
-                        </Style>
-                      </Button.Style>
-                      <Grid Margin="10,7">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="42"/>
-                          <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Border Width="32" Height="32" CornerRadius="16" Background="#1F6FEB" HorizontalAlignment="Left" VerticalAlignment="Top">
-                          <TextBlock Text="{Binding Number}" Foreground="#FFFFFF" FontSize="13" FontWeight="ExtraBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                          <TextBlock Text="{Binding Title}" Style="{StaticResource HmiShellNavTitleText}" ToolTip="{Binding Title}"/>
-                          <TextBlock Text="{Binding Subtitle}" Style="{StaticResource HmiShellNavSubtitleText}" ToolTip="{Binding Subtitle}" Margin="0,2,0,0"/>
-                        </StackPanel>
-                      </Grid>
-                    </Button>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </ScrollViewer>
-          </Grid>
-        </Border>
-
-        <Grid Grid.Column="1">
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-          </Grid.RowDefinitions>
-
-          <Grid Grid.Row="0" Background="#0F151A" x:Name="PageTitleBar" MinHeight="54">
-            <Border BorderBrush="#30383F" BorderThickness="0,0,0,1" Padding="12,7">
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*"/>
-                  <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock x:Name="PageTitleText"
-                           Foreground="#E8EDF2"
-                           FontWeight="ExtraBold"
-                           FontSize="19"
-                           VerticalAlignment="Center"
-                           TextWrapping="Wrap"
-                           TextTrimming="CharacterEllipsis"
-                           MaxHeight="48"
-                           ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                <WrapPanel Grid.Column="1"
-                           x:Name="WorkflowToolbarPanel"
-                           Orientation="Horizontal"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Right"
-                           MaxWidth="860">
-                  <Border Style="{StaticResource HmiShellValueChip}" Background="#172027" BorderBrush="#34414A">
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                      </Grid.ColumnDefinitions>
-                      <TextBlock Text="Sample " Foreground="#8FA0AB" FontSize="14"/>
-                      <TextBlock x:Name="WorkflowSampleText" Grid.Column="1" Text="none" Foreground="#DCE5EB" FontSize="14" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="160" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                    </Grid>
-                  </Border>
-                  <Border Style="{StaticResource HmiShellValueChip}" Background="#172027" BorderBrush="#34414A">
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                      </Grid.ColumnDefinitions>
-                      <TextBlock Text="Golden " Foreground="#8FA0AB" FontSize="14"/>
-                      <TextBlock x:Name="WorkflowGoldenText" Grid.Column="1" Text="none" Foreground="#DCE5EB" FontSize="14" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="160" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                    </Grid>
-                  </Border>
-                  <Border Style="{StaticResource HmiShellValueChip}" Background="#1A2430" BorderBrush="#3B5B77" MaxWidth="128">
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                      </Grid.ColumnDefinitions>
-                      <TextBlock Text="Score " Foreground="#9AB1C4" FontSize="14"/>
-                      <TextBlock x:Name="WorkflowScoreText" Grid.Column="1" Text="--" Foreground="#CFEAFF" FontSize="14" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                    </Grid>
-                  </Border>
-                  <Border x:Name="WorkflowVerdictBorder" Style="{StaticResource HmiShellValueChip}" Background="#2A2E31" BorderBrush="#555E66" MaxWidth="160">
-                    <Grid>
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                      </Grid.ColumnDefinitions>
-                      <TextBlock Text="Verdict " Foreground="#AAB4BB" FontSize="14"/>
-                      <TextBlock x:Name="WorkflowVerdictText" Grid.Column="1" Text="REVIEW" Foreground="#DCE5EB" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-                    </Grid>
-                  </Border>
-                  <Button x:Name="RefreshPageBtn" Style="{StaticResource MiniBtn}" Content="Refresh" MinWidth="104" Margin="0,0,6,6" Click="OnRefreshClick"/>
-                  <Button x:Name="LockRecipeBtn" Style="{StaticResource MiniBtnAmber}" Content="Lock Recipe" MinWidth="118" Margin="0,0,6,6" Click="OnLockRecipeClick"/>
-                  <Button x:Name="ExportBtn" Style="{StaticResource MiniBtnGreen}" Content="Export" MinWidth="104" Margin="0,0,0,6" Click="OnExportClick"/>
-                </WrapPanel>
-              </Grid>
-            </Border>
-          </Grid>
-
-          <Grid Grid.Row="1">
+      <Grid Grid.Row="1" Background="{DynamicResource Bg}">
             <ContentControl x:Name="PageContent"/>
             <Border x:Name="PageErrorCard"
                     Background="#EE151A1E"
@@ -489,15 +320,20 @@
                     VerticalAlignment="Top"
                     Panel.ZIndex="15">
               <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*"/>
-                  <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 <StackPanel>
                   <TextBlock Text="Recoverable page error" Foreground="#FFCDD0" FontSize="16" FontWeight="Bold"/>
-                  <TextBlock x:Name="PageErrorText" Text="The page failed to refresh." Foreground="#E8EEF2" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                  <ScrollViewer MaxHeight="128"
+                                VerticalScrollBarVisibility="Auto"
+                                HorizontalScrollBarVisibility="Disabled"
+                                Margin="0,8,0,0">
+                    <TextBlock x:Name="PageErrorText" Text="The page failed to refresh." Foreground="#E8EEF2" TextWrapping="Wrap"/>
+                  </ScrollViewer>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="18,0,0,0" VerticalAlignment="Center">
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,12,0,0" HorizontalAlignment="Right">
                   <Button Style="{StaticResource MiniBtn}" Content="Retry" Margin="0,0,8,0" Click="OnRefreshClick"/>
                   <Button Style="{StaticResource MiniBtn}" Content="Dismiss" Click="OnDismissPageErrorClick"/>
                 </StackPanel>
@@ -512,22 +348,20 @@
                 </StackPanel>
               </Border>
             </Border>
-          </Grid>
-        </Grid>
       </Grid>
 
-      <Grid Grid.Row="3" Background="#081018" MinHeight="30">
+      <Grid Grid.Row="2" Background="#081018" MinHeight="30">
         <Border BorderBrush="#2E3D47" BorderThickness="0,1,0,0">
           <DockPanel Margin="10,0">
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" MaxWidth="520">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" MaxWidth="560">
               <TextBlock Text="Station " Foreground="#8D99A1" FontSize="14"/>
               <TextBlock x:Name="FooterStationText" Text="AOI-LIB-01" FontWeight="Bold" Foreground="#D4DDE3" FontSize="14" Margin="0,0,14,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="150" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-              <TextBlock Text="Index " Foreground="#8D99A1" FontSize="14"/>
+              <TextBlock Text="Link " Foreground="#8D99A1" FontSize="14"/>
               <TextBlock x:Name="FooterIndexText" Text="SQLite" FontWeight="Bold" Foreground="#50F56E" FontSize="14" Margin="0,0,14,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="110" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
               <TextBlock Text="DB Updated " Foreground="#8D99A1" FontSize="14"/>
               <TextBlock x:Name="FooterDbUpdatedText" Text="--" FontWeight="Bold" Foreground="#D4DDE3" FontSize="14" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="120" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" MaxWidth="520">
+            <StackPanel Orientation="Horizontal" MaxWidth="560">
               <TextBlock Text="REC " Foreground="#8D99A1" FontSize="14"/>
               <TextBlock x:Name="FooterRecordCountText" Text="0" FontWeight="Bold" Foreground="#D4DDE3" FontSize="14" Margin="0,0,14,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="70" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
               <TextBlock Text="IMG LINK " Foreground="#8D99A1" FontSize="14"/>

@@ -73,10 +73,8 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         InspectionModelConfigurationService.ConfigurationChanged -= OnEngineConfigurationChanged;
         LightingSettingsService.SettingsChanged -= OnLightingSettingsChanged;
         _robotCycleService.StateChanged -= OnRobotCycleStateChanged;
-        _robotCycleCancellation?.Cancel();
-        _robotCycleCancellation?.Dispose();
-        _refreshCancellation?.Cancel();
-        _refreshCancellation?.Dispose();
+        CancelAndDispose(ref _robotCycleCancellation);
+        CancelAndDispose(ref _refreshCancellation);
         if (ReferenceEquals(IntegrationBoundaryRegistry.RobotController, _robotController))
             IntegrationBoundaryRegistry.RobotController = new NullRobotController();
         if (ReferenceEquals(IntegrationBoundaryRegistry.EmergencyStopMonitor, _emergencyStopMonitor))
@@ -92,8 +90,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
 
     public async Task RefreshAsync(CancellationToken cancellationToken)
     {
-        _refreshCancellation?.Cancel();
-        _refreshCancellation?.Dispose();
+        CancelAndDispose(ref _refreshCancellation);
         _refreshCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var token = _refreshCancellation.Token;
         var selectedProfileId = _selectedCalibrationProfile?.Id;
@@ -141,13 +138,41 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
 
     public void CancelWork()
     {
-        _refreshCancellation?.Cancel();
-        _robotCycleCancellation?.Cancel();
+        TryCancel(_refreshCancellation);
+        TryCancel(_robotCycleCancellation);
+    }
+
+    private static void TryCancel(CancellationTokenSource? cancellation)
+    {
+        if (cancellation is null)
+            return;
+
+        try
+        {
+            cancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Navigation and unload can race through cached WPF pages; cleanup must stay idempotent.
+        }
+    }
+
+    private static void CancelAndDispose(ref CancellationTokenSource? cancellation)
+    {
+        var source = cancellation;
+        cancellation = null;
+        if (source is null)
+            return;
+
+        TryCancel(source);
+        source.Dispose();
     }
 
     private void OnOpenDispositionClick(object sender, RoutedEventArgs e) => Navigate("review");
     private void OnOpenCompareClick(object sender, RoutedEventArgs e) => Navigate("compare");
     private void OnOpenLibraryClick(object sender, RoutedEventArgs e) => Navigate("library");
+    private void OnOpenImageViewerClick(object sender, RoutedEventArgs e)
+        => AOI_Monitor.ImageViewerWindow.ShowFromVisual(this, "Run Inspection Image / Overlay", InspectionImageViewport);
 
     private void Navigate(string key)
     {

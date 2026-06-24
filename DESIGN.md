@@ -69,12 +69,13 @@ Absolute positioning is forbidden for production UI unless there is a specific v
 
 The shell must preserve a stable industrial workstation layout:
 
-- Top banner: mode, deployment profile, user/role, engine/source state, and any simulation/mock warning.
-- Left navigation: focused workflow windows remain reachable with readable labels at 1920x1080. The rail may scroll when the number of windows exceeds the viewport, but it must not clip menu text or hide active state.
-- Alarm/readiness strip: visible without requiring page-specific navigation.
-- Page content: one primary workflow area with secondary diagnostics kept visually subordinate.
+- Compact top banner: mode, deployment profile, user/role, engine/source state, any simulation/mock warning, and active critical/alarm status without consuming workflow-menu height.
+- Home module map: focused workflow menus remain reachable with large readable tiles at 1920x1080. Normal navigation and noncritical readiness summaries live on Home, not as duplicated chrome on every workflow page.
+- Large image viewer windows: Run Inspection and Golden Compare stay embedded in the main shell like the other workflow menus. Their image-heavy panels may open a separate viewer window for larger visual inspection with zoom, fit, 100% view, PNG save, active critical/alarm status, and prototype/simulation boundary labels.
+- Critical alarm access: visible without requiring page-specific navigation. Noncritical readiness belongs on Home and evidence/readiness pages unless a workflow needs it for an immediate operator decision.
+- Page content: one primary workflow area that fills the workspace between the persistent top banner and bottom evidence footer; secondary diagnostics stay visually subordinate.
 
-The current focused workflow windows are:
+The current focused workflow menus are:
 
 1. `01 Home`
 2. `02 Board & Images`
@@ -92,7 +93,7 @@ The current focused workflow windows are:
 
 Support pages such as Installation Notes and Guide are owned by System Settings and must remain reachable from there without becoming duplicate top-level workflows.
 
-Do not add another focused window without updating the shell, Home module map, role authorization, HMI layout audit, navigation smoke tests, and this design contract. New functionality should either fit one existing owner or justify a new window by reducing cognitive load and clipping risk.
+Do not add another focused window without updating the Home module map, shell route handling, role authorization, HMI layout audit, navigation smoke tests, and this design contract. New functionality should either fit one existing owner or justify a new window by reducing cognitive load and clipping risk.
 
 Do not duplicate the same status or control in the shell and a page unless the duplication serves different operator decisions. If two UI areas answer the same question, consolidate them.
 
@@ -183,8 +184,8 @@ Each feature must have one obvious home:
 
 - Module map and operator entry point: `Home`.
 - Imported images, folder sources, board image inventory, golden references: `Board & Images`.
-- Inspection execution, live progress, current board verdicts: `Run Inspection`.
-- Golden template comparison and difference scoring: `Golden Compare`.
+- Inspection execution, live progress, current board verdicts: `Run Inspection`, opened in the main shell from Home or workflow links, with optional large-image viewing for the active image/overlay.
+- Golden template comparison and difference scoring: `Golden Compare`, opened in the main shell from Home or workflow links, with optional large-image viewing for sample and golden reference panels.
 - Defect queue, evidence, classification, disposition: `Defect Review`.
 - Recipe, ROI, mask, rule, threshold, tolerance setup: `Recipe Rules`.
 - Model validation, Stage 1 evidence, ONNX/test-set review, false-call feedback: `AI / Models`.
@@ -322,7 +323,7 @@ A UI change is done only when:
 
 - All important text remains visible at 1920x1080 and 100/125/150% DPI assumptions.
 - Dense content has scrolling or adaptive layout.
-- All focused workflow windows remain reachable with readable labels, and Home, shell navigation, route handling, role authorization, HMI audit, and navigation smoke tests remain aligned.
+- All focused workflow menus remain reachable with readable labels, and Home, shell navigation, route handling, role authorization, HMI audit, and navigation smoke tests remain aligned.
 - Primary actions are at least 120x40 px.
 - Operator text is at least 14 pt equivalent.
 - Long strings, missing data, empty states, and failed dependencies behave cleanly.

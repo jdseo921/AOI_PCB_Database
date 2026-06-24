@@ -59,8 +59,8 @@ public class MainViewModel : ViewModelBase
     {
         new NavPage { Key="home",        Number="01", Title="Home",               Subtitle="module map" },
         new NavPage { Key="library",     Number="02", Title="Board & Images",     Subtitle="library, folders, golden refs" },
-        new NavPage { Key="monitor",     Number="03", Title="Run Inspection",     Subtitle="board execution" },
-        new NavPage { Key="compare",     Number="04", Title="Golden Compare",     Subtitle="template match, difference score" },
+        new NavPage { Key="monitor",     Number="03", Title="Run Inspection",     Subtitle="embedded run, large image view" },
+        new NavPage { Key="compare",     Number="04", Title="Golden Compare",     Subtitle="embedded compare, large image view" },
         new NavPage { Key="review",      Number="05", Title="Defect Review",      Subtitle="queue, evidence, disposition" },
         new NavPage { Key="recipe",      Number="06", Title="Recipe Rules",       Subtitle="ROI, masks, tolerances" },
         new NavPage { Key="modeltest",   Number="07", Title="AI / Models",        Subtitle="model checks, false calls" },
@@ -103,8 +103,8 @@ public class MainViewModel : ViewModelBase
             {
                 "home" => T(language, "Home", "module map", "\uD648", "\uBAA8\uB4C8 \uB9F5"),
                 "library" => T(language, "Board & Images", "library, folders, golden refs", "\uBCF4\uB4DC / \uC774\uBBF8\uC9C0", "\uB77C\uC774\uBE0C\uB7EC\uB9AC/\uD3F4\uB354/\uAE30\uC900 \uC774\uBBF8\uC9C0"),
-                "monitor" => T(language, "Run Inspection", "board execution", "\uAC80\uC0AC \uC2E4\uD589", "\uBCF4\uB4DC \uC2E4\uD589"),
-                "compare" => T(language, "Golden Compare", "template match, difference score", "\uAE30\uC900 \uBE44\uAD50", "\uD15C\uD50C\uB9BF \uB9E4\uCE6D/\uCC28\uC774 \uC810\uC218"),
+                "monitor" => T(language, "Run Inspection", "embedded run, large image view", "\uAC80\uC0AC \uC2E4\uD589", "\uB0B4\uC7A5 \uC2E4\uD589/\uD070 \uC774\uBBF8\uC9C0 \uBCF4\uAE30"),
+                "compare" => T(language, "Golden Compare", "embedded compare, large image view", "\uAE30\uC900 \uBE44\uAD50", "\uB0B4\uC7A5 \uBE44\uAD50/\uD070 \uC774\uBBF8\uC9C0 \uBCF4\uAE30"),
                 "review" => T(language, "Defect Review", "queue, evidence, disposition", "\uACB0\uD568 \uAC80\uD1A0", "\uB300\uAE30\uC5F4/\uC99D\uBE59/\uCC98\uBD84"),
                 "recipe" => T(language, "Recipe Rules", "ROI, masks, tolerances", "\uB808\uC2DC\uD53C \uADDC\uCE59", "ROI/\uB9C8\uC2A4\uD06C/\uACF5\uCC28"),
                 "modeltest" => T(language, "AI / Models", "model checks, false calls", "AI / \uBAA8\uB378", "\uBAA8\uB378 \uC810\uAC80/\uD5C8\uC704 \uAC80\uCD9C"),

@@ -3,90 +3,140 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{DynamicResource Bg}">
   <UserControl.Resources>
-    <Style x:Key="HomeCard" TargetType="Border" BasedOn="{StaticResource FactoryCard}">
-      <Setter Property="Background" Value="{DynamicResource CellBg}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
-      <Setter Property="Padding" Value="14"/>
-      <Setter Property="MinHeight" Value="82"/>
-    </Style>
     <Style x:Key="HomeModuleButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-      <Setter Property="MinHeight" Value="92"/>
+      <Setter Property="MinHeight" Value="88"/>
       <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
       <Setter Property="VerticalContentAlignment" Value="Stretch"/>
       <Setter Property="Padding" Value="0"/>
-      <Setter Property="Margin" Value="0,0,10,10"/>
+      <Setter Property="Margin" Value="0,0,8,8"/>
       <Setter Property="Background" Value="{DynamicResource Frame2Bg}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
     </Style>
-    <Style x:Key="MetricValue" TargetType="TextBlock">
-      <Setter Property="FontSize" Value="24"/>
-      <Setter Property="FontWeight" Value="ExtraBold"/>
+    <Style x:Key="HomeCompactStatusBorder" TargetType="Border" BasedOn="{StaticResource HmiAdaptiveStatusUnavailable}">
+      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="MinWidth" Value="136"/>
+      <Setter Property="MaxWidth" Value="178"/>
+      <Setter Property="Padding" Value="7,3"/>
+      <Setter Property="Margin" Value="0,0,6,6"/>
+    </Style>
+    <Style x:Key="HomeStatusLabel" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
+      <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="TextWrapping" Value="NoWrap"/>
+    </Style>
+    <Style x:Key="HomeStatusValue" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-      <Setter Property="TextWrapping" Value="Wrap"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontWeight" Value="ExtraBold"/>
+      <Setter Property="MaxWidth" Value="104"/>
     </Style>
   </UserControl.Resources>
 
   <ScrollViewer Style="{StaticResource FactoryScrollablePage}">
-    <Grid Margin="14">
+    <Grid Margin="8">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/>
-        <RowDefinition Height="14"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="14"/>
+        <RowDefinition Height="8"/>
         <RowDefinition Height="Auto"/>
       </Grid.RowDefinitions>
 
-      <Border Grid.Row="0" Style="{StaticResource HomeCard}">
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.55*"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="*"/>
-          </Grid.ColumnDefinitions>
-          <StackPanel>
-            <TextBlock Text="Station AOI-LIB-01" Style="{StaticResource HmiPageTitleText}" FontSize="22"/>
-            <WrapPanel Margin="0,8,0,0">
-              <TextBlock Text="Camera: Stage 1 folder source" Foreground="{DynamicResource GreenBrush}" FontSize="14" FontWeight="Bold" Margin="0,0,18,0"/>
-              <TextBlock Text="Lighting: simulated boundary" Foreground="{DynamicResource AmberBrush}" FontSize="14" FontWeight="Bold" Margin="0,0,18,0"/>
-              <TextBlock Text="DB: SQLite local cache" Foreground="{DynamicResource GreenBrush}" FontSize="14" FontWeight="Bold" Margin="0,0,18,0"/>
-              <TextBlock Text="Robot/MES: not production-connected" Foreground="{DynamicResource PurpleBrush}" FontSize="14" FontWeight="Bold"/>
-            </WrapPanel>
-          </StackPanel>
-          <StackPanel Grid.Column="1" Margin="18,0,0,0">
-            <TextBlock Text="Product" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-            <TextBlock Text="TBOX-MAIN" Foreground="{DynamicResource TextBrush}" FontSize="17" FontWeight="ExtraBold" TextWrapping="Wrap"/>
-          </StackPanel>
-          <StackPanel Grid.Column="2" Margin="18,0,0,0">
-            <TextBlock Text="Recipe" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-            <TextBlock Text="PIXEL_DIFF_0.1 / Active" Foreground="{DynamicResource TextBrush}" FontSize="17" FontWeight="ExtraBold" TextWrapping="Wrap"/>
-          </StackPanel>
-          <StackPanel Grid.Column="3" Margin="18,0,0,0">
-            <TextBlock Text="Inspection Basis" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-            <TextBlock Text="Image validation PoC" Foreground="{DynamicResource TextBrush}" FontSize="17" FontWeight="ExtraBold" TextWrapping="Wrap"/>
-          </StackPanel>
-        </Grid>
-      </Border>
+      <Grid Grid.Row="0">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="5"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DockPanel LastChildFill="True">
+          <TextBlock x:Name="HomeAlarmSummaryText"
+                     DockPanel.Dock="Right"
+                     Text="Critical status: none"
+                     Foreground="{DynamicResource TextBrush}"
+                     FontSize="14"
+                     FontWeight="ExtraBold"
+                     VerticalAlignment="Center"
+                     TextWrapping="NoWrap"
+                     TextTrimming="CharacterEllipsis"
+                     MaxWidth="330"
+                     ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+          <TextBlock Text="Home"
+                     Style="{StaticResource HmiPageTitleText}"
+                     FontSize="18"
+                     VerticalAlignment="Center"
+                     TextWrapping="NoWrap"/>
+        </DockPanel>
+
+        <WrapPanel Grid.Row="2" Orientation="Horizontal">
+          <Border x:Name="HomeDatabaseStatusBorder" Style="{StaticResource HomeCompactStatusBorder}">
+            <DockPanel LastChildFill="True">
+              <TextBlock Text="DB" Style="{StaticResource HomeStatusLabel}" Margin="0,0,6,0"/>
+              <TextBlock x:Name="HomeDatabaseStatusText" Text="Not Connected" Style="{StaticResource HomeStatusValue}"/>
+            </DockPanel>
+          </Border>
+          <Border x:Name="HomeImageVaultStatusBorder" Style="{StaticResource HomeCompactStatusBorder}">
+            <DockPanel LastChildFill="True">
+              <TextBlock Text="Vault" Style="{StaticResource HomeStatusLabel}" Margin="0,0,6,0"/>
+              <TextBlock x:Name="HomeImageVaultStatusText" Text="Not Available" Style="{StaticResource HomeStatusValue}"/>
+            </DockPanel>
+          </Border>
+          <Border x:Name="HomeEngineStatusBorder" Style="{StaticResource HomeCompactStatusBorder}">
+            <DockPanel LastChildFill="True">
+              <TextBlock Text="Engine" Style="{StaticResource HomeStatusLabel}" Margin="0,0,6,0"/>
+              <TextBlock x:Name="HomeEngineStatusText" Text="Pixel Difference Prototype Engine" Style="{StaticResource HomeStatusValue}"/>
+            </DockPanel>
+          </Border>
+          <Border x:Name="HomeCameraStatusBorder" Style="{StaticResource HomeCompactStatusBorder}">
+            <DockPanel LastChildFill="True">
+              <TextBlock Text="Camera" Style="{StaticResource HomeStatusLabel}" Margin="0,0,6,0"/>
+              <TextBlock x:Name="HomeCameraStatusText" Text="Not Connected" Style="{StaticResource HomeStatusValue}"/>
+            </DockPanel>
+          </Border>
+          <Border x:Name="HomeLightingStatusBorder" Style="{StaticResource HomeCompactStatusBorder}">
+            <DockPanel LastChildFill="True">
+              <TextBlock Text="Light" Style="{StaticResource HomeStatusLabel}" Margin="0,0,6,0"/>
+              <TextBlock x:Name="HomeLightingStatusText" Text="Not Connected" Style="{StaticResource HomeStatusValue}"/>
+            </DockPanel>
+          </Border>
+          <Border x:Name="HomeRobotStatusBorder" Style="{StaticResource HomeCompactStatusBorder}">
+            <DockPanel LastChildFill="True">
+              <TextBlock Text="Robot" Style="{StaticResource HomeStatusLabel}" Margin="0,0,6,0"/>
+              <TextBlock x:Name="HomeRobotStatusText" Text="Not Connected" Style="{StaticResource HomeStatusValue}"/>
+            </DockPanel>
+          </Border>
+          <Border x:Name="HomeMesStatusBorder" Style="{StaticResource HomeCompactStatusBorder}">
+            <DockPanel LastChildFill="True">
+              <TextBlock Text="MES" Style="{StaticResource HomeStatusLabel}" Margin="0,0,6,0"/>
+              <TextBlock x:Name="HomeMesStatusText" Text="Not Connected" Style="{StaticResource HomeStatusValue}"/>
+            </DockPanel>
+          </Border>
+          <Border x:Name="HomeEStopStatusBorder" Style="{StaticResource HomeCompactStatusBorder}">
+            <DockPanel LastChildFill="True">
+              <TextBlock Text="E-Stop" Style="{StaticResource HomeStatusLabel}" Margin="0,0,6,0"/>
+              <TextBlock x:Name="HomeEStopStatusText" Text="Not Connected" Style="{StaticResource HomeStatusValue}"/>
+            </DockPanel>
+          </Border>
+        </WrapPanel>
+      </Grid>
 
       <Grid Grid.Row="2">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="1.35*"/>
-          <ColumnDefinition Width="14"/>
-          <ColumnDefinition Width="1*"/>
+          <ColumnDefinition Width="1.95*"/>
+          <ColumnDefinition Width="10"/>
+          <ColumnDefinition Width="0.85*"/>
         </Grid.ColumnDefinitions>
 
         <Grid Grid.Column="0">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="5"/>
             <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
-          <TextBlock Text="Focused Workflow Windows" Style="{StaticResource HmiPageTitleText}" FontSize="22"/>
+          <TextBlock Text="AOI Workflow Menus" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
           <ItemsControl x:Name="HomeModuleItems" Grid.Row="2" ItemsSource="{Binding NavPages}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
-                <UniformGrid Columns="2"/>
+                <UniformGrid Columns="4"/>
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
@@ -95,19 +145,19 @@
                         IsEnabled="{Binding IsEnabled}"
                         Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                         CommandParameter="{Binding Key}">
-                  <Grid Margin="14">
+                  <Grid Margin="10">
                     <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="48"/>
+                      <ColumnDefinition Width="40"/>
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Width="38"
-                            Height="38"
+                    <Border Width="32"
+                            Height="32"
                             Background="{DynamicResource BlueBrush}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Top">
                       <TextBlock Text="{Binding Number}"
                                  Foreground="White"
-                                 FontSize="15"
+                                 FontSize="14"
                                  FontWeight="ExtraBold"
                                  HorizontalAlignment="Center"
                                  VerticalAlignment="Center"/>
@@ -115,15 +165,16 @@
                     <StackPanel Grid.Column="1">
                       <TextBlock Text="{Binding Title}"
                                  Foreground="{DynamicResource TextBrush}"
-                                 FontSize="17"
+                                 FontSize="15"
                                  FontWeight="ExtraBold"
-                                 TextWrapping="Wrap"/>
+                                 TextWrapping="Wrap"
+                                 LineHeight="18"/>
                       <TextBlock Text="{Binding Subtitle}"
                                  Foreground="{DynamicResource MutedBrush}"
                                  FontSize="14"
                                  TextWrapping="Wrap"
-                                 LineHeight="19"
-                                 Margin="0,4,0,0"/>
+                                 LineHeight="17"
+                                 Margin="0,3,0,0"/>
                     </StackPanel>
                   </Grid>
                 </Button>
@@ -135,122 +186,55 @@
         <Grid Grid.Column="2">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="5"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="14"/>
-            <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
-          <TextBlock Text="AOI Inspection Pipeline" Style="{StaticResource HmiPageTitleText}" FontSize="22"/>
-          <Border Grid.Row="2" Style="{StaticResource HomeCard}">
+          <TextBlock Text="Current State" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
+          <Border Grid.Row="2" Style="{StaticResource FactoryCard}" Padding="8">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="10"/>
+                <RowDefinition Height="4"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="10"/>
+                <RowDefinition Height="4"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="4"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="8"/>
                 <RowDefinition Height="Auto"/>
               </Grid.RowDefinitions>
-
-              <UniformGrid Columns="2">
-                <Border Style="{StaticResource FieldBox}" Background="{DynamicResource Frame2Bg}" BorderBrush="{DynamicResource LineBrush}" Margin="0,0,8,8">
-                  <StackPanel>
-                    <TextBlock Text="Input" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-                    <TextBlock Text="PNG/JPG, AOI files, golden images" Foreground="{DynamicResource TextBrush}" FontSize="14" FontWeight="Bold" TextWrapping="Wrap"/>
-                  </StackPanel>
-                </Border>
-                <Border Style="{StaticResource FieldBox}" Background="{DynamicResource Frame2Bg}" BorderBrush="{DynamicResource LineBrush}" Margin="0,0,0,8">
-                  <StackPanel>
-                    <TextBlock Text="Register" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-                    <TextBlock Text="Fiducials, rotation, X/Y offset" Foreground="{DynamicResource TextBrush}" FontSize="14" FontWeight="Bold" TextWrapping="Wrap"/>
-                  </StackPanel>
-                </Border>
-                <Border Style="{StaticResource FieldBox}" Background="{DynamicResource Frame2Bg}" BorderBrush="{DynamicResource LineBrush}" Margin="0,0,8,0">
-                  <StackPanel>
-                    <TextBlock Text="Inspect" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-                    <TextBlock Text="Component, solder, polarity, surface" Foreground="{DynamicResource TextBrush}" FontSize="14" FontWeight="Bold" TextWrapping="Wrap"/>
-                  </StackPanel>
-                </Border>
-                <Border Style="{StaticResource FieldBox}" Background="{DynamicResource Frame2Bg}" BorderBrush="{DynamicResource LineBrush}">
-                  <StackPanel>
-                    <TextBlock Text="Export" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-                    <TextBlock Text="Evidence, coordinates, IPC class, MES" Foreground="{DynamicResource TextBrush}" FontSize="14" FontWeight="Bold" TextWrapping="Wrap"/>
-                  </StackPanel>
-                </Border>
-              </UniformGrid>
-
-              <UniformGrid Grid.Row="2" Columns="2">
-                <Border Style="{StaticResource HmiKpiCard}" Background="{DynamicResource CellBg}" BorderBrush="{DynamicResource LineBrush}" Margin="0,0,8,8">
-                  <StackPanel>
-                    <TextBlock Text="Boards inspected" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-                    <TextBlock Text="1,284" Style="{StaticResource MetricValue}" Foreground="{DynamicResource GreenBrush}"/>
-                  </StackPanel>
-                </Border>
-                <Border Style="{StaticResource HmiKpiCard}" Background="{DynamicResource CellBg}" BorderBrush="{DynamicResource LineBrush}" Margin="0,0,0,8">
-                  <StackPanel>
-                    <TextBlock Text="First-pass yield" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-                    <TextBlock Text="98.2%" Style="{StaticResource MetricValue}" Foreground="{DynamicResource BlueBrush}"/>
-                  </StackPanel>
-                </Border>
-                <Border Style="{StaticResource HmiKpiCard}" Background="{DynamicResource CellBg}" BorderBrush="{DynamicResource LineBrush}" Margin="0,0,8,0">
-                  <StackPanel>
-                    <TextBlock Text="Pending review" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-                    <TextBlock Text="17" Style="{StaticResource MetricValue}" Foreground="{DynamicResource AmberBrush}"/>
-                  </StackPanel>
-                </Border>
-                <Border Style="{StaticResource HmiKpiCard}" Background="{DynamicResource CellBg}" BorderBrush="{DynamicResource LineBrush}">
-                  <StackPanel>
-                    <TextBlock Text="Critical defects" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-                    <TextBlock Text="3" Style="{StaticResource MetricValue}" Foreground="{DynamicResource RedBrush}"/>
-                  </StackPanel>
-                </Border>
-              </UniformGrid>
-
-              <Border Grid.Row="4" Style="{StaticResource HmiPlainLanguageNote}">
-                <StackPanel>
-                  <TextBlock Text="Capability groups" Style="{StaticResource HmiSectionHeaderText}"/>
-                  <TextBlock Text="Board and image management, defect detection algorithms, processing and tolerance rules, and output traceability are split into dedicated windows so dense inspection work does not crowd the main review screen."
-                             Style="{StaticResource HmiPageSubtitleText}" Margin="0,6,0,0"/>
-                </StackPanel>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="82"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="Sample" Style="{StaticResource HomeStatusLabel}"/>
+              <TextBlock x:Name="HomeSampleText" Grid.Column="1" Text="none" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
+              <TextBlock Grid.Row="2" Text="Golden" Style="{StaticResource HomeStatusLabel}"/>
+              <TextBlock x:Name="HomeGoldenText" Grid.Row="2" Grid.Column="1" Text="none" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
+              <TextBlock Grid.Row="4" Text="Score" Style="{StaticResource HomeStatusLabel}"/>
+              <TextBlock x:Name="HomeScoreText" Grid.Row="4" Grid.Column="1" Text="--" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
+              <TextBlock Grid.Row="6" Text="Recipe" Style="{StaticResource HomeStatusLabel}"/>
+              <TextBlock x:Name="HomeRecipeText" Grid.Row="6" Grid.Column="1" Text="PIXEL_DIFF_0.1" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
+              <Border x:Name="HomeVerdictBorder" Grid.Row="8" Grid.ColumnSpan="2" Background="#372914" BorderBrush="#987538" BorderThickness="2" Padding="8,5">
+                <DockPanel LastChildFill="True">
+                  <TextBlock Text="Verdict" Foreground="{DynamicResource MutedBrush}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="HomeVerdictText" Text="REVIEW" Foreground="#FFE0A7" FontSize="24" FontWeight="ExtraBold" HorizontalAlignment="Right" TextAlignment="Right"/>
+                </DockPanel>
               </Border>
             </Grid>
           </Border>
 
-          <Border Grid.Row="4" Style="{StaticResource HomeCard}">
+          <Border Grid.Row="4" Style="{StaticResource HmiPlainLanguageNote}" Padding="8">
             <StackPanel>
-              <TextBlock Text="Current Evidence Boundary" Style="{StaticResource HmiSectionHeaderText}"/>
-              <TextBlock Text="Stage 1 image-validation evidence is visible and usable. Real camera, lighting, robot, and MES readiness must be validated through Hardware Readiness evidence before it can be represented as production hardware readiness."
-                         Style="{StaticResource HmiPageSubtitleText}" Margin="0,8,0,0"/>
+              <TextBlock Text="Evidence Boundary" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
+              <TextBlock Text="Stage 1 image-validation evidence is for review. Camera, lighting, robot, safety, and MES readiness still require Hardware Readiness evidence before any real factory-integration claim."
+                         Style="{StaticResource HmiPageSubtitleText}" LineHeight="18" Margin="0,5,0,0"/>
             </StackPanel>
           </Border>
         </Grid>
       </Grid>
-
-      <Border Grid.Row="4" Style="{StaticResource HomeCard}">
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.1*"/>
-            <ColumnDefinition Width="1.3*"/>
-          </Grid.ColumnDefinitions>
-          <StackPanel>
-            <TextBlock Text="Recent Jobs" Style="{StaticResource HmiSectionHeaderText}"/>
-            <UniformGrid Columns="4" Margin="0,10,0,0">
-              <TextBlock Text="Lot" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-              <TextBlock Text="Product" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-              <TextBlock Text="Status" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-              <TextBlock Text="Review" Foreground="{DynamicResource MutedBrush}" FontSize="14"/>
-              <TextBlock Text="POC-LOT" Foreground="{DynamicResource TextBrush}" FontSize="14"/>
-              <TextBlock Text="TBOX-MAIN" Foreground="{DynamicResource TextBrush}" FontSize="14"/>
-              <TextBlock Text="RUNNING" Foreground="{DynamicResource GreenBrush}" FontSize="14" FontWeight="Bold"/>
-              <TextBlock Text="17 pending" Foreground="{DynamicResource AmberBrush}" FontSize="14" FontWeight="Bold"/>
-            </UniformGrid>
-          </StackPanel>
-          <StackPanel Grid.Column="1" Margin="24,0,0,0">
-            <TextBlock Text="Separated-window design rule" Style="{StaticResource HmiSectionHeaderText}"/>
-            <TextBlock Text="Use the home map to enter the narrow window needed for the task. New features should become a focused page, tab, or dialog when they would crowd inspection, review, settings, or export workflows."
-                       Style="{StaticResource HmiPageSubtitleText}" Margin="0,8,0,0"/>
-          </StackPanel>
-        </Grid>
-      </Border>
     </Grid>
   </ScrollViewer>
 </UserControl>

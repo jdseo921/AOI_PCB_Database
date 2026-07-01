@@ -325,10 +325,16 @@ public static class ExportVerificationService
 
     private static void VerifyPackageManifest(ExportVerificationResult result, string folder, IReadOnlyCollection<string> actualFiles)
     {
-        var manifestPath = Directory.EnumerateFiles(folder, "validation_manifest.json", SearchOption.AllDirectories)
-            .Concat(Directory.EnumerateFiles(folder, "package_manifest.json", SearchOption.AllDirectories))
-            .OrderBy(path => Path.GetRelativePath(folder, path), StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
+        var rootValidationManifest = Path.Combine(folder, "validation_manifest.json");
+        var rootPackageManifest = Path.Combine(folder, "package_manifest.json");
+        var manifestPath = File.Exists(rootValidationManifest)
+            ? rootValidationManifest
+            : File.Exists(rootPackageManifest)
+                ? rootPackageManifest
+                : Directory.EnumerateFiles(folder, "validation_manifest.json", SearchOption.AllDirectories)
+                    .Concat(Directory.EnumerateFiles(folder, "package_manifest.json", SearchOption.AllDirectories))
+                    .OrderBy(path => Path.GetRelativePath(folder, path), StringComparer.OrdinalIgnoreCase)
+                    .FirstOrDefault();
 
         if (manifestPath is null)
         {
@@ -390,6 +396,9 @@ public static class ExportVerificationService
 
         if (fileName.Equals("benchmark_results.csv", StringComparison.OrdinalIgnoreCase))
             return Array.Empty<string>();
+
+        if (fileName.Equals("factory_acceptance_checklist.csv", StringComparison.OrdinalIgnoreCase))
+            return new[] { "requirement_id", "requirement_text", "required_evidence", "current_evidence_path", "status", "signoff_role" };
 
         if (exportType.Contains("ReviewDispositionLog", StringComparison.OrdinalIgnoreCase) ||
             fileName.Contains("review_disposition", StringComparison.OrdinalIgnoreCase))

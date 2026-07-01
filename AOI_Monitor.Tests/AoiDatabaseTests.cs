@@ -562,6 +562,49 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
+    public void ExportVerificationPrefersRootPackageManifestWhenNestedPackagesExist()
+    {
+        var package = Path.Combine(_root, "stage2_package");
+        var nested = Path.Combine(package, "factory_readiness", "factory_readiness_20260701_000000");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(package, "README.txt"), "stage 2 root package");
+        File.WriteAllText(Path.Combine(nested, "nested.txt"), "nested factory readiness package");
+        File.WriteAllText(
+            Path.Combine(nested, "package_manifest.json"),
+            """
+            {
+              "schemaVersion": "factory-readiness-package/v1",
+              "packageId": "nested-package",
+              "generatedAtUtc": "2026-07-01T00:00:00Z",
+              "includedFiles": [
+                { "relativePath": "nested.txt", "fileType": "Nested text", "bytes": 32 }
+              ]
+            }
+            """,
+            Encoding.UTF8);
+        File.WriteAllText(
+            Path.Combine(package, "package_manifest.json"),
+            """
+            {
+              "schemaVersion": "stage2-camera-pilot-package/v1",
+              "packageId": "root-package",
+              "generatedAtUtc": "2026-07-01T00:00:00Z",
+              "includedFiles": [
+                { "relativePath": "README.txt", "fileType": "README", "bytes": 20 },
+                { "relativePath": "factory_readiness/factory_readiness_20260701_000000/nested.txt", "fileType": "Nested text", "bytes": 32 },
+                { "relativePath": "factory_readiness/factory_readiness_20260701_000000/package_manifest.json", "fileType": "Nested manifest", "bytes": 224 }
+              ]
+            }
+            """,
+            Encoding.UTF8);
+
+        var result = ExportVerificationService.Verify(package, "Stage2CameraPilotEvidencePackage");
+
+        Assert.Equal(ExportVerificationStatus.OK, result.Status);
+        Assert.Contains(result.Messages, message => message.Contains("manifest file list matches", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void DiagnosticsReturnOkForTempWritableStorage()
     {
         AoiDatabase.Initialize();

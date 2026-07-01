@@ -1,0 +1,21 @@
+using AOI_Monitor.Data;
+
+namespace AOI_Monitor.Tools;
+
+public static class Program
+{
+    public static int Main(string[] args)
+    {
+        var storageRoot = Environment.GetEnvironmentVariable("AOI_MONITOR_STORAGE_ROOT");
+        if (!string.IsNullOrWhiteSpace(storageRoot))
+            AoiDatabase.ConfigureStorageRoot(storageRoot);
+
+        if (args.Length > 0 && string.Equals(args[0], "camera-adapter-validate", StringComparison.OrdinalIgnoreCase))
+            return CameraAdapterValidationCommand.Execute(args, Console.Out, Console.Error);
+
+        if (args.Length > 0 && string.Equals(args[0], "stage2-camera-pilot", StringComparison.OrdinalIgnoreCase))
+            return Stage2CameraPilotCommand.Execute(args, Console.Out, Console.Error);
+
+        return Stage1ExitCommand.Execute(args, Console.Out, Console.Error);
+    }
+}

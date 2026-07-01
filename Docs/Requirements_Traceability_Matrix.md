@@ -9,7 +9,7 @@ Status definitions:
 - `Planned` means the codebase has a boundary, placeholder, or documented roadmap item, but the production feature is not implemented.
 - `Not Applicable` means the item is out of current PoC scope.
 
-Important boundary: this PoC is a local Windows WPF application. It uses local files and SQLite. It does not claim live camera hardware, live robot/handler control, production MES/ERP authentication, a bundled trained production ML model, or production database integration.
+Important boundary: this PoC is a local Windows WPF application. It uses local files and SQLite. It includes architecture for Stage 2 camera-pilot adapters and acceptance evidence, but it does not claim accepted live camera hardware, accepted live 3D hardware, live robot/handler control, production MES/ERP authentication, a bundled trained production ML model, or production database integration.
 
 ## Main Inspection
 
@@ -17,7 +17,7 @@ Important boundary: this PoC is a local Windows WPF application. It uses local f
 | --- | --- | --- | --- | --- | --- | --- |
 | MI-001 | Provide Main Inspection as the primary operator workflow. | User Manual / Main Inspection Workflow | Implemented | Main Inspection | `AOI_Monitor/Views/MonitorView.xaml`, `AOI_Monitor/Views/MonitorView.xaml.cs` | Operator can start, stop, load next board, review result, and save results. |
 | MI-002 | Show large image/live-feed display area. | Main Inspection prompt / User Manual | Implemented | Main Inspection | `AOI_Monitor/Views/MonitorView.xaml` | Uses imported images or simulated folder frames, not live hardware feed. |
-| MI-003 | Support Top, Side, and Bottom view selection. | Main Inspection prompt / Stage Mapping | Implemented | Main Inspection | `AOI_Monitor/Views/MonitorView.xaml.cs`, `AOI_Monitor/Services/CameraSources.cs` | View switching works with Folder Camera Simulation. |
+| MI-003 | Support Top, Side, and Bottom view selection. | Main Inspection prompt / Stage Mapping | Implemented | Main Inspection | `AOI_Monitor/Views/MonitorView.xaml.cs`, `AOI_Monitor/Services/ICameraSource.cs`, `AOI_Monitor/Services/FolderCameraSource.cs` | View switching works with Folder Camera Simulation. |
 | MI-004 | Display defect overlay layer with bounding boxes and labels. | Acceptance checklist / Defect Overlay Display | Implemented | Main Inspection / Golden Compare | `AOI_Monitor/Views/MonitorView.xaml.cs`, `AOI_Monitor/Views/CompareView.xaml.cs` | Overlay uses current `AnalysisResult.Defects` or hotspot evidence. |
 | MI-005 | Display defect list columns No, Type, Score, Side, X, Y. | Main Inspection prompt | Implemented | Main Inspection | `AOI_Monitor/Views/MonitorView.xaml` | Also includes approximate board X/Y mm when a 2D calibration profile is selected. |
 | MI-006 | Provide Start, Stop, Next Board, Save Result controls. | Main Inspection prompt | Implemented | Main Inspection | `AOI_Monitor/Views/MonitorView.xaml.cs` | Start/Stop control simulated acquisition state. |
@@ -51,6 +51,8 @@ Important boundary: this PoC is a local Windows WPF application. It uses local f
 | AI-006 | Include performance summary in validation report. | Performance prompt | Implemented | AI Model Test / Reports | `AOI_Monitor/Services/CustomerValidationReportService.cs` | Reports average/min/max/count over 1 second. |
 | AI-007 | Run ONNX Runtime inference when configured. | ONNX prompt | Partially Implemented | Inspection Engine / AI Model Test | `AOI_Monitor/Services/OnnxInspectionEngine.cs`, `AOI_Monitor/Services/ModelOutputParsers.cs` | Generic detection parser only; production model format validation remains customer/model-specific. |
 | AI-008 | Model readiness test validates paths, labels, tensor names, and runtime session. | Model configuration prompt | Implemented | Settings / AI Model Test | `AOI_Monitor/Services/ModelConfigurationValidator.cs`, `AOI_Monitor/Views/SettingsView.xaml.cs` | Requires Engineer/Admin; records audit event. |
+| AI-009 | Minimize false positives without hiding possible escapes. | Business readiness / false-call prompt | Implemented | AI Model Test / Services | `AOI_Monitor/Services/FalseCallReductionService.cs`, `AOI_Monitor/Services/ThresholdProfileService.cs`, `Docs/False_Positive_Minimization_and_Business_Readiness.md` | Threshold recommendations require labeled OK/NG evidence and track both false-call and possible-escape constraints. |
+| AI-010 | Production model acceptance is evidence-gated. | Model acceptance prompt | Implemented | Settings / Services | `AOI_Monitor/Services/ModelAcceptanceService.cs`, `AOI_Monitor/Services/ModelLifecycleService.cs` | No production model readiness is claimed unless active ONNX model acceptance records `PASS` evidence. |
 
 ## Log & Export
 
@@ -75,7 +77,7 @@ Important boundary: this PoC is a local Windows WPF application. It uses local f
 | 3D-003 | Display 2D color-coded height map and legend. | 3D Profile prompt | Implemented | 3D Profile Viewer | `AOI_Monitor/Views/ProfileView.xaml.cs` | Sample visualization only. |
 | 3D-004 | Show min/max/selected point height and slice/profile line. | 3D Profile prompt | Implemented | 3D Profile Viewer | `AOI_Monitor/Views/ProfileView.xaml.cs` | Uses CSV sample points. |
 | 3D-005 | Accept/reject sample-data defects and record review events. | 3D Profile prompt | Implemented | 3D Profile Viewer / Data | `AOI_Monitor/Views/ProfileView.xaml.cs`, `AOI_Monitor/Data/AoiDatabase.cs` | Review event/audit records are local SQLite. |
-| 3D-006 | Live 3D camera profile inspection. | Stage 2 planned work | Planned | 3D Profile Viewer / Camera | `Docs/Stage_Mapping.md` | Requires Stage 2 hardware integration. |
+| 3D-006 | Live 3D camera profile inspection. | Stage 2 planned work | Planned | 3D Profile Viewer / Camera | `AOI_Monitor/Services/Profile3DSourceService.cs`, `Docs/Stage_Mapping.md` | 3D acceptance service and generic boundary exist, but real 3D acquisition remains not accepted. |
 
 ## Stage 1 Image Upload / Offline AI Validation
 
@@ -88,18 +90,23 @@ Important boundary: this PoC is a local Windows WPF application. It uses local f
 | S1-005 | Missing/invalid model returns clear REVIEW result, not crash. | ONNX prompt | Implemented | Inspection Engine | `AOI_Monitor/Services/OnnxInspectionEngine.cs` | Friendly evidence lines are returned. |
 | S1-006 | Save selected engine, model version, confidence threshold, and model path in inspection history. | ONNX prompt | Implemented | Data / Inspection Engine | `AOI_Monitor/Data/AoiDatabase.cs`, `AOI_Monitor/Models/AoiModels.cs` | Saved in `InspectionResults`. |
 | S1-007 | Stage 1 validation report/package is readable outside app. | Customer package/report prompts | Implemented | AI Model Test / Log & Export | `AOI_Monitor/Services/CustomerValidationReportService.cs`, `AOI_Monitor/Views/ReportsView.xaml.cs` | HTML/Markdown reports and package README generated. |
+| S1-008 | Stage 1 exit evidence can be regenerated without manual app clicking. | Stage 1 exit evidence CLI prompt | Implemented | Tools / Services | `AOI_Monitor.Tools/Stage1ExitCommand.cs`, `AOI_Monitor/Services/Stage1ExitEvidenceService.cs`, `Docs/Stage1_Exit_Evidence_CLI.md` | CLI runs preflight, batch validation, model acceptance when active ONNX is Ready, package export, export verification, and Stage 1 factory readiness. Prototype-only runs do not claim production model acceptance. |
 
 ## Stage 2 Camera Integration
 
 | Requirement ID | Requirement text | Source section | Current status | App module | Evidence/source file | Notes/gaps |
 | --- | --- | --- | --- | --- | --- | --- |
-| S2-001 | Define camera-source abstraction. | Camera abstraction prompt | Implemented | Services | `AOI_Monitor/Services/CameraSources.cs` | Includes `ICameraSource`, frame/status models, factory. |
-| S2-002 | Provide null camera source. | Camera abstraction prompt | Implemented | Services | `AOI_Monitor/Services/CameraSources.cs` | Reports not connected; safe default. |
-| S2-003 | Provide Folder Camera Simulation for Top/Side/Bottom. | Camera abstraction prompt | Implemented | Main Inspection / Settings | `AOI_Monitor/Services/CameraSources.cs`, `AOI_Monitor/Views/SettingsView.xaml.cs` | Simulation only; no hardware claim. |
-| S2-004 | Integrate real GigE/USB3 camera SDKs. | Stage 2 planned work | Planned | Camera | `Docs/Stage_Mapping.md` | No vendor SDK dependency added. |
-| S2-005 | Add lighting-controller boundary. | Integration contracts prompt | Implemented | Services / Readiness Panel | `AOI_Monitor/Services/IntegrationContracts.cs` | Null implementation only; no real lighting control. |
-| S2-006 | Add 2D calibration profile placeholder. | Calibration prompt | Partially Implemented | Calibration / Main Inspection | `AOI_Monitor/Views/CalibrationView.xaml.cs`, `AOI_Monitor/Data/AoiDatabase.cs` | Approximate scale/offset planning workflow, not production calibration. |
-| S2-007 | Live 3D camera hardware integration. | 3D Profile prompt / Stage Mapping | Planned | 3D Profile Viewer | `Docs/Stage_Mapping.md` | Current 3D page is sample CSV mode only. |
+| S2-001 | Define camera-source abstraction. | Camera abstraction prompt | Implemented | Services | `AOI_Monitor/Services/ICameraSource.cs`, `AOI_Monitor/Services/CameraSourceFactory.cs`, `AOI_Monitor/Services/CameraFrame.cs` | Includes camera source, frame/status models, and source factory. |
+| S2-002 | Provide null camera source. | Camera abstraction prompt | Implemented | Services | `AOI_Monitor/Services/NullCameraSource.cs` | Reports not connected; safe default. |
+| S2-003 | Provide Folder Camera Simulation for Top/Side/Bottom. | Camera abstraction prompt | Implemented | Main Inspection / Settings | `AOI_Monitor/Services/FolderCameraSource.cs`, `AOI_Monitor/Views/SettingsView.xaml.cs` | Simulation only; no hardware claim. |
+| S2-004 | Add vendor camera adapter boundary and plugin loader. | Stage 2 camera-pilot architecture | Implemented | Camera | `AOI_Monitor/Services/GenericVisionCameraSource.cs`, `AOI_Monitor/Services/VisionCameraAdapters.cs` | Architecture implemented through `IVisionCameraAdapter`, adapter factories, discovery, manifest loading, and diagnostic null fallback; real vendor SDK adapter acceptance remains separate. |
+| S2-005 | Integrate accepted real GigE/USB3 camera SDKs. | Stage 2 planned work | Planned | Camera | `Docs/Stage_Mapping.md`, `Docs/Vendor_Adapter_Implementation_Guide.md` | No selected customer/vendor SDK adapter or real hardware acceptance evidence is committed. |
+| S2-006 | Add camera acceptance evidence service. | Stage 2 camera-pilot architecture | Implemented | Camera / Settings / Data | `AOI_Monitor/Services/CameraAcceptanceTestService.cs`, `AOI_Monitor/Data/AoiDatabase.cs` | Records acquisition, metadata, timing, and real-vs-simulated status. Simulation or fake-adapter evidence remains `NOT VALIDATED` for real hardware readiness. |
+| S2-007 | Add lighting-controller boundary and acceptance evidence. | Integration contracts prompt / Stage 2 camera-pilot architecture | Implemented | Services / Readiness Panel | `AOI_Monitor/Services/LightingControllers.cs`, `AOI_Monitor/Services/LightingAcceptanceTestService.cs` | Boundary and acceptance reporting exist; real lighting readiness requires physical controller acknowledgement and timing evidence. |
+| S2-008 | Add 2D calibration profile placeholder. | Calibration prompt | Partially Implemented | Calibration / Main Inspection | `AOI_Monitor/Views/CalibrationView.xaml.cs`, `AOI_Monitor/Data/AoiDatabase.cs` | Approximate scale/offset planning workflow, not production calibration. |
+| S2-009 | Add 3D profile acceptance evidence service. | Stage 2 camera-pilot architecture | Implemented | 3D Profile Viewer / Data | `AOI_Monitor/Services/Profile3DSourceService.cs`, `AOI_Monitor/Data/AoiDatabase.cs` | Records profile dimensions, units, pitch, invalid-height counts, timing, and simulated-vs-real status. Sample CSV evidence is not real 3D camera validation. |
+| S2-010 | Live 3D camera hardware integration. | 3D Profile prompt / Stage Mapping | Planned | 3D Profile Viewer | `Docs/Stage_Mapping.md` | Current 3D page is sample CSV mode plus an adapter boundary; no accepted real 3D sensor acquisition. |
+| S2-011 | Factory readiness profile for Stage 2 camera pilot. | Factory readiness prompt | Implemented | Export & Trace / Hardware Readiness | `AOI_Monitor/Services/FactoryReadinessService.cs`, `AOI_Monitor/Services/CompletionAssessmentService.cs` | Stage 2 profile evaluates camera, lighting, 3D, export, build/test, and limitation evidence; it does not make Stage 2 complete without accepted real hardware evidence. |
 
 ## Stage 3 Robot Integration
 
@@ -161,7 +168,7 @@ Important boundary: this PoC is a local Windows WPF application. It uses local f
 | AC-005 | Existing batch test works with new manifest format. | AI Model Test prompt | Implemented | AI Model Test | `AOI_Monitor/Services/BatchValidationService.cs` | Bad rows skipped/logged where possible. |
 | AC-006 | Customer report is readable outside the app. | Customer report prompt | Implemented | AI Model Test / Log & Export | `AOI_Monitor/Services/CustomerValidationReportService.cs` | HTML/Markdown artifacts. |
 | AC-007 | Operator can complete full inspection cycle from Main Inspection. | Main Inspection prompt | Implemented | Main Inspection | `AOI_Monitor/Views/MonitorView.xaml.cs` | Uses simulated/imported images. |
-| AC-008 | Folder-simulated camera frames work and view switching works. | Camera prompt | Implemented | Main Inspection / Camera Source | `AOI_Monitor/Services/CameraSources.cs` | No real hardware implied. |
+| AC-008 | Folder-simulated camera frames work and view switching works. | Camera prompt | Implemented | Main Inspection / Camera Source | `AOI_Monitor/Services/FolderCameraSource.cs` | No real hardware implied. |
 | AC-009 | Operator cannot edit recipes or run restricted validation tests. | Roles prompt | Implemented | Shell / Role Authorization | `AOI_Monitor/Services/RoleAuthorization.cs` | Local role policy only. |
 | AC-010 | Height-map CSV loads, displays, and accept/reject creates review event. | 3D Profile prompt | Implemented | 3D Profile Viewer | `AOI_Monitor/Views/ProfileView.xaml.cs` | Sample Data Mode only. |
 | AC-011 | One button creates complete customer-review folder. | Customer package prompt | Implemented | Log & Export | `AOI_Monitor/Views/ReportsView.xaml.cs` | Missing optional evidence creates warnings instead of failure. |

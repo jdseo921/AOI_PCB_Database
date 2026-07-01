@@ -38,6 +38,41 @@ Do not commit:
 
 Small non-confidential instructions can live in `SampleData/`, but image payloads should be kept outside the repository and imported locally.
 
+## Milestone Evidence CLI Smoke
+
+CI builds `AOI_Monitor.Tools` and exercises the milestone evidence commands with generated tiny PNG files only. The smoke path is intentionally simulation-only:
+
+```powershell
+dotnet build AOI_Monitor.Tools/AOI_Monitor.Tools.csproj --configuration Release --no-restore
+
+$env:AOI_MONITOR_STORAGE_ROOT = "TestResults/simulation-dry-run/runtime-storage-not-acceptance"
+
+dotnet run --project AOI_Monitor.Tools/AOI_Monitor.Tools.csproj --configuration Release --no-build -- `
+  stage1-exit `
+  --dataset TestResults/simulation-dry-run/stage1-sample-dataset `
+  --manifest TestResults/simulation-dry-run/stage1-sample-dataset/customer_validation_manifest.csv `
+  --output TestResults/simulation-dry-run/stage1-evidence-package `
+  --operator ci-simulation-dry-run `
+  --allow-simulation
+
+dotnet run --project AOI_Monitor.Tools/AOI_Monitor.Tools.csproj --configuration Release --no-build -- `
+  stage2-camera-pilot `
+  --output TestResults/simulation-dry-run/stage2-camera-pilot-package `
+  --operator ci-simulation-dry-run `
+  --allow-simulation
+```
+
+The CI dataset is generated during the workflow from tiny synthetic PNG bytes and a synthetic manifest. It is not customer data, does not exercise a production ONNX model acceptance gate, does not load a vendor camera SDK, and does not validate real lighting synchronization or real 3D acquisition hardware.
+
+`AOI_MONITOR_STORAGE_ROOT` is set only for the simulation smoke so the CLI writes its SQLite/runtime state to an isolated CI folder. Do not upload that runtime storage as acceptance evidence; only the exported dry-run packages are published.
+
+CI uploads these milestone artifacts:
+
+- `stage1-simulation-dry-run-evidence-package`
+- `stage2-camera-pilot-simulation-dry-run-evidence-package`
+
+The `simulation-dry-run` wording is part of the artifact name by design. These packages prove that evidence-package generation, export verification, and Stage 2 aggregation plumbing are still executable in CI. They must not be interpreted as customer dataset acceptance, production model readiness, real camera readiness, lighting readiness, 3D readiness, or factory acceptance.
+
 ## Publish Package
 
 Create a local Windows x64 PoC package:
@@ -71,11 +106,16 @@ The workflow in `.github/workflows/dotnet-ci.yml` runs on `push` and `pull_reque
 
 The job runs:
 
-1. Repository hygiene check.
-2. `dotnet restore AOI_PCB_Database.slnx`.
-3. `dotnet build AOI_PCB_Database.slnx --configuration Release --no-restore`.
-4. `dotnet test AOI_PCB_Database.slnx --configuration Release --no-build`.
-5. Runtime restore for `AOI_Monitor/AOI_Monitor.csproj --runtime win-x64`.
-6. `Scripts/publish.ps1 -ValidationOnly -NoRestore`.
-7. Test log upload on failure.
-8. Package artifact upload for successful `main` branch pushes.
+1. `dotnet restore AOI_PCB_Database.slnx`.
+2. `dotnet build AOI_Monitor.Tools/AOI_Monitor.Tools.csproj --configuration Release --no-restore`.
+3. `Scripts/check-pr-quality.ps1`.
+4. `Scripts/check-code-quality.ps1`.
+5. `Scripts/run-quality-gates.ps1 -Configuration Release -ResultsDirectory TestResults`.
+6. Generated tiny-image Stage 1 dataset and manifest creation under `TestResults/simulation-dry-run`.
+7. `AOI_Monitor.Tools stage1-exit ... --allow-simulation`.
+8. `AOI_Monitor.Tools stage2-camera-pilot ... --allow-simulation`.
+9. Test/result/audit artifact uploads.
+10. Simulation dry-run evidence package uploads with `simulation-dry-run` in the artifact names.
+11. Package artifact upload for successful `main` branch pushes.
+
+Keep the quality-gate step as the authoritative CI health check. The simulation dry-run milestone packages are supporting workflow evidence only, not a substitute for customer data, model acceptance, or real hardware acceptance.

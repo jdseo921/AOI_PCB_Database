@@ -24,6 +24,10 @@ jobs:
         shell: pwsh
         run: dotnet restore AOI_PCB_Database.slnx
 
+      - name: Build milestone evidence CLI
+        shell: pwsh
+        run: dotnet build AOI_Monitor.Tools/AOI_Monitor.Tools.csproj --configuration Release --no-restore
+
       - name: Check PR quality expectations
         shell: pwsh
         run: ./Scripts/check-pr-quality.ps1
@@ -35,6 +39,111 @@ jobs:
       - name: Run quality gates
         shell: pwsh
         run: ./Scripts/run-quality-gates.ps1 -Configuration Release -ResultsDirectory TestResults
+
+      - name: Generate simulation dry-run milestone evidence
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $testResults = Join-Path (Get-Location) 'TestResults'
+          $simRoot = Join-Path $testResults 'simulation-dry-run'
+          $dataset = Join-Path $simRoot 'stage1-sample-dataset'
+          $images = Join-Path $dataset 'images'
+          $golden = Join-Path $dataset 'golden'
+          $stage1Output = Join-Path $simRoot 'stage1-evidence-package'
+          $stage2Output = Join-Path $simRoot 'stage2-camera-pilot-package'
+          $env:AOI_MONITOR_STORAGE_ROOT = Join-Path $simRoot 'runtime-storage-not-acceptance'
+          New-Item -ItemType Directory -Force -Path $images, $golden, $stage1Output, $stage2Output, $env:AOI_MONITOR_STORAGE_ROOT | Out-Null
+
+          Add-Type -AssemblyName System.Drawing
+
+          function Write-TinyImage {
+            param(
+              [Parameter(Mandatory = $true)][string]$Path,
+              [Parameter(Mandatory = $true)][string]$Kind,
+              [int]$Index = 0
+            )
+
+            [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Path)) | Out-Null
+            $bitmap = [System.Drawing.Bitmap]::new(16, 16)
+            try {
+              for ($x = 0; $x -lt 16; $x++) {
+                for ($y = 0; $y -lt 16; $y++) {
+                  $color = switch ($Kind) {
+                    'Bridge' { [System.Drawing.Color]::FromArgb(230, 20, 20); break }
+                    'Missing' { [System.Drawing.Color]::FromArgb(20, 20, 20); break }
+                    default { [System.Drawing.Color]::White; break }
+                  }
+                  $bitmap.SetPixel($x, $y, $color)
+                }
+              }
+
+              $markerX = $Index % 16
+              $markerY = [Math]::Floor($Index / 16) % 16
+              $marker = switch ($Kind) {
+                'OK' { [System.Drawing.Color]::FromArgb(245 - ($Index % 5), 245, 245); break }
+                'Bridge' { [System.Drawing.Color]::FromArgb(180 + ($Index % 50), 0, 0); break }
+                'Missing' { [System.Drawing.Color]::FromArgb($Index % 40, $Index % 40, $Index % 40); break }
+                default { [System.Drawing.Color]::White; break }
+              }
+              $bitmap.SetPixel($markerX, $markerY, $marker)
+              $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+            }
+            finally {
+              $bitmap.Dispose()
+            }
+          }
+
+          $rows = [System.Collections.Generic.List[string]]::new()
+          [void]$rows.Add('image,ground_truth,golden_image,defect_type,side,refdes,roi_id,roi_type,lot_id,board_model,notes')
+
+          function Add-ManifestRow {
+            param(
+              [string]$Image,
+              [string]$GroundTruth,
+              [string]$DefectType,
+              [string]$Refdes,
+              [string]$RoiId
+            )
+
+            [void]$rows.Add("$Image,$GroundTruth,golden/golden_top.png,$DefectType,Top,$Refdes,$RoiId,Component,LOT-CI-SIM,TBOX-CI-SIM,simulation-dry-run generated tiny sample image")
+          }
+
+          Write-TinyImage -Path (Join-Path $golden 'golden_top.png') -Kind 'Golden'
+
+          for ($i = 0; $i -lt 25; $i++) {
+            $idx = '{0:D2}' -f $i
+            $name = "board_ok_$idx.png"
+            Write-TinyImage -Path (Join-Path $images $name) -Kind 'OK' -Index $i
+            Add-ManifestRow -Image "images/$name" -GroundTruth 'OK' -DefectType 'OK' -Refdes "R-OK-$idx" -RoiId "ROI-OK-$idx"
+          }
+
+          for ($i = 0; $i -lt 13; $i++) {
+            $idx = '{0:D2}' -f $i
+            $name = "board_ng_bridge_$idx.png"
+            Write-TinyImage -Path (Join-Path $images $name) -Kind 'Bridge' -Index $i
+            Add-ManifestRow -Image "images/$name" -GroundTruth 'NG' -DefectType 'Solder Bridge' -Refdes "R-BR-$idx" -RoiId "ROI-BR-$idx"
+          }
+
+          for ($i = 0; $i -lt 12; $i++) {
+            $idx = '{0:D2}' -f $i
+            $name = "board_ng_missing_$idx.png"
+            Write-TinyImage -Path (Join-Path $images $name) -Kind 'Missing' -Index $i
+            Add-ManifestRow -Image "images/$name" -GroundTruth 'NG' -DefectType 'Missing Component' -Refdes "R-MC-$idx" -RoiId "ROI-MC-$idx"
+          }
+
+          $manifest = Join-Path $dataset 'customer_validation_manifest.csv'
+          [IO.File]::WriteAllLines($manifest, $rows, [Text.Encoding]::UTF8)
+
+          @(
+            'simulation-dry-run evidence package',
+            'Generated with tiny synthetic PNG images created in CI.',
+            'No customer dataset, production model acceptance, vendor camera adapter, lighting controller, or real 3D acquisition hardware was validated.',
+            'These artifacts exercise package plumbing only and are not customer or hardware acceptance evidence.'
+          ) | Set-Content -Path (Join-Path $simRoot 'README_simulation-dry-run.txt') -Encoding UTF8
+
+          dotnet run --project AOI_Monitor.Tools/AOI_Monitor.Tools.csproj --configuration Release --no-build -- stage1-exit --dataset $dataset --manifest $manifest --output $stage1Output --operator 'ci-simulation-dry-run' --allow-simulation
+          dotnet run --project AOI_Monitor.Tools/AOI_Monitor.Tools.csproj --configuration Release --no-build -- stage2-camera-pilot --output $stage2Output --operator 'ci-simulation-dry-run' --allow-simulation
 
       - name: Upload test results
         if: always()
@@ -61,6 +170,20 @@ jobs:
           name: ui-navigation-performance
           path: TestResults/ui_navigation_performance.json
           if-no-files-found: ignore
+
+      - name: Upload Stage 1 simulation dry-run evidence package
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage1-simulation-dry-run-evidence-package
+          path: TestResults/simulation-dry-run/stage1-evidence-package
+          if-no-files-found: error
+
+      - name: Upload Stage 2 camera pilot simulation dry-run evidence package
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage2-camera-pilot-simulation-dry-run-evidence-package
+          path: TestResults/simulation-dry-run/stage2-camera-pilot-package
+          if-no-files-found: error
 
       - name: Upload industrial quality gate report
         if: always()

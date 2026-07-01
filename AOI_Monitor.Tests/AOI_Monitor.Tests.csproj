@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AOI_Monitor\AOI_Monitor.csproj" />
+    <ProjectReference Include="..\AOI_Monitor.Tools\AOI_Monitor.Tools.csproj" />
     <ProjectReference Include="..\Templates\CameraAdapterTemplate\CameraAdapterTemplate.csproj" />
     <ProjectReference Include="..\Templates\LightingAdapterTemplate\LightingAdapterTemplate.csproj" />
     <ProjectReference Include="..\Templates\RobotControllerTemplate\RobotControllerTemplate.csproj" />

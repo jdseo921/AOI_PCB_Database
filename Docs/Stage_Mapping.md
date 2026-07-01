@@ -30,6 +30,7 @@ Stage 1 currently includes:
 - Customer-facing validation report export with HTML output, sample annotated images, print-to-PDF instructions, prototype limitations, and signature/approval section.
 - Annotated overlay export.
 - Stage 1 customer evidence package export including the strengthened validation report, CSV evidence, overlays, summaries, README, and warnings for missing optional evidence.
+- Stage 1 exit evidence CLI for repeatable dataset preflight, batch validation, model acceptance when an active ONNX model is ready, export verification, and Stage 1 factory readiness package generation.
 - Admin-only local soak-test mode for repeated Folder Camera Simulation inspections with cancellation, timing, memory estimate, error capture, and HTML stability report export.
 - Mock MES integration mode with MES-style traceability payload generation, optional mock REST POST, local JSON fallback, and SQLite upload-attempt audit records.
 - Export history audit records.
@@ -58,23 +59,36 @@ The following items are not complete production functionality in Stage 1:
 
 ## Stage 2 Planned Camera Work
 
-Stage 2 should add real acquisition and optical integration. Planned work includes:
+Stage 2 should add real acquisition and optical integration. The current codebase has Stage 2 camera-pilot architecture, but not accepted real hardware integration.
 
-- Vendor SDK integration for selected GigE/USB3 cameras.
-- Real camera source implementations behind the existing `ICameraSource` abstraction.
-- Top, Side, and Bottom camera acquisition.
-- Hardware connection status and diagnostics.
-- Trigger synchronization.
-- Exposure, gain, and acquisition settings.
-- Lighting controller integration.
+Architecture already implemented:
+
+- `GenericVisionCameraSource` can run a vendor adapter behind the existing camera-source workflow.
+- `IVisionCameraAdapter`, `IVisionCameraAdapterFactory`, and `IVisionDeviceDiscovery` define the GigE/USB3 vendor SDK boundary.
+- Manifest-based camera adapter plugin loading exists through `VisionCameraPluginLoader` / `CameraAdapterPluginService`.
+- Camera acceptance records per-view frame acquisition, metadata validation, frame timing, dropped frames, trigger failures, and whether evidence is real hardware or simulation.
+- Lighting acceptance records per-view lighting command timing and trigger-to-frame timing where a camera source is supplied.
+- 3D profile acceptance records source kind, frame dimensions, units, pitch, invalid-height counts, timing, and simulated-vs-real factory readiness status.
+- Factory readiness has a `Stage2CameraPilot` profile that evaluates camera, lighting, 3D, export verification, build/test, and limitation evidence.
+
+Real hardware work still planned or blocked:
+
+- Vendor SDK integration for the selected GigE/USB3 cameras through an external adapter plugin.
+- Accepted Top, Side, and Bottom camera acquisition from physical devices.
+- Stable real camera metadata: physical camera IDs, view assignment, frame IDs, UTC capture timestamps, dimensions, pixel format, and non-simulated source kind.
+- Real hardware connection status and diagnostics from the selected vendor adapter.
+- Trigger synchronization using the selected camera and lighting hardware.
+- Exposure, gain, acquisition settings, and error recovery validated against the selected camera model.
+- Physical lighting controller integration and controller acknowledgement evidence.
 - Production image calibration and coordinate mapping using validated hardware images and calibration fixtures.
 - Real 3D camera integration for live height and coplanarity inspection.
-- 3D profile acquisition, slice measurement, and calibrated height units.
-- Camera error recovery and operator-safe status messaging.
+- 3D profile acquisition, slice measurement, and calibrated height units from a real sensor.
 
-Folder Camera Simulation is intended to keep Stage 1 workflows testable while preserving a clean structure for Stage 2 hardware sources.
+Folder Camera Simulation is intended to keep Stage 1 workflows testable while preserving a clean structure for Stage 2 hardware sources. It is not real camera validation.
 
-The current `ILightingController` contract and `NullLightingController` implementation are boundary placeholders only. They do not control real lighting hardware.
+The current lighting boundary and acceptance service can exercise null, simulated, TCP, or serial controller paths according to configuration, but real lighting readiness requires physical controller evidence. Null or simulated lighting evidence does not control or validate real lighting hardware.
+
+For the current milestone assessment, see [Stage 1 Exit + Stage 2 Camera Pilot Milestone Status](Milestone_Status_Stage1_Exit_Stage2_Camera_Pilot.md). For repeatable Stage 1 evidence generation, see [Stage 1 Exit Evidence CLI](Stage1_Exit_Evidence_CLI.md). For false-positive tradeoff governance, see [False-Positive Minimization and Business Readiness](False_Positive_Minimization_and_Business_Readiness.md).
 
 ## Stage 3 Planned Robot / Handler Work
 

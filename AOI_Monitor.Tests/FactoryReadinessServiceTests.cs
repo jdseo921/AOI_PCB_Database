@@ -459,6 +459,111 @@ public sealed class FactoryReadinessServiceTests : IDisposable
     }
 
     [Fact]
+    public void Stage2CameraPilotEvidencePackageRejectsSimulatedCameraForRealHardwareReadiness()
+    {
+        RecordStage1Package("PASS");
+        RecordOkExportVerification();
+        RecordSimulatedCameraAcceptance();
+        RecordRealLightingAcceptance();
+        RecordRealProfile3DAcceptance();
+
+        var result = Stage2CameraPilotEvidencePackageService.CreatePackage(new Stage2CameraPilotEvidenceRequest
+        {
+            OutputFolder = Path.Combine(_root, "stage2_packages"),
+            OperatorId = "TestAdmin [Admin]",
+        });
+
+        Assert.Equal("NO-GO", result.Status);
+        Assert.Equal("NOT VALIDATED", result.CameraEvidenceStatus);
+        Assert.True(result.SimulationEvidencePresent);
+        Assert.False(result.RealHardwareValidated);
+        Assert.Contains(result.BlockingIssues, issue => issue.Contains("real vendor camera acceptance", StringComparison.OrdinalIgnoreCase));
+
+        using var document = JsonDocument.Parse(File.ReadAllText(result.ManifestPath));
+        Assert.Equal("Stage2CameraPilot", document.RootElement.GetProperty("deploymentProfile").GetString());
+        Assert.Equal("NOT VALIDATED", document.RootElement.GetProperty("cameraEvidenceStatus").GetString());
+        Assert.True(document.RootElement.TryGetProperty("profile3dEvidenceStatus", out _));
+        Assert.True(document.RootElement.GetProperty("simulationEvidencePresent").GetBoolean());
+        Assert.False(document.RootElement.GetProperty("realHardwareValidated").GetBoolean());
+        Assert.NotEmpty(document.RootElement.GetProperty("includedFiles").EnumerateArray());
+    }
+
+    [Fact]
+    public void Stage2CameraPilotEvidencePackageWithSimulationFlagIsDryRunOnly()
+    {
+        RecordStage1Package("PASS");
+        RecordOkExportVerification();
+        RecordSimulatedCameraAcceptance();
+        AoiDatabase.RecordLightingAcceptanceRun(new LightingAcceptanceRun
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            ControllerName = "Simulated Lighting",
+            Mode = LightingModes.Simulated,
+            Status = "PASS",
+            IsSimulated = true,
+            StepCount = 1,
+            PassedStepCount = 1,
+            Warnings = new() { "Lighting acceptance was run in simulated mode." },
+        });
+        AoiDatabase.RecordProfile3DAcceptanceRun(new Profile3DAcceptanceRun
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            SourceName = "CSV Sample 3D Source",
+            SourceKind = "CSV Sample",
+            IsSimulated = true,
+            Status = "WARN",
+            FactoryReadinessStatus = "NOT VALIDATED",
+            FrameId = "SIM-3D-001",
+            Width = 4,
+            Height = 4,
+            Unit = "microns",
+            XPitchMicrons = 1,
+            YPitchMicrons = 1,
+            Warnings = new() { "Simulation/sample CSV evidence only." },
+        });
+
+        var result = Stage2CameraPilotEvidencePackageService.CreatePackage(new Stage2CameraPilotEvidenceRequest
+        {
+            OutputFolder = Path.Combine(_root, "stage2_packages"),
+            OperatorId = "TestAdmin [Admin]",
+            AllowSimulation = true,
+        });
+
+        Assert.Equal("DRY RUN", result.Status);
+        Assert.True(result.DryRun);
+        Assert.False(result.RealHardwareValidated);
+        Assert.Contains(Stage2CameraPilotEvidencePackageService.SimulationNotice, File.ReadAllText(result.ReadmePath));
+        Assert.Contains(Stage2CameraPilotEvidencePackageService.SimulationNotice, File.ReadAllText(result.ManifestPath));
+    }
+
+    [Fact]
+    public void Stage2CameraPilotSimulationFlagCreatesDryRunEvidenceOnCleanStorage()
+    {
+        RecordStage1Package("PASS");
+        RecordOkExportVerification();
+
+        var result = Stage2CameraPilotEvidencePackageService.CreatePackage(new Stage2CameraPilotEvidenceRequest
+        {
+            OutputFolder = Path.Combine(_root, "stage2_clean_simulation_packages"),
+            OperatorId = "TestAdmin [Admin]",
+            AllowSimulation = true,
+        });
+
+        Assert.Equal("DRY RUN", result.Status);
+        Assert.True(result.DryRun);
+        Assert.Equal("NOT VALIDATED", result.CameraEvidenceStatus);
+        Assert.Equal("NOT VALIDATED", result.LightingEvidenceStatus);
+        Assert.Equal("NOT VALIDATED", result.Profile3DEvidenceStatus);
+        Assert.True(result.SimulationEvidencePresent);
+        Assert.False(result.RealHardwareValidated);
+        Assert.Contains(Stage2CameraPilotEvidencePackageService.SimulationNotice, File.ReadAllText(result.ReadmePath));
+        Assert.Contains(Stage2CameraPilotEvidencePackageService.SimulationNotice, File.ReadAllText(result.ManifestPath));
+        Assert.False(AoiDatabase.GetLatestCameraAcceptanceRun(realHardwareOnly: false)?.IsRealHardware ?? true);
+        Assert.True(AoiDatabase.GetLatestLightingAcceptanceRun()?.IsSimulated ?? false);
+        Assert.True(AoiDatabase.GetLatestProfile3DAcceptanceRun()?.IsSimulated ?? false);
+    }
+
+    [Fact]
     public void Stage1CanPassWithoutRealRobotOrMes()
     {
         RecordStage1Package("PASS");
@@ -612,6 +717,85 @@ public sealed class FactoryReadinessServiceTests : IDisposable
         var path = Path.Combine(_root, "verified.txt");
         File.WriteAllText(path, "verified");
         ExportVerificationService.RecordVerifiedExport("FactoryReadinessEvidenceText", path);
+    }
+
+    private static void RecordSimulatedCameraAcceptance()
+    {
+        AoiDatabase.RecordCameraAcceptanceRun(new CameraAcceptanceRun
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            AdapterName = "Folder Simulation",
+            SourceKey = "folder",
+            Status = "PASS",
+            FactoryReadinessStatus = "NOT VALIDATED",
+            IsRealHardware = false,
+            TotalRequestedFrames = 5,
+            TotalReceivedFrames = 5,
+            Frames =
+            {
+                new CameraAcceptanceFrameRecord
+                {
+                    ViewType = "Top",
+                    Sequence = 1,
+                    FrameId = "SIM-CAM-001",
+                    CameraId = "SIM",
+                    Width = 32,
+                    Height = 32,
+                    PixelFormat = "Mono8",
+                    SourceKind = "FolderSimulation",
+                    IsSimulated = true,
+                    MetadataValid = true,
+                },
+            },
+            Warnings = new() { "Folder simulation evidence only." },
+        });
+    }
+
+    private static void RecordRealLightingAcceptance()
+    {
+        AoiDatabase.RecordLightingAcceptanceRun(new LightingAcceptanceRun
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            ControllerName = "Vendor Lighting Controller",
+            Mode = LightingModes.TcpText,
+            Status = "PASS",
+            IsSimulated = false,
+            StepCount = 1,
+            PassedStepCount = 1,
+            Steps =
+            {
+                new LightingAcceptanceStep
+                {
+                    ViewType = "Top",
+                    ProgramName = "TOP",
+                    CommandAccepted = true,
+                    FrameReceived = true,
+                    FrameId = "REAL-CAM-001",
+                    CameraId = "CAM-001",
+                    Status = "PASS",
+                    Message = "Real lighting command and camera frame evidence recorded.",
+                },
+            },
+        });
+    }
+
+    private static void RecordRealProfile3DAcceptance()
+    {
+        AoiDatabase.RecordProfile3DAcceptanceRun(new Profile3DAcceptanceRun
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            SourceName = "Vendor 3D Profile Camera",
+            SourceKind = "Real Hardware",
+            IsSimulated = false,
+            Status = "PASS",
+            FactoryReadinessStatus = "PASS",
+            FrameId = "REAL-3D-001",
+            Width = 4,
+            Height = 4,
+            Unit = "microns",
+            XPitchMicrons = 1,
+            YPitchMicrons = 1,
+        });
     }
 
     private static long EnqueueMesItem(int maxRetryCount = 3)

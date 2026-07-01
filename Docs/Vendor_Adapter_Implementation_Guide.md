@@ -85,6 +85,31 @@ Do not auto-load robot motion plugins from an unreviewed folder. Register robot 
 5. Export the acceptance report/package.
 6. Review whether the report says real hardware is validated. Fake templates must remain simulation-only.
 
+## Vendor Onboarding Checklist
+
+Use this checklist before a vendor camera adapter is delivered for Stage 2 camera pilot review:
+
+- Keep vendor SDK references, redistributables, licenses, and native runtime files in the external adapter project/package only. Do not add vendor SDK dependencies to `AOI_Monitor`.
+- Package one camera adapter folder with `camera_adapter_manifest.json` or one `*.camera-adapter.json` file, the compiled adapter assembly, and any licensed runtime files needed by that adapter.
+- Confirm the manifest includes non-empty `adapterId`, `displayName`, `version`, `assemblyFile`, `factoryTypeName`, `supportedInterfaces`, `supportedViews`, and `supportedPixelFormats`.
+- Confirm the factory identity and capabilities match the manifest exactly enough for `VisionCameraPluginLoader` to load the adapter.
+- Implement bounded connect, start, trigger, frame, stop, and disconnect behavior. Do not block UI-facing workflows; long hardware calls must respect configured timeouts.
+- Implement discovery when the SDK supports it, returning real device ID, vendor, model, serial, interface, suggested view, status, and capabilities.
+- Return complete frame metadata for each accepted frame: stable frame ID, real camera ID, view, UTC timestamp, dimensions, pixel format, source kind, board/lot context when configured, and acquisition timing.
+- Set `CameraFrame.IsSimulated = false` only for live frames acquired from the real camera. Fake, replay, folder, metadata-only, SDK sample, and template adapters must set `IsSimulated = true`.
+- Run the package validator:
+
+```powershell
+pwsh Scripts/validate-camera-adapter-package.ps1 `
+  -AdapterFolder C:\VendorPackages\CustomerVendor.CameraAdapter `
+  -SettingsJson C:\VendorPackages\camera_acceptance_settings.json `
+  -OutputFolder C:\AOI_Evidence\camera_adapter_validation
+```
+
+`-SettingsJson` is optional. When supplied, it may contain a `CameraSourceSettings` JSON object directly, or an object with `cameraSourceSettings` and `acceptanceCriteria` sections. The validator writes JSON/HTML summary files and a camera acceptance JSON/HTML report under the output folder.
+
+PASS/WARN output is not the same as factory acceptance. A fake/template adapter should load and may produce a WARN validation package, but its factory readiness must remain `NOT VALIDATED`. Real Stage 2 camera readiness requires live hardware frames with `IsSimulated=false`, real device metadata, and acceptable timing/metadata results.
+
 ## Packaging Plugin Folder
 
 Recommended layout:

@@ -26,11 +26,13 @@ public sealed class Stage1ExitEvidenceServiceTests : IDisposable
             if (Directory.Exists(_root))
                 Directory.Delete(_root, recursive: true);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Stage 1 exit evidence test cleanup skipped: {ex.Message}");
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Stage 1 exit evidence test cleanup skipped: {ex.Message}");
         }
     }
 

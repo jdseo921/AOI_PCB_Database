@@ -217,6 +217,26 @@ function Test-HasServiceTestEvidence {
     }).Count -gt 0
 }
 
+function Test-IsDocumentationClaimPath {
+    param([string]$Path)
+
+    return $Path -match '(?i)(^Docs/|^README\.md$|^DESIGN\.md$|^\.github/.*\.md$|\.md$)'
+}
+
+function Test-LineStillExists {
+    param(
+        [string]$Path,
+        [string]$Text
+    )
+
+    $fullPath = Join-Path $repoRoot $Path
+    if (!(Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        return $false
+    }
+
+    return (Get-Content -LiteralPath $fullPath -Raw).Contains($Text, [StringComparison]::Ordinal)
+}
+
 Write-Host "AOI Monitor PR quality gate"
 Write-Host "Repository: $repoRoot"
 
@@ -286,7 +306,15 @@ foreach ($file in $changedFiles) {
 
 $productionClaimPattern = '(?i)\bproduction[- ]ready\b|\breal[- ]hardware[- ]ready\b|\bfactory[- ]ready\b|\bclient[- ]ready\b'
 $simulationPattern = '(?i)\bmock\b|\bsimulat(?:ed|ion|or)\b|\bstub\b|\bfake\b|\bnot[- ]validated\b'
-$negativeInstructionPattern = '(?i)\b(do not|must not|cannot|never|avoid|forbidden|prohibited|not claim|do not claim|do not use)\b'
+$negativeInstructionPattern = '(?i)\b(do not|did not|must not|cannot|never|avoid|forbidden|prohibited|not claim|do not claim|do not use|not use|not be interpreted|not interpreted|not a substitute|not production)\b'
+$stage2CompletePattern = '(?i)\bStage\s*2\s+(?:is\s+)?complete(?:d)?\b'
+$stage2RealHardwareEvidencePattern = '(?i)\breal[- ]hardware[- ]acceptance\b|\breal[- ]camera\b|\breal[- ]lighting\b|\breal[- ]3D\b|\breal 3D\b|\bvendor camera\b|\bcamera, lighting, and 3D acceptance\b'
+$productionReadyPattern = '(?i)\bproduction[- ]ready\b'
+$clearProductionReadyPattern = '(?i)\b(is|are|now|fully|validated as|declared|marked|certified)\b.{0,40}\bproduction[- ]ready\b|\bproduction[- ]ready\b.{0,40}\b(release|deployment|status|claim)\b'
+$factoryReadinessEvidencePattern = '(?i)\bfactory[- ]readiness[- ]evidence\b|\bfactory readiness (package|report|profile|status|evidence)\b|\bGo/No-Go\b|\breal[- ]hardware[- ]acceptance\b|\baccepted real hardware\b|\bexport verification\b'
+$mesIntegratedPattern = '(?i)\bMES[- /]*(?:ERP[- /]*)?integrated\b|\bMES integration complete\b|\bintegrated\s+MES\b'
+$mockMesContextPattern = '(?i)\bmock\b|\bmock mode\b|\bmock REST\b|\bMES mock\b|\bsimulation\b|\bnot connected\b|\bonly mock\b'
+$realMesEvidencePattern = '(?i)\bMES REST Ready\b|\bproduction MES\b|\breal MES\b|\baccepted factory traceability\b|\btraceability signoff\b|\bpassing traceability\b|\bMES acceptance\b'
 
 $linesByPath = $addedLines | Group-Object -Property path
 foreach ($group in $linesByPath) {
@@ -297,6 +325,9 @@ foreach ($group in $linesByPath) {
     $lines = @($group.Group)
     for ($index = 0; $index -lt $lines.Count; $index++) {
         if ($lines[$index].text -notmatch $productionClaimPattern) {
+            continue
+        }
+        if (!(Test-LineStillExists $group.Name $lines[$index].text)) {
             continue
         }
 
@@ -313,28 +344,78 @@ foreach ($group in $linesByPath) {
     }
 }
 
-foreach ($group in $linesByPath) {
-    if ($group.Name -notmatch '(?i)\.(cs|ps1)$') {
-        continue
-    }
+$docLinesByPath = $addedLines |
+    Where-Object { Test-IsDocumentationClaimPath $_.path } |
+    Group-Object -Property path
 
+foreach ($group in $docLinesByPath) {
     $lines = @($group.Group)
     for ($index = 0; $index -lt $lines.Count; $index++) {
         $line = $lines[$index].text
+        if (!(Test-LineStillExists $group.Name $line)) {
+            continue
+        }
+
+        $start = [Math]::Max(0, $index - 5)
+        $end = [Math]::Min($lines.Count - 1, $index + 5)
+        $context = ($lines[$start..$end].text -join " ")
+
+        if ($context -match $negativeInstructionPattern) {
+            continue
+        }
+
+        if ($line -match $stage2CompletePattern -and $context -notmatch $stage2RealHardwareEvidencePattern) {
+            Add-Issue "FAIL" "PR-STAGE2-CLAIM-001" $group.Name "Stage 2 completion wording was added without nearby real camera/lighting/3D hardware acceptance evidence."
+            continue
+        }
+
+        if ($line -match $productionReadyPattern -and $context -notmatch $factoryReadinessEvidencePattern) {
+            if ($context -match $clearProductionReadyPattern) {
+                Add-Issue "FAIL" "PR-PROD-CLAIM-001" $group.Name "Production-ready wording was added without nearby factory readiness evidence."
+            }
+            else {
+                Add-Issue "WARN" "PR-PROD-CLAIM-001" $group.Name "Production-ready wording may need nearby factory readiness evidence."
+            }
+        }
+
+        if ($line -match $mesIntegratedPattern -and $context -notmatch $realMesEvidencePattern) {
+            if ($context -match $mockMesContextPattern) {
+                Add-Issue "FAIL" "PR-MES-CLAIM-001" $group.Name "MES integrated wording appears with mock/not-connected context and no real MES acceptance evidence."
+            }
+            else {
+                Add-Issue "WARN" "PR-MES-CLAIM-001" $group.Name "MES integrated wording may need real MES acceptance or traceability signoff evidence."
+            }
+        }
+    }
+}
+
+foreach ($file in @($changedFiles | Where-Object { $_ -match '(?i)\.(cs|ps1)$' } | Sort-Object -Unique)) {
+    if ($file -eq "Scripts/check-pr-quality.ps1") {
+        continue
+    }
+
+    $fullPath = Join-Path $repoRoot $file
+    if (!(Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        continue
+    }
+
+    $sourceLines = @(Get-Content -LiteralPath $fullPath)
+    for ($index = 0; $index -lt $sourceLines.Count; $index++) {
+        $line = $sourceLines[$index]
         if ($line -match '(?i)\b(OperationCanceledException|TaskCanceledException)\b') {
             continue
         }
 
         if ($line -match '(?i)\bcatch\s*(\([^)]*\))?\s*\{\s*\}') {
-            Add-Issue "FAIL" "PR-CATCH-001" $group.Name "Empty catch block was added."
+            Add-Issue "FAIL" "PR-CATCH-001" $file "Empty catch block was added."
             continue
         }
 
         if ($line -match '(?i)\bcatch\s*(\([^)]*\))?\s*$' -and
-            $index + 2 -lt $lines.Count -and
-            $lines[$index + 1].text -match '^\s*\{\s*$' -and
-            $lines[$index + 2].text -match '^\s*\}\s*$') {
-            Add-Issue "FAIL" "PR-CATCH-001" $group.Name "Empty catch block was added."
+            $index + 2 -lt $sourceLines.Count -and
+            $sourceLines[$index + 1] -match '^\s*\{\s*$' -and
+            $sourceLines[$index + 2] -match '^\s*\}\s*$') {
+            Add-Issue "FAIL" "PR-CATCH-001" $file "Empty catch block was added."
         }
     }
 }
@@ -422,6 +503,21 @@ $report = [pscustomobject]@{
             id = "PR-CLAIM-001"
             description = "Release readiness wording must not be added near mock, simulated, or not-validated context."
             result = if (@($script:issues | Where-Object { $_.ruleId -eq "PR-CLAIM-001" }).Count -gt 0) { "FAIL" } else { "PASS" }
+        },
+        [pscustomobject]@{
+            id = "PR-STAGE2-CLAIM-001"
+            description = "Stage 2 completion wording requires nearby real camera, lighting, and 3D hardware acceptance evidence."
+            result = if (@($script:issues | Where-Object { $_.ruleId -eq "PR-STAGE2-CLAIM-001" }).Count -gt 0) { "FAIL" } else { "PASS" }
+        },
+        [pscustomobject]@{
+            id = "PR-PROD-CLAIM-001"
+            description = "Production-ready wording requires nearby factory readiness evidence."
+            result = if (@($script:issues | Where-Object { $_.ruleId -eq "PR-PROD-CLAIM-001" -and $_.level -eq "FAIL" }).Count -gt 0) { "FAIL" } elseif (@($script:issues | Where-Object { $_.ruleId -eq "PR-PROD-CLAIM-001" }).Count -gt 0) { "WARN" } else { "PASS" }
+        },
+        [pscustomobject]@{
+            id = "PR-MES-CLAIM-001"
+            description = "MES integrated wording requires real MES acceptance or traceability signoff evidence, especially near mock-mode context."
+            result = if (@($script:issues | Where-Object { $_.ruleId -eq "PR-MES-CLAIM-001" -and $_.level -eq "FAIL" }).Count -gt 0) { "FAIL" } elseif (@($script:issues | Where-Object { $_.ruleId -eq "PR-MES-CLAIM-001" }).Count -gt 0) { "WARN" } else { "PASS" }
         },
         [pscustomobject]@{
             id = "PR-CATCH-001"

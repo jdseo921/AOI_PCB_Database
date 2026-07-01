@@ -33,11 +33,13 @@ public sealed class AoiDatabaseTests : IDisposable
             if (Directory.Exists(_root))
                 Directory.Delete(_root, recursive: true);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            System.Diagnostics.Trace.WriteLine($"AOI database test cleanup skipped: {ex.Message}");
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            System.Diagnostics.Trace.WriteLine($"AOI database test cleanup skipped: {ex.Message}");
         }
     }
 

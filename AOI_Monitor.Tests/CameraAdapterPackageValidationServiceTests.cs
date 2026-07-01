@@ -120,11 +120,13 @@ public sealed class CameraAdapterPackageValidationServiceTests : IDisposable
             if (Directory.Exists(_root))
                 Directory.Delete(_root, recursive: true);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Camera adapter validation test cleanup skipped: {ex.Message}");
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Camera adapter validation test cleanup skipped: {ex.Message}");
         }
     }
 

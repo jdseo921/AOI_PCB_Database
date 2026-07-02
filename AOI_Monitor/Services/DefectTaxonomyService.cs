@@ -225,15 +225,25 @@ public static class DefectTaxonomyService
 
     public static DefectTaxonomySnapshot CreateDefaultTaxonomy()
     {
+        // Canonical AOI defect classes covering the client classification table. Model-label IDs for the
+        // original eight classes are kept stable (0-7) so existing model label maps are unaffected; newly
+        // added classes take IDs 8+. Detection depth for some classes (e.g. Solder Volume, Coplanarity)
+        // depends on future 3D hardware, but the classes must exist for labeling, MES codes, and reporting.
         var names = new[]
         {
             ("OK", 0, "OK", false, "OK"),
             ("Solder Bridge", 1, "SB", true, "Bridge|SolderBridge|Short|Solder Short"),
             ("Insufficient Solder", 2, "IS", true, "Insufficient|Low Solder|Open Solder"),
+            ("Solder Volume", 8, "VOL", true, "Solder Volume|Excess Solder|Excessive Solder|Volume Error"),
+            ("Cold Joint", 9, "CJ", true, "Cold Joint|Cold Solder|Cold Solder Joint|Dry Joint"),
             ("Polarity Error", 3, "POL", true, "Polarity|Reversed|Wrong Polarity"),
             ("Tombstone", 4, "TOMB", true, "Tombstoned"),
             ("Missing Component", 5, "MISS", true, "Missing|Missing Part|Component Missing"),
-            ("Height Error", 6, "HGT", true, "Height|Pin Height Error|Coplanarity"),
+            ("Misalignment", 10, "MIS", true, "Misalignment|Misaligned|Shift|Offset|Placement Shift"),
+            ("Height Error", 6, "HGT", true, "Height|Height Defect"),
+            ("Connector Pin Height", 11, "CPH", true, "Pin Height Error|Connector Pin Height|Pin Height"),
+            ("3D Coplanarity", 12, "COP", true, "Coplanarity|Lead Coplanarity|3D Coplanarity"),
+            ("Shield Can Gap", 13, "SCG", true, "Shield Can Gap|Shield Gap|Can Gap|Shield Can"),
             ("Anomaly", 7, "ANOM", false, "Unknown Defect|Other"),
         };
         var snapshot = new DefectTaxonomySnapshot

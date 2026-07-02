@@ -81,6 +81,7 @@ public sealed class RecipeDocumentPersistenceTests : IDisposable
         var doc = new RecipeDocument
         {
             RecipeName = string.Empty,
+            BoardProgram = string.Empty, // force the fallback board-program parameter to be used
             Rois = new List<RecipeRoiDocument>
             {
                 new() { Name = "R1", X = 0.1, Y = 0.1, Width = 0.2, Height = 0.2 },

@@ -73,7 +73,7 @@
                        TextWrapping="NoWrap"
                        TextTrimming="CharacterEllipsis"
                        ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
-            <Border Background="#14262E" BorderBrush="#4C6A7D" BorderThickness="1" Padding="7,3" Margin="0,0,4,0" MaxWidth="205" MinHeight="28" VerticalAlignment="Center">
+            <Border Background="#14262E" BorderBrush="#4C6A7D" BorderThickness="1" Padding="7,3" Margin="0,0,4,0" MaxWidth="205" MinHeight="34" VerticalAlignment="Center">
               <DockPanel LastChildFill="True">
                 <TextBlock Text="Station " Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
                 <TextBlock x:Name="StationNameText" Text="AOI-LIB" Foreground="#F7FAFC" FontSize="14" FontWeight="ExtraBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="130" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>

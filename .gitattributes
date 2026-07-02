@@ -1,15 +1,15 @@
-* text=auto
+* text=auto eol=lf
 
-*.cs text
-*.xaml text
-*.csproj text
-*.slnx text
-*.md text
-*.ps1 text
-*.yml text
-*.yaml text
-*.json text
-*.csv text
+*.cs text eol=lf
+*.xaml text eol=lf
+*.csproj text eol=lf
+*.slnx text eol=lf
+*.md text eol=lf
+*.ps1 text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
 
 *.png binary
 *.jpg binary

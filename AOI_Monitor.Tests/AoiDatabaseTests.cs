@@ -555,6 +555,29 @@ public sealed class AoiDatabaseTests : IDisposable
     }
 
     [Fact]
+    public void PdfExportPreservesKoreanTextViaUnicodeFont()
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, "korean_report.pdf");
+
+        PdfExportService.ExportHtmlToPdf(
+            "<html><body><h1>검사 보고서</h1><p>결과: 합격</p></body></html>",
+            path,
+            "검사 보고서");
+
+        var bytes = File.ReadAllBytes(path);
+        var content = Encoding.ASCII.GetString(bytes);
+
+        Assert.Equal("%PDF", content[..4]);
+        // Non-ASCII (Korean) content must select the Type0 CID font path and be encoded as hex text,
+        // instead of being silently dropped to blanks by the ASCII-only path.
+        Assert.Contains("/Type0", content, StringComparison.Ordinal);
+        Assert.Contains("/UniKS-UCS2-H", content, StringComparison.Ordinal);
+        // "검사" ("검사") encodes to big-endian UCS-2 hex AC80C0AC.
+        Assert.Contains("AC80C0AC", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ExportVerificationCustomerPackageManifestMismatchFails()
     {
         var package = Path.Combine(_root, "stage1_validation_package");
@@ -1084,6 +1107,32 @@ public sealed class AoiDatabaseTests : IDisposable
         Assert.Equal(1250, performance.MaxMilliseconds, precision: 3);
         Assert.Equal(500, performance.MinMilliseconds, precision: 3);
         Assert.Equal(1, performance.CountOverOneSecond);
+    }
+
+    [Fact]
+    public void ReviewVerdictIsNotCountedAsFalseCallOrDetection()
+    {
+        var rows = new[]
+        {
+            Row("OK", "OK"),
+            Row("OK", "REVIEW"), // pending review on a good board must not be a false call
+            Row("NG", "NG"),
+            Row("NG", "REVIEW"), // pending review on a defective board is not scored either way
+        };
+
+        var metrics = BatchValidationService.CalculateMetrics(rows);
+
+        // Only the two definitive verdicts feed the confusion matrix.
+        Assert.Equal(1, metrics.TruePositive);
+        Assert.Equal(1, metrics.TrueNegative);
+        Assert.Equal(0, metrics.FalsePositive);
+        Assert.Equal(0, metrics.FalseNegative);
+        Assert.Equal(0.0, metrics.FalseCallRate, precision: 3);
+        Assert.Equal(2, metrics.ReviewCount);
+
+        // A reviewed board is a pending-review request, not a false call or a possible escape.
+        Assert.Equal("REVIEW_PENDING", BatchValidationService.DetermineFailureCategory(
+            "OK", "REVIEW", "UNASSIGNED", "UNASSIGNED", "UNASSIGNED", "UNASSIGNED", false));
     }
 
     [Fact]

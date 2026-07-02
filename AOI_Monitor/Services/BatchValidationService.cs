@@ -106,12 +106,19 @@ public static class BatchValidationService
         if (known.Length == 0)
             return new BatchMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, rows.Count, CountResult(rows, "OK"), CountResult(rows, "NG"), CountResult(rows, "REVIEW"));
 
-        var tp = known.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "NG" && NormalizeBinaryLabel(r.EngineResult) == "NG");
-        var tn = known.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "OK" && NormalizeBinaryLabel(r.EngineResult) == "OK");
-        var fp = known.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "OK" && NormalizeBinaryLabel(r.EngineResult) == "NG");
-        var fn = known.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "NG" && NormalizeBinaryLabel(r.EngineResult) == "OK");
+        // A REVIEW engine verdict is a request for human review, not a definitive OK/NG decision. It
+        // must not be scored as a defect detection or a false call (which would inflate the false-call
+        // rate), so rows the engine sent to REVIEW are excluded from the confusion matrix and reported
+        // separately via ReviewCount.
+        var decided = known.Where(r => !IsReviewVerdict(r.EngineResult)).ToArray();
 
-        var accuracy = (tp + tn) / (double)known.Length;
+        var tp = decided.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "NG" && NormalizeBinaryLabel(r.EngineResult) == "NG");
+        var tn = decided.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "OK" && NormalizeBinaryLabel(r.EngineResult) == "OK");
+        var fp = decided.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "OK" && NormalizeBinaryLabel(r.EngineResult) == "NG");
+        var fn = decided.Count(r => NormalizeBinaryLabel(r.GroundTruth) == "NG" && NormalizeBinaryLabel(r.EngineResult) == "OK");
+
+        var decidedCount = tp + tn + fp + fn;
+        var accuracy = decidedCount == 0 ? 0 : (tp + tn) / (double)decidedCount;
         var precision = tp + fp == 0 ? 0 : tp / (double)(tp + fp);
         var recall = tp + fn == 0 ? 0 : tp / (double)(tp + fn);
         var falseCallRate = fp + tn == 0 ? 0 : fp / (double)(fp + tn);
@@ -180,6 +187,11 @@ public static class BatchValidationService
         if (expected == "UNKNOWN")
             return "UNKNOWN_GT";
 
+        // An engine REVIEW verdict is a pending human-review request, not a confirmed OK/NG decision,
+        // so it is neither a false call nor a possible escape.
+        if (IsReviewVerdict(engineResult))
+            return "REVIEW_PENDING";
+
         var actual = NormalizeBinaryLabel(engineResult);
         if (expected == "OK" && actual == "NG")
             return "FALSE_CALL";
@@ -216,6 +228,13 @@ public static class BatchValidationService
             _ => "UNKNOWN",
         };
     }
+
+    /// <summary>
+    /// True when the engine verdict is a REVIEW (pending human review). Such rows are excluded from the
+    /// binary confusion matrix so they do not inflate the false-call or defect-detection counts.
+    /// </summary>
+    public static bool IsReviewVerdict(string? verdict)
+        => string.Equals(verdict?.Trim(), "REVIEW", StringComparison.OrdinalIgnoreCase);
 
     public static IReadOnlyList<RunItem> BuildRunItems(IReadOnlyList<string> imageFiles, ValidationManifest manifest)
     {

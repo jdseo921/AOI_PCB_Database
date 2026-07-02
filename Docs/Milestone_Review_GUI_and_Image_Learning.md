@@ -106,12 +106,18 @@ Gaps against the spec, ranked by client visibility:
 
 ### 5.1 Resolved on branch `claude/aoi-pcb-gui-review-qpqo05`
 
-Four of the gaps above have been closed so the five GUI-spec modules and UI guidelines carry full check marks:
+The non-hardware gaps above have been closed so the five GUI-spec modules and UI guidelines carry full check marks, and the client classification/reporting requirements are met. Live camera and 3D-scanner hardware integration remains explicitly deferred (Stage 2) pending the client discussion.
 
 - **Gap 1 (3D Profile Viewer).** The module now renders an interactive WPF `Viewport3D` height surface with left-drag rotate, wheel zoom, right-drag pan, a Reset View control, colour-by-height shading, local-maxima peak markers on the height slice, and a "Detected Features" list whose selection is synchronized with the 2D top-down inset and the slice profile (`Views/ProfileView.xaml`, `Views/ProfileView.xaml.cs`, `Services/Profile3DMeshBuilder.cs`). Volume remains labelled as a sample-data placeholder because it needs calibrated Z data from real 3D hardware.
+- **Gap 2 (defect taxonomy).** The default taxonomy now covers the mandatory classes — Solder Volume, Cold Joint, Misalignment, and Shield Can Gap were added, and Connector Pin Height and 3D Coplanarity are promoted from aliases to first-class canonical classes with MES codes (`Services/DefectTaxonomyService.cs`). Detection depth for some classes still needs 3D hardware, but the classes exist for labeling, MES codes, and reporting.
+- **Gap 3 (AI model deliverable).** The learned statistical visual model is designated the Stage 1 "AI model v1.0" deliverable; the optional customer ONNX model registry remains the upgrade path for a trained detector.
+- **Gap 4 (PDF Unicode).** PDF export no longer drops non-ASCII text. When a report contains non-ASCII characters (e.g. Korean), it is rendered through a Type0 CID font (Adobe-Korea1, `UniKS-UCS2-H`) as UCS-2BE text so it is preserved for a Korean-capable viewer; ASCII reports keep the Helvetica/WinAnsi path (`Services/PdfExportService.cs`).
 - **Gap 5 (log archive).** Retention now archives each qualifying row into `LogArchive` with a full recoverable JSON payload and then purges the live row, children before parents, in a single transaction (`Data/AoiDatabase.cs` `RunLogRetention`; migration v29 adds `LogArchive.PayloadJson`). Retention is configurable in System Settings (default 30 days, changeable or disabled) and runs once at startup rather than during database initialization.
-- **Gap 6 (Log & Export view role).** The Export & Trace page is now viewable by Operator and Engineer; only the export action stays Admin-only (`Services/RoleAuthorization.cs`).
+- **Gap 6 (roles).** The Export & Trace page is now viewable by Operator and Engineer with the export action still Admin-only (`Services/RoleAuthorization.cs`); AI Model Test batch runs are now gated to Engineer/Admin (`Views/AIModelTestView.xaml.cs` `OnRunBatchClick`), matching the roles spec and the corrected RTM row AI-001.
+- **Gap 7 (REVIEW in metrics).** A REVIEW engine verdict is treated as a pending human-review request rather than a defect: REVIEW rows are excluded from the batch confusion matrix (so they no longer inflate the false-call rate) and classified as `REVIEW_PENDING`, while `ReviewCount` reports them separately (`Services/BatchValidationService.cs`).
 - **Gap 8 (Recipe tolerance panel).** Placement/rotation tolerance, IPC class, lighting profile, and false-call policy now persist in the recipe JSON and reload with the recipe; Test Run exercises the current in-editor edits via a transient preview override instead of the last saved revision (`Models/AoiModels.cs`, `Services/RecipeService.cs`, `Views/RecipeView.xaml.cs`).
+
+Remaining open items are hardware-dependent (live 3D camera/scanner, real vendor adapters) or explicitly optional (the 12-column responsive grid in Gap 9, pending sign-off; a broader `AutomationProperties` accessibility pass).
 
 ## 6. Recommended Plan
 

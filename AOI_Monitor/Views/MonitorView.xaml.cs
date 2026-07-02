@@ -760,6 +760,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
             OperatorText is null ||
             EngineText is null ||
             ModelVersionText is null ||
+            LearnedModelEvidenceText is null ||
             CameraSourceText is null ||
             CameraFrameMetadataText is null ||
             LightingSyncText is null ||
@@ -777,12 +778,38 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         OperatorText.Text = state.OperatorWithRole;
         EngineText.Text = $"{engine.Name} | Camera: {CameraStatusText()}";
         ModelVersionText.Text = engine.Version;
+        LearnedModelEvidenceText.Text = BuildLearnedModelEvidenceText(_currentAnalysis);
         CameraSourceText.Text = $"{_cameraSource.Name}: {CameraStatusText()}";
         CameraFrameMetadataText.Text = _currentFrameMetadata;
         LightingSyncText.Text = _lastLightingResult;
         if (_currentAnalysis is null)
             TimingText.Text = "--";
         UpdateRobotSimulationStatus();
+    }
+
+    private static string BuildLearnedModelEvidenceText(AnalysisResult? analysis)
+    {
+        var configuration = InspectionModelConfigurationService.Load();
+        if (!configuration.IsLearnedVisualModelSelected)
+            return "Learned visual model: not active.";
+
+        if (analysis is not null &&
+            string.Equals(analysis.InspectionEngine, ImageOnlyPcbLearningService.EngineName, StringComparison.OrdinalIgnoreCase))
+        {
+            var evidenceLines = analysis.Evidence
+                .Where(line =>
+                    line.StartsWith("Learned from", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("False-call target", StringComparison.OrdinalIgnoreCase) ||
+                    line.StartsWith("Recommended threshold", StringComparison.OrdinalIgnoreCase))
+                .Take(3)
+                .ToArray();
+            if (evidenceLines.Length > 0)
+                return string.Join(" ", evidenceLines);
+        }
+
+        return LearnedVisualModelRegistryService.GetActiveLearnedVisualModel() is { } active
+            ? string.Join(" ", LearnedVisualModelRegistryService.BuildEvidenceLines(active.Model).Take(3))
+            : "Learned PCB Visual Model selected, but no active model metadata is available. Review required.";
     }
 
     private void RefreshCalibrationProfiles(long? preferredProfileId = null)

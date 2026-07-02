@@ -35,6 +35,7 @@ public sealed class CustomerValidationReportContext
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> PrototypeLimitations { get; init; } = DefaultPrototypeLimitations;
     public FalseCallRecommendationSummary? FalseCallRecommendation { get; init; }
+    public LearnedVisualModelEvidenceSummary? LearnedVisualModel { get; init; }
     public ThresholdProfileEvidenceSummary ThresholdProfileEvidence { get; init; } = new();
     public ValidationBreakdownSummary BreakdownSummary { get; init; } = new();
     public DatasetQualitySummary DatasetQualitySummary { get; init; } = new();
@@ -47,6 +48,7 @@ public sealed class CustomerValidationReportContext
     [
         "Stage 1 evidence is generated from local files and the local SQLite database.",
         "The Pixel Difference Prototype Engine is deterministic workflow evidence, not a trained production ML model.",
+        "The Learned PCB Visual Model is image-only Stage 1 learning evidence; it does not prove live camera validation or production acceptance.",
         "ONNX inference is claimed only when a configured local model loads and inference succeeds; no trained model is bundled by default.",
         "Folder Camera Simulation frames may be used for workflow validation. Live AOI camera, 3D camera, lighting, production robot, PLC, production MES, and ERP integrations remain planned for later stages.",
         "This report supports customer review of the Stage 1 proof of concept and should be paired with the agreed validation protocol before production acceptance.",
@@ -175,6 +177,7 @@ public static class CustomerValidationReportService
         AppendRobotAcceptanceSection(sb, context.RobotAcceptanceSummary);
         AppendMesReadinessSection(sb, context.MesReadinessSummary);
         AppendFalseCallLaborImpact(sb, context.FalseCallRecommendation);
+        AppendLearnedVisualModelSection(sb, context.LearnedVisualModel);
         AppendThresholdProfileEvidence(sb, context.ThresholdProfileEvidence);
         AppendBreakdownSection(sb, context.BreakdownSummary);
 
@@ -302,6 +305,7 @@ public static class CustomerValidationReportService
         AppendMarkdownRobotAcceptanceSection(sb, context.RobotAcceptanceSummary);
         AppendMarkdownMesReadinessSection(sb, context.MesReadinessSummary);
         AppendMarkdownFalseCallLaborImpact(sb, context.FalseCallRecommendation);
+        AppendMarkdownLearnedVisualModelSection(sb, context.LearnedVisualModel);
         AppendMarkdownThresholdProfileEvidence(sb, context.ThresholdProfileEvidence);
         AppendMarkdownBreakdownSection(sb, context.BreakdownSummary);
         sb.AppendLine();
@@ -487,6 +491,60 @@ public static class CustomerValidationReportService
         sb.AppendLine($"- Review burden estimate: {summary.EstimatedManualReviewMinutes:F1} minutes ({FormatPercent(summary.ReviewRate)} review rate)");
         foreach (var limitation in summary.Limitations)
             sb.AppendLine($"- {EscapeMarkdown(limitation)}");
+    }
+
+    private static void AppendLearnedVisualModelSection(StringBuilder sb, LearnedVisualModelEvidenceSummary? summary)
+    {
+        sb.AppendLine("  <h2>Learned PCB Visual Model Evidence</h2>");
+        if (summary is null)
+        {
+            sb.AppendLine("  <p>No Learned PCB Visual Model was attached to this package.</p>");
+            return;
+        }
+
+        sb.AppendLine("  <table class=\"details\">");
+        AppendDetailRow(sb, "Model ID / version", $"{summary.ModelId} / {summary.ModelVersion}");
+        AppendDetailRow(sb, "Training project", $"{summary.ProjectName} ({summary.ProjectId})");
+        AppendDetailRow(sb, "Board model", string.IsNullOrWhiteSpace(summary.BoardModel) ? "Not provided" : summary.BoardModel);
+        AppendDetailRow(sb, "Evidence mode", summary.EvidenceMode);
+        AppendDetailRow(sb, "Images learned from", summary.ImagesLearnedFrom.ToString(CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "Golden / OK learning / OK validation", $"{summary.GoldenCount} / {summary.OkLearningCount} / {summary.OkValidationCount}");
+        AppendDetailRow(sb, "False-call target", FormatPercent(summary.FalseCallTarget));
+        AppendDetailRow(sb, "False-call rate", FormatPercent(summary.FalseCallRate));
+        AppendDetailRow(sb, "Possible escape rate", FormatPercent(summary.PossibleEscapeRate));
+        AppendDetailRow(sb, "Recommended threshold", summary.LearnedThreshold.ToString("F2", CultureInfo.InvariantCulture));
+        AppendDetailRow(sb, "Reference artifact", summary.LearnedReferenceArtifactPath);
+        AppendDetailRow(sb, "Tolerance artifact", summary.ToleranceMapArtifactPath);
+        AppendDetailRow(sb, "Anomaly threshold artifact", summary.AnomalyThresholdMapArtifactPath);
+        AppendDetailRow(sb, "Boundary", summary.BoundaryNote);
+        sb.AppendLine("  </table>");
+        if (summary.EvidenceLines.Count > 0)
+            AppendList(sb, summary.EvidenceLines);
+    }
+
+    private static void AppendMarkdownLearnedVisualModelSection(StringBuilder sb, LearnedVisualModelEvidenceSummary? summary)
+    {
+        sb.AppendLine();
+        sb.AppendLine("## Learned PCB Visual Model Evidence");
+        sb.AppendLine();
+        if (summary is null)
+        {
+            sb.AppendLine("No Learned PCB Visual Model was attached to this package.");
+            return;
+        }
+
+        sb.AppendLine($"- Model ID / version: {EscapeMarkdown(summary.ModelId)} / {EscapeMarkdown(summary.ModelVersion)}");
+        sb.AppendLine($"- Training project: {EscapeMarkdown(summary.ProjectName)} ({EscapeMarkdown(summary.ProjectId)})");
+        sb.AppendLine($"- Images learned from: {summary.ImagesLearnedFrom}");
+        sb.AppendLine($"- Golden / OK learning / OK validation: {summary.GoldenCount} / {summary.OkLearningCount} / {summary.OkValidationCount}");
+        sb.AppendLine($"- False-call target: {FormatPercent(summary.FalseCallTarget)}");
+        sb.AppendLine($"- False-call rate: {FormatPercent(summary.FalseCallRate)}");
+        sb.AppendLine($"- Possible escape rate: {FormatPercent(summary.PossibleEscapeRate)}");
+        sb.AppendLine($"- Recommended threshold: {summary.LearnedThreshold:F2}");
+        sb.AppendLine($"- Reference artifact: {EscapeMarkdown(summary.LearnedReferenceArtifactPath)}");
+        sb.AppendLine($"- Tolerance artifact: {EscapeMarkdown(summary.ToleranceMapArtifactPath)}");
+        sb.AppendLine($"- Anomaly threshold artifact: {EscapeMarkdown(summary.AnomalyThresholdMapArtifactPath)}");
+        sb.AppendLine($"- Boundary: {EscapeMarkdown(summary.BoundaryNote)}");
     }
 
     private static void AppendThresholdProfileEvidence(StringBuilder sb, ThresholdProfileEvidenceSummary summary)

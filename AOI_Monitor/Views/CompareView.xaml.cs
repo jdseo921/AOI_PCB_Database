@@ -29,7 +29,8 @@ public partial class CompareView : UserControl
         InitializeComponent();
         FindingsGrid.ItemsSource = Findings;
         WorkflowState.Instance.StateChanged += OnStateChanged;
-        Unloaded += (_, _) => WorkflowState.Instance.StateChanged -= OnStateChanged;
+        InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
+        Unloaded += OnUnloaded;
         RefreshFromState();
     }
 
@@ -78,6 +79,8 @@ public partial class CompareView : UserControl
             FindingsSourceChip.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#372914"));
             FindingsSourceChip.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8C6C35"));
         }
+
+        ApplyLearnedVisualComparison(state.LastAnalysis);
     }
 
     private static string ToChipVerdict(string verdict)
@@ -96,6 +99,14 @@ public partial class CompareView : UserControl
     }
 
     private void OnStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshFromState);
+
+    private void OnInspectionConfigurationChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshFromState);
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        WorkflowState.Instance.StateChanged -= OnStateChanged;
+        InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
+    }
 
     private void OnOpenDefectImageViewerClick(object sender, RoutedEventArgs e)
         => AOI_Monitor.ImageViewerWindow.ShowFromVisual(this, "Defect Sample Image / Overlay", DefectImageViewport);
@@ -125,13 +136,21 @@ public partial class CompareView : UserControl
     private void OnShowDifferenceClick(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
-        if (string.IsNullOrWhiteSpace(state.SampleImagePath) || string.IsNullOrWhiteSpace(state.GoldenImagePath))
+        var configuration = InspectionModelConfigurationService.Load();
+        if (string.IsNullOrWhiteSpace(state.SampleImagePath) ||
+            (!configuration.IsLearnedVisualModelSelected && string.IsNullOrWhiteSpace(state.GoldenImagePath)))
         {
-            MessageBox.Show("Load sample and golden images from Library > Open Record / Compare Golden first.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(
+                configuration.IsLearnedVisualModelSelected
+                    ? "Load a sample image first. The selected Learned PCB Visual Model supplies the learned reference artifact."
+                    : "Load sample and golden images from Library > Open Record / Compare Golden first.",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
 
-        var result = ImageAnalysisService.Analyze(state.SampleImagePath!, state.GoldenImagePath, state.DetectionPriority);
+        var result = InspectionEngineFactory.Create().Analyze(state.SampleImagePath!, state.GoldenImagePath, state.DetectionPriority);
         state.SetAnalysis(result);
         RefreshFromState();
     }
@@ -171,5 +190,73 @@ public partial class CompareView : UserControl
 
         var verified = ExportVerificationService.RecordVerifiedExport("ComparisonSnapshot", dialog.FileName);
         WorkflowState.Instance.AddEvent("EXPORT", $"Comparison pair exported: {Path.GetFileName(dialog.FileName)}; verification={verified.Verification.Status}.");
+    }
+
+    private void ApplyLearnedVisualComparison(AnalysisResult? analysis)
+    {
+        var configuration = InspectionModelConfigurationService.Load();
+        if (!configuration.IsLearnedVisualModelSelected ||
+            LearnedVisualModelRegistryService.GetActiveLearnedVisualModel() is not { } active)
+        {
+            ShowDemoComparisonCanvases();
+            return;
+        }
+
+        var state = WorkflowState.Instance;
+        SetImageSource(DefectActualImage, state.SampleImagePath);
+        SetImageSource(GoldenLearnedReferenceImage, LearnedVisualModelRegistryService.ArtifactPath(active.Model, "learned_reference.png"));
+        SetImageSource(LearnedToleranceImage, LearnedVisualModelRegistryService.ArtifactPath(active.Model, "tolerance_map.png"));
+        SetImageSource(LearnedAnomalyMapImage, LearnedVisualModelRegistryService.ArtifactPath(active.Model, "anomaly_threshold_map.png"));
+
+        DefectCanvasViewbox.Visibility = DefectActualImage.Source is null ? Visibility.Visible : Visibility.Collapsed;
+        GoldenCanvasViewbox.Visibility = GoldenLearnedReferenceImage.Source is null ? Visibility.Visible : Visibility.Collapsed;
+        DefectActualImage.Visibility = DefectActualImage.Source is null ? Visibility.Collapsed : Visibility.Visible;
+        GoldenLearnedReferenceImage.Visibility = GoldenLearnedReferenceImage.Source is null ? Visibility.Collapsed : Visibility.Visible;
+        LearnedArtifactsPanel.Visibility = Visibility.Visible;
+
+        DefectSubtitleText.Text = string.IsNullOrWhiteSpace(state.SampleImagePath)
+            ? "No inspected image loaded"
+            : $"{Path.GetFileName(state.SampleImagePath)} / inspected image";
+        GoldenSubtitleText.Text = "learned_reference.png / image-only Stage 1";
+        LearnedCompareEvidenceText.Text = analysis is not null &&
+            string.Equals(analysis.InspectionEngine, ImageOnlyPcbLearningService.EngineName, StringComparison.OrdinalIgnoreCase)
+                ? string.Join(" ", analysis.Evidence.Take(4))
+                : string.Join(" ", LearnedVisualModelRegistryService.BuildEvidenceLines(active.Model));
+
+        FindingsSourceText.Text = "Learned Visual Model";
+        FindingsSourceText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F1D8FF"));
+        FindingsSourceChip.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3A2149"));
+        FindingsSourceChip.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C4FB6"));
+    }
+
+    private void ShowDemoComparisonCanvases()
+    {
+        DefectCanvasViewbox.Visibility = Visibility.Visible;
+        GoldenCanvasViewbox.Visibility = Visibility.Visible;
+        DefectActualImage.Visibility = Visibility.Collapsed;
+        GoldenLearnedReferenceImage.Visibility = Visibility.Collapsed;
+        DefectActualImage.Source = null;
+        GoldenLearnedReferenceImage.Source = null;
+        LearnedToleranceImage.Source = null;
+        LearnedAnomalyMapImage.Source = null;
+        LearnedArtifactsPanel.Visibility = Visibility.Collapsed;
+    }
+
+    private static void SetImageSource(Image image, string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            image.Source = null;
+            return;
+        }
+
+        try
+        {
+            image.Source = ImageCacheService.LoadBitmap(path, decodePixelWidth: 900, cache: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or InvalidDataException)
+        {
+            image.Source = null;
+        }
     }
 }

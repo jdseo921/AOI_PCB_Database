@@ -139,7 +139,7 @@
           <Grid x:Name="StepEngine" Visibility="Collapsed">
             <StackPanel>
               <TextBlock Text="Inspection engine" Foreground="#DCE5EB" FontWeight="Bold" FontSize="14"/>
-              <TextBlock Text="Pixel Difference is the stable Stage 1 demonstration path. ONNX can be selected only when model configuration is available."
+              <TextBlock Text="Pixel Difference is the stable Stage 1 demonstration path. ONNX requires model configuration. Learned PCB Visual Model uses image-only Stage 1 learning evidence."
                          Foreground="#9AA6AF" TextWrapping="Wrap" Margin="0,4,0,12"/>
               <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -147,6 +147,7 @@
                 <ComboBox x:Name="EngineCombo" Grid.Column="1" MinHeight="34" SelectedIndex="0">
                   <ComboBoxItem Content="Pixel Difference Prototype Engine"/>
                   <ComboBoxItem Content="ONNX ML Model"/>
+                  <ComboBoxItem Content="Learned PCB Visual Model"/>
                 </ComboBox>
               </Grid>
               <TextBlock x:Name="EngineStatusText" Text="Current engine status will be shown after diagnostics run."

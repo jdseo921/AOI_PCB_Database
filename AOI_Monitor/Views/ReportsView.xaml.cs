@@ -2261,7 +2261,9 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
     private static string BuildModelConfigurationSummary(InspectionModelConfiguration configuration, ICollection<string> warnings)
     {
         var status = InspectionModelConfigurationService.GetStatusText();
-        if (!configuration.IsOnnxSelected)
+        if (configuration.IsLearnedVisualModelSelected)
+            warnings.Add("Inspection engine is the Learned PCB Visual Model. Evidence is image-only Stage 1 learning, not live camera validation or production acceptance.");
+        else if (!configuration.IsOnnxSelected)
             warnings.Add("Inspection engine is the deterministic Pixel Difference Prototype Engine, not a trained production ML model.");
         if (configuration.IsOnnxSelected && !configuration.HasModelFile)
             warnings.Add($"ONNX engine is selected, but the configured model file is missing: {configuration.ModelFilePath}");
@@ -2288,7 +2290,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
         foreach (var label in configuration.BuiltInLabelMap.OrderBy(kvp => kvp.Key))
             sb.AppendLine($"  {label.Key}: {label.Value}");
         sb.AppendLine();
-        sb.AppendLine("PrototypeNotice: Stage 1 is a local PoC. The default Pixel Difference Prototype Engine is deterministic evidence generation. ONNX ML Model inference is claimed only when a configured local model loads and inference succeeds.");
+        sb.AppendLine("PrototypeNotice: Stage 1 is a local PoC. The default Pixel Difference Prototype Engine is deterministic evidence generation. Learned PCB Visual Model evidence is image-only learning. ONNX ML Model inference is claimed only when a configured local model loads and inference succeeds.");
         return sb.ToString();
     }
 
@@ -3088,8 +3090,14 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
         {
             _engineCombo.Items.Add(new ComboBoxItem { Content = "Pixel Difference Prototype Engine", Tag = InspectionEngineFactory.DefaultEngineKey });
             _engineCombo.Items.Add(new ComboBoxItem { Content = "ONNX ML Model (configured)", Tag = InspectionEngineFactory.OnnxEngineKey });
+            _engineCombo.Items.Add(new ComboBoxItem { Content = "Learned PCB Visual Model (image-only Stage 1)", Tag = InspectionEngineFactory.LearnedVisualEngineKey });
             var normalized = InspectionEngineFactory.NormalizeEngineKey(defaultEngineKey);
-            _engineCombo.SelectedIndex = normalized == InspectionEngineFactory.OnnxEngineKey ? 1 : 0;
+            _engineCombo.SelectedIndex = normalized switch
+            {
+                InspectionEngineFactory.OnnxEngineKey => 1,
+                InspectionEngineFactory.LearnedVisualEngineKey => 2,
+                _ => 0,
+            };
         }
 
         private void ConfigureProfileOptions()

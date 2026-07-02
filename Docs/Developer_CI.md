@@ -73,6 +73,28 @@ CI uploads these milestone artifacts:
 
 The `simulation-dry-run` wording is part of the artifact name by design. These packages prove that evidence-package generation, export verification, and Stage 2 aggregation plumbing are still executable in CI. They must not be interpreted as customer dataset acceptance, production model readiness, real camera readiness, lighting readiness, 3D readiness, or factory acceptance.
 
+## Image-Only Learning CI Smoke
+
+After the authoritative quality gates pass, CI runs a synthetic image-only learning smoke through `AOI_Monitor.Tools`:
+
+```powershell
+dotnet run --project AOI_Monitor.Tools/AOI_Monitor.Tools.csproj --configuration Release --no-build -- `
+  client-image-learning-demo `
+  --synthetic `
+  --output TestResults/image-learning-demo `
+  --operator ci-image-learning `
+  --false-call-target 0.05
+```
+
+The command generates a synthetic image-only learning project under `TestResults`, imports image groups, trains Learned PCB Visual Model v1, calibrates false calls, runs inspection, exports heatmaps/overlays, and writes `visual_learning_report.html`.
+
+CI uploads:
+
+- `image-learning-demo-report-synthetic-not-customer-acceptance`.
+- `image-learning-demo-overlays-synthetic-not-customer-acceptance`.
+
+Each uploaded image-learning artifact includes a README stating that the evidence is synthetic only, not customer acceptance, and not production model certification. The smoke proves that the workflow executes; the existing quality gates remain the authoritative CI health check.
+
 ## Publish Package
 
 Create a local Windows x64 PoC package:
@@ -114,8 +136,9 @@ The job runs:
 6. Generated tiny-image Stage 1 dataset and manifest creation under `TestResults/simulation-dry-run`.
 7. `AOI_Monitor.Tools stage1-exit ... --allow-simulation`.
 8. `AOI_Monitor.Tools stage2-camera-pilot ... --allow-simulation`.
-9. Test/result/audit artifact uploads.
-10. Simulation dry-run evidence package uploads with `simulation-dry-run` in the artifact names.
-11. Package artifact upload for successful `main` branch pushes.
+9. Synthetic image-only learning smoke with `client-image-learning-demo --synthetic`.
+10. Test/result/audit artifact uploads.
+11. Simulation dry-run and image-learning evidence uploads with synthetic/non-acceptance wording in the artifact names.
+12. Package artifact upload for successful `main` branch pushes.
 
 Keep the quality-gate step as the authoritative CI health check. The simulation dry-run milestone packages are supporting workflow evidence only, not a substitute for customer data, model acceptance, or real hardware acceptance.

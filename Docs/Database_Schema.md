@@ -5,7 +5,7 @@
 The SQLite database is versioned through the `SchemaInfo` table.
 
 - `SchemaInfo.Key = SchemaVersion`
-- Current baseline: `2`
+- Current baseline: `28`
 - Runtime database path: `%LOCALAPPDATA%\AOI_Monitor\aoi_monitor.sqlite` by default, or the configured storage root.
 
 ## Migration Policy
@@ -33,6 +33,14 @@ Current application tables:
 - `AuditEvents` - traceable user and system actions.
 - `RecipeRevisions` - saved recipe definitions and revision metadata.
 - `TrainingSamples` - local training/evaluation sample references.
+- `ImageLearningProjects` - image-only PCB learning project metadata and archive state.
+- `ImageLearningProjectImages` - imported project images grouped by Golden / Reference, OK Learning, OK Validation, Inspection, or optional NG Validation role.
+- `LearnedPcbVisualModels` - learned image-only visual model metadata, thresholds, calibration rates, evidence mode, and project counts.
+- `LearnedPcbVisualModelArtifacts` - runtime artifact paths for learned reference, tolerance map, anomaly threshold map, learning summary, alignment summary, and threshold sweep outputs.
+- `ImageLearningInspectionResults` - image-only inspection decisions produced after learning.
+- `ImageLearningAnomalyRegions` - anomaly regions associated with image-only inspection results, including normalized rectangles, score, area, confidence, and reason; these are not required defect-class training labels.
+- `ImageLearningCalibrationResults` - OK/NG validation calibration summaries for false-call and possible-escape estimates.
+- `ImageLearningComparisonResults` - learned-model comparison summaries for inspected images.
 - `CalibrationProfiles` - calibration profile summary records.
 - `CalibrationPoints` - calibration point mappings for a profile.
 - `BatchTestRuns` - AI model/batch validation run summaries.

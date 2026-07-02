@@ -2033,6 +2033,10 @@ public static class AoiDatabase
             CountTable(connection, "RecipeRevisions", "OK"),
             CountTable(connection, "CalibrationProfiles", "OK"),
             CountTable(connection, "CalibrationPoints", "OK"),
+            CountTable(connection, "ImageLearningProjects", "OK"),
+            CountTable(connection, "ImageLearningProjectImages", "OK"),
+            CountTable(connection, "LearnedPcbVisualModels", "OK"),
+            CountTable(connection, "ImageLearningInspectionResults", "OK"),
             CountTable(connection, "BatchTestRuns", "OK"),
             CountTable(connection, "ValidationBreakdownMetrics", "OK"),
             CountTable(connection, "FalseCallReductionRuns", "OK"),
@@ -2205,6 +2209,615 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$notes", notes);
         command.Parameters.AddWithValue("$createdAtUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         command.ExecuteNonQuery();
+    }
+
+    public static long CreateImageLearningProject(ImageLearningProject project)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(project);
+
+        var now = DateTime.UtcNow;
+        project.ProjectId = string.IsNullOrWhiteSpace(project.ProjectId)
+            ? $"ILP-{now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
+            : project.ProjectId.Trim();
+        project.ProjectName = string.IsNullOrWhiteSpace(project.ProjectName) ? project.ProjectId : project.ProjectName.Trim();
+        project.BoardModel = project.BoardModel?.Trim() ?? string.Empty;
+        project.Description = project.Description?.Trim() ?? string.Empty;
+        project.CreatedBy = string.IsNullOrWhiteSpace(project.CreatedBy) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : project.CreatedBy.Trim();
+        project.CreatedAtUtc = project.CreatedAtUtc == default ? now : project.CreatedAtUtc.ToUniversalTime();
+        project.UpdatedAtUtc = project.UpdatedAtUtc == default ? project.CreatedAtUtc : project.UpdatedAtUtc.ToUniversalTime();
+
+        RecordAuditEvent(
+            "IMAGE_LEARNING_PROJECT_CREATE",
+            $"Image-only learning project created: {project.ProjectId}; board={project.BoardModel}; evidenceMode={project.EvidenceMode}.",
+            operatorWithRole: project.CreatedBy,
+            relatedEntityType: "ImageLearningProject",
+            relatedEntityId: project.ProjectId);
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO ImageLearningProjects
+                (ProjectId, ProjectName, BoardModel, Description, EvidenceMode, CreatedBy,
+                 CreatedAtUtc, UpdatedAtUtc, IsArchived, ArchivedBy, ArchivedAtUtc, ArchiveReason)
+            VALUES
+                ($projectId, $projectName, $boardModel, $description, $evidenceMode, $createdBy,
+                 $createdAtUtc, $updatedAtUtc, $isArchived, $archivedBy, $archivedAtUtc, $archiveReason);
+            SELECT last_insert_rowid();
+            """;
+        BindImageLearningProject(command, project);
+        project.Id = (long)(command.ExecuteScalar() ?? 0L);
+        return project.Id;
+    }
+
+    public static ImageLearningProject? GetImageLearningProject(string projectId)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ProjectId, ProjectName, BoardModel, Description, EvidenceMode, CreatedBy,
+                   CreatedAtUtc, UpdatedAtUtc, IsArchived, ArchivedBy, ArchivedAtUtc, ArchiveReason
+            FROM ImageLearningProjects
+            WHERE ProjectId = $projectId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadImageLearningProject(reader) : null;
+    }
+
+    public static IReadOnlyList<ImageLearningProject> GetImageLearningProjects(bool includeArchived = false)
+    {
+        EnsureInitialized();
+
+        var projects = new List<ImageLearningProject>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ProjectId, ProjectName, BoardModel, Description, EvidenceMode, CreatedBy,
+                   CreatedAtUtc, UpdatedAtUtc, IsArchived, ArchivedBy, ArchivedAtUtc, ArchiveReason
+            FROM ImageLearningProjects
+            WHERE $includeArchived = 1 OR IsArchived = 0
+            ORDER BY datetime(UpdatedAtUtc) DESC, Id DESC;
+            """;
+        command.Parameters.AddWithValue("$includeArchived", includeArchived ? 1 : 0);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            projects.Add(ReadImageLearningProject(reader));
+
+        return projects;
+    }
+
+    public static void ArchiveImageLearningProject(string projectId, string archivedBy, string reason)
+    {
+        EnsureInitialized();
+
+        var archivedAt = DateTime.UtcNow;
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE ImageLearningProjects
+            SET IsArchived = 1,
+                ArchivedBy = $archivedBy,
+                ArchivedAtUtc = $archivedAtUtc,
+                ArchiveReason = $archiveReason,
+                UpdatedAtUtc = $archivedAtUtc
+            WHERE ProjectId = $projectId;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId);
+        command.Parameters.AddWithValue("$archivedBy", string.IsNullOrWhiteSpace(archivedBy) ? "UNKNOWN" : archivedBy.Trim());
+        command.Parameters.AddWithValue("$archivedAtUtc", archivedAt.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$archiveReason", reason?.Trim() ?? string.Empty);
+        command.ExecuteNonQuery();
+
+        RecordAuditEvent(
+            "IMAGE_LEARNING_PROJECT_ARCHIVE",
+            $"Image-only learning project archived: {projectId}; reason={reason}.",
+            operatorWithRole: archivedBy,
+            relatedEntityType: "ImageLearningProject",
+            relatedEntityId: projectId);
+    }
+
+    public static void DeleteImageLearningProjectMetadata(string projectId, string deletedBy, string reason)
+    {
+        EnsureInitialized();
+
+        RecordAuditEvent(
+            "IMAGE_LEARNING_PROJECT_METADATA_DELETE",
+            $"Image-only learning project metadata deleted: {projectId}; source customer images were not deleted; reason={reason}.",
+            operatorWithRole: deletedBy,
+            relatedEntityType: "ImageLearningProject",
+            relatedEntityId: projectId);
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        ExecuteImageLearningDelete(connection, transaction, "DELETE FROM ImageLearningAnomalyRegions WHERE InspectionResultId IN (SELECT Id FROM ImageLearningInspectionResults WHERE ProjectId = $projectId);", projectId);
+        ExecuteImageLearningDelete(connection, transaction, "DELETE FROM ImageLearningInspectionResults WHERE ProjectId = $projectId;", projectId);
+        ExecuteImageLearningDelete(connection, transaction, "DELETE FROM ImageLearningComparisonResults WHERE ProjectId = $projectId;", projectId);
+        ExecuteImageLearningDelete(connection, transaction, "DELETE FROM ImageLearningCalibrationResults WHERE ProjectId = $projectId;", projectId);
+        ExecuteImageLearningDelete(connection, transaction, "DELETE FROM LearnedPcbVisualModelArtifacts WHERE ModelId IN (SELECT ModelId FROM LearnedPcbVisualModels WHERE ProjectId = $projectId);", projectId);
+        ExecuteImageLearningDelete(connection, transaction, "DELETE FROM LearnedPcbVisualModels WHERE ProjectId = $projectId;", projectId);
+        ExecuteImageLearningDelete(connection, transaction, "DELETE FROM ImageLearningProjectImages WHERE ProjectId = $projectId;", projectId);
+        ExecuteImageLearningDelete(connection, transaction, "DELETE FROM ImageLearningProjects WHERE ProjectId = $projectId;", projectId);
+        transaction.Commit();
+    }
+
+    public static ImageLearningProjectImage InsertImageLearningProjectImage(ImageLearningProjectImage image)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(image);
+
+        image.ImportedAtUtc = image.ImportedAtUtc == default ? DateTime.UtcNow : image.ImportedAtUtc.ToUniversalTime();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO ImageLearningProjectImages
+                (ProjectId, Role, OriginalPath, VaultPath, FileName, Sha256, BoardModel, LotId, ViewType,
+                 Width, Height, ImportedBy, ImportedAtUtc, ImageLevelTruth, Notes)
+            VALUES
+                ($projectId, $role, $originalPath, $vaultPath, $fileName, $sha256, $boardModel, $lotId, $viewType,
+                 $width, $height, $importedBy, $importedAtUtc, $imageLevelTruth, $notes);
+            SELECT last_insert_rowid();
+            """;
+        BindImageLearningProjectImage(command, image);
+        image.Id = (long)(command.ExecuteScalar() ?? 0L);
+
+        RecordAuditEvent(
+            "IMAGE_LEARNING_IMAGE_IMPORT",
+            $"Image-only learning image imported: project={image.ProjectId}; role={image.Role}; file={image.FileName}; truth={image.ImageLevelTruth}.",
+            operatorWithRole: image.ImportedBy,
+            relatedEntityType: "ImageLearningProjectImage",
+            relatedEntityId: image.Id.ToString(CultureInfo.InvariantCulture),
+            relatedPath: image.VaultPath);
+        return image;
+    }
+
+    public static ImageLearningProjectImage? GetImageLearningProjectImageByHash(string projectId, string sha256)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ProjectId, Role, OriginalPath, VaultPath, FileName, Sha256, BoardModel, LotId, ViewType,
+                   Width, Height, ImportedBy, ImportedAtUtc, ImageLevelTruth, Notes
+            FROM ImageLearningProjectImages
+            WHERE ProjectId = $projectId
+              AND Sha256 = $sha256
+            ORDER BY Id DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId);
+        command.Parameters.AddWithValue("$sha256", sha256);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadImageLearningProjectImage(reader) : null;
+    }
+
+    public static IReadOnlyList<ImageLearningProjectImage> GetImageLearningProjectImages(string projectId, ImageLearningImageRole? role = null)
+    {
+        EnsureInitialized();
+
+        var images = new List<ImageLearningProjectImage>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ProjectId, Role, OriginalPath, VaultPath, FileName, Sha256, BoardModel, LotId, ViewType,
+                   Width, Height, ImportedBy, ImportedAtUtc, ImageLevelTruth, Notes
+            FROM ImageLearningProjectImages
+            WHERE ProjectId = $projectId
+              AND ($role = '' OR Role = $role)
+            ORDER BY datetime(ImportedAtUtc) DESC, Id DESC;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId);
+        command.Parameters.AddWithValue("$role", role?.ToString() ?? string.Empty);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            images.Add(ReadImageLearningProjectImage(reader));
+
+        return images;
+    }
+
+    public static IReadOnlyDictionary<ImageLearningImageRole, int> GetImageLearningImageCountsByRole(string projectId)
+    {
+        EnsureInitialized();
+
+        var counts = Enum.GetValues<ImageLearningImageRole>().ToDictionary(role => role, _ => 0);
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Role, COUNT(*)
+            FROM ImageLearningProjectImages
+            WHERE ProjectId = $projectId
+            GROUP BY Role;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (Enum.TryParse<ImageLearningImageRole>(reader.GetString(0), out var role))
+                counts[role] = reader.GetInt32(1);
+        }
+
+        return counts;
+    }
+
+    public static long RecordLearnedPcbVisualModel(LearnedPcbVisualModel model)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(model);
+
+        var now = DateTime.UtcNow;
+        model.ModelId = string.IsNullOrWhiteSpace(model.ModelId)
+            ? $"ILM-{now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
+            : model.ModelId.Trim();
+        model.ModelVersion = string.IsNullOrWhiteSpace(model.ModelVersion) ? "1.0.0" : model.ModelVersion.Trim();
+        model.CreatedAtUtc = model.CreatedAtUtc == default ? now : model.CreatedAtUtc.ToUniversalTime();
+        model.CreatedBy = string.IsNullOrWhiteSpace(model.CreatedBy) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : model.CreatedBy.Trim();
+
+        var auditEventId = RecordAuditEvent(
+            "IMAGE_LEARNING_MODEL_CREATE",
+            $"Image-only visual model metadata recorded: model={model.ModelId}; version={model.ModelVersion}; project={model.ProjectId}; evidenceMode={model.EvidenceMode}.",
+            operatorWithRole: model.CreatedBy,
+            relatedEntityType: "LearnedPcbVisualModel",
+            relatedEntityId: model.ModelId);
+        model.AuditEventId = auditEventId;
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO LearnedPcbVisualModels
+                (ModelId, ModelVersion, CreatedAtUtc, ProjectId, GoldenCount, OkLearningCount, OkValidationCount,
+                 InputWidth, InputHeight, AlignmentMode, BrightnessNormalizationMode, LearnedThreshold,
+                 FalseCallTarget, FalseCallRate, PossibleEscapeRate, EvidenceMode, CreatedBy, AuditEventId)
+            VALUES
+                ($modelId, $modelVersion, $createdAtUtc, $projectId, $goldenCount, $okLearningCount, $okValidationCount,
+                 $inputWidth, $inputHeight, $alignmentMode, $brightnessNormalizationMode, $learnedThreshold,
+                 $falseCallTarget, $falseCallRate, $possibleEscapeRate, $evidenceMode, $createdBy, $auditEventId)
+            ON CONFLICT(ModelId) DO UPDATE SET
+                ModelVersion = excluded.ModelVersion,
+                CreatedAtUtc = excluded.CreatedAtUtc,
+                ProjectId = excluded.ProjectId,
+                GoldenCount = excluded.GoldenCount,
+                OkLearningCount = excluded.OkLearningCount,
+                OkValidationCount = excluded.OkValidationCount,
+                InputWidth = excluded.InputWidth,
+                InputHeight = excluded.InputHeight,
+                AlignmentMode = excluded.AlignmentMode,
+                BrightnessNormalizationMode = excluded.BrightnessNormalizationMode,
+                LearnedThreshold = excluded.LearnedThreshold,
+                FalseCallTarget = excluded.FalseCallTarget,
+                FalseCallRate = excluded.FalseCallRate,
+                PossibleEscapeRate = excluded.PossibleEscapeRate,
+                EvidenceMode = excluded.EvidenceMode,
+                CreatedBy = excluded.CreatedBy,
+                AuditEventId = excluded.AuditEventId;
+            """;
+        BindLearnedPcbVisualModel(command, model);
+        command.ExecuteNonQuery();
+
+        using (var idCommand = connection.CreateCommand())
+        {
+            idCommand.Transaction = transaction;
+            idCommand.CommandText = "SELECT Id FROM LearnedPcbVisualModels WHERE ModelId = $modelId LIMIT 1;";
+            idCommand.Parameters.AddWithValue("$modelId", model.ModelId);
+            model.Id = (long)(idCommand.ExecuteScalar() ?? 0L);
+        }
+
+        using (var clearArtifacts = connection.CreateCommand())
+        {
+            clearArtifacts.Transaction = transaction;
+            clearArtifacts.CommandText = "DELETE FROM LearnedPcbVisualModelArtifacts WHERE ModelId = $modelId;";
+            clearArtifacts.Parameters.AddWithValue("$modelId", model.ModelId);
+            clearArtifacts.ExecuteNonQuery();
+        }
+
+        foreach (var artifact in model.Artifacts)
+        {
+            artifact.ModelId = model.ModelId;
+            artifact.CreatedAtUtc = artifact.CreatedAtUtc == default ? model.CreatedAtUtc : artifact.CreatedAtUtc.ToUniversalTime();
+            using var artifactCommand = connection.CreateCommand();
+            artifactCommand.Transaction = transaction;
+            artifactCommand.CommandText =
+                """
+                INSERT INTO LearnedPcbVisualModelArtifacts
+                    (ModelId, ArtifactName, ArtifactPath, Sha256, CreatedAtUtc)
+                VALUES
+                    ($modelId, $artifactName, $artifactPath, $sha256, $createdAtUtc);
+                SELECT last_insert_rowid();
+                """;
+            BindLearnedPcbVisualModelArtifact(artifactCommand, artifact);
+            artifact.Id = (long)(artifactCommand.ExecuteScalar() ?? 0L);
+        }
+
+        transaction.Commit();
+        return model.Id;
+    }
+
+    public static LearnedPcbVisualModel? GetLearnedPcbVisualModel(string modelId)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ModelId, ModelVersion, CreatedAtUtc, ProjectId, GoldenCount, OkLearningCount, OkValidationCount,
+                   InputWidth, InputHeight, AlignmentMode, BrightnessNormalizationMode, LearnedThreshold,
+                   FalseCallTarget, FalseCallRate, PossibleEscapeRate, EvidenceMode, CreatedBy, AuditEventId
+            FROM LearnedPcbVisualModels
+            WHERE ModelId = $modelId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$modelId", modelId);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read()
+            ? ReadLearnedPcbVisualModel(reader, GetLearnedPcbVisualModelArtifacts(modelId))
+            : null;
+    }
+
+    public static IReadOnlyList<LearnedPcbVisualModel> GetLearnedPcbVisualModels(int limit = 100)
+    {
+        EnsureInitialized();
+
+        var models = new List<LearnedPcbVisualModel>();
+        using (var connection = OpenConnection())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                """
+                SELECT Id, ModelId, ModelVersion, CreatedAtUtc, ProjectId, GoldenCount, OkLearningCount, OkValidationCount,
+                       InputWidth, InputHeight, AlignmentMode, BrightnessNormalizationMode, LearnedThreshold,
+                       FalseCallTarget, FalseCallRate, PossibleEscapeRate, EvidenceMode, CreatedBy, AuditEventId
+                FROM LearnedPcbVisualModels
+                ORDER BY CreatedAtUtc DESC, Id DESC
+                LIMIT $limit;
+                """;
+            command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 1000));
+
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                models.Add(ReadLearnedPcbVisualModel(reader, Array.Empty<LearnedPcbVisualModelArtifact>()));
+        }
+
+        foreach (var model in models)
+            model.Artifacts = GetLearnedPcbVisualModelArtifacts(model.ModelId).ToList();
+
+        return models;
+    }
+
+    public static long RecordImageLearningInspectionResult(ImageLearningInspectionResult result)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(result);
+
+        var now = DateTime.UtcNow;
+        result.ResultId = string.IsNullOrWhiteSpace(result.ResultId)
+            ? $"ILR-{now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
+            : result.ResultId.Trim();
+        result.CreatedAtUtc = result.CreatedAtUtc == default ? now : result.CreatedAtUtc.ToUniversalTime();
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO ImageLearningInspectionResults
+                (ResultId, ProjectId, ModelId, ProjectImageId, ImageSha256, ImagePath, CreatedAtUtc,
+                 Verdict, AnomalyScore, DecisionReason, OperatorId, EvidenceMode)
+            VALUES
+                ($resultId, $projectId, $modelId, $projectImageId, $imageSha256, $imagePath, $createdAtUtc,
+                 $verdict, $anomalyScore, $decisionReason, $operatorId, $evidenceMode);
+            SELECT last_insert_rowid();
+            """;
+        BindImageLearningInspectionResult(command, result);
+        result.Id = (long)(command.ExecuteScalar() ?? 0L);
+
+        foreach (var region in result.AnomalyRegions)
+        {
+            region.InspectionResultId = result.Id;
+            using var regionCommand = connection.CreateCommand();
+            regionCommand.Transaction = transaction;
+            regionCommand.CommandText =
+                """
+                INSERT INTO ImageLearningAnomalyRegions
+                    (InspectionResultId, RegionId, X, Y, Width, Height, Score, AreaPixels, Confidence, Severity, RegionType, Reason, Notes)
+                VALUES
+                    ($inspectionResultId, $regionId, $x, $y, $width, $height, $score, $areaPixels, $confidence, $severity, $regionType, $reason, $notes);
+                SELECT last_insert_rowid();
+                """;
+            BindImageLearningAnomalyRegion(regionCommand, region);
+            region.Id = (long)(regionCommand.ExecuteScalar() ?? 0L);
+        }
+
+        transaction.Commit();
+        return result.Id;
+    }
+
+    public static ImageLearningInspectionResult? GetImageLearningInspectionResult(long id)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ResultId, ProjectId, ModelId, ProjectImageId, ImageSha256, ImagePath, CreatedAtUtc,
+                   Verdict, AnomalyScore, DecisionReason, OperatorId, EvidenceMode
+            FROM ImageLearningInspectionResults
+            WHERE Id = $id
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read()
+            ? ReadImageLearningInspectionResult(reader, GetImageLearningAnomalyRegions(id))
+            : null;
+    }
+
+    public static IReadOnlyList<ImageLearningInspectionResult> GetImageLearningInspectionResults(
+        string projectId,
+        string? modelId = null,
+        int limit = 1000)
+    {
+        EnsureInitialized();
+
+        var results = new List<ImageLearningInspectionResult>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            command.CommandText =
+                """
+                SELECT Id, ResultId, ProjectId, ModelId, ProjectImageId, ImageSha256, ImagePath, CreatedAtUtc,
+                       Verdict, AnomalyScore, DecisionReason, OperatorId, EvidenceMode
+                FROM ImageLearningInspectionResults
+                WHERE ProjectId = $projectId
+                ORDER BY CreatedAtUtc DESC, Id DESC
+                LIMIT $limit;
+                """;
+        }
+        else
+        {
+            command.CommandText =
+                """
+                SELECT Id, ResultId, ProjectId, ModelId, ProjectImageId, ImageSha256, ImagePath, CreatedAtUtc,
+                       Verdict, AnomalyScore, DecisionReason, OperatorId, EvidenceMode
+                FROM ImageLearningInspectionResults
+                WHERE ProjectId = $projectId AND ModelId = $modelId
+                ORDER BY CreatedAtUtc DESC, Id DESC
+                LIMIT $limit;
+                """;
+            command.Parameters.AddWithValue("$modelId", modelId.Trim());
+        }
+
+        command.Parameters.AddWithValue("$projectId", projectId);
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 10000));
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var id = reader.GetInt64(0);
+            results.Add(ReadImageLearningInspectionResult(reader, GetImageLearningAnomalyRegions(id)));
+        }
+
+        return results;
+    }
+
+    public static long RecordImageLearningCalibrationResult(ImageLearningCalibrationResult result)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(result);
+
+        var now = DateTime.UtcNow;
+        result.CalibrationId = string.IsNullOrWhiteSpace(result.CalibrationId)
+            ? $"ILC-{now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
+            : result.CalibrationId.Trim();
+        result.CreatedAtUtc = result.CreatedAtUtc == default ? now : result.CreatedAtUtc.ToUniversalTime();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO ImageLearningCalibrationResults
+                (CalibrationId, ProjectId, ModelId, CreatedAtUtc, OkValidationCount, NgValidationCount,
+                 LearnedThreshold, FalseCallTarget, FalseCallRate, PossibleEscapeRate, Status, Summary)
+            VALUES
+                ($calibrationId, $projectId, $modelId, $createdAtUtc, $okValidationCount, $ngValidationCount,
+                 $learnedThreshold, $falseCallTarget, $falseCallRate, $possibleEscapeRate, $status, $summary);
+            SELECT last_insert_rowid();
+            """;
+        BindImageLearningCalibrationResult(command, result);
+        result.Id = (long)(command.ExecuteScalar() ?? 0L);
+        return result.Id;
+    }
+
+    public static ImageLearningCalibrationResult? GetImageLearningCalibrationResult(string calibrationId)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CalibrationId, ProjectId, ModelId, CreatedAtUtc, OkValidationCount, NgValidationCount,
+                   LearnedThreshold, FalseCallTarget, FalseCallRate, PossibleEscapeRate, Status, Summary
+            FROM ImageLearningCalibrationResults
+            WHERE CalibrationId = $calibrationId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$calibrationId", calibrationId);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadImageLearningCalibrationResult(reader) : null;
+    }
+
+    public static long RecordImageLearningComparisonResult(ImageLearningComparisonResult result)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(result);
+
+        var now = DateTime.UtcNow;
+        result.ComparisonId = string.IsNullOrWhiteSpace(result.ComparisonId)
+            ? $"ILCMP-{now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6]}"
+            : result.ComparisonId.Trim();
+        result.CreatedAtUtc = result.CreatedAtUtc == default ? now : result.CreatedAtUtc.ToUniversalTime();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO ImageLearningComparisonResults
+                (ComparisonId, ProjectId, ModelId, ProjectImageId, ImageSha256, CreatedAtUtc,
+                 DifferenceScore, AnomalyScore, Verdict, Summary)
+            VALUES
+                ($comparisonId, $projectId, $modelId, $projectImageId, $imageSha256, $createdAtUtc,
+                 $differenceScore, $anomalyScore, $verdict, $summary);
+            SELECT last_insert_rowid();
+            """;
+        BindImageLearningComparisonResult(command, result);
+        result.Id = (long)(command.ExecuteScalar() ?? 0L);
+        return result.Id;
+    }
+
+    public static ImageLearningComparisonResult? GetImageLearningComparisonResult(string comparisonId)
+    {
+        EnsureInitialized();
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ComparisonId, ProjectId, ModelId, ProjectImageId, ImageSha256, CreatedAtUtc,
+                   DifferenceScore, AnomalyScore, Verdict, Summary
+            FROM ImageLearningComparisonResults
+            WHERE ComparisonId = $comparisonId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$comparisonId", comparisonId);
+
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadImageLearningComparisonResult(reader) : null;
     }
 
     public static long RecordValidationPackage(
@@ -3827,6 +4440,173 @@ public static class AoiDatabase
             reader.GetString(8));
     }
 
+    private static ImageLearningProject ReadImageLearningProject(SqliteDataReader reader)
+    {
+        return new ImageLearningProject
+        {
+            Id = reader.GetInt64(0),
+            ProjectId = reader.GetString(1),
+            ProjectName = reader.GetString(2),
+            BoardModel = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+            Description = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+            EvidenceMode = ParseImageLearningEvidenceMode(reader.GetString(5)),
+            CreatedBy = reader.IsDBNull(6) ? "UNKNOWN" : reader.GetString(6),
+            CreatedAtUtc = ParseDateTime(reader.GetString(7)),
+            UpdatedAtUtc = ParseDateTime(reader.GetString(8)),
+            IsArchived = reader.GetInt32(9) == 1,
+            ArchivedBy = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+            ArchivedAtUtc = reader.IsDBNull(11) ? null : ParseDateTime(reader.GetString(11)),
+            ArchiveReason = reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
+        };
+    }
+
+    private static ImageLearningProjectImage ReadImageLearningProjectImage(SqliteDataReader reader)
+    {
+        return new ImageLearningProjectImage
+        {
+            Id = reader.GetInt64(0),
+            ProjectId = reader.GetString(1),
+            Role = ParseImageLearningImageRole(reader.GetString(2)),
+            OriginalPath = reader.GetString(3),
+            VaultPath = reader.GetString(4),
+            FileName = reader.GetString(5),
+            Sha256 = reader.GetString(6),
+            BoardModel = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+            LotId = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+            ViewType = reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+            Width = reader.GetInt32(10),
+            Height = reader.GetInt32(11),
+            ImportedBy = reader.IsDBNull(12) ? "UNKNOWN" : reader.GetString(12),
+            ImportedAtUtc = ParseDateTime(reader.GetString(13)),
+            ImageLevelTruth = reader.IsDBNull(14) ? "UNKNOWN" : reader.GetString(14),
+            Notes = reader.IsDBNull(15) ? string.Empty : reader.GetString(15),
+        };
+    }
+
+    private static LearnedPcbVisualModel ReadLearnedPcbVisualModel(
+        SqliteDataReader reader,
+        IReadOnlyList<LearnedPcbVisualModelArtifact> artifacts)
+    {
+        return new LearnedPcbVisualModel
+        {
+            Id = reader.GetInt64(0),
+            ModelId = reader.GetString(1),
+            ModelVersion = reader.GetString(2),
+            CreatedAtUtc = ParseDateTime(reader.GetString(3)),
+            ProjectId = reader.GetString(4),
+            GoldenCount = reader.GetInt32(5),
+            OkLearningCount = reader.GetInt32(6),
+            OkValidationCount = reader.GetInt32(7),
+            InputWidth = reader.GetInt32(8),
+            InputHeight = reader.GetInt32(9),
+            AlignmentMode = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+            BrightnessNormalizationMode = reader.IsDBNull(11) ? string.Empty : reader.GetString(11),
+            LearnedThreshold = reader.GetDouble(12),
+            FalseCallTarget = reader.GetDouble(13),
+            FalseCallRate = reader.GetDouble(14),
+            PossibleEscapeRate = reader.GetDouble(15),
+            EvidenceMode = ParseImageLearningEvidenceMode(reader.GetString(16)),
+            CreatedBy = reader.IsDBNull(17) ? "UNKNOWN" : reader.GetString(17),
+            AuditEventId = reader.IsDBNull(18) ? null : reader.GetInt64(18),
+            Artifacts = artifacts.ToList(),
+        };
+    }
+
+    private static LearnedPcbVisualModelArtifact ReadLearnedPcbVisualModelArtifact(SqliteDataReader reader)
+    {
+        return new LearnedPcbVisualModelArtifact
+        {
+            Id = reader.GetInt64(0),
+            ModelId = reader.GetString(1),
+            ArtifactName = reader.GetString(2),
+            ArtifactPath = reader.GetString(3),
+            Sha256 = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+            CreatedAtUtc = ParseDateTime(reader.GetString(5)),
+        };
+    }
+
+    private static ImageLearningInspectionResult ReadImageLearningInspectionResult(
+        SqliteDataReader reader,
+        IReadOnlyList<ImageLearningAnomalyRegion> regions)
+    {
+        return new ImageLearningInspectionResult
+        {
+            Id = reader.GetInt64(0),
+            ResultId = reader.GetString(1),
+            ProjectId = reader.GetString(2),
+            ModelId = reader.GetString(3),
+            ProjectImageId = reader.GetInt64(4),
+            ImageSha256 = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+            ImagePath = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+            CreatedAtUtc = ParseDateTime(reader.GetString(7)),
+            Verdict = reader.GetString(8),
+            AnomalyScore = reader.GetDouble(9),
+            DecisionReason = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+            OperatorId = reader.IsDBNull(11) ? "UNKNOWN" : reader.GetString(11),
+            EvidenceMode = ParseImageLearningEvidenceMode(reader.GetString(12)),
+            AnomalyRegions = regions.ToList(),
+        };
+    }
+
+    private static ImageLearningAnomalyRegion ReadImageLearningAnomalyRegion(SqliteDataReader reader)
+    {
+        return new ImageLearningAnomalyRegion
+        {
+            Id = reader.GetInt64(0),
+            InspectionResultId = reader.GetInt64(1),
+            RegionId = reader.GetString(2),
+            X = reader.GetDouble(3),
+            Y = reader.GetDouble(4),
+            Width = reader.GetDouble(5),
+            Height = reader.GetDouble(6),
+            Score = reader.GetDouble(7),
+            AreaPixels = reader.IsDBNull(8) ? 0 : reader.GetInt32(8),
+            Confidence = reader.IsDBNull(9) ? 0 : reader.GetDouble(9),
+            Severity = reader.IsDBNull(10) ? "REVIEW" : reader.GetString(10),
+            RegionType = reader.IsDBNull(11) ? "Anomaly" : reader.GetString(11),
+            Reason = reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
+            Notes = reader.IsDBNull(13) ? string.Empty : reader.GetString(13),
+        };
+    }
+
+    private static ImageLearningCalibrationResult ReadImageLearningCalibrationResult(SqliteDataReader reader)
+    {
+        return new ImageLearningCalibrationResult
+        {
+            Id = reader.GetInt64(0),
+            CalibrationId = reader.GetString(1),
+            ProjectId = reader.GetString(2),
+            ModelId = reader.GetString(3),
+            CreatedAtUtc = ParseDateTime(reader.GetString(4)),
+            OkValidationCount = reader.GetInt32(5),
+            NgValidationCount = reader.GetInt32(6),
+            LearnedThreshold = reader.GetDouble(7),
+            FalseCallTarget = reader.GetDouble(8),
+            FalseCallRate = reader.GetDouble(9),
+            PossibleEscapeRate = reader.GetDouble(10),
+            Status = reader.GetString(11),
+            Summary = reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
+        };
+    }
+
+    private static ImageLearningComparisonResult ReadImageLearningComparisonResult(SqliteDataReader reader)
+    {
+        return new ImageLearningComparisonResult
+        {
+            Id = reader.GetInt64(0),
+            ComparisonId = reader.GetString(1),
+            ProjectId = reader.GetString(2),
+            ModelId = reader.GetString(3),
+            ProjectImageId = reader.GetInt64(4),
+            ImageSha256 = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+            CreatedAtUtc = ParseDateTime(reader.GetString(6)),
+            DifferenceScore = reader.GetDouble(7),
+            AnomalyScore = reader.GetDouble(8),
+            Verdict = reader.GetString(9),
+            Summary = reader.IsDBNull(10) ? string.Empty : reader.GetString(10),
+        };
+    }
+
     private static BatchTestRunRecord ReadBatchTestRun(SqliteDataReader reader)
     {
         return new BatchTestRunRecord(
@@ -4944,6 +5724,135 @@ public static class AoiDatabase
             points);
     }
 
+    private static void BindImageLearningProject(SqliteCommand command, ImageLearningProject project)
+    {
+        command.Parameters.AddWithValue("$projectId", project.ProjectId);
+        command.Parameters.AddWithValue("$projectName", project.ProjectName);
+        command.Parameters.AddWithValue("$boardModel", project.BoardModel ?? string.Empty);
+        command.Parameters.AddWithValue("$description", project.Description ?? string.Empty);
+        command.Parameters.AddWithValue("$evidenceMode", project.EvidenceMode.ToString());
+        command.Parameters.AddWithValue("$createdBy", project.CreatedBy ?? "UNKNOWN");
+        command.Parameters.AddWithValue("$createdAtUtc", project.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$updatedAtUtc", project.UpdatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$isArchived", project.IsArchived ? 1 : 0);
+        command.Parameters.AddWithValue("$archivedBy", project.ArchivedBy ?? string.Empty);
+        command.Parameters.AddWithValue("$archivedAtUtc", project.ArchivedAtUtc is { } archivedAt ? (object)archivedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
+        command.Parameters.AddWithValue("$archiveReason", project.ArchiveReason ?? string.Empty);
+    }
+
+    private static void BindImageLearningProjectImage(SqliteCommand command, ImageLearningProjectImage image)
+    {
+        command.Parameters.AddWithValue("$projectId", image.ProjectId);
+        command.Parameters.AddWithValue("$role", image.Role.ToString());
+        command.Parameters.AddWithValue("$originalPath", image.OriginalPath ?? string.Empty);
+        command.Parameters.AddWithValue("$vaultPath", image.VaultPath ?? string.Empty);
+        command.Parameters.AddWithValue("$fileName", image.FileName ?? string.Empty);
+        command.Parameters.AddWithValue("$sha256", image.Sha256 ?? string.Empty);
+        command.Parameters.AddWithValue("$boardModel", image.BoardModel ?? string.Empty);
+        command.Parameters.AddWithValue("$lotId", image.LotId ?? string.Empty);
+        command.Parameters.AddWithValue("$viewType", image.ViewType ?? string.Empty);
+        command.Parameters.AddWithValue("$width", image.Width);
+        command.Parameters.AddWithValue("$height", image.Height);
+        command.Parameters.AddWithValue("$importedBy", image.ImportedBy ?? "UNKNOWN");
+        command.Parameters.AddWithValue("$importedAtUtc", image.ImportedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$imageLevelTruth", NormalizeImageLevelTruth(image.ImageLevelTruth));
+        command.Parameters.AddWithValue("$notes", image.Notes ?? string.Empty);
+    }
+
+    private static void BindLearnedPcbVisualModel(SqliteCommand command, LearnedPcbVisualModel model)
+    {
+        command.Parameters.AddWithValue("$modelId", model.ModelId);
+        command.Parameters.AddWithValue("$modelVersion", model.ModelVersion);
+        command.Parameters.AddWithValue("$createdAtUtc", model.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$projectId", model.ProjectId ?? string.Empty);
+        command.Parameters.AddWithValue("$goldenCount", model.GoldenCount);
+        command.Parameters.AddWithValue("$okLearningCount", model.OkLearningCount);
+        command.Parameters.AddWithValue("$okValidationCount", model.OkValidationCount);
+        command.Parameters.AddWithValue("$inputWidth", model.InputWidth);
+        command.Parameters.AddWithValue("$inputHeight", model.InputHeight);
+        command.Parameters.AddWithValue("$alignmentMode", model.AlignmentMode ?? string.Empty);
+        command.Parameters.AddWithValue("$brightnessNormalizationMode", model.BrightnessNormalizationMode ?? string.Empty);
+        command.Parameters.AddWithValue("$learnedThreshold", model.LearnedThreshold);
+        command.Parameters.AddWithValue("$falseCallTarget", model.FalseCallTarget);
+        command.Parameters.AddWithValue("$falseCallRate", model.FalseCallRate);
+        command.Parameters.AddWithValue("$possibleEscapeRate", model.PossibleEscapeRate);
+        command.Parameters.AddWithValue("$evidenceMode", model.EvidenceMode.ToString());
+        command.Parameters.AddWithValue("$createdBy", model.CreatedBy ?? "UNKNOWN");
+        command.Parameters.AddWithValue("$auditEventId", model.AuditEventId is { } id ? (object)id : DBNull.Value);
+    }
+
+    private static void BindLearnedPcbVisualModelArtifact(SqliteCommand command, LearnedPcbVisualModelArtifact artifact)
+    {
+        command.Parameters.AddWithValue("$modelId", artifact.ModelId);
+        command.Parameters.AddWithValue("$artifactName", artifact.ArtifactName ?? string.Empty);
+        command.Parameters.AddWithValue("$artifactPath", artifact.ArtifactPath ?? string.Empty);
+        command.Parameters.AddWithValue("$sha256", artifact.Sha256 ?? string.Empty);
+        command.Parameters.AddWithValue("$createdAtUtc", artifact.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+    }
+
+    private static void BindImageLearningInspectionResult(SqliteCommand command, ImageLearningInspectionResult result)
+    {
+        command.Parameters.AddWithValue("$resultId", result.ResultId);
+        command.Parameters.AddWithValue("$projectId", result.ProjectId ?? string.Empty);
+        command.Parameters.AddWithValue("$modelId", result.ModelId ?? string.Empty);
+        command.Parameters.AddWithValue("$projectImageId", result.ProjectImageId);
+        command.Parameters.AddWithValue("$imageSha256", result.ImageSha256 ?? string.Empty);
+        command.Parameters.AddWithValue("$imagePath", result.ImagePath ?? string.Empty);
+        command.Parameters.AddWithValue("$createdAtUtc", result.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$verdict", result.Verdict ?? "REVIEW");
+        command.Parameters.AddWithValue("$anomalyScore", result.AnomalyScore);
+        command.Parameters.AddWithValue("$decisionReason", result.DecisionReason ?? string.Empty);
+        command.Parameters.AddWithValue("$operatorId", result.OperatorId ?? "UNKNOWN");
+        command.Parameters.AddWithValue("$evidenceMode", result.EvidenceMode.ToString());
+    }
+
+    private static void BindImageLearningAnomalyRegion(SqliteCommand command, ImageLearningAnomalyRegion region)
+    {
+        command.Parameters.AddWithValue("$inspectionResultId", region.InspectionResultId);
+        command.Parameters.AddWithValue("$regionId", region.RegionId ?? string.Empty);
+        command.Parameters.AddWithValue("$x", region.X);
+        command.Parameters.AddWithValue("$y", region.Y);
+        command.Parameters.AddWithValue("$width", region.Width);
+        command.Parameters.AddWithValue("$height", region.Height);
+        command.Parameters.AddWithValue("$score", region.Score);
+        command.Parameters.AddWithValue("$areaPixels", region.AreaPixels);
+        command.Parameters.AddWithValue("$confidence", region.Confidence);
+        command.Parameters.AddWithValue("$severity", region.Severity ?? "REVIEW");
+        command.Parameters.AddWithValue("$regionType", region.RegionType ?? "Anomaly");
+        command.Parameters.AddWithValue("$reason", region.Reason ?? string.Empty);
+        command.Parameters.AddWithValue("$notes", region.Notes ?? string.Empty);
+    }
+
+    private static void BindImageLearningCalibrationResult(SqliteCommand command, ImageLearningCalibrationResult result)
+    {
+        command.Parameters.AddWithValue("$calibrationId", result.CalibrationId);
+        command.Parameters.AddWithValue("$projectId", result.ProjectId ?? string.Empty);
+        command.Parameters.AddWithValue("$modelId", result.ModelId ?? string.Empty);
+        command.Parameters.AddWithValue("$createdAtUtc", result.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$okValidationCount", result.OkValidationCount);
+        command.Parameters.AddWithValue("$ngValidationCount", result.NgValidationCount);
+        command.Parameters.AddWithValue("$learnedThreshold", result.LearnedThreshold);
+        command.Parameters.AddWithValue("$falseCallTarget", result.FalseCallTarget);
+        command.Parameters.AddWithValue("$falseCallRate", result.FalseCallRate);
+        command.Parameters.AddWithValue("$possibleEscapeRate", result.PossibleEscapeRate);
+        command.Parameters.AddWithValue("$status", result.Status ?? "REVIEW");
+        command.Parameters.AddWithValue("$summary", result.Summary ?? string.Empty);
+    }
+
+    private static void BindImageLearningComparisonResult(SqliteCommand command, ImageLearningComparisonResult result)
+    {
+        command.Parameters.AddWithValue("$comparisonId", result.ComparisonId);
+        command.Parameters.AddWithValue("$projectId", result.ProjectId ?? string.Empty);
+        command.Parameters.AddWithValue("$modelId", result.ModelId ?? string.Empty);
+        command.Parameters.AddWithValue("$projectImageId", result.ProjectImageId);
+        command.Parameters.AddWithValue("$imageSha256", result.ImageSha256 ?? string.Empty);
+        command.Parameters.AddWithValue("$createdAtUtc", result.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$differenceScore", result.DifferenceScore);
+        command.Parameters.AddWithValue("$anomalyScore", result.AnomalyScore);
+        command.Parameters.AddWithValue("$verdict", result.Verdict ?? "REVIEW");
+        command.Parameters.AddWithValue("$summary", result.Summary ?? string.Empty);
+    }
+
     private static void BindModelRegistryRecord(SqliteCommand command, ModelRegistryRecord record)
     {
         command.Parameters.AddWithValue("$modelId", record.ModelId);
@@ -5149,6 +6058,78 @@ public static class AoiDatabase
         }
 
         return points;
+    }
+
+    private static IReadOnlyList<LearnedPcbVisualModelArtifact> GetLearnedPcbVisualModelArtifacts(string modelId)
+    {
+        var artifacts = new List<LearnedPcbVisualModelArtifact>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, ModelId, ArtifactName, ArtifactPath, Sha256, CreatedAtUtc
+            FROM LearnedPcbVisualModelArtifacts
+            WHERE ModelId = $modelId
+            ORDER BY ArtifactName ASC, Id ASC;
+            """;
+        command.Parameters.AddWithValue("$modelId", modelId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            artifacts.Add(ReadLearnedPcbVisualModelArtifact(reader));
+
+        return artifacts;
+    }
+
+    private static IReadOnlyList<ImageLearningAnomalyRegion> GetImageLearningAnomalyRegions(long inspectionResultId)
+    {
+        var regions = new List<ImageLearningAnomalyRegion>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, InspectionResultId, RegionId, X, Y, Width, Height, Score, AreaPixels, Confidence, Severity, RegionType, Reason, Notes
+            FROM ImageLearningAnomalyRegions
+            WHERE InspectionResultId = $inspectionResultId
+            ORDER BY Id ASC;
+            """;
+        command.Parameters.AddWithValue("$inspectionResultId", inspectionResultId);
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            regions.Add(ReadImageLearningAnomalyRegion(reader));
+
+        return regions;
+    }
+
+    private static void ExecuteImageLearningDelete(SqliteConnection connection, SqliteTransaction transaction, string commandText, string projectId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = commandText;
+        command.Parameters.AddWithValue("$projectId", projectId);
+        command.ExecuteNonQuery();
+    }
+
+    private static ImageLearningImageRole ParseImageLearningImageRole(string value)
+        => Enum.TryParse<ImageLearningImageRole>(value, ignoreCase: true, out var role)
+            ? role
+            : ImageLearningImageRole.Inspection;
+
+    private static ImageLearningEvidenceMode ParseImageLearningEvidenceMode(string value)
+        => Enum.TryParse<ImageLearningEvidenceMode>(value, ignoreCase: true, out var mode)
+            ? mode
+            : ImageLearningEvidenceMode.CustomerData;
+
+    private static string NormalizeImageLevelTruth(string? value)
+    {
+        var text = value?.Trim();
+        if (string.Equals(text, "OK", StringComparison.OrdinalIgnoreCase))
+            return "OK";
+        if (string.Equals(text, "NG", StringComparison.OrdinalIgnoreCase))
+            return "NG";
+
+        return "UNKNOWN";
     }
 
     private static string BuildInspectionWhere(LogFilter filter, SqliteCommand command)
@@ -6276,6 +7257,202 @@ public static class AoiDatabase
             CREATE INDEX IF NOT EXISTS IX_ModelReleasePackages_Model ON ModelReleasePackages(ModelId, CreatedAtUtc);
             """;
         command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureTrainingDatasetTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS TrainingSamples
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SourceImagePath TEXT NOT NULL,
+                VaultPath TEXT NOT NULL,
+                Label TEXT NOT NULL,
+                Notes TEXT NULL,
+                CreatedAtUtc TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_TrainingSamples_CreatedAtUtc ON TrainingSamples(CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_TrainingSamples_Label ON TrainingSamples(Label);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    internal static void EnsureImageLearningTables(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS ImageLearningProjects
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ProjectId TEXT NOT NULL UNIQUE,
+                ProjectName TEXT NOT NULL,
+                BoardModel TEXT NOT NULL DEFAULT '',
+                Description TEXT NOT NULL DEFAULT '',
+                EvidenceMode TEXT NOT NULL DEFAULT 'CustomerData',
+                CreatedBy TEXT NOT NULL DEFAULT 'UNKNOWN',
+                CreatedAtUtc TEXT NOT NULL,
+                UpdatedAtUtc TEXT NOT NULL,
+                IsArchived INTEGER NOT NULL DEFAULT 0,
+                ArchivedBy TEXT NOT NULL DEFAULT '',
+                ArchivedAtUtc TEXT NULL,
+                ArchiveReason TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS ImageLearningProjectImages
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ProjectId TEXT NOT NULL,
+                Role TEXT NOT NULL,
+                OriginalPath TEXT NOT NULL,
+                VaultPath TEXT NOT NULL,
+                FileName TEXT NOT NULL,
+                Sha256 TEXT NOT NULL,
+                BoardModel TEXT NOT NULL DEFAULT '',
+                LotId TEXT NOT NULL DEFAULT '',
+                ViewType TEXT NOT NULL DEFAULT '',
+                Width INTEGER NOT NULL DEFAULT 0,
+                Height INTEGER NOT NULL DEFAULT 0,
+                ImportedBy TEXT NOT NULL DEFAULT 'UNKNOWN',
+                ImportedAtUtc TEXT NOT NULL,
+                ImageLevelTruth TEXT NOT NULL DEFAULT 'UNKNOWN',
+                Notes TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (ProjectId) REFERENCES ImageLearningProjects(ProjectId)
+            );
+
+            CREATE TABLE IF NOT EXISTS LearnedPcbVisualModels
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ModelId TEXT NOT NULL UNIQUE,
+                ModelVersion TEXT NOT NULL,
+                CreatedAtUtc TEXT NOT NULL,
+                ProjectId TEXT NOT NULL,
+                GoldenCount INTEGER NOT NULL DEFAULT 0,
+                OkLearningCount INTEGER NOT NULL DEFAULT 0,
+                OkValidationCount INTEGER NOT NULL DEFAULT 0,
+                InputWidth INTEGER NOT NULL DEFAULT 0,
+                InputHeight INTEGER NOT NULL DEFAULT 0,
+                AlignmentMode TEXT NOT NULL DEFAULT '',
+                BrightnessNormalizationMode TEXT NOT NULL DEFAULT '',
+                LearnedThreshold REAL NOT NULL DEFAULT 0,
+                FalseCallTarget REAL NOT NULL DEFAULT 0,
+                FalseCallRate REAL NOT NULL DEFAULT 0,
+                PossibleEscapeRate REAL NOT NULL DEFAULT 0,
+                EvidenceMode TEXT NOT NULL DEFAULT 'CustomerData',
+                CreatedBy TEXT NOT NULL DEFAULT 'UNKNOWN',
+                AuditEventId INTEGER NULL,
+                FOREIGN KEY (ProjectId) REFERENCES ImageLearningProjects(ProjectId)
+            );
+
+            CREATE TABLE IF NOT EXISTS LearnedPcbVisualModelArtifacts
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ModelId TEXT NOT NULL,
+                ArtifactName TEXT NOT NULL,
+                ArtifactPath TEXT NOT NULL,
+                Sha256 TEXT NOT NULL DEFAULT '',
+                CreatedAtUtc TEXT NOT NULL,
+                FOREIGN KEY (ModelId) REFERENCES LearnedPcbVisualModels(ModelId)
+            );
+
+            CREATE TABLE IF NOT EXISTS ImageLearningInspectionResults
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ResultId TEXT NOT NULL UNIQUE,
+                ProjectId TEXT NOT NULL,
+                ModelId TEXT NOT NULL,
+                ProjectImageId INTEGER NOT NULL,
+                ImageSha256 TEXT NOT NULL DEFAULT '',
+                ImagePath TEXT NOT NULL DEFAULT '',
+                CreatedAtUtc TEXT NOT NULL,
+                Verdict TEXT NOT NULL DEFAULT 'REVIEW',
+                AnomalyScore REAL NOT NULL DEFAULT 0,
+                DecisionReason TEXT NOT NULL DEFAULT '',
+                OperatorId TEXT NOT NULL DEFAULT 'UNKNOWN',
+                EvidenceMode TEXT NOT NULL DEFAULT 'CustomerData',
+                FOREIGN KEY (ProjectId) REFERENCES ImageLearningProjects(ProjectId),
+                FOREIGN KEY (ModelId) REFERENCES LearnedPcbVisualModels(ModelId),
+                FOREIGN KEY (ProjectImageId) REFERENCES ImageLearningProjectImages(Id)
+            );
+
+            CREATE TABLE IF NOT EXISTS ImageLearningAnomalyRegions
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                InspectionResultId INTEGER NOT NULL,
+                RegionId TEXT NOT NULL DEFAULT '',
+                X REAL NOT NULL DEFAULT 0,
+                Y REAL NOT NULL DEFAULT 0,
+                Width REAL NOT NULL DEFAULT 0,
+                Height REAL NOT NULL DEFAULT 0,
+                Score REAL NOT NULL DEFAULT 0,
+                AreaPixels INTEGER NOT NULL DEFAULT 0,
+                Confidence REAL NOT NULL DEFAULT 0,
+                Severity TEXT NOT NULL DEFAULT 'REVIEW',
+                RegionType TEXT NOT NULL DEFAULT 'Anomaly',
+                Reason TEXT NOT NULL DEFAULT '',
+                Notes TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (InspectionResultId) REFERENCES ImageLearningInspectionResults(Id)
+            );
+
+            CREATE TABLE IF NOT EXISTS ImageLearningCalibrationResults
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CalibrationId TEXT NOT NULL UNIQUE,
+                ProjectId TEXT NOT NULL,
+                ModelId TEXT NOT NULL,
+                CreatedAtUtc TEXT NOT NULL,
+                OkValidationCount INTEGER NOT NULL DEFAULT 0,
+                NgValidationCount INTEGER NOT NULL DEFAULT 0,
+                LearnedThreshold REAL NOT NULL DEFAULT 0,
+                FalseCallTarget REAL NOT NULL DEFAULT 0,
+                FalseCallRate REAL NOT NULL DEFAULT 0,
+                PossibleEscapeRate REAL NOT NULL DEFAULT 0,
+                Status TEXT NOT NULL DEFAULT 'REVIEW',
+                Summary TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (ProjectId) REFERENCES ImageLearningProjects(ProjectId),
+                FOREIGN KEY (ModelId) REFERENCES LearnedPcbVisualModels(ModelId)
+            );
+
+            CREATE TABLE IF NOT EXISTS ImageLearningComparisonResults
+            (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ComparisonId TEXT NOT NULL UNIQUE,
+                ProjectId TEXT NOT NULL,
+                ModelId TEXT NOT NULL,
+                ProjectImageId INTEGER NOT NULL,
+                ImageSha256 TEXT NOT NULL DEFAULT '',
+                CreatedAtUtc TEXT NOT NULL,
+                DifferenceScore REAL NOT NULL DEFAULT 0,
+                AnomalyScore REAL NOT NULL DEFAULT 0,
+                Verdict TEXT NOT NULL DEFAULT 'REVIEW',
+                Summary TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (ProjectId) REFERENCES ImageLearningProjects(ProjectId),
+                FOREIGN KEY (ModelId) REFERENCES LearnedPcbVisualModels(ModelId),
+                FOREIGN KEY (ProjectImageId) REFERENCES ImageLearningProjectImages(Id)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_ImageLearningProjects_ProjectId ON ImageLearningProjects(ProjectId);
+            CREATE INDEX IF NOT EXISTS IX_ImageLearningProjects_Archived ON ImageLearningProjects(IsArchived, UpdatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_ImageLearningProjectImages_ProjectRole ON ImageLearningProjectImages(ProjectId, Role);
+            CREATE INDEX IF NOT EXISTS IX_ImageLearningProjectImages_Sha256 ON ImageLearningProjectImages(Sha256);
+            CREATE UNIQUE INDEX IF NOT EXISTS UX_ImageLearningProjectImages_ProjectHash ON ImageLearningProjectImages(ProjectId, Sha256);
+            CREATE INDEX IF NOT EXISTS IX_LearnedPcbVisualModels_ProjectId ON LearnedPcbVisualModels(ProjectId, CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_LearnedPcbVisualModelArtifacts_ModelId ON LearnedPcbVisualModelArtifacts(ModelId);
+            CREATE INDEX IF NOT EXISTS IX_ImageLearningInspectionResults_ProjectModel ON ImageLearningInspectionResults(ProjectId, ModelId, CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_ImageLearningAnomalyRegions_ResultId ON ImageLearningAnomalyRegions(InspectionResultId);
+            CREATE INDEX IF NOT EXISTS IX_ImageLearningCalibrationResults_ProjectModel ON ImageLearningCalibrationResults(ProjectId, ModelId, CreatedAtUtc);
+            CREATE INDEX IF NOT EXISTS IX_ImageLearningComparisonResults_ProjectModel ON ImageLearningComparisonResults(ProjectId, ModelId, CreatedAtUtc);
+            """;
+        command.ExecuteNonQuery();
+
+        AddColumnIfMissing(connection, transaction, "ImageLearningAnomalyRegions", "AreaPixels", "INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, transaction, "ImageLearningAnomalyRegions", "Confidence", "REAL NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, transaction, "ImageLearningAnomalyRegions", "Reason", "TEXT NOT NULL DEFAULT ''");
     }
 
     internal static void EnsureExportVerificationTable(SqliteConnection connection, SqliteTransaction? transaction = null)

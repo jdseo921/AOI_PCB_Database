@@ -30,6 +30,9 @@ The current repository implements the Stage 1 local-image validation workflow an
 - Golden comparison, defect overlays, disposition logging, false-call and possible-escape workflow support, and candidate sample export review.
 - Recipe ROI editing, threshold storage, recipe revisions, and local recipe lock behavior.
 - AI / Models batch validation with manifest support, confusion metrics, timing capture, and customer validation report generation.
+- AI / Models > AI Training Setup for image-only PCB learning from Golden / Reference, OK Learning, OK Validation, Inspection, and optional NG Validation image groups.
+- Learned PCB Visual Model v1 artifacts for Stage 1 image-only evidence, including learned reference image, tolerance map, anomaly threshold map, false-call calibration, anomaly overlays, and visual learning report export.
+- One-command image-only learning evidence packages through `learn-from-images` for customer folders and `client-image-learning-demo` for clearly labeled synthetic/internal demo output.
 - Stage 1 customer evidence package export with reports, CSV evidence, overlays, summaries, README, and missing-evidence warnings.
 - Export verification records and factory-style audit trail records.
 - Build/test, HMI layout audit, navigation performance, standards traceability, and quality-gate evidence generation through repository scripts.
@@ -42,7 +45,9 @@ Stage 1 exit is not just feature presence. It requires current, reviewable evide
 Open blockers before Stage 1 exit can be claimed:
 
 - Real customer dataset evidence: run the customer/evaluator image dataset through the Stage 1 validation workflow with a manifest, expected truth labels where available, and generated validation package evidence.
+- Image-only customer learning evidence: run the customer/evaluator Golden / OK Learning / OK Validation / Inspection image groups through AI Training Setup or `learn-from-images`, then review `visual_learning_report.html`, OK Validation image count, false-call calibration, anomaly overlays, and possible-escape status.
 - Model acceptance evidence: record an accepted model or explicitly scope the exit to the Pixel Difference Prototype Engine / configured local model evidence. A configured ONNX path alone is not a production model claim.
+- Learned visual model acceptance evidence: a synthetic or internal demo learned model can show workflow capability, but Stage 1 customer acceptance requires customer/evaluator images and review of the exported evidence.
 - False-call and possible-escape evidence: produce review evidence for false calls, possible escapes, missed-defect annotations, operator dispositions, and any approved operating threshold profile.
 - Export verification evidence: verify generated CSV, HTML, JSON, PNG, PDF, and package artifacts used for the handoff; unresolved export verification errors block exit.
 - Build/test evidence: preserve passing hygiene, build, test, quality-gate, HMI layout audit, navigation performance, and package-validation artifacts for the release candidate.
@@ -71,6 +76,7 @@ The following items block any claim that Stage 2 camera pilot hardware is accept
 - Real 3D acquisition evidence: no accepted real 3D sensor run proves live height/profile acquisition, calibrated units, valid dimensions, pitch, invalid-height limits, and source diagnostics.
 - Real performance benchmark: Stage 2 needs frame-to-overlay timing evidence with the accepted real camera source and selected inspection path.
 - Customer/factory pilot package: Stage 2 evidence must be exported in a readiness package that keeps simulation evidence separate from real hardware evidence.
+- Image-only learning does not close Stage 2 hardware blockers. It remains separate from real camera, lighting, 3D, robot, safety, and MES acceptance.
 
 ## Required Next Evidence
 
@@ -91,6 +97,8 @@ Recommended order before promoting a Stage 2 camera pilot:
 - [Requirements Traceability Matrix](Requirements_Traceability_Matrix.md)
 - [Stage 1 Exit Evidence CLI](Stage1_Exit_Evidence_CLI.md)
 - [False-Positive Minimization and Business Readiness](False_Positive_Minimization_and_Business_Readiness.md)
+- [Image-Only PCB Learning Workflow](Image_Only_PCB_Learning_Workflow.md)
+- [Client Image Learning Demo Guide](Client_Image_Learning_Demo_Guide.md)
 - [Factory Acceptance Test Plan](Factory_Acceptance_Test_Plan.md)
 - [Hardware In The Loop Checklist](Hardware_In_The_Loop_Checklist.md)
 - [Vendor Adapter Implementation Guide](Vendor_Adapter_Implementation_Guide.md)

@@ -16,6 +16,15 @@ public static class Program
         if (args.Length > 0 && string.Equals(args[0], "stage2-camera-pilot", StringComparison.OrdinalIgnoreCase))
             return Stage2CameraPilotCommand.Execute(args, Console.Out, Console.Error);
 
+        if (args.Length > 0 && string.Equals(args[0], "import-image-learning-project", StringComparison.OrdinalIgnoreCase))
+            return ImageLearningProjectImportCommand.Execute(args, Console.Out, Console.Error);
+
+        if (args.Length > 0 && string.Equals(args[0], "client-image-learning-demo", StringComparison.OrdinalIgnoreCase))
+            return ClientImageLearningDemoCommand.Execute(args, Console.Out, Console.Error);
+
+        if (args.Length > 0 && string.Equals(args[0], "learn-from-images", StringComparison.OrdinalIgnoreCase))
+            return LearnFromImagesCommand.Execute(args, Console.Out, Console.Error);
+
         return Stage1ExitCommand.Execute(args, Console.Out, Console.Error);
     }
 }

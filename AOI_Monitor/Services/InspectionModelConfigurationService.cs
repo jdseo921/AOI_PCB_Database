@@ -54,6 +54,11 @@ public static class InspectionModelConfigurationService
 
     public static InspectionEngineStatus GetStatus(InspectionModelConfiguration configuration)
     {
+        if (configuration.IsLearnedVisualModelSelected)
+            return LearnedVisualModelRegistryService.HasUsableActiveModel(configuration.ActiveModelId)
+                ? InspectionEngineStatus.LearnedVisualModelReady
+                : InspectionEngineStatus.LearnedVisualModelMissing;
+
         if (!configuration.IsOnnxSelected)
             return InspectionEngineStatus.PrototypeEngine;
 
@@ -85,6 +90,8 @@ public static class InspectionModelConfigurationService
         InspectionEngineStatus.MlInvalidLabelMap => "Invalid Label Map",
         InspectionEngineStatus.MlRuntimeError => "ML Runtime Error",
         InspectionEngineStatus.MlUnsupportedOutputFormat => "Unsupported Output Format",
+        InspectionEngineStatus.LearnedVisualModelReady => "Learned PCB Visual Model Active",
+        InspectionEngineStatus.LearnedVisualModelMissing => "Learned Visual Model Missing",
         _ => "Pixel Difference Prototype Engine",
     };
 

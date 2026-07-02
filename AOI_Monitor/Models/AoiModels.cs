@@ -932,6 +932,7 @@ public sealed class ValidationPackageManifest
     public string AcceptanceStatus { get; set; } = "CONDITIONAL";
     public ValidationAcceptanceCriteria Criteria { get; set; } = new();
     public FalseCallRecommendationSummary? FalseCallRecommendation { get; set; }
+    public LearnedVisualModelEvidenceSummary? LearnedVisualModel { get; set; }
     public ThresholdProfileEvidenceSummary ThresholdProfileEvidence { get; set; } = new();
     public string DatasetPreflightStatus { get; set; } = "CONDITIONAL";
     public List<string> DatasetPreflightFailures { get; set; } = new();

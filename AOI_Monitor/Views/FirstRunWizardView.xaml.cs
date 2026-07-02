@@ -49,7 +49,9 @@ public partial class FirstRunWizardView : Window
         CameraFolderText.Text = cameraSettings.TopFolder;
 
         var engineConfig = InspectionModelConfigurationService.Load();
-        EngineCombo.SelectedIndex = engineConfig.IsOnnxSelected ? 1 : 0;
+        EngineCombo.SelectedIndex = engineConfig.IsLearnedVisualModelSelected
+            ? 2
+            : engineConfig.IsOnnxSelected ? 1 : 0;
         EngineStatusText.Text = $"Current status: {InspectionModelConfigurationService.GetStatusText(InspectionModelConfigurationService.GetStatus(engineConfig))}";
 
         RunDiagnostics();
@@ -192,9 +194,12 @@ public partial class FirstRunWizardView : Window
     private void ApplyEngineSelection()
     {
         var configuration = InspectionModelConfigurationService.Load();
-        configuration.SelectedEngineKey = EngineCombo.SelectedIndex == 1
-            ? InspectionEngineFactory.OnnxEngineKey
-            : InspectionEngineFactory.DefaultEngineKey;
+        configuration.SelectedEngineKey = EngineCombo.SelectedIndex switch
+        {
+            1 => InspectionEngineFactory.OnnxEngineKey,
+            2 => InspectionEngineFactory.LearnedVisualEngineKey,
+            _ => InspectionEngineFactory.DefaultEngineKey,
+        };
         InspectionModelConfigurationService.Save(configuration);
         EngineStatusText.Text = $"Current status: {InspectionModelConfigurationService.GetStatusText(InspectionModelConfigurationService.GetStatus(configuration))}";
         WorkflowState.Instance.AddEvent("FIRST_RUN", $"Inspection engine set from setup wizard: {configuration.SelectedEngineKey}.");

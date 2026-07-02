@@ -1397,6 +1397,8 @@ public partial class MainWindow : Window
         => statusText switch
         {
             "Pixel Difference Prototype Engine" => "Pixel Diff Prototype",
+            "Learned PCB Visual Model Active" => "Learned Visual Active",
+            "Learned Visual Model Missing" => "Learned Visual Missing",
             "ML Model Ready" => "ML Ready",
             "ML Model Missing" => "ML Missing",
             "ML Model Not Tested" => "ML Not Tested",
@@ -1566,6 +1568,8 @@ public partial class MainWindow : Window
             Models.InspectionEngineStatus.MlRuntimeError => "#F27777",
             Models.InspectionEngineStatus.MlInvalidLabelMap => "#F27777",
             Models.InspectionEngineStatus.MlUnsupportedOutputFormat => "#F27777",
+            Models.InspectionEngineStatus.LearnedVisualModelReady => "#C084FC",
+            Models.InspectionEngineStatus.LearnedVisualModelMissing => "#E1A334",
             _ => "#E1A334",
         }));
     }

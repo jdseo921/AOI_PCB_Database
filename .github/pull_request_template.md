@@ -13,11 +13,16 @@ Complete every applicable item before requesting review. Mark an item `N/A` only
 - [ ] I handled expected exceptions.
 - [ ] I did not expose secrets.
 - [ ] I did not commit customer images, production images, local runtime SQLite databases, WAL/SHM files, image vaults, generated exports, or package output.
+- [ ] I did not commit generated customer images, generated demo images, image-only learning outputs, learned model artifacts, overlays, heatmaps, or visual learning reports.
 - [ ] I did not commit vendor SDK binaries to `AOI_Monitor`; vendor adapters remain isolated from the app unless reviewed as a plugin/template boundary.
 - [ ] I labeled simulation, mock, fake, folder, null, prototype-only, or dry-run evidence as simulation/non-production evidence.
+- [ ] I labeled synthetic image-only learning evidence as synthetic and not customer acceptance.
+- [ ] Any false-positive or false-call reduction claim includes the OK Validation image count.
+- [ ] Any defect-detection claim says whether NG Validation images were used and whether possible-escape evidence exists.
 - [ ] I did not claim real hardware readiness from simulation, dry-run, folder, fake, null, or mock evidence.
 - [ ] I did not claim Stage 2 camera pilot readiness unless real camera, lighting, and 3D acceptance evidence is attached or explicitly cited.
 - [ ] I did not use "production ready", "factory accepted", "MES integrated", "Stage 2 complete", or equivalent wording without the required evidence and formal scope.
+- [ ] I did not claim production readiness for a learned visual model without model acceptance and supporting evidence.
 - [ ] I updated docs if workflow changed.
 - [ ] I updated requirements/status documentation when implementation status, readiness gates, deployment profile scope, or evidence boundaries changed.
 - [ ] I added or updated tests.
@@ -31,6 +36,8 @@ Complete every applicable item before requesting review. Mark an item `N/A` only
 - Navigation/performance evidence, if relevant:
 - Export/report checksum evidence, if relevant:
 - Stage 2 real camera/lighting/3D acceptance evidence, if claimed:
+- Image-only learning OK Validation count, if false-call claims are included:
+- NG Validation / possible-escape evidence, if defect-detection claims are included:
 - Hardware/MES validation evidence, if relevant:
 - Documentation updates, if requirements/status changed:
 

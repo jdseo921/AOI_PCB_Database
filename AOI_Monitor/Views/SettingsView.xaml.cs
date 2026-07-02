@@ -19,6 +19,7 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
 {
     private readonly MainViewModel _vm;
     private readonly ObservableCollection<ModelRegistryRow> _modelRegistryRows = new();
+    private readonly ObservableCollection<LearnedVisualModelRow> _learnedVisualModelRows = new();
     private readonly ObservableCollection<ThresholdProfileRow> _thresholdProfileRows = new();
     private readonly ObservableCollection<ModelAcceptanceRunRow> _modelAcceptanceRows = new();
     private CancellationTokenSource? _modelAcceptanceCancellation;
@@ -36,6 +37,7 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         InitializeComponent();
         _vm = vm;
         ModelRegistryGrid.ItemsSource = _modelRegistryRows;
+        LearnedVisualModelGrid.ItemsSource = _learnedVisualModelRows;
         ThresholdProfilesGrid.ItemsSource = _thresholdProfileRows;
         ModelAcceptanceRunsGrid.ItemsSource = _modelAcceptanceRows;
         LoadUiPreferenceSelection();
@@ -49,6 +51,7 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         WorkflowState.Instance.StateChanged += OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged += OnInspectionConfigurationChanged;
         ModelRegistryService.RegistryChanged += OnModelRegistryChanged;
+        LearnedVisualModelRegistryService.ActiveModelChanged += OnLearnedVisualModelRegistryChanged;
         CameraSourceSettingsService.SettingsChanged += OnCameraSourceSettingsChanged;
         LightingSettingsService.SettingsChanged += OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged += OnMesIntegrationSettingsChanged;
@@ -64,6 +67,7 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
         InspectionModelConfigurationService.ConfigurationChanged -= OnInspectionConfigurationChanged;
         ModelRegistryService.RegistryChanged -= OnModelRegistryChanged;
+        LearnedVisualModelRegistryService.ActiveModelChanged -= OnLearnedVisualModelRegistryChanged;
         CameraSourceSettingsService.SettingsChanged -= OnCameraSourceSettingsChanged;
         LightingSettingsService.SettingsChanged -= OnLightingSettingsChanged;
         MesIntegrationSettingsService.SettingsChanged -= OnMesIntegrationSettingsChanged;
@@ -72,8 +76,13 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
     }
 
     private void OnWorkflowStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshWorkflowUi);
-    private void OnInspectionConfigurationChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshInspectionConfigurationUi);
+    private void OnInspectionConfigurationChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, () =>
+    {
+        RefreshInspectionConfigurationUi();
+        _ = RefreshLearnedVisualModelRegistryUiAsync();
+    });
     private void OnModelRegistryChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, () => _ = RefreshModelRegistryUiAsync());
+    private void OnLearnedVisualModelRegistryChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, () => _ = RefreshLearnedVisualModelRegistryUiAsync());
     private void OnCameraSourceSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshCameraSourceUi);
     private void OnLightingSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshLightingUi);
     private void OnMesIntegrationSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshMesIntegrationUi);
@@ -840,6 +849,38 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
             MessageBoxImage.Information);
     }
 
+    private void OnSetActiveLearnedVisualModelClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanSetActiveLearnedVisualModel, "Setting active learned visual model"))
+            return;
+
+        if (LearnedVisualModelGrid.SelectedItem is not LearnedVisualModelRow row)
+        {
+            MessageBox.Show("Select a learned PCB visual model first.", "Learned Visual Model", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var active = LearnedVisualModelRegistryService.SetActiveLearnedVisualModel(
+                row.ModelId,
+                WorkflowState.Instance.CurrentRole,
+                WorkflowState.Instance.OperatorWithRole);
+            RefreshInspectionConfigurationUi(InspectionModelConfigurationService.Load());
+            _ = RefreshLearnedVisualModelRegistryUiAsync();
+            WorkflowState.Instance.AddEvent("MODEL_DEPLOYMENT", $"Active learned visual model set to {active.ModelId}. Image-only Stage 1 evidence; not live camera validation.");
+            MessageBox.Show(
+                $"Active learned visual model set.\n\nModel ID: {active.ModelId}\nTraining project: {active.ProjectName}\n\nImage-only Stage 1 learning; not live camera validation.",
+                "Learned Visual Model",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or IOException)
+        {
+            MessageBox.Show(ex.Message, "Learned Visual Model", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private async void OnRunModelAcceptanceClick(object sender, RoutedEventArgs e)
     {
         if (!Authorize(RoleAuthorization.CanTestModelConfiguration, "Running model acceptance"))
@@ -1423,6 +1464,7 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         RefreshRoleControls();
         RefreshInspectionConfigurationUi();
         _ = RefreshModelRegistryUiAsync();
+        _ = RefreshLearnedVisualModelRegistryUiAsync();
         RefreshModelAcceptanceRunsUi();
         RefreshCameraSourceUi();
         RefreshLightingUi();
@@ -1529,6 +1571,7 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         BrowseLabelMapBtn.IsEnabled = canManageSettings;
         RegisterModelBtn.IsEnabled = canManageSettings;
         SetActiveModelBtn.IsEnabled = canManageSettings;
+        SetActiveLearnedVisualModelBtn.IsEnabled = RoleAuthorization.CanSetActiveLearnedVisualModel(role);
         RunSetupWizardBtn.IsEnabled = canManageSettings;
         OpenInstallNotesBtn.IsEnabled = canManageSettings;
         OpenGuideBtn.IsEnabled = true;
@@ -1673,7 +1716,9 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
 
     private void RefreshInspectionConfigurationUi(InspectionModelConfiguration configuration)
     {
-        InspectionEngineCombo.SelectedIndex = configuration.IsOnnxSelected ? 1 : 0;
+        InspectionEngineCombo.SelectedIndex = configuration.IsLearnedVisualModelSelected
+            ? 2
+            : configuration.IsOnnxSelected ? 1 : 0;
         ModelPathText.Text = configuration.ModelFilePath;
         ModelVersionText.Text = configuration.ModelVersion;
         LabelMapPathText.Text = configuration.LabelMapPath;
@@ -1686,7 +1731,7 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         var status = InspectionModelConfigurationService.GetStatus(configuration);
         EngineRuntimeStatusText.Text = InspectionModelConfigurationService.GetStatusText(status);
         EngineRuntimeStatusText.Foreground = StatusBrush(status);
-        EngineVersionText.Text = configuration.IsOnnxSelected
+        EngineVersionText.Text = configuration.IsOnnxSelected || configuration.IsLearnedVisualModelSelected
             ? configuration.EffectiveModelVersion
             : "PIXEL_DIFF_0.1";
         ModelCheckResultText.Text = ModelConfigurationValidator.ToDisplay(configuration.LastModelCheckResult);
@@ -1717,6 +1762,33 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             ModelCheckMessageText.Text = $"Model registry could not be loaded: {ex.Message}";
+        }
+    }
+
+    private async Task RefreshLearnedVisualModelRegistryUiAsync()
+    {
+        var selectedModelId = (LearnedVisualModelGrid.SelectedItem as LearnedVisualModelRow)?.ModelId;
+        _learnedVisualModelRows.Clear();
+
+        try
+        {
+            var models = await Task.Run(() => LearnedVisualModelRegistryService.ListLearnedModels().Select(model => new LearnedVisualModelRow(model)).ToArray());
+            foreach (var model in models)
+                _learnedVisualModelRows.Add(model);
+
+            if (!string.IsNullOrWhiteSpace(selectedModelId))
+            {
+                LearnedVisualModelGrid.SelectedItem = _learnedVisualModelRows.FirstOrDefault(row =>
+                    string.Equals(row.ModelId, selectedModelId, StringComparison.OrdinalIgnoreCase));
+            }
+
+            LearnedVisualModelStatusText.Text = LearnedVisualModelRegistryService.GetActiveLearnedVisualModel() is { } active
+                ? $"Active learned visual model: {active.ModelId} / {active.ProjectName}."
+                : "No learned visual model is active.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            LearnedVisualModelStatusText.Text = $"Learned visual model registry could not be loaded: {ex.Message}";
         }
     }
 
@@ -1774,7 +1846,9 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         var state = WorkflowState.Instance;
         state.AddEvent(
             "ENGINE_CONFIG",
-            configuration.IsOnnxSelected
+            configuration.IsLearnedVisualModelSelected
+                ? $"Inspection engine set to Learned PCB Visual Model; active model {configuration.ActiveModelId}; image-only Stage 1 evidence."
+                : configuration.IsOnnxSelected
                 ? $"Inspection engine set to ONNX ML Model; status {EngineRuntimeStatusText.Text}; version {configuration.EffectiveModelVersion}."
                 : "Inspection engine set to Pixel Difference Prototype Engine.");
     }
@@ -1823,7 +1897,33 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
 
         var numericError = ValidateRawModelCheckFields();
         ModelConfigurationTestResult result;
-        if (numericError is not null)
+        if (configuration.IsLearnedVisualModelSelected)
+        {
+            if (string.IsNullOrWhiteSpace(configuration.ActiveModelId) &&
+                existing.IsLearnedVisualModelSelected &&
+                !string.IsNullOrWhiteSpace(existing.ActiveModelId))
+            {
+                configuration.ActiveModelId = existing.ActiveModelId;
+                configuration.ActiveModelSha256 = existing.ActiveModelSha256;
+                configuration.ActiveModelValidationStatus = existing.ActiveModelValidationStatus;
+            }
+
+            var status = InspectionModelConfigurationService.GetStatus(configuration);
+            var ready = status == InspectionEngineStatus.LearnedVisualModelReady;
+            result = new ModelConfigurationTestResult(
+                ready ? ModelConfigurationTestStatus.Ready : ModelConfigurationTestStatus.MissingModel,
+                DateTime.UtcNow,
+                ready
+                    ? "Learned PCB Visual Model metadata and reference/tolerance artifacts are available. Image-only Stage 1 learning; not live camera validation."
+                    : "No active learned PCB visual model with required artifacts is available.",
+                string.Empty);
+            configuration.LastModelCheckTimestampUtc = result.TimestampUtc;
+            configuration.LastModelCheckResult = result.Status;
+            configuration.LastModelCheckMessage = result.Message;
+            configuration.LastModelCheckConfigurationHash = string.Empty;
+            InspectionModelConfigurationService.Save(configuration);
+        }
+        else if (numericError is not null)
         {
             result = new ModelConfigurationTestResult(
                 ModelConfigurationTestStatus.RuntimeError,
@@ -2566,9 +2666,12 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
 
         return new InspectionModelConfiguration
         {
-            SelectedEngineKey = InspectionEngineCombo.SelectedIndex == 1
-                ? InspectionEngineFactory.OnnxEngineKey
-                : InspectionEngineFactory.DefaultEngineKey,
+            SelectedEngineKey = InspectionEngineCombo.SelectedIndex switch
+            {
+                1 => InspectionEngineFactory.OnnxEngineKey,
+                2 => InspectionEngineFactory.LearnedVisualEngineKey,
+                _ => InspectionEngineFactory.DefaultEngineKey,
+            },
             ModelFilePath = modelPath,
             ModelVersion = version,
             LabelMapPath = LabelMapPathText.Text.Trim(),
@@ -2628,6 +2731,8 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
             InspectionEngineStatus.MlInvalidLabelMap => "#F27777",
             InspectionEngineStatus.MlRuntimeError => "#F27777",
             InspectionEngineStatus.MlUnsupportedOutputFormat => "#F27777",
+            InspectionEngineStatus.LearnedVisualModelReady => "#C084FC",
+            InspectionEngineStatus.LearnedVisualModelMissing => "#E1A334",
             _ => "#E1A334",
         };
 
@@ -3092,6 +3197,36 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         public string WaiverDisplay { get; }
         public string ThresholdDisplay { get; }
         public string LastValidatedDisplay { get; }
+        public string ActiveDisplay { get; }
+    }
+
+    private sealed class LearnedVisualModelRow
+    {
+        public LearnedVisualModelRow(LearnedVisualModelRegistryEntry entry)
+        {
+            ModelId = entry.ModelId;
+            ModelVersion = entry.ModelVersion;
+            ProjectName = string.IsNullOrWhiteSpace(entry.ProjectName) ? entry.ProjectId : entry.ProjectName;
+            BoardModel = string.IsNullOrWhiteSpace(entry.BoardModel) ? "--" : entry.BoardModel;
+            ImagesLearnedFrom = entry.ImagesLearnedFrom.ToString(CultureInfo.InvariantCulture);
+            OkValidationCount = entry.OkValidationCount.ToString(CultureInfo.InvariantCulture);
+            FalseCallTargetDisplay = entry.FalseCallTargetDisplay;
+            RecommendedThresholdDisplay = entry.RecommendedThresholdDisplay;
+            EvidenceMode = entry.EvidenceMode;
+            ArtifactStatus = entry.ArtifactStatus;
+            ActiveDisplay = entry.ActiveDisplay;
+        }
+
+        public string ModelId { get; }
+        public string ModelVersion { get; }
+        public string ProjectName { get; }
+        public string BoardModel { get; }
+        public string ImagesLearnedFrom { get; }
+        public string OkValidationCount { get; }
+        public string FalseCallTargetDisplay { get; }
+        public string RecommendedThresholdDisplay { get; }
+        public string EvidenceMode { get; }
+        public string ArtifactStatus { get; }
         public string ActiveDisplay { get; }
     }
 

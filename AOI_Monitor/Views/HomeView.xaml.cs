@@ -65,6 +65,7 @@ public partial class HomeView : UserControl
             engineStatus switch
             {
                 InspectionEngineStatus.MlModelReady => StatusKind.Ok,
+                InspectionEngineStatus.LearnedVisualModelReady => StatusKind.Simulated,
                 InspectionEngineStatus.MlRuntimeError or
                     InspectionEngineStatus.MlInvalidLabelMap or
                     InspectionEngineStatus.MlUnsupportedOutputFormat => StatusKind.Ng,

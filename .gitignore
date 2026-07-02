@@ -59,6 +59,8 @@ training_sets/
 **/image_vault/training/
 data/
 AOI_Monitor/data/
+!AOI_Monitor/Data/
+!AOI_Monitor/Data/AoiDatabaseMigrations.cs
 model_registry/
 **/model_registry/
 
@@ -75,6 +77,7 @@ appsettings.Development.json
 # Sample/customer image data
 # Keep README/instructions in SampleData, but do not commit image payloads by default.
 SampleData/DemoSet_Quick/
+SampleData/ImageLearningDemo*/
 SampleData/**/*.png
 SampleData/**/*.jpg
 SampleData/**/*.jpeg

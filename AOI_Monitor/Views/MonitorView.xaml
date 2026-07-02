@@ -204,6 +204,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="68"/>
               </Grid.RowDefinitions>
               <TextBlock Text="Station" Style="{StaticResource MonitorStatusLabel}"/>
@@ -218,8 +219,10 @@
               <TextBlock Grid.Row="4" Grid.Column="1" x:Name="EngineText" Text="Pixel Difference Prototype Engine" Style="{StaticResource MonitorStatusWrappedValue}"/>
               <TextBlock Grid.Row="5" Text="Model Version" Style="{StaticResource MonitorStatusLabel}"/>
               <TextBlock Grid.Row="5" Grid.Column="1" x:Name="ModelVersionText" Text="PIXEL_DIFF_0.1" Style="{StaticResource MonitorStatusWrappedValue}"/>
-              <TextBlock Grid.Row="6" Text="2D Cal Profile" Style="{StaticResource MonitorStatusLabel}"/>
-              <ComboBox Grid.Row="6" Grid.Column="1" x:Name="CalibrationProfileCombo" MinHeight="34"
+              <TextBlock Grid.Row="6" Text="Learned Evidence" Style="{StaticResource MonitorStatusLabel}"/>
+              <TextBlock Grid.Row="6" Grid.Column="1" x:Name="LearnedModelEvidenceText" Text="Learned visual model: not active." Style="{StaticResource MonitorStatusWrappedValue}" Foreground="#C084FC"/>
+              <TextBlock Grid.Row="7" Text="2D Cal Profile" Style="{StaticResource MonitorStatusLabel}"/>
+              <ComboBox Grid.Row="7" Grid.Column="1" x:Name="CalibrationProfileCombo" MinHeight="34"
                         SelectionChanged="OnCalibrationProfileSelectionChanged"
                         ToolTip="2D calibration profile / Stage 2 preparation only. Approximate board-mm coordinates are not robot-ready.">
                 <ComboBox.ItemTemplate>
@@ -228,16 +231,16 @@
                   </DataTemplate>
                 </ComboBox.ItemTemplate>
               </ComboBox>
-              <TextBlock Grid.Row="7" Text="Camera" Style="{StaticResource MonitorStatusLabel}"/>
-              <TextBlock Grid.Row="7" Grid.Column="1" x:Name="CameraSourceText" Text="No Camera Connected" Style="{StaticResource MonitorStatusWrappedValue}"/>
-              <TextBlock Grid.Row="8" Text="Frame" Style="{StaticResource MonitorStatusLabel}"/>
-              <TextBlock Grid.Row="8" Grid.Column="1" x:Name="CameraFrameMetadataText" Text="No frame" Style="{StaticResource MonitorStatusWrappedValue}" Foreground="#9AA6AF" FontWeight="Normal"/>
-              <TextBlock Grid.Row="9" Text="Lighting" Style="{StaticResource MonitorStatusLabel}"/>
-              <TextBlock Grid.Row="9" Grid.Column="1" x:Name="LightingSyncText" Text="Lighting: Not Connected" Style="{StaticResource MonitorStatusWrappedValue}" Foreground="#9AA6AF" FontWeight="Normal"/>
-              <TextBlock Grid.Row="10" Text="Timing" Style="{StaticResource MonitorStatusLabel}"/>
-              <TextBlock Grid.Row="10" Grid.Column="1" x:Name="TimingText" Text="--" Style="{StaticResource MonitorStatusValue}"/>
-              <TextBlock Grid.Row="11" Text="Result" Style="{StaticResource MonitorStatusLabel}"/>
-              <Border Grid.Row="11" Grid.Column="1" x:Name="ResultStatusBorder" Background="#372914" BorderBrush="#8C6C35" BorderThickness="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="10,6">
+              <TextBlock Grid.Row="8" Text="Camera" Style="{StaticResource MonitorStatusLabel}"/>
+              <TextBlock Grid.Row="8" Grid.Column="1" x:Name="CameraSourceText" Text="No Camera Connected" Style="{StaticResource MonitorStatusWrappedValue}"/>
+              <TextBlock Grid.Row="9" Text="Frame" Style="{StaticResource MonitorStatusLabel}"/>
+              <TextBlock Grid.Row="9" Grid.Column="1" x:Name="CameraFrameMetadataText" Text="No frame" Style="{StaticResource MonitorStatusWrappedValue}" Foreground="#9AA6AF" FontWeight="Normal"/>
+              <TextBlock Grid.Row="10" Text="Lighting" Style="{StaticResource MonitorStatusLabel}"/>
+              <TextBlock Grid.Row="10" Grid.Column="1" x:Name="LightingSyncText" Text="Lighting: Not Connected" Style="{StaticResource MonitorStatusWrappedValue}" Foreground="#9AA6AF" FontWeight="Normal"/>
+              <TextBlock Grid.Row="11" Text="Timing" Style="{StaticResource MonitorStatusLabel}"/>
+              <TextBlock Grid.Row="11" Grid.Column="1" x:Name="TimingText" Text="--" Style="{StaticResource MonitorStatusValue}"/>
+              <TextBlock Grid.Row="12" Text="Result" Style="{StaticResource MonitorStatusLabel}"/>
+              <Border Grid.Row="12" Grid.Column="1" x:Name="ResultStatusBorder" Background="#372914" BorderBrush="#8C6C35" BorderThickness="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="10,6">
                 <TextBlock x:Name="ResultStatusText" Text="REVIEW" FontWeight="ExtraBold" FontSize="28" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Border>
             </Grid>

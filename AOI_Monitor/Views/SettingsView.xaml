@@ -398,7 +398,7 @@
               <Border Style="{StaticResource SettingsPanel}">
                 <StackPanel>
                   <TextBlock Text="Inspection Engine Configuration" Style="{StaticResource HmiSectionHeaderText}"/>
-                  <TextBlock Text="ONNX is the production ML path. Pixel Difference remains a clearly labeled prototype fallback." Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+                  <TextBlock Text="ONNX is the production ML path. Pixel Difference is a prototype fallback. Learned PCB Visual Model is image-only Stage 1 learning and is not live camera validation." Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -406,6 +406,7 @@
                     <ComboBox x:Name="InspectionEngineCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}" ToolTip="ONNX is the supported ML model format. Pixel Difference is a prototype fallback engine.">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pixel Difference Prototype Engine"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="ONNX ML Model"/>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Learned PCB Visual Model"/>
                     </ComboBox>
                   </Grid>
 
@@ -466,6 +467,29 @@
                   </UniformGrid>
                   <TextBlock x:Name="ModelCheckMessageText" Text="No model configuration test has been run." Style="{StaticResource HmiTechnicalHintText}" Margin="0,8,0,0"/>
                   <Button x:Name="TestModelBtn" Style="{StaticResource ActionBtnBlue}" Content="Test Model Configuration" Click="OnTestModelConfigurationClick" Margin="0,10,0,0" HorizontalAlignment="Left"/>
+                </StackPanel>
+              </Border>
+
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Learned PCB Visual Models" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="Image-only Stage 1 models learned from Golden / OK image groups. Setting active here does not claim live camera validation or production acceptance." Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,8"/>
+                  <DataGrid x:Name="LearnedVisualModelGrid" Height="170" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" CanUserAddRows="False" Style="{StaticResource HmiTable}" ToolTip="Learned visual models are selected by model ID and training project. Hover long values to inspect.">
+                    <DataGrid.Columns>
+                      <DataGridTextColumn Header="Model" Binding="{Binding ModelId}" Width="*"/>
+                      <DataGridTextColumn Header="Version" Binding="{Binding ModelVersion}" Width="92"/>
+                      <DataGridTextColumn Header="Project" Binding="{Binding ProjectName}" Width="140"/>
+                      <DataGridTextColumn Header="Learned" Binding="{Binding ImagesLearnedFrom}" Width="78"/>
+                      <DataGridTextColumn Header="False Target" Binding="{Binding FalseCallTargetDisplay}" Width="100"/>
+                      <DataGridTextColumn Header="Threshold" Binding="{Binding RecommendedThresholdDisplay}" Width="86"/>
+                      <DataGridTextColumn Header="Artifacts" Binding="{Binding ArtifactStatus}" Width="105"/>
+                      <DataGridTextColumn Header="Active" Binding="{Binding ActiveDisplay}" Width="64"/>
+                    </DataGrid.Columns>
+                  </DataGrid>
+                  <WrapPanel Margin="0,8,0,0">
+                    <Button x:Name="SetActiveLearnedVisualModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Set as Active Inspection Model" MinWidth="230" Margin="0,0,8,8" Click="OnSetActiveLearnedVisualModelClick"/>
+                    <TextBlock x:Name="LearnedVisualModelStatusText" Text="No learned visual model selected." Style="{StaticResource HmiTechnicalHintText}" VerticalAlignment="Center"/>
+                  </WrapPanel>
                 </StackPanel>
               </Border>
 

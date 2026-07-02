@@ -315,6 +315,9 @@ $factoryReadinessEvidencePattern = '(?i)\bfactory[- ]readiness[- ]evidence\b|\bf
 $mesIntegratedPattern = '(?i)\bMES[- /]*(?:ERP[- /]*)?integrated\b|\bMES integration complete\b|\bintegrated\s+MES\b'
 $mockMesContextPattern = '(?i)\bmock\b|\bmock mode\b|\bmock REST\b|\bMES mock\b|\bsimulation\b|\bnot connected\b|\bonly mock\b'
 $realMesEvidencePattern = '(?i)\bMES REST Ready\b|\bproduction MES\b|\breal MES\b|\baccepted factory traceability\b|\btraceability signoff\b|\bpassing traceability\b|\bMES acceptance\b'
+$noFalsePositiveClaimPattern = '(?i)\b(no|zero|0)\s+false[- ]positives?\b|\b(no|zero|0)\s+false[- ]calls?\b|\bfalse[- ]positive[- ]free\b|\bfalse[- ]call[- ]free\b'
+$detectsAllDefectsPattern = '(?i)\bdetects?\s+(all|every)\s+defects?\b|\ball\s+defects?\s+(are\s+)?detected\b|\bevery\s+defect\s+(is\s+)?detected\b'
+$ngValidationEvidencePattern = '(?i)\bNG validation\b|\bknown[- ]bad\b|\bpossible[- ]escape\b|\bpossible escapes\b|\bmissed[- ]defect\b|\bmissed defect rate\b'
 
 $linesByPath = $addedLines | Group-Object -Property path
 foreach ($group in $linesByPath) {
@@ -370,12 +373,15 @@ foreach ($group in $docLinesByPath) {
         }
 
         if ($line -match $productionReadyPattern -and $context -notmatch $factoryReadinessEvidencePattern) {
-            if ($context -match $clearProductionReadyPattern) {
-                Add-Issue "FAIL" "PR-PROD-CLAIM-001" $group.Name "Production-ready wording was added without nearby factory readiness evidence."
-            }
-            else {
-                Add-Issue "WARN" "PR-PROD-CLAIM-001" $group.Name "Production-ready wording may need nearby factory readiness evidence."
-            }
+            Add-Issue "FAIL" "PR-PROD-CLAIM-001" $group.Name "Production-ready wording was added without nearby factory readiness evidence."
+        }
+
+        if ($line -match $noFalsePositiveClaimPattern) {
+            Add-Issue "FAIL" "PR-FP-CLAIM-001" $group.Name "Absolute no-false-positive or no-false-call wording was added. Report measured false-call rates with OK Validation image counts instead."
+        }
+
+        if ($line -match $detectsAllDefectsPattern -and $context -notmatch $ngValidationEvidencePattern) {
+            Add-Issue "WARN" "PR-DEFECT-CLAIM-001" $group.Name "Absolute defect-detection wording was added without nearby NG Validation and possible-escape evidence."
         }
 
         if ($line -match $mesIntegratedPattern -and $context -notmatch $realMesEvidencePattern) {
@@ -512,7 +518,17 @@ $report = [pscustomobject]@{
         [pscustomobject]@{
             id = "PR-PROD-CLAIM-001"
             description = "Production-ready wording requires nearby factory readiness evidence."
-            result = if (@($script:issues | Where-Object { $_.ruleId -eq "PR-PROD-CLAIM-001" -and $_.level -eq "FAIL" }).Count -gt 0) { "FAIL" } elseif (@($script:issues | Where-Object { $_.ruleId -eq "PR-PROD-CLAIM-001" }).Count -gt 0) { "WARN" } else { "PASS" }
+            result = if (@($script:issues | Where-Object { $_.ruleId -eq "PR-PROD-CLAIM-001" }).Count -gt 0) { "FAIL" } else { "PASS" }
+        },
+        [pscustomobject]@{
+            id = "PR-FP-CLAIM-001"
+            description = "Absolute no-false-positive/no-false-call claims are forbidden; use measured OK Validation evidence."
+            result = if (@($script:issues | Where-Object { $_.ruleId -eq "PR-FP-CLAIM-001" }).Count -gt 0) { "FAIL" } else { "PASS" }
+        },
+        [pscustomobject]@{
+            id = "PR-DEFECT-CLAIM-001"
+            description = "Absolute defect-detection wording needs NG Validation and possible-escape context."
+            result = if (@($script:issues | Where-Object { $_.ruleId -eq "PR-DEFECT-CLAIM-001" }).Count -gt 0) { "WARN" } else { "PASS" }
         },
         [pscustomobject]@{
             id = "PR-MES-CLAIM-001"

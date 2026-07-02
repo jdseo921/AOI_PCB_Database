@@ -400,6 +400,12 @@ public static class ExportVerificationService
         if (fileName.Equals("factory_acceptance_checklist.csv", StringComparison.OrdinalIgnoreCase))
             return new[] { "requirement_id", "requirement_text", "required_evidence", "current_evidence_path", "status", "signoff_role" };
 
+        if (exportType.Contains("ClientImageLearningDemoEvidence", StringComparison.OrdinalIgnoreCase))
+            return Array.Empty<string>();
+
+        if (exportType.Contains("LearnFromImagesEvidence", StringComparison.OrdinalIgnoreCase))
+            return Array.Empty<string>();
+
         if (exportType.Contains("ReviewDispositionLog", StringComparison.OrdinalIgnoreCase) ||
             fileName.Contains("review_disposition", StringComparison.OrdinalIgnoreCase))
             return new[] { "TimestampUtc", "StationId", "OperatorId", "Sample", "Golden", "Verdict", "Action" };

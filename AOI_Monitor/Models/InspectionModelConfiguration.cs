@@ -11,6 +11,8 @@ public enum InspectionEngineStatus
     MlInvalidLabelMap,
     MlRuntimeError,
     MlUnsupportedOutputFormat,
+    LearnedVisualModelReady,
+    LearnedVisualModelMissing,
 }
 
 public enum ModelConfigurationTestStatus
@@ -54,6 +56,9 @@ public class InspectionEngineSettings
 
     public bool IsOnnxSelected =>
         string.Equals(SelectedEngineKey, "onnx", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsLearnedVisualModelSelected =>
+        string.Equals(SelectedEngineKey, "learned-pcb-visual", StringComparison.OrdinalIgnoreCase);
 
     public bool HasModelFile =>
         !string.IsNullOrWhiteSpace(ModelFilePath) && File.Exists(ModelFilePath);

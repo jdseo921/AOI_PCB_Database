@@ -20,6 +20,8 @@ Client/evaluator documents:
 - [Requirements Traceability Matrix](Docs/Requirements_Traceability_Matrix.md)
 - [Integration Boundaries](Docs/Integration_Boundaries.md)
 - [Stage 1 Acceptance Checklist](Docs/Stage1_Acceptance_Checklist.md)
+- [Image-Only PCB Learning Workflow](Docs/Image_Only_PCB_Learning_Workflow.md)
+- [Client Image Learning Demo Guide](Docs/Client_Image_Learning_Demo_Guide.md)
 - [Design Contract](DESIGN.md)
 - [Frontend Design Review and Rework Plan](Docs/Frontend_Design_Review_and_Rework_Plan.md)
 - [AOI Competitive HMI Reference Guide](Docs/AOI_Competitive_HMI_Reference_Guide.md)
@@ -133,6 +135,34 @@ The release folder is intended to be zipped and shared. It intentionally exclude
 5. Review the generated score, verdict, evidence, and hotspot in Golden Compare. Use the Large Image buttons when either side needs zoomed inspection.
 6. Use Defect Review to confirm, mark false calls, hold for review, or queue local candidate samples.
 7. Use Export & Trace to inspect SQLite history, create CSV exports, build customer packages, and open database health.
+
+## Image-Only PCB Learning
+
+AOI Monitor includes a Stage 1 image-only PCB learning workflow for uploaded image folders. Users group images as Golden / Reference, OK Learning, OK Validation, Inspection, and optional NG Validation. Learning does not require defect labels, bounding boxes, per-defect variables, model files, or camera hardware.
+
+The workflow learns a `learned_reference.png` from good samples, builds a `tolerance_map.png` for normal lighting/position/visual variation, calibrates false calls using OK Validation images, and exports anomaly heatmaps and annotated overlays for inspection samples. If NG Validation images are provided, reports include possible-escape evidence. If they are not provided, reports state that missed-defect rate cannot yet be fully proven.
+
+Use `AI / Models > AI Training Setup` for the guided GUI. For a command-line customer image workflow, use:
+
+```powershell
+dotnet run --project AOI_Monitor.Tools -- learn-from-images `
+  --project-folder <folder> `
+  --output <folder> `
+  --operator <id> `
+  --false-call-target 0.05
+```
+
+For an internal synthetic workflow smoke/demo package, use:
+
+```powershell
+dotnet run --project AOI_Monitor.Tools -- client-image-learning-demo `
+  --synthetic `
+  --output TestResults/image-learning-demo `
+  --operator ci-image-learning `
+  --false-call-target 0.05
+```
+
+Synthetic demo output proves workflow capability only. Customer acceptance requires customer/evaluator images and reviewer signoff. Stage 2 live camera validation remains separate.
 
 Generated files are written below the running application's `exports/` folder, usually under:
 

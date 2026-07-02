@@ -23,6 +23,18 @@ public static class ModelConfigurationValidator
         var timestamp = DateTime.UtcNow;
         var fingerprint = ComputeConfigurationHash(configuration);
 
+        if (configuration.IsLearnedVisualModelSelected)
+        {
+            var ready = LearnedVisualModelRegistryService.HasUsableActiveModel(configuration.ActiveModelId);
+            return Result(
+                ready ? ModelConfigurationTestStatus.Ready : ModelConfigurationTestStatus.MissingModel,
+                ready
+                    ? "Learned PCB Visual Model selected; required image-only reference/tolerance artifacts are available. Not live camera validation."
+                    : "Learned PCB Visual Model selected, but no active learned model with required artifacts is available.",
+                timestamp,
+                fingerprint);
+        }
+
         if (!configuration.IsOnnxSelected)
             return Result(ModelConfigurationTestStatus.Ready, "Pixel Difference Prototype Engine selected; no ONNX ML Model is required.", timestamp, fingerprint);
 

@@ -13,6 +13,10 @@ public static class RoleAuthorization
     public static bool CanEditCalibration(UserRole role) => role >= UserRole.Engineer;
     public static bool CanRunModelTests(UserRole role) => role >= UserRole.Engineer;
     public static bool CanTestModelConfiguration(UserRole role) => role >= UserRole.Engineer;
+    public static bool CanImportImageLearningImages(UserRole role) => role >= UserRole.Engineer;
+    public static bool CanRunImageOnlyLearning(UserRole role) => role >= UserRole.Engineer;
+    public static bool CanSetActiveLearnedVisualModel(UserRole role) => role >= UserRole.Engineer;
+    public static bool CanExportImageLearningReports(UserRole role) => role >= UserRole.Engineer;
     public static bool CanChangeThresholds(UserRole role) => role >= UserRole.Engineer;
     public static bool CanExportLogs(UserRole role) => role >= UserRole.Admin;
     public static bool CanManageSettings(UserRole role) => role >= UserRole.Admin;
@@ -25,7 +29,8 @@ public static class RoleAuthorization
             "home" => true,
             "recipe" => CanEditRecipes(role),
             "calibration" => CanEditCalibration(role),
-            "modeltest" or "spc" => CanRunModelTests(role),
+            "modeltest" => true,
+            "spc" => CanRunModelTests(role),
             "pilot" => role >= UserRole.Engineer,
             "reports" => CanExportLogs(role),
             "settings" => role >= UserRole.Engineer,

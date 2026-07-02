@@ -37,6 +37,7 @@ public sealed class CustomerValidationPackageRequest
     public DatasetQualitySummary? DatasetQualitySummary { get; init; }
     public CustomerDatasetPreflightResult? DatasetPreflightResult { get; init; }
     public FalseCallReductionRun? FalseCallReductionRun { get; init; }
+    public LearnedVisualModelEvidenceSummary? LearnedVisualModel { get; init; }
     public InspectionLatencySummary? LatencySummary { get; init; }
 }
 
@@ -198,6 +199,8 @@ public static class CustomerValidationPackageService
         var preflightPath = Path.Combine(packageFolder, "dataset_preflight_summary.json");
         var issueSummaryPath = Path.Combine(packageFolder, "pilot_issue_summary.json");
         var annotatedFolder = Path.Combine(packageFolder, "annotated_images");
+        var learnedVisualModelFolder = Path.Combine(packageFolder, "learned_visual_model");
+        var learnedVisualModelSummaryPath = Path.Combine(learnedVisualModelFolder, "learned_visual_model_summary.json");
 
         File.WriteAllText(csvPath, BatchValidationService.BuildResultsCsv(rows), Encoding.UTF8);
         var breakdownSummary = ClassMetricsService.Calculate(rows);
@@ -249,6 +252,11 @@ public static class CustomerValidationPackageService
         var packageWarnings = new List<string>();
         CopyLatestBenchmarkCsv(latestBenchmark, benchmarkCsvPath, packageWarnings);
         CopySourceManifest(request.GroundTruthCsvPath, sourceManifestCopyPath, packageWarnings);
+        var learnedVisualModel = CopyLearnedVisualModelEvidence(
+            request.LearnedVisualModel ?? LearnedVisualModelRegistryService.GetActiveSummary(),
+            learnedVisualModelFolder,
+            learnedVisualModelSummaryPath,
+            packageWarnings);
         File.WriteAllText(limitationsPath, BuildLimitationsText(), Encoding.UTF8);
         var warnings = request.Warnings
             .Concat(packageWarnings)
@@ -301,6 +309,7 @@ public static class CustomerValidationPackageService
             RobotAcceptanceSummary = robotAcceptance,
             MesReadinessSummary = mesReadiness,
             ThresholdProfileEvidence = thresholdProfileEvidence,
+            LearnedVisualModel = learnedVisualModel,
             LatencySummary = latencySummary,
         };
 
@@ -311,7 +320,7 @@ public static class CustomerValidationPackageService
         File.WriteAllText(instructionsPath, CustomerValidationReportService.BuildPrintToPdfInstructions(reportPath), Encoding.UTF8);
         File.WriteAllText(readmePath, BuildReadme(packageId, acceptance, warnings), Encoding.UTF8);
 
-        var manifest = BuildManifest(request, criteria, acceptance, warnings, generatedAtUtc, packageId, breakdownSummary, datasetQuality, cameraAcceptance, robotAcceptance, mesReadiness, thresholdProfileEvidence, preflight, latencySummary);
+        var manifest = BuildManifest(request, criteria, acceptance, warnings, generatedAtUtc, packageId, breakdownSummary, datasetQuality, cameraAcceptance, robotAcceptance, mesReadiness, thresholdProfileEvidence, preflight, latencySummary, learnedVisualModel);
         manifest.IncludedFiles = EnumerateIncludedFiles(packageFolder).ToList();
         WriteManifest(manifestPath, manifest);
         manifest.IncludedFiles = EnumerateIncludedFiles(packageFolder).ToList();
@@ -354,7 +363,8 @@ public static class CustomerValidationPackageService
         MesReadinessSummary mesReadiness,
         ThresholdProfileEvidenceSummary thresholdProfileEvidence,
         CustomerDatasetPreflightResult preflight,
-        InspectionLatencySummary latencySummary)
+        InspectionLatencySummary latencySummary,
+        LearnedVisualModelEvidenceSummary? learnedVisualModel)
     {
         return new ValidationPackageManifest
         {
@@ -413,6 +423,7 @@ public static class CustomerValidationPackageService
             AcceptanceStatus = acceptance.Status,
             Criteria = criteria,
             FalseCallRecommendation = FalseCallReductionService.ToSummary(request.FalseCallReductionRun),
+            LearnedVisualModel = learnedVisualModel,
             ThresholdProfileEvidence = thresholdProfileEvidence,
             DatasetPreflightStatus = preflight.Status,
             DatasetPreflightFailures = preflight.BlockingFailures,
@@ -490,6 +501,90 @@ public static class CustomerValidationPackageService
             warnings.Add($"Source customer validation manifest could not be copied into the package ({ex.GetType().Name}).");
         }
     }
+
+    private static LearnedVisualModelEvidenceSummary? CopyLearnedVisualModelEvidence(
+        LearnedVisualModelEvidenceSummary? source,
+        string learnedVisualModelFolder,
+        string summaryPath,
+        IList<string> warnings)
+    {
+        if (source is null)
+            return null;
+
+        Directory.CreateDirectory(learnedVisualModelFolder);
+        var summary = CloneLearnedVisualModelSummary(source);
+        summary.LearnedReferenceArtifactPath = CopyLearnedArtifact(
+            source.LearnedReferenceArtifactPath,
+            "learned_reference.png",
+            learnedVisualModelFolder,
+            warnings);
+        summary.ToleranceMapArtifactPath = CopyLearnedArtifact(
+            source.ToleranceMapArtifactPath,
+            "tolerance_map.png",
+            learnedVisualModelFolder,
+            warnings);
+        summary.AnomalyThresholdMapArtifactPath = CopyLearnedArtifact(
+            source.AnomalyThresholdMapArtifactPath,
+            "anomaly_threshold_map.png",
+            learnedVisualModelFolder,
+            warnings);
+        File.WriteAllText(summaryPath, JsonSerializer.Serialize(summary, JsonOptions), Encoding.UTF8);
+        return summary;
+    }
+
+    private static string CopyLearnedArtifact(
+        string sourcePath,
+        string fileName,
+        string learnedVisualModelFolder,
+        IList<string> warnings)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+        {
+            warnings.Add($"Learned PCB Visual Model artifact was not copied because it was missing: {fileName}.");
+            return string.Empty;
+        }
+
+        var destinationPath = Path.Combine(learnedVisualModelFolder, fileName);
+        try
+        {
+            File.Copy(sourcePath, destinationPath, overwrite: true);
+            return Path.Combine("learned_visual_model", fileName).Replace('\\', '/');
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or PathTooLongException)
+        {
+            warnings.Add($"Learned PCB Visual Model artifact could not be copied: {fileName} ({ex.GetType().Name}).");
+            return string.Empty;
+        }
+    }
+
+    private static LearnedVisualModelEvidenceSummary CloneLearnedVisualModelSummary(LearnedVisualModelEvidenceSummary source)
+        => new()
+        {
+            ModelId = source.ModelId,
+            ModelVersion = source.ModelVersion,
+            CreatedAtUtc = source.CreatedAtUtc,
+            ProjectId = source.ProjectId,
+            ProjectName = source.ProjectName,
+            BoardModel = source.BoardModel,
+            EvidenceMode = source.EvidenceMode,
+            GoldenCount = source.GoldenCount,
+            OkLearningCount = source.OkLearningCount,
+            OkValidationCount = source.OkValidationCount,
+            ImagesLearnedFrom = source.ImagesLearnedFrom,
+            InputWidth = source.InputWidth,
+            InputHeight = source.InputHeight,
+            AlignmentMode = source.AlignmentMode,
+            BrightnessNormalizationMode = source.BrightnessNormalizationMode,
+            LearnedThreshold = source.LearnedThreshold,
+            FalseCallTarget = source.FalseCallTarget,
+            FalseCallRate = source.FalseCallRate,
+            PossibleEscapeRate = source.PossibleEscapeRate,
+            LearnedReferenceArtifactPath = source.LearnedReferenceArtifactPath,
+            ToleranceMapArtifactPath = source.ToleranceMapArtifactPath,
+            AnomalyThresholdMapArtifactPath = source.AnomalyThresholdMapArtifactPath,
+            EvidenceLines = source.EvidenceLines.ToList(),
+            BoundaryNote = source.BoundaryNote,
+        };
 
     private static IEnumerable<ValidationIncludedFile> EnumerateIncludedFiles(string packageFolder)
     {

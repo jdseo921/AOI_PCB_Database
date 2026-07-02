@@ -16,6 +16,8 @@ A client test package should contain:
 
 The package intentionally does not include customer images, generated demo images, local SQLite databases, image vaults, generated exports, model files, secrets, MES credentials, or production hardware adapters.
 
+Clients do not need to run automated tests to review an image-only learning evidence packet. The internal AOI team can run the workflow and send `visual_learning_report.html` plus the related overlay and false-call comparison artifacts for review.
+
 ## Client PC Requirements
 
 - Windows 10 or Windows 11, 64-bit.
@@ -60,6 +62,21 @@ Use this route for a quick software workflow evaluation with synthetic, non-conf
 14. Review `stage1_readiness_report.html`, `stage1_readiness_report.pdf`, `stage1_readiness_report.json`, `validation_summary.html`, `customer_validation_report.html`, `benchmark_report.html`, `benchmark_results.csv`, and `limitations.txt`.
 
 This demo can produce Stage 1 uploaded-image validation evidence. It does not validate real camera, lighting, robot, PLC safety, production MES, ERP, cybersecurity, or full factory automation.
+
+## Review Image-Only Learning Evidence
+
+For a visual review packet, ask the internal AOI team for:
+
+- `visual_learning_report.html`.
+- `before_after_false_call_report.html`.
+- `learned_reference.png`.
+- `learned_tolerance_map.png`.
+- Representative files from `annotated_overlays/` and `heatmaps/`.
+- The package README and manifest.
+
+The client can read the HTML report directly. It explains which Golden / OK / Inspection image groups were used, how many OK Validation images supported false-call calibration, whether NG Validation images were available for possible-escape evidence, and what evidence limits remain.
+
+Synthetic image-learning packets are workflow demonstrations only. Customer acceptance requires the customer/evaluator image set and review of the generated evidence.
 
 ## Suggested Independent Test Flow
 

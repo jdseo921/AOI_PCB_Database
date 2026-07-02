@@ -71,6 +71,7 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
         _refreshCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var token = _refreshCts.Token;
         RefreshEngineText();
+        AiTrainingSetupPanel.RefreshFromState();
         await LoadLatestRunAsync(token);
     }
 
@@ -752,6 +753,7 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
             PerformanceSummary = BatchValidationService.CalculatePerformanceSummary(_rows),
             Rows = _rows.ToArray(),
             FalseCallReductionRun = _currentFalseCallRun ?? AoiDatabase.GetLatestFalseCallReductionRun(_currentRunId),
+            LearnedVisualModel = LearnedVisualModelRegistryService.GetActiveSummary(),
             DatasetQualitySummary = _currentDatasetQuality ?? DatasetQualityService.Analyze(_rows, TryLoadManifest(_groundTruthCsvPath, _selectedFolder ?? string.Empty)),
             DatasetPreflightResult = _currentPreflightResult,
         };
@@ -808,6 +810,7 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
             SampleAnnotatedImages = sampleImages,
             Warnings = warnings,
             FalseCallRecommendation = FalseCallReductionService.ToSummary(_currentFalseCallRun ?? AoiDatabase.GetLatestFalseCallReductionRun(_currentRunId)),
+            LearnedVisualModel = LearnedVisualModelRegistryService.GetActiveSummary(),
             ThresholdProfileEvidence = ThresholdProfileService.GetActiveEvidenceSummary(boardModel, state.BoardProgram, "ANY"),
             BreakdownSummary = ClassMetricsService.Calculate(_rows),
             DatasetQualitySummary = datasetQuality,

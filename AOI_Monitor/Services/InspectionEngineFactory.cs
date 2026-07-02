@@ -6,6 +6,7 @@ public static class InspectionEngineFactory
 {
     public const string DefaultEngineKey = "pixel-difference";
     public const string OnnxEngineKey = "onnx";
+    public const string LearnedVisualEngineKey = "learned-pcb-visual";
 
     public static IInspectionEngine Create(string? engineKey = null)
     {
@@ -18,14 +19,24 @@ public static class InspectionEngineFactory
         {
             DefaultEngineKey => new PixelDifferenceInspectionEngine(),
             OnnxEngineKey => new OnnxInspectionEngine(ResolveRegistryOnnxConfiguration(configuration)),
+            LearnedVisualEngineKey => new LearnedPcbVisualInspectionEngine(configuration.ActiveModelId),
             _ => new PixelDifferenceInspectionEngine(),
         };
     }
 
     public static string NormalizeEngineKey(string? engineKey)
-        => string.IsNullOrWhiteSpace(engineKey)
-            ? DefaultEngineKey
-            : engineKey.Trim().ToLowerInvariant();
+    {
+        if (string.IsNullOrWhiteSpace(engineKey))
+            return DefaultEngineKey;
+
+        return engineKey.Trim().ToLowerInvariant() switch
+        {
+            "pixel" or "pixel-diff" or "pixel-difference-prototype" => DefaultEngineKey,
+            "onnx-ml" or "onnx-model" or "onnx-ml-model" => OnnxEngineKey,
+            "learned" or "learned-visual" or "learned-pcb-visual-model" or "image-learning" => LearnedVisualEngineKey,
+            var normalized => normalized,
+        };
+    }
 
     private static InspectionModelConfiguration ResolveRegistryOnnxConfiguration(InspectionModelConfiguration fallback)
     {

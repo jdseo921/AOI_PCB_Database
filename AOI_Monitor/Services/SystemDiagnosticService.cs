@@ -137,6 +137,7 @@ public static class SystemDiagnosticService
         {
             InspectionEngineStatus.PrototypeEngine => DiagnosticStatus.OK,
             InspectionEngineStatus.MlModelReady => DiagnosticStatus.OK,
+            InspectionEngineStatus.LearnedVisualModelReady => DiagnosticStatus.Warn,
             InspectionEngineStatus.MlModelMissing => DiagnosticStatus.Warn,
             InspectionEngineStatus.MlModelNotTested => DiagnosticStatus.Warn,
             _ => DiagnosticStatus.Error,
@@ -150,7 +151,9 @@ public static class SystemDiagnosticService
             $"{statusText}; selected={configuration.SelectedEngineKey}; version={configuration.ModelVersion}",
             diagnosticStatus == DiagnosticStatus.OK
                 ? "No action required for Stage 1 pixel-difference validation."
-                : "Use Pixel Difference for Stage 1 or validate the ONNX model registry/configuration.");
+                : configuration.IsLearnedVisualModelSelected
+                    ? "Learned visual model is image-only Stage 1 evidence; use customer validation and live hardware checks before acceptance."
+                    : "Use Pixel Difference for Stage 1 or validate the ONNX model registry/configuration.");
     }
 
     private static void AddCameraChecks(SystemDiagnosticReport report)

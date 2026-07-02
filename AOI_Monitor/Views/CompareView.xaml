@@ -93,6 +93,7 @@
         </Border>
         <!-- Defect PCB view -->
         <Border x:Name="DefectImageViewport" Grid.Row="1" Margin="8" BorderBrush="#59636B" BorderThickness="1" Background="#0E1214" ClipToBounds="True">
+          <Grid>
           <Viewbox x:Name="DefectCanvasViewbox" Stretch="Uniform">
           <Viewbox.LayoutTransform>
             <ScaleTransform x:Name="DefectZoomTransform" ScaleX="1" ScaleY="1"/>
@@ -135,6 +136,8 @@
             <Line X1="290" Y1="0" X2="290" Y2="380" Stroke="#3C6480" StrokeThickness="1" Opacity="0.5"/>
           </Canvas>
           </Viewbox>
+          <Image x:Name="DefectActualImage" Visibility="Collapsed" Stretch="Uniform"/>
+          </Grid>
         </Border>
         <!-- Footer fields -->
         <UniformGrid Grid.Row="2" Columns="3" Margin="8" Rows="2">
@@ -168,6 +171,7 @@
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <!-- Toolbar -->
             <WrapPanel Grid.Row="0" Margin="0,0,0,8">
@@ -186,8 +190,27 @@
                 <TextBlock x:Name="DiffSummaryText" Text="ROI mismatch vs golden" Foreground="#9AA6AF" FontSize="14" TextAlignment="Center"/>
               </StackPanel>
             </Border>
+            <Border Grid.Row="2" x:Name="LearnedArtifactsPanel" Background="#13191D" BorderBrush="#4B5660" BorderThickness="1" MinHeight="118" Padding="8" Margin="0,0,0,6" Visibility="Collapsed">
+              <StackPanel>
+                <TextBlock x:Name="LearnedCompareEvidenceText" Text="Learned PCB Visual Model evidence unavailable." Foreground="#C084FC" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                <UniformGrid Columns="2" Height="78" Margin="0,6,0,0">
+                  <Border Background="#080A0C" BorderBrush="#343D44" BorderThickness="1" Margin="0,0,5,0">
+                    <Grid>
+                      <Image x:Name="LearnedToleranceImage" Stretch="Uniform"/>
+                      <TextBlock Text="Tolerance Map" Foreground="#DCE5EB" FontSize="14" FontWeight="Bold" Margin="6" VerticalAlignment="Bottom"/>
+                    </Grid>
+                  </Border>
+                  <Border Background="#080A0C" BorderBrush="#343D44" BorderThickness="1">
+                    <Grid>
+                      <Image x:Name="LearnedAnomalyMapImage" Stretch="Uniform"/>
+                      <TextBlock Text="Anomaly Threshold Map" Foreground="#DCE5EB" FontSize="14" FontWeight="Bold" Margin="6" VerticalAlignment="Bottom"/>
+                    </Grid>
+                  </Border>
+                </UniformGrid>
+              </StackPanel>
+            </Border>
             <!-- Sync controls -->
-            <UniformGrid Grid.Row="2" Columns="2" Rows="2">
+            <UniformGrid Grid.Row="3" Columns="2" Rows="2">
               <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5"><StackPanel><TextBlock Text="01" Foreground="#7F8C95" FontSize="14"/><TextBlock Text="Lock board orientation" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/></StackPanel></Border>
               <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5"><StackPanel><TextBlock Text="02" Foreground="#7F8C95" FontSize="14"/><TextBlock Text="Equalize brightness" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/></StackPanel></Border>
               <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0"><StackPanel><TextBlock Text="03" Foreground="#7F8C95" FontSize="14"/><TextBlock Text="Normalize ROI scale" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/></StackPanel></Border>
@@ -270,6 +293,7 @@
         </Border>
         <!-- Golden PCB view (slightly desaturated) -->
         <Border x:Name="GoldenImageViewport" Grid.Row="1" Margin="8" BorderBrush="#59636B" BorderThickness="1" Background="#0E1214" ClipToBounds="True" Opacity="0.88">
+          <Grid>
           <Viewbox x:Name="GoldenCanvasViewbox" Stretch="Uniform">
           <Viewbox.LayoutTransform>
             <ScaleTransform x:Name="GoldenZoomTransform" ScaleX="1" ScaleY="1"/>
@@ -299,6 +323,8 @@
             <Line X1="290" Y1="0" X2="290" Y2="380" Stroke="#3C6480" StrokeThickness="1" Opacity="0.5"/>
           </Canvas>
           </Viewbox>
+          <Image x:Name="GoldenLearnedReferenceImage" Visibility="Collapsed" Stretch="Uniform"/>
+          </Grid>
         </Border>
         <!-- Footer fields -->
         <UniformGrid Grid.Row="2" Columns="3" Margin="8" Rows="2">

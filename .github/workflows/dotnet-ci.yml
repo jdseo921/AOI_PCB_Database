@@ -40,6 +40,25 @@ jobs:
         shell: pwsh
         run: ./Scripts/run-quality-gates.ps1 -Configuration Release -ResultsDirectory TestResults
 
+      - name: Generate synthetic image-only learning smoke evidence
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $imageLearningOutput = Join-Path (Get-Location) 'TestResults/image-learning-demo'
+          $env:AOI_MONITOR_STORAGE_ROOT = Join-Path $imageLearningOutput 'runtime-storage-synthetic-not-acceptance'
+          New-Item -ItemType Directory -Force -Path $imageLearningOutput, $env:AOI_MONITOR_STORAGE_ROOT | Out-Null
+
+          dotnet run --project AOI_Monitor.Tools/AOI_Monitor.Tools.csproj --configuration Release --no-build -- client-image-learning-demo --synthetic --output $imageLearningOutput --operator ci-image-learning --false-call-target 0.05
+
+          @(
+            'Synthetic image-only learning CI smoke artifact.',
+            'Synthetic only.',
+            'Not customer acceptance.',
+            'Not production model certification.',
+            'Existing quality gates remain authoritative for CI health.'
+          ) | Set-Content -Path (Join-Path $imageLearningOutput 'README_SYNTHETIC_NOT_CUSTOMER_ACCEPTANCE.txt') -Encoding UTF8
+
       - name: Generate simulation dry-run milestone evidence
         shell: pwsh
         run: |
@@ -183,6 +202,35 @@ jobs:
         with:
           name: stage2-camera-pilot-simulation-dry-run-evidence-package
           path: TestResults/simulation-dry-run/stage2-camera-pilot-package
+          if-no-files-found: error
+
+      - name: Upload image-learning report synthetic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-learning-demo-report-synthetic-not-customer-acceptance
+          path: |
+            TestResults/image-learning-demo/README_SYNTHETIC_NOT_CUSTOMER_ACCEPTANCE.txt
+            TestResults/image-learning-demo/README_CLIENT_IMAGE_LEARNING_DEMO.txt
+            TestResults/image-learning-demo/visual_learning_report.html
+            TestResults/image-learning-demo/visual_learning_report.json
+            TestResults/image-learning-demo/learned_reference.png
+            TestResults/image-learning-demo/learned_tolerance_map.png
+            TestResults/image-learning-demo/before_after_false_call_report.html
+            TestResults/image-learning-demo/before_after_results.csv
+            TestResults/image-learning-demo/threshold_sweep.csv
+            TestResults/image-learning-demo/inspection_results.csv
+            TestResults/image-learning-demo/package_manifest.json
+          if-no-files-found: error
+
+      - name: Upload image-learning overlays synthetic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-learning-demo-overlays-synthetic-not-customer-acceptance
+          path: |
+            TestResults/image-learning-demo/README_SYNTHETIC_NOT_CUSTOMER_ACCEPTANCE.txt
+            TestResults/image-learning-demo/annotated_overlays
+            TestResults/image-learning-demo/heatmaps
+            TestResults/image-learning-demo/example_images
           if-no-files-found: error
 
       - name: Upload industrial quality gate report

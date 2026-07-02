@@ -108,19 +108,28 @@ public partial class AiTrainingSetupView : UserControl
         }
     }
 
-    private void OnOpenFolderClick(object sender, RoutedEventArgs e)
+    private async void OnImportRoleFolderClick(object sender, RoutedEventArgs e)
     {
-        if (!TryGetRole(sender, out var role))
-            return;
-
-        var folder = AiTrainingSetupViewModel.RoleFolder(role);
-        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+        try
         {
-            MessageBox.Show("No folder is available for this image group yet.", "AI Training Setup", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+            if (!TryGetRole(sender, out var role))
+                return;
 
-        OpenPath(folder, "Open Folder");
+            var dialog = new OpenFolderDialog
+            {
+                Title = $"Import {DisplayRole(role)} image folder",
+                Multiselect = false,
+            };
+
+            if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.FolderName))
+                return;
+
+            await ImportRolePathsAsync(role, [dialog.FolderName], $"Import {DisplayRole(role)} Folder");
+        }
+        catch (Exception ex)
+        {
+            ShowOperationFailure("Import Folder", ex);
+        }
     }
 
     private void OnPreviewRoleClick(object sender, RoutedEventArgs e)
@@ -220,6 +229,161 @@ public partial class AiTrainingSetupView : UserControl
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }, "Set Active Inspection Model");
+
+    private void OnManageOpenProjectClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetStringTag(sender, out var projectId))
+            return;
+
+        RunUiAction(() => _viewModel.OpenManagedProject(projectId), "Open Managed Training Project");
+    }
+
+    private void OnManageRenameProjectClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: TrainedDataProjectRow row })
+            return;
+
+        RunUiAction(() => _viewModel.RenameManagedProject(row.ProjectId, row.RenameText), "Rename Training Project");
+    }
+
+    private void OnManageArchiveProjectClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetStringTag(sender, out var projectId))
+            return;
+
+        var confirmed = MessageBox.Show(
+            "Archive this image-only learning project metadata? Original customer image files are not deleted by this action.",
+            "Manage Trained Data",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirmed != MessageBoxResult.Yes)
+            return;
+
+        RunUiAction(() => _viewModel.ArchiveManagedProject(projectId), "Archive Training Project");
+    }
+
+    private void OnManageDuplicateProjectClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetStringTag(sender, out var projectId))
+            return;
+
+        RunUiAction(() => _viewModel.DuplicateManagedProject(projectId), "Duplicate Training Project");
+    }
+
+    private async void OnManageRebuildModelClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!TryGetStringTag(sender, out var projectId))
+                return;
+
+            await RunLongActionAsync(
+                () => _viewModel.RebuildManagedModel(projectId),
+                "Rebuild Learned Model");
+        }
+        catch (Exception ex)
+        {
+            ShowOperationFailure("Rebuild Learned Model", ex);
+        }
+    }
+
+    private void OnManageSetActiveModelClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetStringTag(sender, out var modelId))
+            return;
+
+        RunUiAction(() =>
+        {
+            var active = _viewModel.SetManagedModelAsActive(modelId);
+            MessageBox.Show(
+                $"Active learned model set.\n\nModel ID: {active.ModelId}\nVersion: {active.ModelVersion}\n\nImage-only Stage 1 learning; not live camera validation.",
+                "Manage Trained Data",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }, "Set Active Learned Model");
+    }
+
+    private async void OnManageExportArtifactsClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!TryGetStringTag(sender, out var modelId))
+                return;
+
+            TrainedDataManagementExportResult? result = null;
+            await RunLongActionAsync(
+                () => result = _viewModel.ExportManagedModelArtifacts(modelId),
+                "Export Model Artifacts");
+            if (result is not null)
+                OpenPath(result.OutputFolder, "Open Model Artifact Export Folder");
+        }
+        catch (Exception ex)
+        {
+            ShowOperationFailure("Export Model Artifacts", ex);
+        }
+    }
+
+    private async void OnManageExportLearningReportClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is not FrameworkElement { Tag: TrainedDataModelVersionRow row })
+                return;
+
+            ImageOnlyLearningReportResult? result = null;
+            await RunLongActionAsync(
+                () => result = _viewModel.ExportManagedLearningReport(row.ProjectId, row.ModelId),
+                "Export Learning Report");
+            if (result is not null)
+                OpenPath(result.OutputFolder, "Open Learning Report Folder");
+        }
+        catch (Exception ex)
+        {
+            ShowOperationFailure("Export Learning Report", ex);
+        }
+    }
+
+    private void OnManageOpenArtifactFolderClick(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetStringTag(sender, out var modelId))
+            return;
+
+        RunUiAction(() => OpenPath(_viewModel.ManagedArtifactFolder(modelId), "Open Artifact Folder"), "Open Artifact Folder");
+    }
+
+    private async void OnManageDeleteGeneratedArtifactsClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!TryGetStringTag(sender, out var modelId))
+                return;
+
+            var confirmed = MessageBox.Show(
+                "Delete generated learned-model artifacts for this version? Original customer image files and imported image records are not deleted.",
+                "Manage Trained Data",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (confirmed != MessageBoxResult.Yes)
+                return;
+
+            ImageLearningArtifactDeletionResult? result = null;
+            await RunLongActionAsync(
+                () => result = _viewModel.DeleteManagedGeneratedArtifacts(modelId, explicitConfirmation: true),
+                "Delete Generated Artifacts");
+            if (result is not null)
+            {
+                MessageBox.Show(
+                    $"Generated artifacts deleted.\n\nFiles deleted: {result.FilesDeleted}\nMissing files: {result.MissingFiles}\n\nOriginal customer images were not deleted.",
+                    "Manage Trained Data",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowOperationFailure("Delete Generated Artifacts", ex);
+        }
+    }
 
     private async Task RunLongActionAsync(Action action, string title)
     {
@@ -327,6 +491,18 @@ public partial class AiTrainingSetupView : UserControl
             Enum.TryParse(text, ignoreCase: true, out ImageLearningImageRole parsed))
         {
             role = parsed;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetStringTag(object sender, out string value)
+    {
+        value = string.Empty;
+        if (sender is FrameworkElement { Tag: string text } && !string.IsNullOrWhiteSpace(text))
+        {
+            value = text;
             return true;
         }
 

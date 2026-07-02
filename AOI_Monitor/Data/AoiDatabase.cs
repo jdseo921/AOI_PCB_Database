@@ -2228,7 +2228,7 @@ public static class AoiDatabase
         project.UpdatedAtUtc = project.UpdatedAtUtc == default ? project.CreatedAtUtc : project.UpdatedAtUtc.ToUniversalTime();
 
         RecordAuditEvent(
-            "IMAGE_LEARNING_PROJECT_CREATE",
+            "IMAGE_LEARNING_PROJECT_CREATED",
             $"Image-only learning project created: {project.ProjectId}; board={project.BoardModel}; evidenceMode={project.EvidenceMode}.",
             operatorWithRole: project.CreatedBy,
             relatedEntityType: "ImageLearningProject",
@@ -2295,6 +2295,45 @@ public static class AoiDatabase
         return projects;
     }
 
+    public static void UpdateImageLearningProjectMetadata(
+        string projectId,
+        string projectName,
+        string boardModel,
+        string description,
+        string updatedBy = "UNKNOWN")
+    {
+        EnsureInitialized();
+
+        if (string.IsNullOrWhiteSpace(projectId))
+            throw new ArgumentException("Project ID is required.", nameof(projectId));
+        var updatedAt = DateTime.UtcNow;
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE ImageLearningProjects
+            SET ProjectName = $projectName,
+                BoardModel = $boardModel,
+                Description = $description,
+                UpdatedAtUtc = $updatedAtUtc
+            WHERE ProjectId = $projectId;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId.Trim());
+        command.Parameters.AddWithValue("$projectName", string.IsNullOrWhiteSpace(projectName) ? "Image-only PCB learning" : projectName.Trim());
+        command.Parameters.AddWithValue("$boardModel", string.IsNullOrWhiteSpace(boardModel) ? "UNKNOWN" : boardModel.Trim());
+        command.Parameters.AddWithValue("$description", description?.Trim() ?? string.Empty);
+        command.Parameters.AddWithValue("$updatedAtUtc", updatedAt.ToString("O", CultureInfo.InvariantCulture));
+        if (command.ExecuteNonQuery() == 0)
+            throw new InvalidOperationException("Image-only learning project does not exist.");
+
+        RecordAuditEvent(
+            "IMAGE_LEARNING_PROJECT_METADATA_UPDATED",
+            $"Image-only learning project metadata updated: {projectId}; name={projectName}.",
+            operatorWithRole: updatedBy,
+            relatedEntityType: "ImageLearningProject",
+            relatedEntityId: projectId);
+    }
+
     public static void ArchiveImageLearningProject(string projectId, string archivedBy, string reason)
     {
         EnsureInitialized();
@@ -2319,7 +2358,7 @@ public static class AoiDatabase
         command.ExecuteNonQuery();
 
         RecordAuditEvent(
-            "IMAGE_LEARNING_PROJECT_ARCHIVE",
+            "IMAGE_LEARNING_PROJECT_ARCHIVED",
             $"Image-only learning project archived: {projectId}; reason={reason}.",
             operatorWithRole: archivedBy,
             relatedEntityType: "ImageLearningProject",
@@ -2372,7 +2411,7 @@ public static class AoiDatabase
         image.Id = (long)(command.ExecuteScalar() ?? 0L);
 
         RecordAuditEvent(
-            "IMAGE_LEARNING_IMAGE_IMPORT",
+            "IMAGE_LEARNING_IMAGES_IMPORTED",
             $"Image-only learning image imported: project={image.ProjectId}; role={image.Role}; file={image.FileName}; truth={image.ImageLevelTruth}.",
             operatorWithRole: image.ImportedBy,
             relatedEntityType: "ImageLearningProjectImage",
@@ -2470,7 +2509,7 @@ public static class AoiDatabase
         model.CreatedBy = string.IsNullOrWhiteSpace(model.CreatedBy) ? AuditOperatorProvider?.Invoke() ?? "UNKNOWN" : model.CreatedBy.Trim();
 
         var auditEventId = RecordAuditEvent(
-            "IMAGE_LEARNING_MODEL_CREATE",
+            "IMAGE_LEARNING_MODEL_CREATED",
             $"Image-only visual model metadata recorded: model={model.ModelId}; version={model.ModelVersion}; project={model.ProjectId}; evidenceMode={model.EvidenceMode}.",
             operatorWithRole: model.CreatedBy,
             relatedEntityType: "LearnedPcbVisualModel",
@@ -2602,6 +2641,81 @@ public static class AoiDatabase
             model.Artifacts = GetLearnedPcbVisualModelArtifacts(model.ModelId).ToList();
 
         return models;
+    }
+
+    public static IReadOnlyList<LearnedPcbVisualModel> GetLearnedPcbVisualModelsForProject(string projectId, int limit = 100)
+    {
+        EnsureInitialized();
+
+        var models = new List<LearnedPcbVisualModel>();
+        using (var connection = OpenConnection())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                """
+                SELECT Id, ModelId, ModelVersion, CreatedAtUtc, ProjectId, GoldenCount, OkLearningCount, OkValidationCount,
+                       InputWidth, InputHeight, AlignmentMode, BrightnessNormalizationMode, LearnedThreshold,
+                       FalseCallTarget, FalseCallRate, PossibleEscapeRate, EvidenceMode, CreatedBy, AuditEventId
+                FROM LearnedPcbVisualModels
+                WHERE ProjectId = $projectId
+                ORDER BY CreatedAtUtc DESC, Id DESC
+                LIMIT $limit;
+                """;
+            command.Parameters.AddWithValue("$projectId", projectId);
+            command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 1000));
+
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                models.Add(ReadLearnedPcbVisualModel(reader, Array.Empty<LearnedPcbVisualModelArtifact>()));
+        }
+
+        foreach (var model in models)
+            model.Artifacts = GetLearnedPcbVisualModelArtifacts(model.ModelId).ToList();
+
+        return models;
+    }
+
+    public static int DeleteLearnedPcbVisualModelArtifactRecords(string modelId, IEnumerable<string>? artifactNames = null)
+    {
+        EnsureInitialized();
+
+        var names = artifactNames?
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? Array.Empty<string>();
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var deleted = 0;
+
+        if (names.Length == 0)
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "DELETE FROM LearnedPcbVisualModelArtifacts WHERE ModelId = $modelId;";
+            command.Parameters.AddWithValue("$modelId", modelId);
+            deleted += command.ExecuteNonQuery();
+        }
+        else
+        {
+            foreach (var name in names)
+            {
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText =
+                    """
+                    DELETE FROM LearnedPcbVisualModelArtifacts
+                    WHERE ModelId = $modelId
+                      AND ArtifactName = $artifactName;
+                    """;
+                command.Parameters.AddWithValue("$modelId", modelId);
+                command.Parameters.AddWithValue("$artifactName", name);
+                deleted += command.ExecuteNonQuery();
+            }
+        }
+
+        transaction.Commit();
+        return deleted;
     }
 
     public static long RecordImageLearningInspectionResult(ImageLearningInspectionResult result)
@@ -2770,6 +2884,37 @@ public static class AoiDatabase
 
         using var reader = command.ExecuteReader();
         return reader.Read() ? ReadImageLearningCalibrationResult(reader) : null;
+    }
+
+    public static IReadOnlyList<ImageLearningCalibrationResult> GetImageLearningCalibrationResults(
+        string? projectId = null,
+        string? modelId = null,
+        int limit = 100)
+    {
+        EnsureInitialized();
+
+        var results = new List<ImageLearningCalibrationResult>();
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, CalibrationId, ProjectId, ModelId, CreatedAtUtc, OkValidationCount, NgValidationCount,
+                   LearnedThreshold, FalseCallTarget, FalseCallRate, PossibleEscapeRate, Status, Summary
+            FROM ImageLearningCalibrationResults
+            WHERE ($projectId = '' OR ProjectId = $projectId)
+              AND ($modelId = '' OR ModelId = $modelId)
+            ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$projectId", string.IsNullOrWhiteSpace(projectId) ? string.Empty : projectId.Trim());
+        command.Parameters.AddWithValue("$modelId", string.IsNullOrWhiteSpace(modelId) ? string.Empty : modelId.Trim());
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 1000));
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            results.Add(ReadImageLearningCalibrationResult(reader));
+
+        return results;
     }
 
     public static long RecordImageLearningComparisonResult(ImageLearningComparisonResult result)

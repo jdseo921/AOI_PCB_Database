@@ -96,6 +96,49 @@ public sealed class AiTrainingSetupServiceTests : IDisposable
     }
 
     [Fact]
+    public void AiTrainingSetupRoleFolderImportShowsOkValidationMetric()
+    {
+        AiTrainingSetupService.CreateTrainingProject("Role folder import", "BOARD-SETUP", UserRole.Engineer, "Engineer01 [Engineer]");
+        var okValidationFolder = Path.Combine(_root, "ok-validation-folder");
+        WritePng(Path.Combine(okValidationFolder, "ok-validation-1.png"), 92);
+        WritePng(Path.Combine(okValidationFolder, "ok-validation-2.jpg"), 94);
+
+        var results = AiTrainingSetupService.ImportImages(
+            ImageLearningImageRole.OkValidation,
+            new[] { okValidationFolder },
+            UserRole.Engineer,
+            "Engineer01 [Engineer]");
+        var snapshot = AiTrainingSetupService.GetSnapshot(UserRole.Engineer);
+
+        Assert.Equal(2, results.Count(result => result.Imported));
+        Assert.Contains(snapshot.RoleCards, card =>
+            card.Role == ImageLearningImageRole.OkValidation &&
+            card.ImageCount == 2 &&
+            string.Equals(card.LastFolder, okValidationFolder, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(snapshot.MetricCards, card =>
+            card.Label == "OK validation images" &&
+            card.Value == "2");
+    }
+
+    [Fact]
+    public void AiTrainingSetupFalseCallReductionMetricUsesRelativeReduction()
+    {
+        AiTrainingSetupService.CreateTrainingProject("False-call metric", "BOARD-SETUP", UserRole.Engineer, "Engineer01 [Engineer]");
+        var state = AiTrainingSetupService.LoadState();
+        state.FalseCallsBeforeLearning = 2;
+        state.FalseCallsAfterLearning = 1;
+        state.FalseCallRateBeforeLearning = 0.5;
+        state.FalseCallRateAfterLearning = 0.25;
+        AiTrainingSetupService.SaveState(state);
+
+        var snapshot = AiTrainingSetupService.GetSnapshot(UserRole.Engineer);
+
+        Assert.Contains(snapshot.MetricCards, card =>
+            card.Label == "False-call reduction" &&
+            card.Value == "50.0 %");
+    }
+
+    [Fact]
     public void AiTrainingSetupOperatorCannotRunLearning()
     {
         AiTrainingSetupService.CreateTrainingProject("Operator denied", "BOARD-SETUP", UserRole.Engineer, "Engineer01 [Engineer]");
@@ -128,6 +171,18 @@ public sealed class AiTrainingSetupServiceTests : IDisposable
         Assert.Contains(snapshot.Timeline, item => item.Label == "Model learned" && item.IsComplete);
     }
 
+    [Fact]
+    public void AiTrainingSetupAdminCanRunLearning()
+    {
+        AiTrainingSetupService.CreateTrainingProject("Admin learns", "BOARD-SETUP", UserRole.Admin, "Admin01 [Admin]");
+        ImportOkLearningImages();
+
+        var outcome = AiTrainingSetupService.RunLearning(UserRole.Admin, _options, "Admin01 [Admin]");
+
+        Assert.NotNull(outcome.LearningResult.Model);
+        Assert.False(string.IsNullOrWhiteSpace(outcome.LearningResult.Model.ModelId));
+    }
+
     private void ImportOkLearningImages()
     {
         for (var i = 0; i < 5; i++)
@@ -142,8 +197,10 @@ public sealed class AiTrainingSetupServiceTests : IDisposable
 
     private string WritePng(string fileName, int value)
     {
-        Directory.CreateDirectory(_root);
-        var path = Path.Combine(_root, fileName);
+        var path = Path.IsPathRooted(fileName)
+            ? fileName
+            : Path.Combine(_root, fileName);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         const int width = 8;
         const int height = 8;
         var pixels = new byte[width * height * 4];

@@ -317,7 +317,8 @@ $mockMesContextPattern = '(?i)\bmock\b|\bmock mode\b|\bmock REST\b|\bMES mock\b|
 $realMesEvidencePattern = '(?i)\bMES REST Ready\b|\bproduction MES\b|\breal MES\b|\baccepted factory traceability\b|\btraceability signoff\b|\bpassing traceability\b|\bMES acceptance\b'
 $noFalsePositiveClaimPattern = '(?i)\b(no|zero|0)\s+false[- ]positives?\b|\b(no|zero|0)\s+false[- ]calls?\b|\bfalse[- ]positive[- ]free\b|\bfalse[- ]call[- ]free\b'
 $detectsAllDefectsPattern = '(?i)\bdetects?\s+(all|every)\s+defects?\b|\ball\s+defects?\s+(are\s+)?detected\b|\bevery\s+defect\s+(is\s+)?detected\b'
-$ngValidationEvidencePattern = '(?i)\bNG validation\b|\bknown[- ]bad\b|\bpossible[- ]escape\b|\bpossible escapes\b|\bmissed[- ]defect\b|\bmissed defect rate\b'
+$ngValidationEvidencePattern = '(?i)\bNG validation\b|\bknown[- ]bad\b'
+$possibleEscapeEvidencePattern = '(?i)\bpossible[- ]escape\b|\bpossible escapes\b|\bmissed[- ]defect\b|\bmissed defect rate\b'
 
 $linesByPath = $addedLines | Group-Object -Property path
 foreach ($group in $linesByPath) {
@@ -380,7 +381,8 @@ foreach ($group in $docLinesByPath) {
             Add-Issue "FAIL" "PR-FP-CLAIM-001" $group.Name "Absolute no-false-positive or no-false-call wording was added. Report measured false-call rates with OK Validation image counts instead."
         }
 
-        if ($line -match $detectsAllDefectsPattern -and $context -notmatch $ngValidationEvidencePattern) {
+        if ($line -match $detectsAllDefectsPattern -and
+            ($context -notmatch $ngValidationEvidencePattern -or $context -notmatch $possibleEscapeEvidencePattern)) {
             Add-Issue "WARN" "PR-DEFECT-CLAIM-001" $group.Name "Absolute defect-detection wording was added without nearby NG Validation and possible-escape evidence."
         }
 

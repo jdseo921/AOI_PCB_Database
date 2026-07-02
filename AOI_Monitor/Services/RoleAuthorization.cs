@@ -17,6 +17,9 @@ public static class RoleAuthorization
     public static bool CanRunImageOnlyLearning(UserRole role) => role >= UserRole.Engineer;
     public static bool CanSetActiveLearnedVisualModel(UserRole role) => role >= UserRole.Engineer;
     public static bool CanExportImageLearningReports(UserRole role) => role >= UserRole.Engineer;
+    public static bool CanManageImageLearningTrainedData(UserRole role) => role >= UserRole.Engineer;
+    public static bool CanArchiveImageLearningProjects(UserRole role) => role >= UserRole.Admin;
+    public static bool CanDeleteImageLearningArtifacts(UserRole role) => role >= UserRole.Admin;
     public static bool CanChangeThresholds(UserRole role) => role >= UserRole.Engineer;
     public static bool CanExportLogs(UserRole role) => role >= UserRole.Admin;
     public static bool CanManageSettings(UserRole role) => role >= UserRole.Admin;

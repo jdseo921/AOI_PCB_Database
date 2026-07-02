@@ -99,7 +99,12 @@ public sealed class ImageLearningOverlayExportServiceTests : IDisposable
 
         Assert.True(File.Exists(export.ManifestPath));
         Assert.Equal(export.OutputFolder, Path.GetDirectoryName(export.ManifestPath));
-        Assert.Contains("image-learning-visual-evidence.v1", File.ReadAllText(export.ManifestPath), StringComparison.OrdinalIgnoreCase);
+        var manifest = File.ReadAllText(export.ManifestPath);
+        var inspectionItem = Assert.Single(export.Items, row => row.Category == "inspection_results");
+        Assert.Contains("image-learning-visual-evidence.v1", manifest, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(ImageOnlyPcbLearningService.EngineName, manifest, StringComparison.OrdinalIgnoreCase);
+        Assert.True(File.Exists(inspectionItem.ReferenceVsInspectedPath));
+        Assert.True(File.Exists(inspectionItem.BaselineVsLearnedPath));
         Assert.Contains(AoiDatabase.GetExportHistory(), row => row.Id == export.ExportHistoryId && row.ExportType == "ImageLearningVisualEvidence");
         Assert.Single(AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "IMAGE_LEARNING_VISUAL_EVIDENCE_EXPORT" }));
     }

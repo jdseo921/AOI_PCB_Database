@@ -381,8 +381,8 @@ public static class ImageLearningOverlayExportService
                 dc.DrawRectangle(fill, null, rect);
             }
 
-            DrawLabel(dc, "Learned anomaly heatmap", new Point(8, 8), Brushes.White, HeatmapLabelBrush(), size.Width - 16);
-            DrawLabel(dc, $"Verdict {NormalizeVerdict(result.Verdict)} / score {result.AnomalyScore:F2}", new Point(8, size.Height - 34), Brushes.White, DarkLabelBrush(), size.Width - 16);
+            DrawLabel(dc, $"{ImageOnlyPcbLearningService.EngineName} anomaly heatmap", new Point(8, 8), Brushes.White, HeatmapLabelBrush(), size.Width - 16);
+            DrawLabel(dc, BuildLearnedSummaryLabel(result), new Point(8, size.Height - 34), Brushes.White, DarkLabelBrush(), size.Width - 16);
         }
 
         SaveRenderedVisual(visual, (int)Math.Ceiling(size.Width), (int)Math.Ceiling(size.Height), outputPath);
@@ -400,8 +400,8 @@ public static class ImageLearningOverlayExportService
         {
             dc.DrawImage(inspected, imageRect);
             DrawLearnedBoxes(dc, result, imageRect);
-            DrawLabel(dc, "Learned visual model", new Point(8, 8), Brushes.White, LearnedLabelBrush(), size.Width - 16);
-            DrawLabel(dc, $"Verdict {NormalizeVerdict(result.Verdict)} / score {result.AnomalyScore:F2}", new Point(8, 38), Brushes.White, DarkLabelBrush(), size.Width - 16);
+            DrawLabel(dc, ImageOnlyPcbLearningService.EngineName, new Point(8, 8), Brushes.White, LearnedLabelBrush(), size.Width - 16);
+            DrawLabel(dc, BuildLearnedSummaryLabel(result), new Point(8, 38), Brushes.White, DarkLabelBrush(), size.Width - 16);
         }
 
         SaveRenderedVisual(visual, (int)Math.Ceiling(size.Width), (int)Math.Ceiling(size.Height), outputPath);
@@ -453,7 +453,7 @@ public static class ImageLearningOverlayExportService
                 DrawBaselineBoxes(dc, baseline, left);
             DrawLearnedBoxes(dc, learned, right);
             DrawLabel(dc, $"Before learning: {NormalizeVerdict(baseline?.Verdict ?? "REVIEW")}", new Point(8, 5), Brushes.White, BaselineLabelBrush(), panelSize.Width - 16);
-            DrawLabel(dc, $"Learned visual model: {NormalizeVerdict(learned.Verdict)}", new Point(panelSize.Width + SideBySideGapPixels + 8, 5), Brushes.White, LearnedLabelBrush(), panelSize.Width - 16);
+            DrawLabel(dc, $"{ImageOnlyPcbLearningService.EngineName}: {NormalizeVerdict(learned.Verdict)} / Anomaly score {learned.AnomalyScore:F2}", new Point(panelSize.Width + SideBySideGapPixels + 8, 5), Brushes.White, LearnedLabelBrush(), panelSize.Width - 16);
         }
 
         SaveRenderedVisual(visual, width, height, outputPath);
@@ -476,9 +476,17 @@ public static class ImageLearningOverlayExportService
         {
             var rect = ToDisplayRect(region.X, region.Y, region.Width, region.Height, imageRect);
             dc.DrawRectangle(null, string.Equals(region.Severity, "NG", StringComparison.OrdinalIgnoreCase) ? pen : reviewPen, rect);
-            var label = $"Score {region.Score:F2} / Conf {region.Confidence:P0}";
+            var label = $"Anomaly score {region.Score:F2} / Confidence {region.Confidence:P0}";
             DrawLabel(dc, label, new Point(rect.X, Math.Max(imageRect.Y + 2, rect.Y - 28)), Brushes.White, DarkLabelBrush(), Math.Max(110, imageRect.Right - rect.X - 4));
         }
+    }
+
+    private static string BuildLearnedSummaryLabel(ImageLearningInspectionResult result)
+    {
+        var confidence = result.AnomalyRegions.Count == 0
+            ? 0
+            : result.AnomalyRegions.Max(region => region.Confidence);
+        return $"Verdict {NormalizeVerdict(result.Verdict)} / Anomaly score {result.AnomalyScore:F2} / Confidence {confidence:P0}";
     }
 
     private static void DrawBaselineBoxes(DrawingContext dc, AnalysisResult baseline, Rect imageRect)

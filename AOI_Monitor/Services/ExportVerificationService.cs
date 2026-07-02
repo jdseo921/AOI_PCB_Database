@@ -406,6 +406,10 @@ public static class ExportVerificationService
         if (exportType.Contains("LearnFromImagesEvidence", StringComparison.OrdinalIgnoreCase))
             return Array.Empty<string>();
 
+        if (exportType.Contains("ImageLearning", StringComparison.OrdinalIgnoreCase) ||
+            exportType.Contains("ImageOnlyLearning", StringComparison.OrdinalIgnoreCase))
+            return Array.Empty<string>();
+
         if (exportType.Contains("ReviewDispositionLog", StringComparison.OrdinalIgnoreCase) ||
             fileName.Contains("review_disposition", StringComparison.OrdinalIgnoreCase))
             return new[] { "TimestampUtc", "StationId", "OperatorId", "Sample", "Golden", "Verdict", "Action" };

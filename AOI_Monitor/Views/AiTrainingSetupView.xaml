@@ -96,7 +96,7 @@
                     <TextBlock Text="{Binding LastFolder}" Foreground="#7F8C95" FontSize="14" TextTrimming="CharacterEllipsis" ToolTip="{Binding LastFolder}" Margin="0,0,0,8"/>
                     <WrapPanel>
                       <Button Style="{StaticResource ActionBtnBlue}" Content="Add Images" MinWidth="120" MinHeight="40" IsEnabled="{Binding CanEdit}" Tag="{Binding Role}" Click="OnAddImagesClick" Margin="0,0,6,6"/>
-                      <Button Style="{StaticResource ActionBtn}" Content="Open Folder" MinWidth="120" MinHeight="40" Tag="{Binding Role}" Click="OnOpenFolderClick" Margin="0,0,6,6"/>
+                      <Button Style="{StaticResource ActionBtn}" Content="Import Folder" MinWidth="120" MinHeight="40" IsEnabled="{Binding CanEdit}" Tag="{Binding Role}" Click="OnImportRoleFolderClick" Margin="0,0,6,6"/>
                       <Button Style="{StaticResource ActionBtn}" Content="Preview" MinWidth="120" MinHeight="40" Tag="{Binding Role}" Click="OnPreviewRoleClick" Margin="0,0,6,6"/>
                     </WrapPanel>
                   </StackPanel>
@@ -209,6 +209,170 @@
             <Button Style="{StaticResource ActionBtnAmber}" Content="Set as Active Inspection Model" MinWidth="250" MinHeight="40" IsEnabled="{Binding CanSetActiveInspectionModel}" Click="OnSetActiveInspectionModelClick" Margin="0,0,6,6"/>
             <Button Style="{StaticResource ActionBtn}" Content="Export Client Learning Report" MinWidth="230" MinHeight="40" IsEnabled="{Binding CanExportReport}" Click="OnExportReportClick" Margin="0,0,6,6"/>
           </WrapPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource Panel}" Padding="10" Margin="0,0,0,8">
+        <StackPanel>
+          <DockPanel>
+            <StackPanel>
+              <TextBlock Text="AI / Models > AI Training Setup > Manage Trained Data" Style="{StaticResource HmiSectionHeaderText}"/>
+              <TextBlock Text="{Binding TrainedDataSummaryText}" Style="{StaticResource HmiTechnicalHintText}" TextWrapping="Wrap"/>
+              <TextBlock Text="{Binding ActiveTrainedDataModelDisplay}" Foreground="#C084FC" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
+            </StackPanel>
+          </DockPanel>
+
+          <ItemsControl ItemsSource="{Binding TrainedDataInstructions}" Margin="0,8,0,0">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource FieldBox}" Width="360" MinHeight="58" Margin="0,0,8,8">
+                  <TextBlock Text="{Binding}" Foreground="#E8EEF2" FontSize="14" TextWrapping="Wrap"/>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="Learning Projects" Style="{StaticResource HmiSectionHeaderText}" Margin="0,4,0,0"/>
+          <ItemsControl ItemsSource="{Binding TrainedDataProjects}" Margin="0,6,0,0">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource FieldBox}" Width="430" MinHeight="234" Margin="0,0,8,8">
+                  <StackPanel>
+                    <DockPanel>
+                      <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Foreground="#E1A334" FontWeight="Bold" FontSize="14" Margin="8,0,0,0"/>
+                      <TextBlock Text="{Binding ProjectName}" Foreground="#E8EEF2" FontWeight="Bold" FontSize="16" TextWrapping="Wrap"/>
+                    </DockPanel>
+                    <TextBlock Text="{Binding ProjectId}" Style="{StaticResource FactoryTrimmedTextWithTooltip}" Margin="0,4,0,0"/>
+                    <TextBlock Text="{Binding ImageGroupSummary}" Foreground="#A8B2B9" FontSize="14" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                    <TextBlock Text="{Binding MetricsSummary}" Foreground="#A8B2B9" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,6"/>
+                    <TextBox Text="{Binding RenameText, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" FontSize="14" Margin="0,0,0,6"/>
+                    <WrapPanel>
+                      <Button Style="{StaticResource ActionBtnBlue}" Content="Open Project" MinWidth="130" MinHeight="40" IsEnabled="{Binding DataContext.CanManageOpenProject, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding ProjectId}" Click="OnManageOpenProjectClick" Margin="0,0,6,6"/>
+                      <Button Style="{StaticResource ActionBtn}" Content="Rename Project" MinWidth="145" MinHeight="40" IsEnabled="{Binding DataContext.CanManageRenameProject, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding}" Click="OnManageRenameProjectClick" Margin="0,0,6,6"/>
+                      <Button Style="{StaticResource ActionBtn}" Content="Duplicate Project" MinWidth="155" MinHeight="40" IsEnabled="{Binding DataContext.CanManageDuplicateProject, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding ProjectId}" Click="OnManageDuplicateProjectClick" Margin="0,0,6,6"/>
+                      <Button Style="{StaticResource ActionBtnGreen}" Content="Rebuild Learned Model" MinWidth="190" MinHeight="40" IsEnabled="{Binding DataContext.CanManageRebuildModel, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding ProjectId}" Click="OnManageRebuildModelClick" Margin="0,0,6,6"/>
+                      <Button Style="{StaticResource ActionBtnAmber}" Content="Archive Project" MinWidth="145" MinHeight="40" IsEnabled="{Binding DataContext.CanManageArchiveProject, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding ProjectId}" Click="OnManageArchiveProjectClick" Margin="0,0,6,6"/>
+                    </WrapPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="Learned Visual Model Versions" Style="{StaticResource HmiSectionHeaderText}" Margin="0,4,0,0"/>
+          <ItemsControl ItemsSource="{Binding TrainedDataModelVersions}" Margin="0,6,0,0">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel/>
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource FieldBox}" Width="460" MinHeight="230" Margin="0,0,8,8">
+                  <StackPanel>
+                    <DockPanel>
+                      <TextBlock DockPanel.Dock="Right" Text="{Binding IsActive, StringFormat=Active: {0}}" Foreground="#C084FC" FontWeight="Bold" FontSize="14" Margin="8,0,0,0"/>
+                      <TextBlock Text="{Binding VersionDisplay}" Foreground="#E8EEF2" FontWeight="Bold" FontSize="16" TextWrapping="Wrap"/>
+                    </DockPanel>
+                    <TextBlock Text="{Binding ModelId}" Style="{StaticResource FactoryTrimmedTextWithTooltip}" Margin="0,4,0,0"/>
+                    <TextBlock Text="{Binding ProjectName}" Foreground="#A8B2B9" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    <TextBlock Text="{Binding MetricsSummary}" Foreground="#A8B2B9" FontSize="14" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                    <TextBlock Text="{Binding ArtifactStatus}" Foreground="#E1A334" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    <TextBlock Text="{Binding ArtifactFolder}" Style="{StaticResource FactoryTrimmedTextWithTooltip}" Margin="0,4,0,8"/>
+                    <WrapPanel>
+                      <Button Style="{StaticResource ActionBtnAmber}" Content="Set Active" MinWidth="120" MinHeight="40" IsEnabled="{Binding DataContext.CanManageSetActiveModel, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding ModelId}" Click="OnManageSetActiveModelClick" Margin="0,0,6,6"/>
+                      <Button Style="{StaticResource ActionBtnBlue}" Content="Export Artifacts" MinWidth="150" MinHeight="40" IsEnabled="{Binding DataContext.CanManageExportModelArtifacts, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding ModelId}" Click="OnManageExportArtifactsClick" Margin="0,0,6,6"/>
+                      <Button Style="{StaticResource ActionBtn}" Content="Export Learning Report" MinWidth="190" MinHeight="40" IsEnabled="{Binding DataContext.CanManageExportLearningReport, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding}" Click="OnManageExportLearningReportClick" Margin="0,0,6,6"/>
+                      <Button Style="{StaticResource ActionBtn}" Content="Open Artifact Folder" MinWidth="180" MinHeight="40" IsEnabled="{Binding DataContext.CanManageOpenArtifactFolder, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding ModelId}" Click="OnManageOpenArtifactFolderClick" Margin="0,0,6,6"/>
+                      <Button Style="{StaticResource ActionBtnAmber}" Content="Delete Generated Artifacts" MinWidth="220" MinHeight="40" IsEnabled="{Binding DataContext.CanManageDeleteGeneratedArtifacts, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding ModelId}" Click="OnManageDeleteGeneratedArtifactsClick" Margin="0,0,6,6"/>
+                    </WrapPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Grid Margin="0,4,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="1.2*"/>
+              <ColumnDefinition Width="8"/>
+              <ColumnDefinition Width="1.1*"/>
+              <ColumnDefinition Width="8"/>
+              <ColumnDefinition Width="1.2*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource FieldBox}" MinHeight="180">
+              <StackPanel>
+                <TextBlock Text="Calibration Runs" Foreground="#E8EEF2" FontWeight="Bold" FontSize="16"/>
+                <ItemsControl ItemsSource="{Binding TrainedDataCalibrationRuns}" Margin="0,6,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="0,0,0,6" Margin="0,0,0,6">
+                        <StackPanel>
+                          <TextBlock Text="{Binding CalibrationId}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
+                          <TextBlock Text="{Binding ModelId}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
+                          <TextBlock Text="{Binding Summary}" Foreground="#A8B2B9" FontSize="14" TextWrapping="Wrap"/>
+                          <TextBlock Foreground="#E1A334" FontSize="14" TextWrapping="Wrap">
+                            <Run Text="False calls "/><Run Text="{Binding FalseCallRateDisplay}"/><Run Text=" / Possible escapes "/><Run Text="{Binding PossibleEscapeRateDisplay}"/>
+                          </TextBlock>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource FieldBox}" MinHeight="180">
+              <StackPanel>
+                <TextBlock Text="Exported Reports" Foreground="#E8EEF2" FontWeight="Bold" FontSize="16"/>
+                <ItemsControl ItemsSource="{Binding TrainedDataExportedReports}" Margin="0,6,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="0,0,0,6" Margin="0,0,0,6">
+                        <StackPanel>
+                          <TextBlock Text="{Binding ExportType}" Foreground="#E8EEF2" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                          <TextBlock Text="{Binding FilePath}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
+                          <TextBlock Foreground="#A8B2B9" FontSize="14" TextWrapping="Wrap">
+                            <Run Text="Status "/><Run Text="{Binding Status}"/><Run Text=" / Operator "/><Run Text="{Binding OperatorId}"/>
+                          </TextBlock>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Column="4" Style="{StaticResource FieldBox}" MinHeight="180">
+              <StackPanel>
+                <TextBlock Text="Version Comparison" Foreground="#E8EEF2" FontWeight="Bold" FontSize="16"/>
+                <ItemsControl ItemsSource="{Binding TrainedDataModelComparisons}" Margin="0,6,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="0,0,0,6" Margin="0,0,0,6">
+                        <StackPanel>
+                          <TextBlock Text="{Binding VersionDisplay}" Foreground="#E8EEF2" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                          <TextBlock Text="{Binding ModelId}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
+                          <TextBlock Text="{Binding ComparisonSummary}" Foreground="#A8B2B9" FontSize="14" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </Grid>
         </StackPanel>
       </Border>
 

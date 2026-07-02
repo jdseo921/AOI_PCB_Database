@@ -385,7 +385,11 @@ public static class AiTrainingSetupService
             : model.GoldenCount + model.OkLearningCount;
         var before = state.FalseCallRateBeforeLearning;
         var after = state.FalseCallRateAfterLearning;
-        double? reduction = before.HasValue && after.HasValue ? Math.Max(0.0, before.Value - after.Value) : null;
+        double? reduction = before.HasValue && after.HasValue
+            ? before.Value > 0
+                ? Math.Max(0.0, (before.Value - after.Value) / before.Value)
+                : 0
+            : null;
         var beforeValue = state.FalseCallsBeforeLearning.HasValue && before.HasValue
             ? $"{state.FalseCallsBeforeLearning.Value} ({before.Value:P1})"
             : FormatRate(before);
@@ -395,9 +399,10 @@ public static class AiTrainingSetupService
         return
         [
             new("Images learned from", learnedFrom.ToString(CultureInfo.InvariantCulture), "Golden / Reference plus OK Learning images."),
+            new("OK validation images", counts.GetValueOrDefault(ImageLearningImageRole.OkValidation).ToString(CultureInfo.InvariantCulture), "Good boards used to calibrate tolerance and estimate false calls."),
             new("False calls before learning", beforeValue, "Pixel Difference Prototype Engine on OK Validation images."),
             new("False calls after learning", afterValue, "Learned PCB Visual Model v1 on OK Validation images."),
-            new("False-call reduction", FormatRate(reduction), "Before minus after; higher means less unnecessary review."),
+            new("False-call reduction", FormatRate(reduction), "Relative reduction from before-learning false calls; higher means less unnecessary review."),
             new("Possible escapes", state.PossibleEscapeCount.HasValue ? $"{state.PossibleEscapeCount.Value} ({FormatRate(state.PossibleEscapeRate)})" : "No NG set", "Shown only when optional NG Validation images are available."),
             new("Recommended threshold", state.RecommendedThreshold?.ToString("F2", CultureInfo.InvariantCulture) ?? "--", "Threshold selected by OK/NG validation sweep."),
         ];

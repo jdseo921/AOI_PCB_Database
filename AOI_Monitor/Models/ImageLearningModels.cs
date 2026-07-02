@@ -87,6 +87,14 @@ public sealed class LearnedPcbVisualModelArtifact
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 }
 
+public sealed record ImageLearningArtifactDeletionResult(
+    string ModelId,
+    int ArtifactRecordsDeleted,
+    int FilesDeleted,
+    int MissingFiles,
+    IReadOnlyList<string> DeletedPaths,
+    IReadOnlyList<string> MissingPaths);
+
 public sealed class LearnedVisualModelEvidenceSummary
 {
     public string ModelId { get; set; } = string.Empty;

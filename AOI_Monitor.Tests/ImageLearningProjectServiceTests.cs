@@ -54,7 +54,7 @@ public sealed class ImageLearningProjectServiceTests : IDisposable
             "Customer image-only sample grouping.");
 
         var loaded = AoiDatabase.GetImageLearningProject(project.ProjectId);
-        var audit = Assert.Single(AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "IMAGE_LEARNING_PROJECT_CREATE" }));
+        var audit = Assert.Single(AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "IMAGE_LEARNING_PROJECT_CREATED" }));
 
         Assert.NotNull(loaded);
         Assert.StartsWith("ILP-", project.ProjectId, StringComparison.Ordinal);
@@ -101,6 +101,7 @@ public sealed class ImageLearningProjectServiceTests : IDisposable
             Assert.Equal(2, image.Height);
             Assert.False(string.IsNullOrWhiteSpace(image.Sha256));
         });
+        Assert.Equal(2, AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "IMAGE_LEARNING_IMAGES_IMPORTED" }).Count);
     }
 
     [Fact]
@@ -220,7 +221,7 @@ public sealed class ImageLearningProjectServiceTests : IDisposable
         Assert.Contains(loaded.Artifacts, artifact => artifact.ArtifactName == "learning_summary.json");
         Assert.Contains(loaded.Artifacts, artifact => artifact.ArtifactName == "alignment_summary.csv");
         Assert.Contains(loaded.Artifacts, artifact => artifact.ArtifactName == "threshold_sweep.csv");
-        Assert.Single(AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "IMAGE_LEARNING_MODEL_CREATE" }));
+        Assert.Single(AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "IMAGE_LEARNING_MODEL_CREATED" }));
     }
 
     [Fact]
@@ -297,12 +298,71 @@ public sealed class ImageLearningProjectServiceTests : IDisposable
 
         ImageLearningProjectService.ArchiveProject(project.ProjectId, "Admin01 [Admin]", "Customer requested project metadata cleanup.");
         var archived = AoiDatabase.GetImageLearningProject(project.ProjectId);
+        var activeProjects = ImageLearningProjectService.ListProjects();
+        var allProjects = ImageLearningProjectService.ListProjects(includeArchived: true);
         ImageLearningProjectService.DeleteProjectMetadata(project.ProjectId, "Admin01 [Admin]", "Remove local project metadata only.");
 
         Assert.NotNull(archived);
         Assert.True(archived!.IsArchived);
+        Assert.DoesNotContain(activeProjects, item => item.ProjectId == project.ProjectId);
+        Assert.Contains(allProjects, item => item.ProjectId == project.ProjectId && item.IsArchived);
         Assert.True(File.Exists(source));
         Assert.Null(AoiDatabase.GetImageLearningProject(project.ProjectId));
+        Assert.Single(AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "IMAGE_LEARNING_PROJECT_ARCHIVED" }));
+    }
+
+    [Fact]
+    public void DeleteGeneratedLearnedModelArtifactsRequiresExplicitConfirmationAndPreservesImportedImages()
+    {
+        var project = ImageLearningProjectService.CreateProject("Artifact cleanup", "BOARD-ARTIFACT");
+        var source = WritePng("artifact-source.png", 120, 121, 122);
+        var import = ImageLearningProjectService.ImportImageFiles(
+            project.ProjectId,
+            ImageLearningImageRole.GoldenReference,
+            new[] { source }).Single();
+        var artifactFolder = Path.Combine(_root, "runtime-artifacts", "ILM-DELETE");
+        Directory.CreateDirectory(artifactFolder);
+        var artifacts = ImageLearningProjectService.CreateExpectedArtifactRecords("ILM-DELETE", artifactFolder).ToList();
+        foreach (var artifact in artifacts)
+            File.WriteAllText(artifact.ArtifactPath, "generated image-only learning artifact");
+        var model = ImageLearningProjectService.SaveModelMetadata(new LearnedPcbVisualModel
+        {
+            ModelId = "ILM-DELETE",
+            ModelVersion = "1.0.0",
+            ProjectId = project.ProjectId,
+            CreatedBy = "Engineer01 [Engineer]",
+            Artifacts = artifacts,
+        });
+
+        var confirmationError = Assert.Throws<InvalidOperationException>(() =>
+            ImageLearningProjectService.DeleteGeneratedLearnedModelArtifacts(
+                model.ModelId,
+                explicitConfirmation: false,
+                deletedBy: "Admin01 [Admin]",
+                reason: "Unit test guard."));
+        var beforeConfirmedDelete = AoiDatabase.GetLearnedPcbVisualModel(model.ModelId);
+
+        Assert.Contains("Explicit confirmation", confirmationError.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(beforeConfirmedDelete);
+        Assert.Equal(artifacts.Count, beforeConfirmedDelete!.Artifacts.Count);
+        Assert.All(beforeConfirmedDelete.Artifacts, artifact => Assert.True(File.Exists(artifact.ArtifactPath)));
+
+        var deletion = ImageLearningProjectService.DeleteGeneratedLearnedModelArtifacts(
+            model.ModelId,
+            explicitConfirmation: true,
+            deletedBy: "Admin01 [Admin]",
+            reason: "Regenerate learned artifacts.");
+        var afterConfirmedDelete = AoiDatabase.GetLearnedPcbVisualModel(model.ModelId);
+
+        Assert.Equal(artifacts.Count, deletion.ArtifactRecordsDeleted);
+        Assert.Equal(artifacts.Count, deletion.FilesDeleted);
+        Assert.Equal(0, deletion.MissingFiles);
+        Assert.All(artifacts, artifact => Assert.False(File.Exists(artifact.ArtifactPath)));
+        Assert.True(File.Exists(source));
+        Assert.True(File.Exists(import.Image!.VaultPath));
+        Assert.NotNull(afterConfirmedDelete);
+        Assert.Empty(afterConfirmedDelete!.Artifacts);
+        Assert.Single(AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "IMAGE_LEARNING_MODEL_ARTIFACTS_DELETED" }));
     }
 
     private string WritePng(string fileName, byte red, byte green, byte blue)

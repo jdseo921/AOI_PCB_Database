@@ -159,6 +159,29 @@ public sealed class ImageOnlyPcbLearningServiceTests : IDisposable
     }
 
     [Fact]
+    public void ImageOnlyPcbLearningSkipsUnreadableValidationImageAndWritesSummaryWarning()
+    {
+        var project = CreateLearningProject("Unreadable validation skip");
+        ImportStandardTrainingSet(project);
+        var unreadable = ImportImages(
+            project,
+            ImageLearningImageRole.OkValidation,
+            WriteBoardPng("ok-validation-corrupt.png", variant: 33)).Single();
+        File.WriteAllText(unreadable.Image!.VaultPath, "not a readable image");
+
+        var result = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options);
+        var summary = File.ReadAllText(Path.Combine(result.ArtifactFolder, "learning_summary.json"));
+
+        var skipped = Assert.Single(result.SkippedImages);
+        Assert.Equal("ok-validation-corrupt.png", skipped.FileName);
+        Assert.Equal(ImageLearningImageRole.OkValidation, skipped.Role);
+        Assert.Equal(0, result.Calibration.OkValidationCount);
+        Assert.Contains(result.Warnings, warning => warning.Contains("skipped", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("skippedImages", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ok-validation-corrupt.png", summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ImageOnlyPcbLearningMissingOkLearningImagesFailClearly()
     {
         var project = CreateLearningProject("Missing minimum set");

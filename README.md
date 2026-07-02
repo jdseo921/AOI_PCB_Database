@@ -216,6 +216,15 @@ Candidate samples for local training-set export review are copied below:
 
 The database is initialized with tables for images, inspection results, defects, review events, recipe revisions, training-set candidate samples, and export history. Image records include original path, vault path, filename, board model, lot ID, view type, import time, and SHA-256 file hash. If the OS local-app-data folder cannot be resolved, the app falls back to a `data/` folder beside the executable.
 
+## Log Retention and Recoverable Archive
+
+To keep the local database bounded, inspection results, defects, review events, audit events, and export history/verification rows older than a configurable retention window are archived and purged from the live tables. Retention runs once at application startup.
+
+- **Default:** archive-then-purge rows older than **30 days**.
+- **Configurable in `Settings > Basics > Data Retention`:** change the retention window, disable purging entirely, or turn off the pre-purge warning. Managing retention requires Admin.
+- **Recoverable:** before a live row is removed, its full contents are copied into the `LogArchive` table as a JSON payload, so archived records stay queryable and recoverable. The `LogArchive` table itself is retained indefinitely.
+- **Pre-purge warning:** when enabled, the Export & Trace page shows how many rows will be archived and purged within the warning lead time (default 7 days) so operators can export first.
+
 ## Troubleshooting
 
 - If `dotnet run` fails with a missing framework or SDK message, install a .NET SDK that supports Windows desktop/WPF and the project's `net10.0-windows` target.

@@ -1370,6 +1370,14 @@ public sealed class RecipeDocument
     public string BoardProgram { get; set; } = "TBOX-MAIN";
     public string BackgroundImagePath { get; set; } = string.Empty;
     public List<RecipeRoiDocument> Rois { get; set; } = new();
+
+    // Recipe-level processing and tolerance settings. Persisted as part of the recipe JSON;
+    // missing keys in older recipes fall back to these defaults.
+    public double PlacementToleranceMm { get; set; } = 0.020;
+    public double RotationToleranceDeg { get; set; } = 1.0;
+    public string IpcClass { get; set; } = "IPC Class 2";
+    public string LightingProfile { get; set; } = "Top bright field";
+    public string FalseCallPolicy { get; set; } = "Balanced: review benign visual noise";
 }
 
 public sealed class RecipeRoiDocument
@@ -1435,3 +1443,12 @@ public sealed class RecipeLoadResult
     public IReadOnlyList<string> Warnings { get; }
     public bool HasEnabledRois => Recipe?.Rois.Any(roi => roi.Enabled) == true;
 }
+
+public sealed class LogRetentionPolicy
+{
+    public bool Enabled { get; set; } = true;
+    public int RetentionDays { get; set; } = 30;
+    public int WarningLeadDays { get; set; } = 7;
+}
+
+public readonly record struct LogRetentionResult(int ArchivedRowCount, int PurgedRowCount);

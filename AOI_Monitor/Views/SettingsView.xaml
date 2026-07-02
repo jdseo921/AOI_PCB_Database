@@ -329,6 +329,37 @@
                 </StackPanel>
               </Border>
 
+              <Border Style="{StaticResource SettingsPanel}">
+                <StackPanel>
+                  <TextBlock Text="Data Retention" Style="{StaticResource HmiSectionHeaderText}"/>
+                  <TextBlock Text="Logs older than the retention window are copied into the recoverable archive and then removed from the live tables. The archive keeps the full record. Purge is applied at application startup."
+                             Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
+
+                  <CheckBox x:Name="RetentionEnabledCheck" Content="Enable automatic archive and purge" MinHeight="34"
+                            ToolTip="When off, no logs are purged; live tables keep growing."/>
+
+                  <Grid Margin="0,8,0,8">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="170"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Retention days" Style="{StaticResource SettingsLabel}"/>
+                    <TextBox x:Name="RetentionDaysText" Grid.Column="1" MinHeight="34" Text="30"
+                             ToolTip="Age in days after which logs are archived and purged from the live tables. Default 30."/>
+                  </Grid>
+
+                  <CheckBox x:Name="RetentionWarningCheck" Content="Warn on the Export &amp; Trace screen before purge" MinHeight="34"
+                            ToolTip="Show an advisory when rows are within the warning window of being purged."/>
+
+                  <WrapPanel Margin="0,8,0,0">
+                    <Button x:Name="ApplyRetentionBtn" Style="{StaticResource ActionBtnBlue}" MinWidth="220" MinHeight="40"
+                            Content="Apply Data Retention Policy" Click="OnApplyRetentionClick"/>
+                  </WrapPanel>
+                  <TextBlock x:Name="RetentionStatusText" Text="Retention policy: loading..." Foreground="#9AA6AF"
+                             FontSize="14" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                </StackPanel>
+              </Border>
+
             </StackPanel>
           </Grid>
         </ScrollViewer>

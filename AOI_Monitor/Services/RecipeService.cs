@@ -15,11 +15,22 @@ public static class RecipeService
     private static readonly object Sync = new();
     private static readonly Dictionary<string, RecipeLoadResult> Cache = new(StringComparer.OrdinalIgnoreCase);
 
+    // Transient in-editor preview: when set, LoadLatestRecipe returns this instead of the saved
+    // revision so "Test Run" can exercise unsaved ROI/parameter edits. Always cleared in a finally.
+    private static string? _previewBoard;
+    private static RecipeLoadResult? _previewOverride;
+
     public static RecipeLoadResult LoadLatestRecipe(string boardProgram)
     {
         var normalizedBoard = string.IsNullOrWhiteSpace(boardProgram) ? "UNKNOWN" : boardProgram.Trim();
         lock (Sync)
         {
+            if (_previewOverride is not null &&
+                string.Equals(_previewBoard, normalizedBoard, StringComparison.OrdinalIgnoreCase))
+            {
+                return _previewOverride;
+            }
+
             if (Cache.TryGetValue(normalizedBoard, out var cached))
                 return cached;
         }
@@ -31,6 +42,25 @@ public static class RecipeService
         }
 
         return loaded;
+    }
+
+    public static void SetPreviewOverride(string boardProgram, RecipeLoadResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        lock (Sync)
+        {
+            _previewBoard = string.IsNullOrWhiteSpace(boardProgram) ? "UNKNOWN" : boardProgram.Trim();
+            _previewOverride = result;
+        }
+    }
+
+    public static void ClearPreviewOverride()
+    {
+        lock (Sync)
+        {
+            _previewBoard = null;
+            _previewOverride = null;
+        }
     }
 
     public static void Invalidate(string? boardProgram = null)
@@ -46,7 +76,6 @@ public static class RecipeService
 
     public static RecipeLoadResult ParseRevision(RecipeRevisionRecord revision)
     {
-        var warnings = new List<string>();
         if (string.IsNullOrWhiteSpace(revision.RecipeJson))
             return new RecipeLoadResult(null, new[] { $"Recipe revision {revision.Id} has empty JSON." });
 
@@ -56,29 +85,14 @@ public static class RecipeService
             if (document is null)
                 return new RecipeLoadResult(null, new[] { $"Recipe revision {revision.Id} JSON parsed to an empty document." });
 
-            var recipe = new RecipeDefinition
-            {
-                RecipeName = string.IsNullOrWhiteSpace(document.RecipeName) ? revision.RecipeName : document.RecipeName.Trim(),
-                Revision = revision.Revision,
-                BoardProgram = string.IsNullOrWhiteSpace(document.BoardProgram) ? revision.BoardProgram : document.BoardProgram.Trim(),
-                DetectionPriority = revision.DetectionPriority,
-                BackgroundImagePath = string.IsNullOrWhiteSpace(document.BackgroundImagePath)
-                    ? revision.BackgroundImagePath
-                    : document.BackgroundImagePath.Trim(),
-            };
-
-            var index = 1;
-            foreach (var roiDoc in document.Rois)
-            {
-                var roi = NormalizeRoi(roiDoc, index++, warnings);
-                if (roi is not null)
-                    recipe.Rois.Add(roi);
-            }
-
-            if (recipe.Rois.Count == 0)
-                warnings.Add($"Recipe '{recipe.RecipeName}' contains no valid ROI definitions.");
-
-            return new RecipeLoadResult(recipe, warnings);
+            return ParseDocument(
+                document,
+                revision.Revision,
+                revision.DetectionPriority,
+                revision.BoardProgram,
+                revision.BackgroundImagePath,
+                revision.RecipeName,
+                $"revision {revision.Id}");
         }
         catch (JsonException ex)
         {
@@ -88,6 +102,44 @@ public static class RecipeService
         {
             return new RecipeLoadResult(null, new[] { $"Recipe revision {revision.Id} JSON could not be parsed: {ex.Message}" });
         }
+    }
+
+    public static RecipeLoadResult ParseDocument(
+        RecipeDocument document,
+        string revision,
+        string detectionPriority,
+        string boardProgram,
+        string backgroundImagePath,
+        string fallbackRecipeName,
+        string sourceLabel)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var warnings = new List<string>();
+        var recipe = new RecipeDefinition
+        {
+            RecipeName = string.IsNullOrWhiteSpace(document.RecipeName)
+                ? (string.IsNullOrWhiteSpace(fallbackRecipeName) ? "AOI_RECIPE" : fallbackRecipeName.Trim())
+                : document.RecipeName.Trim(),
+            Revision = revision,
+            BoardProgram = string.IsNullOrWhiteSpace(document.BoardProgram) ? boardProgram : document.BoardProgram.Trim(),
+            DetectionPriority = detectionPriority,
+            BackgroundImagePath = string.IsNullOrWhiteSpace(document.BackgroundImagePath)
+                ? backgroundImagePath
+                : document.BackgroundImagePath.Trim(),
+        };
+
+        var index = 1;
+        foreach (var roiDoc in document.Rois)
+        {
+            var roi = NormalizeRoi(roiDoc, index++, warnings);
+            if (roi is not null)
+                recipe.Rois.Add(roi);
+        }
+
+        if (recipe.Rois.Count == 0)
+            warnings.Add($"Recipe '{recipe.RecipeName}' ({sourceLabel}) contains no valid ROI definitions.");
+
+        return new RecipeLoadResult(recipe, warnings);
     }
 
     private static RecipeLoadResult LoadLatestRecipeUncached(string boardProgram)

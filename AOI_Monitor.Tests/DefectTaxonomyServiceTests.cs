@@ -23,22 +23,44 @@ public sealed class DefectTaxonomyServiceTests : IDisposable
             if (Directory.Exists(_root))
                 Directory.Delete(_root, recursive: true);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Taxonomy test cleanup skipped: {ex.Message}");
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Taxonomy test cleanup skipped: {ex.Message}");
         }
     }
 
     [Fact]
     public void DefaultAliasMapsToCanonicalDefectClass()
     {
+        // "Pin Height Error" is now an alias of the first-class Connector Pin Height class.
         var normalized = DefectTaxonomyService.Normalize("Pin Height Error");
 
         Assert.True(normalized.IsKnown);
-        Assert.Equal("Height Error", normalized.CanonicalClass);
-        Assert.Equal("HGT", normalized.MesCode);
+        Assert.Equal("Connector Pin Height", normalized.CanonicalClass);
+        Assert.Equal("CPH", normalized.MesCode);
+    }
+
+    [Fact]
+    public void DefaultTaxonomyIncludesMandatoryDefectClasses()
+    {
+        var classes = DefectTaxonomyService.ActiveCanonicalClasses();
+
+        foreach (var required in new[]
+        {
+            "Solder Bridge", "Insufficient Solder", "Solder Volume", "Cold Joint",
+            "Polarity Error", "Tombstone", "Missing Component", "Misalignment",
+            "Height Error", "Connector Pin Height", "3D Coplanarity", "Shield Can Gap",
+        })
+        {
+            Assert.Contains(required, classes);
+        }
+
+        // Coplanarity is now its own class rather than an alias of Height Error.
+        Assert.Equal("3D Coplanarity", DefectTaxonomyService.Normalize("Coplanarity").CanonicalClass);
     }
 
     [Fact]

@@ -60,8 +60,9 @@ public static class AoiDatabase
             EnsureSchemaCompatibility(connection);
         }
 
-        AutoArchiveOldLogs(connection);
-
+        // Log retention (archive + purge) is NOT run here: it is a configurable, potentially
+        // destructive maintenance step driven by user settings and executed once at application
+        // startup via LogRetentionService, so tests and re-initializations never purge data.
         _initialized = true;
     }
 
@@ -7628,64 +7629,173 @@ public static class AoiDatabase
         command.ExecuteNonQuery();
     }
 
-    private static void AutoArchiveOldLogs(SqliteConnection connection)
+    /// <summary>
+    /// Archive-then-purge log retention. Each qualifying row is first copied into LogArchive with a
+    /// full JSON payload (so it stays recoverable), then removed from its live table. Child rows are
+    /// archived and removed before their parents. Runs as a single transaction on a maintenance
+    /// connection with foreign-key enforcement disabled so the bulk purge cannot fail on an
+    /// unattended startup; the shared cutoff means related rows are removed together.
+    /// </summary>
+    public static LogRetentionResult RunLogRetention(LogRetentionPolicy policy)
     {
-        var cutoff = DateTime.UtcNow.AddDays(-30).ToString("O", CultureInfo.InvariantCulture);
+        ArgumentNullException.ThrowIfNull(policy);
+        if (!policy.Enabled || policy.RetentionDays <= 0)
+            return new LogRetentionResult(0, 0);
+
+        var cutoff = DateTime.UtcNow.AddDays(-policy.RetentionDays).ToString("O", CultureInfo.InvariantCulture);
         var archivedAt = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
 
-        CopyArchiveRows(
-            connection,
-            "InspectionResults",
-            "CreatedAtUtc",
-            cutoff,
-            archivedAt,
-            "Auto archive copy-only: source inspection result remains in InspectionResults.");
+        using var connection = OpenConnection();
+        using (var pragma = connection.CreateCommand())
+        {
+            pragma.CommandText = "PRAGMA foreign_keys = OFF;";
+            pragma.ExecuteNonQuery();
+        }
 
-        CopyArchiveRows(
-            connection,
-            "ReviewEvents",
-            "EventTimeUtc",
-            cutoff,
-            archivedAt,
-            "Auto archive copy-only: source review event remains in ReviewEvents.");
+        using var transaction = connection.BeginTransaction();
+        var archived = 0;
+        var purged = 0;
 
-        CopyArchiveRows(
-            connection,
-            "AuditEvents",
-            "TimestampUtc",
-            cutoff,
-            archivedAt,
-            "Auto archive copy-only: source audit event remains in AuditEvents.");
+        // Children first (removed based on their parent's age so a parent and its detail stay together).
+        var defectChild = "InspectionResultId IN (SELECT Id FROM InspectionResults WHERE datetime(CreatedAtUtc) < datetime($cutoff))";
+        var exportChild = "ExportHistoryId IN (SELECT Id FROM ExportHistory WHERE datetime(CreatedAtUtc) < datetime($cutoff))";
+        archived += ArchiveRowsToLogArchive(connection, transaction, "Defects", defectChild, cutoff, null, archivedAt, "Log retention archive: detail of a purged inspection result.");
+        purged += DeleteRows(connection, transaction, "Defects", defectChild, cutoff);
+        archived += ArchiveRowsToLogArchive(connection, transaction, "ExportVerification", exportChild, cutoff, null, archivedAt, "Log retention archive: verification of a purged export.");
+        purged += DeleteRows(connection, transaction, "ExportVerification", exportChild, cutoff);
 
-        CopyArchiveRows(
-            connection,
-            "ExportHistory",
-            "CreatedAtUtc",
-            cutoff,
-            archivedAt,
-            "Auto archive copy-only: source export row remains in ExportHistory.");
+        // Parents.
+        foreach (var (table, dateColumn) in new[]
+        {
+            ("InspectionResults", "CreatedAtUtc"),
+            ("ExportHistory", "CreatedAtUtc"),
+            ("ReviewEvents", "EventTimeUtc"),
+            ("AuditEvents", "TimestampUtc"),
+        })
+        {
+            var where = $"datetime({dateColumn}) < datetime($cutoff)";
+            archived += ArchiveRowsToLogArchive(connection, transaction, table, where, cutoff, dateColumn, archivedAt, $"Log retention archive from {table}.");
+            purged += DeleteRows(connection, transaction, table, where, cutoff);
+        }
+
+        transaction.Commit();
+        return new LogRetentionResult(archived, purged);
     }
 
-    private static void CopyArchiveRows(
+    /// <summary>
+    /// Counts live log rows that will be archived-and-purged within the next <paramref name="leadDays"/>
+    /// under the given retention window, used to warn operators before data leaves the live tables.
+    /// </summary>
+    public static int CountRowsNearingPurge(int retentionDays, int leadDays)
+    {
+        if (retentionDays <= 0)
+            return 0;
+
+        var purgeCutoff = DateTime.UtcNow.AddDays(-retentionDays).ToString("O", CultureInfo.InvariantCulture);
+        var warnCutoff = DateTime.UtcNow.AddDays(-Math.Max(0, retentionDays - Math.Max(0, leadDays))).ToString("O", CultureInfo.InvariantCulture);
+
+        using var connection = OpenConnection();
+        var total = 0;
+        foreach (var (table, dateColumn) in new[]
+        {
+            ("InspectionResults", "CreatedAtUtc"),
+            ("ExportHistory", "CreatedAtUtc"),
+            ("ReviewEvents", "EventTimeUtc"),
+            ("AuditEvents", "TimestampUtc"),
+        })
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                $"SELECT COUNT(*) FROM {table} WHERE datetime({dateColumn}) < datetime($warn) AND datetime({dateColumn}) >= datetime($purge);";
+            command.Parameters.AddWithValue("$warn", warnCutoff);
+            command.Parameters.AddWithValue("$purge", purgeCutoff);
+            total += Convert.ToInt32(command.ExecuteScalar() ?? 0, CultureInfo.InvariantCulture);
+        }
+
+        return total;
+    }
+
+    private static int ArchiveRowsToLogArchive(
         SqliteConnection connection,
+        SqliteTransaction transaction,
         string sourceTable,
-        string dateColumn,
+        string whereClause,
         string cutoffUtc,
+        string? timestampColumn,
         string archivedAtUtc,
         string notes)
     {
+        var rows = new List<(long Id, string Timestamp, string Payload)>();
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = $"SELECT * FROM {sourceTable} WHERE {whereClause};";
+            select.Parameters.AddWithValue("$cutoff", cutoffUtc);
+            using var reader = select.ExecuteReader();
+            while (reader.Read())
+            {
+                long id = 0;
+                var timestamp = archivedAtUtc;
+                var payload = new System.Text.StringBuilder("{");
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    var name = reader.GetName(i);
+                    if (i > 0)
+                        payload.Append(',');
+                    payload.Append(JsonSerializer.Serialize(name)).Append(':');
+                    if (reader.IsDBNull(i))
+                    {
+                        payload.Append("null");
+                    }
+                    else
+                    {
+                        var value = Convert.ToString(reader.GetValue(i), CultureInfo.InvariantCulture) ?? string.Empty;
+                        payload.Append(JsonSerializer.Serialize(value));
+                        if (string.Equals(name, "Id", StringComparison.OrdinalIgnoreCase))
+                            id = Convert.ToInt64(reader.GetValue(i), CultureInfo.InvariantCulture);
+                        if (timestampColumn is not null && string.Equals(name, timestampColumn, StringComparison.OrdinalIgnoreCase))
+                            timestamp = value;
+                    }
+                }
+
+                payload.Append('}');
+                rows.Add((id, timestamp, payload.ToString()));
+            }
+        }
+
+        foreach (var row in rows)
+        {
+            using var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText =
+                """
+                INSERT OR IGNORE INTO LogArchive (SourceTable, SourceId, SourceTimestampUtc, ArchivedAtUtc, Notes, PayloadJson)
+                VALUES ($table, $id, $timestamp, $archivedAt, $notes, $payload);
+                """;
+            insert.Parameters.AddWithValue("$table", sourceTable);
+            insert.Parameters.AddWithValue("$id", row.Id);
+            insert.Parameters.AddWithValue("$timestamp", row.Timestamp);
+            insert.Parameters.AddWithValue("$archivedAt", archivedAtUtc);
+            insert.Parameters.AddWithValue("$notes", notes);
+            insert.Parameters.AddWithValue("$payload", row.Payload);
+            insert.ExecuteNonQuery();
+        }
+
+        return rows.Count;
+    }
+
+    private static int DeleteRows(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string table,
+        string whereClause,
+        string cutoffUtc)
+    {
         using var command = connection.CreateCommand();
-        command.CommandText =
-            $"""
-            INSERT OR IGNORE INTO LogArchive (SourceTable, SourceId, SourceTimestampUtc, ArchivedAtUtc, Notes)
-            SELECT '{sourceTable}', Id, {dateColumn}, $archivedAtUtc, $notes
-            FROM {sourceTable}
-            WHERE datetime({dateColumn}) < datetime($cutoffUtc);
-            """;
-        command.Parameters.AddWithValue("$archivedAtUtc", archivedAtUtc);
-        command.Parameters.AddWithValue("$notes", notes);
-        command.Parameters.AddWithValue("$cutoffUtc", cutoffUtc);
-        command.ExecuteNonQuery();
+        command.Transaction = transaction;
+        command.CommandText = $"DELETE FROM {table} WHERE {whereClause};";
+        command.Parameters.AddWithValue("$cutoff", cutoffUtc);
+        return command.ExecuteNonQuery();
     }
 
     public static void AddColumnIfMissing(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
@@ -8586,6 +8696,7 @@ public static class AoiDatabase
             SourceTimestampUtc TEXT NOT NULL,
             ArchivedAtUtc TEXT NOT NULL,
             Notes TEXT NOT NULL,
+            PayloadJson TEXT NOT NULL DEFAULT '',
             UNIQUE(SourceTable, SourceId)
         );
 

@@ -82,9 +82,68 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
         _refreshCts?.Dispose();
         _refreshCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         await LoadLogsAsync(_refreshCts.Token);
+        await RefreshRetentionWarningAsync(_refreshCts.Token);
     }
 
     public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);
+
+    private static string DescribeRetentionPolicy()
+    {
+        var settings = LogRetentionSettingsService.LoadSettings();
+        return settings.Enabled
+            ? $"Archive-then-purge: logs older than {settings.RetentionDays} day(s) are copied to the recoverable LogArchive and removed from the live tables at startup."
+            : "Automatic purge disabled: logs are retained indefinitely in the live tables.";
+    }
+
+    private async Task RefreshRetentionWarningAsync(CancellationToken cancellationToken)
+    {
+        LogRetentionSettings settings;
+        try
+        {
+            settings = LogRetentionSettingsService.LoadSettings();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Retention warning skipped (settings load): {ex.Message}");
+            RetentionWarningText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (!settings.Enabled || !settings.WarningEnabled)
+        {
+            RetentionWarningText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        int nearing;
+        try
+        {
+            nearing = await Task.Run(
+                () => AoiDatabase.CountRowsNearingPurge(settings.RetentionDays, settings.WarningLeadDays),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Retention warning skipped (count): {ex.Message}");
+            RetentionWarningText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (nearing > 0)
+        {
+            RetentionWarningText.Text =
+                $"Retention notice: {nearing} log row(s) will be archived and purged within {settings.WarningLeadDays} day(s) (retention {settings.RetentionDays}d). Configure in System Settings.";
+            RetentionWarningText.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            RetentionWarningText.Visibility = Visibility.Collapsed;
+        }
+    }
 
     public void CancelWork()
     {
@@ -1217,7 +1276,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
                 sb.AppendLine($"ImageVaultPath: {AoiDatabase.ImageVaultPath}");
                 sb.AppendLine($"InspectionRowsVisible: {_inspectionRows.Count}");
                 sb.AppendLine($"ReviewRowsVisible: {_reviewRows.Count}");
-                sb.AppendLine($"AutoArchivePolicy: copy-only archive for logs older than 30 days; source rows remain queryable.");
+                sb.AppendLine($"AutoArchivePolicy: {DescribeRetentionPolicy()}");
                 sb.AppendLine($"CheckedAt: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 File.WriteAllText(reportPath, sb.ToString());
                 ((IProgress<WorkProgress>)progress).Report(new WorkProgress(4, 4, "SQLite integrity check complete."));
@@ -2308,7 +2367,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
         sb.AppendLine($"SQLiteIntegrityCheck: {integrity}");
         sb.AppendLine($"VisibleInspectionRowsInPackage: {visibleInspectionRows}");
         sb.AppendLine($"VisibleReviewRowsInPackage: {visibleReviewRows}");
-        sb.AppendLine("AutoArchivePolicy: Logs older than 30 days are copied into LogArchive during startup. Source rows remain in place.");
+        sb.AppendLine($"AutoArchivePolicy: {DescribeRetentionPolicy()}");
         sb.AppendLine();
         sb.AppendLine("Table Counts:");
         foreach (var row in AoiDatabase.GetDatabaseHealthRows())

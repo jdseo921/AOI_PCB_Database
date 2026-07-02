@@ -63,6 +63,7 @@ public partial class MainWindow : Window
         {
             StorageRootSettingsService.ApplySavedStorageRoot();
             AoiDatabase.Initialize();
+            LogRetentionService.RunStartupRetention();
             CameraSourceSettingsService.ApplyActiveSource();
             LightingSettingsService.ApplyIntegrationBoundary();
             MesIntegrationSettingsService.ApplyIntegrationBoundary();

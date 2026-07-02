@@ -57,25 +57,103 @@
       <Border Grid.Column="0" Style="{StaticResource Panel}">
         <Grid>
           <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" MinHeight="32"/>
+            <RowDefinition Height="Auto" MinHeight="34"/>
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-            <DockPanel>
-              <TextBlock x:Name="MapStatusText" DockPanel.Dock="Right" Text="No CSV loaded" Foreground="#9AA6AF" FontSize="14"/>
-              <TextBlock Text="2D Color-Coded Height Map" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+            <DockPanel LastChildFill="True">
+              <Button x:Name="ResetViewButton" DockPanel.Dock="Right" Style="{StaticResource MiniBtn}" MinWidth="120"
+                      Content="Reset View" Margin="8,0,0,0" VerticalAlignment="Center" Click="OnResetViewClick"
+                      ToolTip="Reset the 3D surface rotation, zoom, and pan to the default view."/>
+              <TextBlock x:Name="MapStatusText" DockPanel.Dock="Right" Text="No CSV loaded" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center" Margin="8,0,0,0"/>
+              <TextBlock Text="3D Surface Height Map" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14" VerticalAlignment="Center"/>
             </DockPanel>
           </Border>
           <Border Grid.Row="1" Margin="8" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
             <Grid>
+              <Border x:Name="SurfaceHost" Background="Transparent" ClipToBounds="True"
+                      MouseLeftButtonDown="OnSurfaceMouseLeftDown" MouseLeftButtonUp="OnSurfaceMouseLeftUp"
+                      MouseRightButtonDown="OnSurfaceMouseRightDown" MouseRightButtonUp="OnSurfaceMouseRightUp"
+                      MouseMove="OnSurfaceMouseMove" MouseWheel="OnSurfaceMouseWheel">
+                <Viewport3D x:Name="SurfaceViewport">
+                  <Viewport3D.Camera>
+                    <PerspectiveCamera x:Name="SurfaceCamera" Position="0,1.3,2.4" LookDirection="0,-0.55,-1" UpDirection="0,1,0" FieldOfView="50"/>
+                  </Viewport3D.Camera>
+                  <ModelVisual3D>
+                    <ModelVisual3D.Content>
+                      <Model3DGroup>
+                        <AmbientLight Color="#4C4C4C"/>
+                        <DirectionalLight Color="#B4B4B4" Direction="-0.6,-1.1,-0.5"/>
+                        <DirectionalLight Color="#484848" Direction="0.7,0.5,0.6"/>
+                      </Model3DGroup>
+                    </ModelVisual3D.Content>
+                  </ModelVisual3D>
+                  <ModelVisual3D x:Name="SurfaceVisual">
+                    <ModelVisual3D.Content>
+                      <GeometryModel3D x:Name="SurfaceModel">
+                        <GeometryModel3D.Material>
+                          <DiffuseMaterial>
+                            <DiffuseMaterial.Brush>
+                              <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                <GradientStop Color="#2850DC" Offset="0"/>
+                                <GradientStop Color="#68C878" Offset="0.5"/>
+                                <GradientStop Color="#FF5018" Offset="1"/>
+                              </LinearGradientBrush>
+                            </DiffuseMaterial.Brush>
+                          </DiffuseMaterial>
+                        </GeometryModel3D.Material>
+                        <GeometryModel3D.BackMaterial>
+                          <DiffuseMaterial Brush="#1B2228"/>
+                        </GeometryModel3D.BackMaterial>
+                        <GeometryModel3D.Transform>
+                          <Transform3DGroup>
+                            <ScaleTransform3D x:Name="SurfaceScale" ScaleX="1" ScaleY="1" ScaleZ="1"/>
+                            <RotateTransform3D>
+                              <RotateTransform3D.Rotation>
+                                <AxisAngleRotation3D x:Name="SurfacePitch" Axis="1,0,0" Angle="0"/>
+                              </RotateTransform3D.Rotation>
+                            </RotateTransform3D>
+                            <RotateTransform3D>
+                              <RotateTransform3D.Rotation>
+                                <AxisAngleRotation3D x:Name="SurfaceYaw" Axis="0,1,0" Angle="0"/>
+                              </RotateTransform3D.Rotation>
+                            </RotateTransform3D>
+                            <TranslateTransform3D x:Name="SurfacePan" OffsetX="0" OffsetY="0" OffsetZ="0"/>
+                          </Transform3DGroup>
+                        </GeometryModel3D.Transform>
+                      </GeometryModel3D>
+                    </ModelVisual3D.Content>
+                  </ModelVisual3D>
+                </Viewport3D>
+              </Border>
+
               <TextBlock x:Name="EmptyMapText" Text="Load a CSV with columns: x,y,height"
-                         Foreground="#68757D" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
-              <Image x:Name="HeightMapImage" Stretch="Uniform"
-                     MouseLeftButtonDown="OnHeightMapClick"
-                     MouseMove="OnHeightMapMouseMove"/>
-              <Canvas x:Name="SelectionOverlay" IsHitTestVisible="False"/>
+                         Foreground="#68757D" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" IsHitTestVisible="False"/>
+
+              <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,10"
+                      Background="#B00B0E10" BorderBrush="#3A4650" BorderThickness="1" Padding="8,5" IsHitTestVisible="False">
+                <TextBlock Text="Drag: rotate   -   Wheel: zoom   -   Right-drag: pan" Foreground="#AEB9C1" FontSize="14"/>
+              </Border>
+
+              <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0" Width="212"
+                      Background="#CC0B0E10" BorderBrush="#4B5660" BorderThickness="1" Padding="6">
+                <Grid>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="150"/>
+                  </Grid.RowDefinitions>
+                  <TextBlock Text="Top-Down 2D Map" Foreground="#9AA6AF" FontSize="14" FontWeight="Bold" Margin="0,0,0,4"/>
+                  <Grid Grid.Row="1">
+                    <Image x:Name="HeightMapImage" Stretch="Uniform"
+                           MouseLeftButtonDown="OnHeightMapClick"
+                           MouseMove="OnHeightMapMouseMove"/>
+                    <Canvas x:Name="SelectionOverlay" IsHitTestVisible="False"/>
+                  </Grid>
+                </Grid>
+              </Border>
+
               <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,10,10"
-                      Background="#CC101519" BorderBrush="#4B5660" BorderThickness="1" Padding="8,6">
+                      Background="#CC101519" BorderBrush="#4B5660" BorderThickness="1" Padding="8,6" IsHitTestVisible="False">
                 <Grid Width="190">
                   <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -110,13 +188,15 @@
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="8"/>
-          <RowDefinition Height="*"/>
+          <RowDefinition Height="1.1*"/>
+          <RowDefinition Height="8"/>
+          <RowDefinition Height="0.9*"/>
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Style="{StaticResource Panel}">
           <Grid>
             <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" MinHeight="32"/>
+              <RowDefinition Height="Auto" MinHeight="34"/>
               <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
@@ -160,13 +240,41 @@
         <Border Grid.Row="2" Style="{StaticResource Panel}">
           <Grid>
             <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" MinHeight="32"/>
+              <RowDefinition Height="Auto" MinHeight="34"/>
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Height Slice Profile" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+              <DockPanel LastChildFill="True">
+                <TextBlock x:Name="DefectCountText" DockPanel.Dock="Right" Text="0 features" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
+                <TextBlock Text="Detected Features" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14" VerticalAlignment="Center"/>
+              </DockPanel>
             </Border>
-            <Canvas Grid.Row="1" x:Name="ProfileCanvas" Background="#050607" Margin="8"/>
+            <DataGrid Grid.Row="1" x:Name="DefectListGrid" Margin="8" AutoGenerateColumns="False" IsReadOnly="True"
+                      Style="{StaticResource HmiTable}" SelectionMode="Single" HeadersVisibility="Column"
+                      SelectionChanged="OnDefectListSelectionChanged">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Feature" Binding="{Binding Feature}" Width="*" MinWidth="110"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="132" MinWidth="120"/>
+                <DataGridTextColumn Header="Height" Binding="{Binding HeightDisplay}" Width="92" MinWidth="90"/>
+                <DataGridTextColumn Header="Volume" Binding="{Binding VolumeDisplay}" Width="92" MinWidth="90"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </Grid>
+        </Border>
+
+        <Border Grid.Row="4" Style="{StaticResource Panel}">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" MinHeight="34"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+              <DockPanel LastChildFill="True">
+                <TextBlock x:Name="SliceRowText" DockPanel.Dock="Right" Text="--" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
+                <TextBlock Text="Height Slice Profile" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14" VerticalAlignment="Center"/>
+              </DockPanel>
+            </Border>
+            <Canvas Grid.Row="1" x:Name="ProfileCanvas" Background="#050607" Margin="8" SizeChanged="OnProfileCanvasSizeChanged"/>
           </Grid>
         </Border>
       </Grid>
@@ -186,4 +294,3 @@
     </Border>
   </Grid>
 </UserControl>
-

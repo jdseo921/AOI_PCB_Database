@@ -43,7 +43,7 @@ Important boundary: this PoC is a local Windows WPF application. It uses local f
 
 | Requirement ID | Requirement text | Source section | Current status | App module | Evidence/source file | Notes/gaps |
 | --- | --- | --- | --- | --- | --- | --- |
-| AI-001 | Engineer/Admin can run AI Model Test. | Roles/permissions prompt | Implemented | AI Model Test | `AOI_Monitor/Services/RoleAuthorization.cs`, `AOI_Monitor/Views/AIModelTestView.xaml.cs` | Operator page access is restricted. |
+| AI-001 | Engineer/Admin can run AI Model Test. | Roles/permissions prompt | Implemented | AI Model Test | `AOI_Monitor/Services/RoleAuthorization.cs`, `AOI_Monitor/Views/AIModelTestView.xaml.cs` | Operators may open the page to view results, but running batch validation is gated to Engineer/Admin via `CanRunModelTests` in `OnRunBatchClick`; threshold changes also require Engineer/Admin. |
 | AI-002 | Support validation folder selection and batch inspection. | User Manual / AI Model Test Workflow | Implemented | AI Model Test | `AOI_Monitor/Views/AIModelTestView.xaml.cs`, `AOI_Monitor/Services/BatchValidationService.cs` | Uses selected engine; skips bad files where possible. |
 | AI-003 | Support richer manifest CSV with image, ground_truth, golden_image, defect_type, side, refdes, lot_id, board_model, notes. | AI Model Test prompt | Implemented | AI Model Test | `AOI_Monitor/Services/BatchValidationService.cs` | Simpler CSV formats remain supported. |
 | AI-004 | Show accuracy, precision, recall, false-call rate, TP/TN/FP/FN, and category counts. | AI Model Test prompt | Implemented | AI Model Test | `AOI_Monitor/Views/AIModelTestView.xaml`, `AOI_Monitor/Services/BatchValidationService.cs` | Metrics depend on available ground truth. |

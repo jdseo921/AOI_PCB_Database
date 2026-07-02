@@ -39,6 +39,7 @@ public static class AoiDatabaseMigrations
         new(26, "Add learning annotation and training dataset version persistence.", ApplyTrainingDatasetPersistence),
         new(27, "Add image-only PCB sample learning persistence.", ApplyImageLearningPersistence),
         new(28, "Add image-only anomaly region scoring evidence.", ApplyImageLearningAnomalyEvidence),
+        new(29, "Add recoverable payload to log archive for archive-then-purge retention.", ApplyLogArchivePayload),
     };
 
     public static int LatestVersion => OrderedMigrations[^1].Version;
@@ -208,6 +209,13 @@ public static class AoiDatabaseMigrations
         AoiDatabase.AddColumnIfMissing(connection, transaction, "ImageLearningAnomalyRegions", "AreaPixels", "INTEGER NOT NULL DEFAULT 0");
         AoiDatabase.AddColumnIfMissing(connection, transaction, "ImageLearningAnomalyRegions", "Confidence", "REAL NOT NULL DEFAULT 0");
         AoiDatabase.AddColumnIfMissing(connection, transaction, "ImageLearningAnomalyRegions", "Reason", "TEXT NOT NULL DEFAULT ''");
+    }
+
+    private static void ApplyLogArchivePayload(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // Recoverable log retention: LogArchive stores the full source row payload so archived rows
+        // remain queryable/recoverable after the live row is purged.
+        AoiDatabase.AddColumnIfMissing(connection, transaction, "LogArchive", "PayloadJson", "TEXT NOT NULL DEFAULT ''");
     }
 
     private static void ApplyExportVerification(SqliteConnection connection, SqliteTransaction transaction)

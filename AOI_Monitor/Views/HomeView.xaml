@@ -4,11 +4,11 @@
              Background="{DynamicResource Bg}">
   <UserControl.Resources>
     <Style x:Key="HomeModuleButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-      <Setter Property="MinHeight" Value="88"/>
+      <Setter Property="MinHeight" Value="116"/>
       <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
       <Setter Property="VerticalContentAlignment" Value="Stretch"/>
       <Setter Property="Padding" Value="0"/>
-      <Setter Property="Margin" Value="0,0,8,8"/>
+      <Setter Property="Margin" Value="0,0,10,10"/>
       <Setter Property="Background" Value="{DynamicResource Frame2Bg}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
@@ -120,119 +120,127 @@
       </Grid>
 
       <Grid Grid.Row="2">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="1.95*"/>
-          <ColumnDefinition Width="10"/>
-          <ColumnDefinition Width="0.85*"/>
-        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="6"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="12"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-        <Grid Grid.Column="0">
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="5"/>
-            <RowDefinition Height="Auto"/>
-          </Grid.RowDefinitions>
-          <TextBlock Text="AOI Workflow Menus" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
-          <ItemsControl x:Name="HomeModuleItems" Grid.Row="2" ItemsSource="{Binding NavPages}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <UniformGrid Columns="4"/>
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Button Style="{StaticResource HomeModuleButton}"
-                        IsEnabled="{Binding IsEnabled}"
-                        Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                        CommandParameter="{Binding Key}">
-                  <Grid Margin="10">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="40"/>
-                      <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Border Width="32"
-                            Height="32"
-                            Background="{DynamicResource BlueBrush}"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top">
-                      <TextBlock Text="{Binding Number}"
-                                 Foreground="White"
-                                 FontSize="14"
-                                 FontWeight="ExtraBold"
-                                 HorizontalAlignment="Center"
-                                 VerticalAlignment="Center"/>
-                    </Border>
-                    <StackPanel Grid.Column="1">
-                      <TextBlock Text="{Binding Title}"
-                                 Foreground="{DynamicResource TextBrush}"
-                                 FontSize="15"
-                                 FontWeight="ExtraBold"
-                                 TextWrapping="Wrap"
-                                 LineHeight="18"/>
-                      <TextBlock Text="{Binding Subtitle}"
-                                 Foreground="{DynamicResource MutedBrush}"
-                                 FontSize="14"
-                                 TextWrapping="Wrap"
-                                 LineHeight="17"
-                                 Margin="0,3,0,0"/>
-                    </StackPanel>
-                  </Grid>
-                </Button>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </Grid>
+        <TextBlock Text="AOI Workflow Menus" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
 
-        <Grid Grid.Column="2">
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="5"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
-            <RowDefinition Height="Auto"/>
-          </Grid.RowDefinitions>
-          <TextBlock Text="Current State" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
-          <Border Grid.Row="2" Style="{StaticResource FactoryCard}" Padding="8">
-            <Grid>
-              <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="4"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="4"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="4"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="8"/>
-                <RowDefinition Height="Auto"/>
-              </Grid.RowDefinitions>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="82"/>
-                <ColumnDefinition Width="*"/>
-              </Grid.ColumnDefinitions>
-              <TextBlock Text="Sample" Style="{StaticResource HomeStatusLabel}"/>
-              <TextBlock x:Name="HomeSampleText" Grid.Column="1" Text="none" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
-              <TextBlock Grid.Row="2" Text="Golden" Style="{StaticResource HomeStatusLabel}"/>
-              <TextBlock x:Name="HomeGoldenText" Grid.Row="2" Grid.Column="1" Text="none" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
-              <TextBlock Grid.Row="4" Text="Score" Style="{StaticResource HomeStatusLabel}"/>
-              <TextBlock x:Name="HomeScoreText" Grid.Row="4" Grid.Column="1" Text="--" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
-              <TextBlock Grid.Row="6" Text="Recipe" Style="{StaticResource HomeStatusLabel}"/>
-              <TextBlock x:Name="HomeRecipeText" Grid.Row="6" Grid.Column="1" Text="PIXEL_DIFF_0.1" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
-              <Border x:Name="HomeVerdictBorder" Grid.Row="8" Grid.ColumnSpan="2" Background="#372914" BorderBrush="#987538" BorderThickness="2" Padding="8,5">
-                <DockPanel LastChildFill="True">
-                  <TextBlock Text="Verdict" Foreground="{DynamicResource MutedBrush}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                  <TextBlock x:Name="HomeVerdictText" Text="REVIEW" Foreground="#FFE0A7" FontSize="24" FontWeight="ExtraBold" HorizontalAlignment="Right" TextAlignment="Right"/>
-                </DockPanel>
-              </Border>
-            </Grid>
-          </Border>
+        <ItemsControl x:Name="HomeModuleItems" Grid.Row="2" ItemsSource="{Binding NavPages}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="4"/>
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Button Style="{StaticResource HomeModuleButton}"
+                      IsEnabled="{Binding IsEnabled}"
+                      Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                      CommandParameter="{Binding Key}">
+                <Grid Margin="12,10">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="44"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <Border Width="34"
+                          Height="34"
+                          Background="{DynamicResource BlueBrush}"
+                          HorizontalAlignment="Left"
+                          VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Number}"
+                               Foreground="White"
+                               FontSize="14"
+                               FontWeight="ExtraBold"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                  </Border>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Title}"
+                               Foreground="{DynamicResource TextBrush}"
+                               FontSize="15"
+                               FontWeight="ExtraBold"
+                               TextWrapping="Wrap"
+                               LineHeight="18"/>
+                    <TextBlock Text="{Binding Subtitle}"
+                               Foreground="{DynamicResource MutedBrush}"
+                               FontSize="14"
+                               TextWrapping="Wrap"
+                               LineHeight="17"
+                               Margin="0,3,0,0"/>
+                  </StackPanel>
+                </Grid>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
-          <Border Grid.Row="4" Style="{StaticResource HmiPlainLanguageNote}" Padding="8">
-            <StackPanel>
-              <TextBlock Text="Evidence Boundary" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
+        <!-- Full-width status band: Current State + Evidence Boundary side by side -->
+        <Grid Grid.Row="4">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1*"/>
+            <ColumnDefinition Width="10"/>
+            <ColumnDefinition Width="1.25*"/>
+          </Grid.ColumnDefinitions>
+
+          <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="5"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock Text="Current State" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
+            <Border Grid.Row="2" Style="{StaticResource FactoryCard}" Padding="10">
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="4"/>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="4"/>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="4"/>
+                  <RowDefinition Height="Auto"/>
+                  <RowDefinition Height="8"/>
+                  <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="82"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Sample" Style="{StaticResource HomeStatusLabel}"/>
+                <TextBlock x:Name="HomeSampleText" Grid.Column="1" Text="none" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
+                <TextBlock Grid.Row="2" Text="Golden" Style="{StaticResource HomeStatusLabel}"/>
+                <TextBlock x:Name="HomeGoldenText" Grid.Row="2" Grid.Column="1" Text="none" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
+                <TextBlock Grid.Row="4" Text="Score" Style="{StaticResource HomeStatusLabel}"/>
+                <TextBlock x:Name="HomeScoreText" Grid.Row="4" Grid.Column="1" Text="--" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
+                <TextBlock Grid.Row="6" Text="Recipe" Style="{StaticResource HomeStatusLabel}"/>
+                <TextBlock x:Name="HomeRecipeText" Grid.Row="6" Grid.Column="1" Text="PIXEL_DIFF_0.1" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
+                <Border x:Name="HomeVerdictBorder" Grid.Row="8" Grid.ColumnSpan="2" Background="#372914" BorderBrush="#987538" BorderThickness="2" Padding="8,5">
+                  <DockPanel LastChildFill="True">
+                    <TextBlock Text="Verdict" Foreground="{DynamicResource MutedBrush}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="HomeVerdictText" Text="REVIEW" Foreground="#FFE0A7" FontSize="24" FontWeight="ExtraBold" HorizontalAlignment="Right" TextAlignment="Right"/>
+                  </DockPanel>
+                </Border>
+              </Grid>
+            </Border>
+          </Grid>
+
+          <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="5"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Text="Evidence Boundary" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
+            <Border Grid.Row="2" Style="{StaticResource HmiPlainLanguageNote}" Padding="10" VerticalAlignment="Stretch">
               <TextBlock Text="Stage 1 image-validation evidence is for review. Camera, lighting, robot, safety, and MES readiness still require Hardware Readiness evidence before any real factory-integration claim."
-                         Style="{StaticResource HmiPageSubtitleText}" LineHeight="18" Margin="0,5,0,0"/>
-            </StackPanel>
-          </Border>
+                         Style="{StaticResource HmiPageSubtitleText}" LineHeight="19" VerticalAlignment="Center"/>
+            </Border>
+          </Grid>
         </Grid>
       </Grid>
     </Grid>

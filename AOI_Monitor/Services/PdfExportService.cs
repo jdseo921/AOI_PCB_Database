@@ -39,7 +39,8 @@ public static partial class PdfExportService
         if (pages.Length == 0)
             pages = new[] { new[] { title ?? "AOI Monitor Report" } };
 
-        File.WriteAllBytes(pdfPath, BuildPdfBytes(pages));
+        var hasUnicode = pages.Any(page => page.Any(line => line.Any(ch => ch > '~')));
+        File.WriteAllBytes(pdfPath, BuildPdfBytes(pages, hasUnicode));
         return pdfPath;
     }
 
@@ -67,22 +68,39 @@ public static partial class PdfExportService
         }
     }
 
-    private static byte[] BuildPdfBytes(IReadOnlyList<string[]> pages)
+    private static byte[] BuildPdfBytes(IReadOnlyList<string[]> pages, bool hasUnicode)
     {
         var objects = new List<string>
         {
             "<< /Type /Catalog /Pages 2 0 R >>",
+            string.Empty, // object 2 (Pages tree) filled once page object numbers are known
         };
 
-        var pageObjectNumbers = Enumerable.Range(0, pages.Count).Select(index => 3 + index * 2).ToArray();
-        objects.Add($"<< /Type /Pages /Kids [{string.Join(" ", pageObjectNumbers.Select(number => $"{number} 0 R"))}] /Count {pages.Count} >>");
+        // Object 3 is always the page font resource (/F1). When the document contains non-ASCII text
+        // (e.g. Korean), use a Type0 CID-keyed font (Adobe-Korea1, UniKS-UCS2-H) so the text is
+        // preserved and rendered by a Korean-capable viewer instead of being dropped to blanks.
+        int firstPageObject;
+        if (hasUnicode)
+        {
+            objects.Add("<< /Type /Font /Subtype /Type0 /BaseFont /HYSMyeongJo-Medium /Encoding /UniKS-UCS2-H /DescendantFonts [4 0 R] >>");
+            objects.Add("<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HYSMyeongJo-Medium /CIDSystemInfo << /Registry (Adobe) /Ordering (Korea1) /Supplement 1 >> /DW 1000 /FontDescriptor << /Type /FontDescriptor /FontName /HYSMyeongJo-Medium /Flags 6 /FontBBox [-200 -200 1100 900] /ItalicAngle 0 /Ascent 900 /Descent -200 /CapHeight 700 /StemV 80 >> >>");
+            firstPageObject = 5;
+        }
+        else
+        {
+            objects.Add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+            firstPageObject = 4;
+        }
+
+        var pageObjectNumbers = Enumerable.Range(0, pages.Count).Select(index => firstPageObject + index * 2).ToArray();
+        objects[1] = $"<< /Type /Pages /Kids [{string.Join(" ", pageObjectNumbers.Select(number => $"{number} 0 R"))}] /Count {pages.Count} >>";
 
         for (var index = 0; index < pages.Count; index++)
         {
-            var pageObject = 3 + index * 2;
+            var pageObject = firstPageObject + index * 2;
             var contentObject = pageObject + 1;
-            objects.Add($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PageWidth} {PageHeight}] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents {contentObject} 0 R >>");
-            var stream = BuildPageStream(pages[index]);
+            objects.Add($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PageWidth} {PageHeight}] /Resources << /Font << /F1 3 0 R >> >> /Contents {contentObject} 0 R >>");
+            var stream = BuildPageStream(pages[index], hasUnicode);
             var length = Encoding.ASCII.GetByteCount(stream);
             objects.Add($"<< /Length {length} >>\nstream\n{stream}\nendstream");
         }
@@ -108,7 +126,7 @@ public static partial class PdfExportService
         return Encoding.ASCII.GetBytes(output.ToString());
     }
 
-    private static string BuildPageStream(IEnumerable<string> lines)
+    private static string BuildPageStream(IEnumerable<string> lines, bool hasUnicode)
     {
         var sb = new StringBuilder();
         sb.AppendLine("BT");
@@ -116,8 +134,23 @@ public static partial class PdfExportService
         sb.AppendLine($"{LeftMargin} {TopY} Td");
         sb.AppendLine($"{LineHeight} TL");
         foreach (var line in lines)
-            sb.AppendLine($"({EscapePdfText(line)}) Tj T*");
+        {
+            if (hasUnicode)
+                sb.AppendLine($"<{ToUcs2HexBigEndian(line)}> Tj T*");
+            else
+                sb.AppendLine($"({EscapePdfText(line)}) Tj T*");
+        }
+
         sb.Append("ET");
+        return sb.ToString();
+    }
+
+    // Encodes a line as big-endian UCS-2 hex for the Type0 /UniKS-UCS2-H font path (2 bytes per code unit).
+    private static string ToUcs2HexBigEndian(string text)
+    {
+        var sb = new StringBuilder(text.Length * 4);
+        foreach (var ch in text)
+            sb.Append(((int)ch).ToString("X4", System.Globalization.CultureInfo.InvariantCulture));
         return sb.ToString();
     }
 
@@ -173,8 +206,11 @@ public static partial class PdfExportService
             yield return line.ToString();
     }
 
+    // Keeps ASCII printable characters and all printable non-ASCII (Latin-1 supplement and CJK such as
+    // Korean); only control characters (C0/C1 and DEL) are replaced with spaces. Non-ASCII text is
+    // rendered through the Type0 Unicode font path instead of being dropped.
     private static string NormalizeText(string text)
-        => new(text.Select(ch => ch is >= ' ' and <= '~' ? ch : ' ').ToArray());
+        => new(text.Select(ch => ch < ' ' || (ch >= '\u007F' && ch <= '\u009F') ? ' ' : ch).ToArray());
 
     private static string EscapePdfText(string text)
         => text.Replace("\\", "\\\\", StringComparison.Ordinal)

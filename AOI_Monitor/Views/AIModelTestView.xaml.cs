@@ -179,6 +179,14 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
 
     private async void OnRunBatchClick(object sender, RoutedEventArgs e)
     {
+        // Operators may view the AI Model Test page, but running batch validation is an Engineer/Admin
+        // action (roles spec RP-001/RP-002 and RTM AI-001).
+        if (!WorkflowState.Instance.TryAuthorize(RoleAuthorization.CanRunModelTests, "Running AI Model Test batch validation", out var permissionMessage))
+        {
+            MessageBox.Show(permissionMessage, "Permission Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         if (_workCts is not null)
         {
             MessageBox.Show("A validation/export task is already running.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);

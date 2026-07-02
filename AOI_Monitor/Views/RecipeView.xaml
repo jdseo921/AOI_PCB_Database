@@ -196,15 +196,15 @@
                 </Grid.RowDefinitions>
                 <StackPanel Grid.Row="0" Grid.Column="0">
                   <TextBlock Text="X/Y tolerance mm" Foreground="#9AA6AF" FontSize="14"/>
-                  <TextBox Text="0.020" MinHeight="34" ToolTip="Dimensional tolerance for placement offset evidence."/>
+                  <TextBox x:Name="PlacementToleranceText" Text="0.020" MinHeight="34" ToolTip="Dimensional tolerance for placement offset evidence."/>
                 </StackPanel>
                 <StackPanel Grid.Row="0" Grid.Column="2">
                   <TextBlock Text="Rotation tolerance deg" Foreground="#9AA6AF" FontSize="14"/>
-                  <TextBox Text="1.0" MinHeight="34" ToolTip="Skew tolerance for component placement evidence."/>
+                  <TextBox x:Name="RotationToleranceText" Text="1.0" MinHeight="34" ToolTip="Skew tolerance for component placement evidence."/>
                 </StackPanel>
                 <StackPanel Grid.Row="2" Grid.Column="0">
                   <TextBlock Text="IPC acceptability class" Foreground="#9AA6AF" FontSize="14"/>
-                  <ComboBox SelectedIndex="1" MinHeight="34">
+                  <ComboBox x:Name="IpcClassCombo" SelectedIndex="1" MinHeight="34">
                     <ComboBoxItem Content="IPC Class 1"/>
                     <ComboBoxItem Content="IPC Class 2"/>
                     <ComboBoxItem Content="IPC Class 3"/>
@@ -212,7 +212,7 @@
                 </StackPanel>
                 <StackPanel Grid.Row="2" Grid.Column="2">
                   <TextBlock Text="Lighting profile" Foreground="#9AA6AF" FontSize="14"/>
-                  <ComboBox SelectedIndex="0" MinHeight="34">
+                  <ComboBox x:Name="LightingProfileCombo" SelectedIndex="0" MinHeight="34">
                     <ComboBoxItem Content="Top bright field"/>
                     <ComboBoxItem Content="Low-angle dark field"/>
                     <ComboBoxItem Content="Side marking light"/>
@@ -221,7 +221,7 @@
                 </StackPanel>
                 <StackPanel Grid.Row="4" Grid.ColumnSpan="3">
                   <TextBlock Text="False-call policy" Foreground="#9AA6AF" FontSize="14"/>
-                  <ComboBox SelectedIndex="1" MinHeight="34">
+                  <ComboBox x:Name="FalseCallPolicyCombo" SelectedIndex="1" MinHeight="34">
                     <ComboBoxItem Content="Strict: hold every suspected defect"/>
                     <ComboBoxItem Content="Balanced: review benign visual noise"/>
                     <ComboBoxItem Content="Sensitive: reduce possible escapes"/>

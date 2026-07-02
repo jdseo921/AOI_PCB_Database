@@ -212,6 +212,78 @@ public sealed class ImageOnlyPcbLearningServiceTests : IDisposable
         Assert.Contains(result.Evidence, item => item.Contains("does not require manual defect labels", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void ImageOnlyPcbLearningWithoutOkValidationRetainsDefaultThresholdAndReviewStatus()
+    {
+        // L1 guard: training without OK Validation images must not select the aggressive minimum
+        // sweep threshold (which would flag nearly everything). The default threshold is retained
+        // and the run is marked REVIEW so calibration is visibly pending.
+        var project = CreateLearningProject("No OK validation guard");
+        ImportStandardTrainingSet(project);
+
+        var result = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options);
+
+        Assert.Equal(0, result.Calibration.OkValidationCount);
+        Assert.Equal(_options.DefaultLearnedThreshold, result.Calibration.LearnedThreshold, precision: 3);
+        Assert.Equal(_options.DefaultLearnedThreshold, result.Model.LearnedThreshold, precision: 3);
+        Assert.Equal("REVIEW", result.Calibration.Status);
+        Assert.Contains("OK Validation", result.Calibration.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(result.Warnings, warning => warning.Contains("OK Validation", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ImageOnlyPcbLearningCalibratedThresholdHoldsAtRuntimeForOkValidation()
+    {
+        // L2 parity: OK Validation images that calibration counts as passing (false-call rate 0)
+        // must also be scored OK by runtime inspection, which loads the model from disk. This fails
+        // on the old code because calibration and runtime used different region-gating thresholds.
+        var project = CreateLearningProject("Calibration runtime parity");
+        ImportStandardTrainingSet(project);
+        var okValidationImports = new List<ImageLearningImportResult>();
+        for (var i = 0; i < 4; i++)
+        {
+            okValidationImports.AddRange(ImportImages(
+                project,
+                ImageLearningImageRole.OkValidation,
+                WriteBoardPng($"ok-validation-{i}.png", brightnessShift: 8 + i * 4, variant: 50 + i)));
+        }
+
+        var result = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options);
+
+        Assert.Equal(4, result.Calibration.OkValidationCount);
+        Assert.Equal(0.0, result.Calibration.FalseCallRate, precision: 3);
+        Assert.Equal("OK", result.Calibration.Status);
+
+        foreach (var import in okValidationImports)
+        {
+            var inspection = ImageOnlyPcbLearningService.InspectImagePath(
+                result.Model.ModelId,
+                import.Image!.VaultPath,
+                _options,
+                "Operator01 [Operator]");
+            Assert.Equal("OK", inspection.InspectionResult.Verdict);
+        }
+    }
+
+    [Fact]
+    public void ImageOnlyPcbLearningToleranceMapPersistedAsSixteenBitGrayscale()
+    {
+        // L3 lossless persistence: the tolerance (standard-deviation) map is stored as 16-bit
+        // grayscale so it survives the disk round-trip without the coarse 1/16 quantization and
+        // 15.94 saturation of the previous 8-bit artifact.
+        var project = CreateLearningProject("Tolerance persistence");
+        ImportStandardTrainingSet(project);
+        ImportImages(project, ImageLearningImageRole.OkValidation, WriteBoardPng("ok-validation.png", variant: 60));
+
+        var result = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options);
+        var tolerancePath = Path.Combine(result.ArtifactFolder, "tolerance_map.png");
+
+        using var stream = File.OpenRead(tolerancePath);
+        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+
+        Assert.Equal(16, decoder.Frames[0].Format.BitsPerPixel);
+    }
+
     private ImageLearningProject CreateLearningProject(string name)
         => ImageLearningProjectService.CreateProject(name, "BOARD-IMAGE-ONLY", ImageLearningEvidenceMode.SyntheticDemo, "Engineer01 [Engineer]");
 

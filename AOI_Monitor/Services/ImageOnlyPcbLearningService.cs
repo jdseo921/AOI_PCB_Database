@@ -17,7 +17,9 @@ public static class ImageOnlyPcbLearningService
     public const string EngineName = "Learned PCB Visual Model v1";
     public const string EngineVersion = "LPCB_VISUAL_1.0";
 
+    // Legacy Gray8 tolerance artifacts (models trained before Gray16 persistence) used this coarse scale.
     private const double ToleranceArtifactScale = 16.0;
+    private const double ToleranceArtifactScaleGray16 = 256.0;
     private static readonly JsonSerializerOptions SummaryJsonOptions = new()
     {
         WriteIndented = true,
@@ -95,18 +97,27 @@ public static class ImageOnlyPcbLearningService
             normalizedOptions,
             string.Empty);
 
+        var artifactFolder = CreateArtifactFolder(project.ProjectId, package.Model.ModelId);
+        package = package with { ArtifactFolder = artifactFolder };
+        WriteLearnedImageArtifacts(package);
+
+        // Calibrate against the artifacts reloaded from disk so the measured false-call and
+        // possible-escape rates hold at inspection time, which always evaluates the persisted model.
+        var deployedPackage = package with
+        {
+            Reference = LoadImage(Path.Combine(artifactFolder, "learned_reference.png"), normalizedOptions, normalizeBrightness: false).Matrix,
+            Tolerance = ReadToleranceArtifact(Path.Combine(artifactFolder, "tolerance_map.png"), normalizedOptions),
+        };
         var okValidation = LoadImages(okValidationImages, normalizedOptions, skippedImages);
         var ngValidation = LoadImages(ngValidationImages, normalizedOptions, skippedImages);
-        var calibration = Calibrate(project.ProjectId, package, okValidation, ngValidation, normalizedOptions);
+        var calibration = Calibrate(project.ProjectId, deployedPackage, okValidation, ngValidation, normalizedOptions);
 
         package.Model.OkValidationCount = okValidation.Count;
         package.Model.LearnedThreshold = calibration.Result.LearnedThreshold;
         package.Model.FalseCallRate = calibration.Result.FalseCallRate;
         package.Model.PossibleEscapeRate = calibration.Result.PossibleEscapeRate;
 
-        var artifactFolder = CreateArtifactFolder(project.ProjectId, package.Model.ModelId);
-        package = package with { ArtifactFolder = artifactFolder };
-        WriteArtifacts(package, calibration, alignmentRecords, skippedImages);
+        WriteCalibrationArtifacts(package, calibration, alignmentRecords, skippedImages);
         package.Model.Artifacts = CreateArtifactRecords(package.Model.ModelId, artifactFolder).ToList();
 
         AoiDatabase.RecordLearnedPcbVisualModel(package.Model);
@@ -216,11 +227,35 @@ public static class ImageOnlyPcbLearningService
             .Select(image => Evaluate(package, image.Matrix, options).Score)
             .ToArray();
         var sweep = BuildThresholdSweep(okScores, ngScores, options);
+
+        if (okScores.Length == 0)
+        {
+            // Without OK Validation scores every sweep row trivially meets the false-call target,
+            // so an aggressive minimum threshold must never be selected for deployment.
+            var retainedThreshold = options.DefaultLearnedThreshold;
+            var retainedEscapes = ngScores.Count(score => score < retainedThreshold);
+            var retainedEscapeRate = ngScores.Length == 0 ? 0 : retainedEscapes / (double)ngScores.Length;
+            return new CalibrationComputation(
+                new ImageLearningCalibrationResult
+                {
+                    CalibrationId = NewCalibrationId(),
+                    ProjectId = projectId,
+                    ModelId = package.Model.ModelId,
+                    OkValidationCount = 0,
+                    NgValidationCount = ngScores.Length,
+                    LearnedThreshold = retainedThreshold,
+                    FalseCallTarget = options.FalseCallTarget,
+                    FalseCallRate = 0,
+                    PossibleEscapeRate = retainedEscapeRate,
+                    Status = "REVIEW",
+                    Summary = $"No readable OK Validation images were available; the default learned threshold {retainedThreshold:F2} was retained. False-call calibration is pending until OK Validation images are added and the model is rebuilt.",
+                },
+                sweep);
+        }
+
         var selected = SelectThreshold(sweep, options);
         var status = selected.MeetsFalseCallTarget && selected.MeetsPossibleEscapeLimit ? "OK" : "REVIEW";
-        var summary = okScores.Length == 0 && ngScores.Length == 0
-            ? "No validation images were available; default learned threshold was retained for review."
-            : $"Selected threshold {selected.Threshold:F2}; false-call rate {selected.FalseCallRate:P1}; possible escape rate {selected.PossibleEscapeRate:P1}.";
+        var summary = $"Selected threshold {selected.Threshold:F2}; false-call rate {selected.FalseCallRate:P1}; possible escape rate {selected.PossibleEscapeRate:P1}.";
 
         return new CalibrationComputation(
             new ImageLearningCalibrationResult
@@ -318,13 +353,14 @@ public static class ImageOnlyPcbLearningService
         }
 
         var smoothed = Smooth(scoreMap, aligned.Width, aligned.Height);
+        // The image score must not depend on the deployed threshold, otherwise calibration
+        // (measured before the threshold exists) and runtime inspection would score the same
+        // image differently and the calibrated false-call rate would not hold.
+        var score = ComputeAnomalyScore(smoothed, options.MinimumAnomalyAreaPixels);
         var threshold = package.Model.LearnedThreshold > 0
             ? package.Model.LearnedThreshold
             : options.DefaultLearnedThreshold;
         var regions = FindAnomalyRegions(smoothed, aligned.Width, aligned.Height, threshold, options.MinimumAnomalyAreaPixels);
-        var score = regions.Count > 0
-            ? regions.Max(region => region.Score)
-            : Percentile(smoothed, 0.995);
         var verdict = ToVerdict(score, threshold);
         var reason = verdict switch
         {
@@ -340,6 +376,26 @@ public static class ImageOnlyPcbLearningService
             reason,
             regions,
             alignment);
+    }
+
+    private static double ComputeAnomalyScore(double[] smoothed, int minimumAreaPixels)
+    {
+        if (smoothed.Length == 0)
+            return 0;
+
+        // Score = the k-th largest smoothed normalized difference, where k is the minimum
+        // anomaly area. This is the strongest level at which at least `minimumAreaPixels`
+        // pixels are anomalous, and it is independent of any decision threshold, so calibration
+        // (run before the threshold exists) and runtime inspection score an image identically.
+        var k = Math.Clamp(minimumAreaPixels, 1, smoothed.Length);
+        return KthLargest(smoothed, k);
+    }
+
+    private static double KthLargest(double[] values, int k)
+    {
+        var sorted = (double[])values.Clone();
+        Array.Sort(sorted);
+        return sorted[sorted.Length - k];
     }
 
     private static List<ImageLearningAnomalyRegion> FindAnomalyRegions(
@@ -671,19 +727,28 @@ public static class ImageOnlyPcbLearningService
         return new ImageMatrix(fallback.Width, fallback.Height, output);
     }
 
-    private static void WriteArtifacts(
+    private static void WriteLearnedImageArtifacts(LearnedVisualModelPackage package)
+    {
+        Directory.CreateDirectory(package.ArtifactFolder);
+        WriteGray8Png(Path.Combine(package.ArtifactFolder, "learned_reference.png"), package.Reference.Pixels, package.Reference.Width, package.Reference.Height);
+        // Tolerance is persisted as 16-bit grayscale so the standard-deviation map survives the
+        // disk round-trip losslessly (1/256 gray-level precision, no saturation), keeping runtime
+        // anomaly scores aligned with the calibrated values.
+        WriteGray16Png(
+            Path.Combine(package.ArtifactFolder, "tolerance_map.png"),
+            package.Tolerance.Pixels,
+            package.Tolerance.Width,
+            package.Tolerance.Height,
+            ToleranceArtifactScaleGray16);
+    }
+
+    private static void WriteCalibrationArtifacts(
         LearnedVisualModelPackage package,
         CalibrationComputation calibration,
         IReadOnlyList<ImageLearningAlignmentRecord> alignments,
         IReadOnlyList<ImageLearningSkippedImage> skippedImages)
     {
         Directory.CreateDirectory(package.ArtifactFolder);
-        WriteGray8Png(Path.Combine(package.ArtifactFolder, "learned_reference.png"), package.Reference.Pixels, package.Reference.Width, package.Reference.Height);
-        WriteGray8Png(
-            Path.Combine(package.ArtifactFolder, "tolerance_map.png"),
-            package.Tolerance.Pixels.Select(value => Math.Clamp(value * ToleranceArtifactScale, 0.0, 255.0)).ToArray(),
-            package.Tolerance.Width,
-            package.Tolerance.Height);
         WriteGray8Png(
             Path.Combine(package.ArtifactFolder, "anomaly_threshold_map.png"),
             BuildThresholdMap(package.Reference, package.Tolerance, calibration.Result.LearnedThreshold),
@@ -722,7 +787,8 @@ public static class ImageOnlyPcbLearningService
             calibration.Result.FalseCallRate,
             calibration.Result.PossibleEscapeRate,
             calibration.Result.Status,
-            toleranceArtifactScale = ToleranceArtifactScale,
+            toleranceArtifactScale = ToleranceArtifactScaleGray16,
+            toleranceArtifactBitDepth = 16,
             skippedImages,
             note = "Image-only learning uses OK images and optional image-level validation truth; no defect labels or training boxes are required.",
         };
@@ -789,6 +855,63 @@ public static class ImageOnlyPcbLearningService
         encoder.Save(stream);
     }
 
+    private static void WriteGray16Png(string path, IReadOnlyList<double> values, int width, int height, double scale)
+    {
+        var bytes = new byte[values.Count * 2];
+        for (var i = 0; i < values.Count; i++)
+        {
+            var sample = (int)Math.Clamp(Math.Round(values[i] * scale, MidpointRounding.AwayFromZero), 0, 65535);
+            bytes[i * 2] = (byte)(sample & 0xFF);
+            bytes[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
+        }
+
+        var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Gray16, null, bytes, width * 2);
+        bitmap.Freeze();
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(path);
+        encoder.Save(stream);
+    }
+
+    private static ImageMatrix ReadToleranceArtifact(string path, ImageOnlyPcbLearningOptions options)
+    {
+        using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+        if (decoder.Frames.Count == 0)
+            throw new InvalidDataException("Tolerance map decoder found no frames.");
+
+        var frame = decoder.Frames[0];
+        var width = frame.PixelWidth;
+        var height = frame.PixelHeight;
+        var values = new double[width * height];
+
+        if (frame.Format == PixelFormats.Gray16)
+        {
+            var stride = width * 2;
+            var raw = new byte[stride * height];
+            frame.CopyPixels(raw, stride, 0);
+            for (var i = 0; i < values.Length; i++)
+            {
+                var sample = raw[i * 2] | (raw[i * 2 + 1] << 8);
+                values[i] = Math.Max(options.MinimumTolerance, sample / ToleranceArtifactScaleGray16);
+            }
+        }
+        else
+        {
+            // Legacy Gray8 tolerance artifact from models trained before 16-bit persistence.
+            BitmapSource gray8 = frame.Format == PixelFormats.Gray8
+                ? frame
+                : new FormatConvertedBitmap(frame, PixelFormats.Gray8, null, 0);
+            var stride = width;
+            var raw = new byte[stride * height];
+            gray8.CopyPixels(raw, stride, 0);
+            for (var i = 0; i < values.Length; i++)
+                values[i] = Math.Max(options.MinimumTolerance, raw[i] / ToleranceArtifactScale);
+        }
+
+        return new ImageMatrix(width, height, values);
+    }
+
     private static LearnedVisualModelPackage LoadModelPackage(string modelId, ImageOnlyPcbLearningOptions? options)
     {
         var model = AoiDatabase.GetLearnedPcbVisualModel(modelId)
@@ -797,9 +920,7 @@ public static class ImageOnlyPcbLearningService
         var referencePath = FindArtifactPath(model, "learned_reference.png");
         var tolerancePath = FindArtifactPath(model, "tolerance_map.png");
         var reference = LoadImage(referencePath, normalizedOptions, normalizeBrightness: false).Matrix;
-        var toleranceMap = LoadImage(tolerancePath, normalizedOptions, normalizeBrightness: false).Matrix;
-        for (var i = 0; i < toleranceMap.Pixels.Length; i++)
-            toleranceMap.Pixels[i] = Math.Max(normalizedOptions.MinimumTolerance, toleranceMap.Pixels[i] / ToleranceArtifactScale);
+        var toleranceMap = ReadToleranceArtifact(tolerancePath, normalizedOptions);
 
         return new LearnedVisualModelPackage(
             model,
@@ -893,17 +1014,6 @@ public static class ImageOnlyPcbLearningService
             return text;
 
         return $"\"{text.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
-    }
-
-    private static double Percentile(double[] values, double percentile)
-    {
-        if (values.Length == 0)
-            return 0;
-
-        var sorted = values.ToArray();
-        Array.Sort(sorted);
-        var index = Math.Clamp((int)Math.Round((sorted.Length - 1) * percentile, MidpointRounding.AwayFromZero), 0, sorted.Length - 1);
-        return sorted[index];
     }
 
     private static double CalculateRawDifferencePercent(ImageMatrix first, ImageMatrix second)

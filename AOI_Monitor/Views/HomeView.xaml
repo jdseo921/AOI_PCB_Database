@@ -16,7 +16,7 @@
     <Style x:Key="HomeCompactStatusBorder" TargetType="Border" BasedOn="{StaticResource HmiAdaptiveStatusUnavailable}">
       <Setter Property="MinHeight" Value="30"/>
       <Setter Property="MinWidth" Value="136"/>
-      <Setter Property="MaxWidth" Value="178"/>
+      <Setter Property="MaxWidth" Value="286"/>
       <Setter Property="Padding" Value="7,3"/>
       <Setter Property="Margin" Value="0,0,6,6"/>
     </Style>
@@ -30,7 +30,7 @@
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="FontSize" Value="14"/>
       <Setter Property="FontWeight" Value="ExtraBold"/>
-      <Setter Property="MaxWidth" Value="104"/>
+      <Setter Property="MaxWidth" Value="220"/>
     </Style>
   </UserControl.Resources>
 

@@ -2896,9 +2896,9 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
 
         if (_isKorean)
         {
-            SetComboItemText(FontCombo, 0, "\uCD5C\uC18C 14pt");
-            SetComboItemText(FontCombo, 1, "\uD45C\uC900 15pt");
-            SetComboItemText(FontCombo, 2, "\uD06C\uAC8C 17pt");
+            SetComboItemText(FontCombo, 0, "\uAE30\uBCF8 14px");
+            SetComboItemText(FontCombo, 1, "\uD45C\uC900 15px");
+            SetComboItemText(FontCombo, 2, "\uD06C\uAC8C 17px");
             SetComboItemText(ResolutionCombo, 0, "1920 x 1080 \uCD5C\uC18C HMI");
             SetComboItemText(ResolutionCombo, 1, "2560 x 1440 \uC5D4\uC9C0\uB2C8\uC5B4\uB9C1 \uBAA8\uB2C8\uD130");
             SetComboItemText(ResolutionCombo, 2, "3840 x 2160 \uBCBD\uBA74 \uD45C\uC2DC");
@@ -2911,9 +2911,9 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         }
         else
         {
-            SetComboItemText(FontCombo, 0, "Minimum 14 pt");
-            SetComboItemText(FontCombo, 1, "Standard 15 pt");
-            SetComboItemText(FontCombo, 2, "Large 17 pt");
+            SetComboItemText(FontCombo, 0, "Compact 14 px base");
+            SetComboItemText(FontCombo, 1, "Standard 15 px base");
+            SetComboItemText(FontCombo, 2, "Large 17 px base");
             SetComboItemText(ResolutionCombo, 0, "1920 x 1080 minimum HMI");
             SetComboItemText(ResolutionCombo, 1, "2560 x 1440 engineering monitor");
             SetComboItemText(ResolutionCombo, 2, "3840 x 2160 wall display");

@@ -195,12 +195,22 @@ public partial class AiTrainingSetupView : UserControl
         }
     }
 
-    private void OnExportReportClick(object sender, RoutedEventArgs e)
-        => RunUiAction(() =>
+    private async void OnExportReportClick(object sender, RoutedEventArgs e)
+    {
+        try
         {
-            var report = _viewModel.ExportReport();
-            OpenPath(Path.GetDirectoryName(report) ?? report, "Open Report Folder");
-        }, "Export Client Learning Report");
+            string? report = null;
+            await RunLongActionAsync(
+                () => report = _viewModel.ExportReport(),
+                "Export Client Learning Report");
+            if (!string.IsNullOrWhiteSpace(report))
+                OpenPath(Path.GetDirectoryName(report) ?? report, "Open Report Folder");
+        }
+        catch (Exception ex)
+        {
+            ShowOperationFailure("Export Client Learning Report", ex);
+        }
+    }
 
     private async void OnExportVisualEvidenceClick(object sender, RoutedEventArgs e)
     {

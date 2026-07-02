@@ -80,8 +80,8 @@
             <RowDefinition Height="Auto" MinHeight="32"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
@@ -115,7 +115,14 @@
             <CheckBox x:Name="AutoSaveCheck" Content="Auto-save" Foreground="#DCE5EB" VerticalAlignment="Center" Margin="0,0,0,6"/>
           </WrapPanel>
 
-          <Border Grid.Row="2" Margin="8,0,8,8" Style="{StaticResource HmiStatusSimulated}" Padding="10" Visibility="Collapsed">
+          <UniformGrid Grid.Row="2" Columns="4" Margin="8,0,8,8">
+            <Button x:Name="StartInspectionButton" Style="{StaticResource ActionBtnGreen}" Content="Start" Margin="0,0,6,0" Click="OnStartClick"/>
+            <Button x:Name="StopInspectionButton" Style="{StaticResource ActionBtnRed}" Content="Stop" Margin="0,0,6,0" Click="OnStopClick"/>
+            <Button x:Name="NextBoardButton" Style="{StaticResource ActionBtnBlue}" Content="Next Board" Margin="0,0,6,0" Click="OnNextBoardClick"/>
+            <Button x:Name="SaveResultButton" Style="{StaticResource ActionBtnAmber}" Content="Save Result" Click="OnSaveResultClick"/>
+          </UniformGrid>
+
+          <Border Grid.Row="3" Margin="8,0,8,8" Style="{StaticResource HmiStatusSimulated}" Padding="10" Visibility="Collapsed">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -148,7 +155,7 @@
             </Grid>
           </Border>
 
-          <Border x:Name="InspectionImageViewport" Grid.Row="3" Margin="8,0,8,8" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
+          <Border x:Name="InspectionImageViewport" Grid.Row="4" Margin="8,0,8,8" MinHeight="320" MaxHeight="620" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
             <Grid ClipToBounds="True">
               <TextBlock x:Name="EmptyImageText" Text="Select a folder or load an image from Image Library, then press Start / Next Board."
                          Foreground="#68757D" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
@@ -161,13 +168,6 @@
               </Viewbox>
             </Grid>
           </Border>
-
-          <UniformGrid Grid.Row="4" Columns="4" Margin="8,0,8,8">
-            <Button x:Name="StartInspectionButton" Style="{StaticResource ActionBtnGreen}" Content="Start" Margin="0,0,6,0" Click="OnStartClick"/>
-            <Button x:Name="StopInspectionButton" Style="{StaticResource ActionBtnRed}" Content="Stop" Margin="0,0,6,0" Click="OnStopClick"/>
-            <Button x:Name="NextBoardButton" Style="{StaticResource ActionBtnBlue}" Content="Next Board" Margin="0,0,6,0" Click="OnNextBoardClick"/>
-            <Button x:Name="SaveResultButton" Style="{StaticResource ActionBtnAmber}" Content="Save Result" Click="OnSaveResultClick"/>
-          </UniformGrid>
         </Grid>
       </Border>
 
@@ -262,6 +262,7 @@
                       AutoGenerateColumns="False"
                       Style="{StaticResource HmiDenseTable}"
                       MinWidth="0"
+                      MaxHeight="560"
                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                       ToolTip="ROI means region of interest: the image area checked for a defect.">
               <DataGrid.Columns>
@@ -295,7 +296,7 @@
             <TextBlock Text="Alarm / Event Log" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </DockPanel>
         </Border>
-        <DataGrid Grid.Row="1" x:Name="AlarmGrid" AutoGenerateColumns="False" Style="{StaticResource HmiTable}">
+        <DataGrid Grid.Row="1" x:Name="AlarmGrid" AutoGenerateColumns="False" Style="{StaticResource HmiTable}" MaxHeight="300">
           <DataGrid.Columns>
             <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="96" MinWidth="96"/>
             <DataGridTextColumn Header="Event" Binding="{Binding Event}" Width="150" MinWidth="150"/>

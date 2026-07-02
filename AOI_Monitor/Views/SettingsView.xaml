@@ -205,10 +205,11 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="FontSizeLabelText" Text="Font Size" Style="{StaticResource SettingsLabel}"/>
-                    <ComboBox Grid.Column="1" x:Name="FontCombo" SelectedIndex="1" Style="{StaticResource SettingsCombo}">
-                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Minimum 14 pt</ComboBoxItem>
-                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Standard 15 pt</ComboBoxItem>
-                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Large 17 pt</ComboBoxItem>
+                    <ComboBox Grid.Column="1" x:Name="FontCombo" SelectedIndex="1" Style="{StaticResource SettingsCombo}"
+                              ToolTip="Base window font size in pixels. Page text that sets its own HMI size is not scaled by this preset.">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Compact 14 px base</ComboBoxItem>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Standard 15 px base</ComboBoxItem>
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Large 17 px base</ComboBoxItem>
                     </ComboBox>
                   </Grid>
 

@@ -14,8 +14,8 @@
           <Setter Property="BorderBrush" Value="#8C6C35"/>
         </DataTrigger>
         <DataTrigger Binding="{Binding Risk}" Value="Verified NG">
-          <Setter Property="Background" Value="#14311D"/>
-          <Setter Property="BorderBrush" Value="#377849"/>
+          <Setter Property="Background" Value="#172A39"/>
+          <Setter Property="BorderBrush" Value="#477CA5"/>
         </DataTrigger>
       </Style.Triggers>
     </Style>
@@ -31,11 +31,12 @@
           <Setter Property="Foreground" Value="#FFE0A7"/>
         </DataTrigger>
         <DataTrigger Binding="{Binding Risk}" Value="Verified NG">
-          <Setter Property="Foreground" Value="#C6FFD0"/>
+          <Setter Property="Foreground" Value="#CFEAFF"/>
         </DataTrigger>
       </Style.Triggers>
     </Style>
   </UserControl.Resources>
+  <ScrollViewer Style="{StaticResource FactoryScrollablePage}">
   <Grid Margin="8" MinHeight="665">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="340"/>
@@ -59,8 +60,8 @@
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
-              <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
-                <TextBlock Text="Demo Data" Foreground="#FFE0A7" FontWeight="Bold" FontSize="14"/>
+              <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
+                <TextBlock Text="Demo Data" Foreground="#F1D8FF" FontWeight="Bold" FontSize="14"/>
               </Border>
               <TextBlock Text="Prioritized Review Queue" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
             </DockPanel>
@@ -70,6 +71,7 @@
                     BorderThickness="0"
                     Margin="0"
                     MinWidth="0"
+                    MaxHeight="480"
                     Style="{StaticResource HmiDenseTable}"
                     ToolTip="AI means inspection result. GT means ground truth. RefDes means reference designator.">
               <DataGrid.Columns>
@@ -97,8 +99,8 @@
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
-              <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
-                <TextBlock Text="Demo Data" Foreground="#FFE0A7" FontWeight="Bold" FontSize="14"/>
+              <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
+                <TextBlock Text="Demo Data" Foreground="#F1D8FF" FontWeight="Bold" FontSize="14"/>
               </Border>
               <TextBlock Text="Closest Matching Defect Images" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
             </DockPanel>
@@ -159,8 +161,8 @@
 
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
-            <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
-              <TextBlock Text="Demo Board Illustration" Foreground="#FFE0A7" FontWeight="Bold" FontSize="14"/>
+            <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
+              <TextBlock Text="Demo Board Illustration" Foreground="#F1D8FF" FontWeight="Bold" FontSize="14"/>
             </Border>
             <TextBlock Text="Current Sample Image" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </DockPanel>
@@ -178,7 +180,7 @@
         </Border>
 
         <!-- PCB Canvas -->
-        <Border Grid.Row="2" Margin="8" BorderBrush="#59636B" BorderThickness="1" Background="#0E1214" ClipToBounds="True">
+        <Border Grid.Row="2" Margin="8" MaxHeight="560" BorderBrush="#59636B" BorderThickness="1" Background="#0E1214" ClipToBounds="True">
           <Viewbox x:Name="ReviewCanvasViewbox" Stretch="Uniform">
           <Viewbox.LayoutTransform>
             <ScaleTransform x:Name="ReviewZoomTransform" ScaleX="1" ScaleY="1"/>
@@ -293,8 +295,8 @@
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
-              <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
-                <TextBlock Text="Demo Metadata" Foreground="#FFE0A7" FontWeight="Bold" FontSize="14"/>
+              <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
+                <TextBlock Text="Demo Metadata" Foreground="#F1D8FF" FontWeight="Bold" FontSize="14"/>
               </Border>
               <TextBlock Text="Sample Metadata" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
             </DockPanel>
@@ -346,7 +348,7 @@
             <TextBlock Text="Disposition Controls" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
           <StackPanel Grid.Row="1" Margin="8">
-            <Button Style="{StaticResource ActionBtnGreen}" Content="Confirm NG" Margin="0,0,0,6" Click="OnConfirmNgClick"/>
+            <Button Style="{StaticResource ActionBtnRed}" Content="Confirm NG" Margin="0,0,0,6" Click="OnConfirmNgClick"/>
             <Button Style="{StaticResource ActionBtnAmber}" Content="Mark False Call" Margin="0,0,0,6" Click="OnFalseCallClick"/>
             <Button Style="{StaticResource ActionBtnRed}" Content="Mark Possible Escape" Margin="0,0,0,6" Click="OnPossibleEscapeClick"/>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Candidate" Margin="0,0,0,6" Click="OnSendTrainingClick"/>
@@ -357,5 +359,6 @@
     </Grid>
 
   </Grid>
+  </ScrollViewer>
 </UserControl>
 

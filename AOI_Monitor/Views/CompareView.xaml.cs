@@ -75,9 +75,9 @@ public partial class CompareView : UserControl
         else
         {
             FindingsSourceText.Text = "Demo Data";
-            FindingsSourceText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFE0A7"));
-            FindingsSourceChip.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#372914"));
-            FindingsSourceChip.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8C6C35"));
+            FindingsSourceText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F1D8FF"));
+            FindingsSourceChip.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2A1740"));
+            FindingsSourceChip.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8F5FD1"));
         }
 
         ApplyLearnedVisualComparison(state.LastAnalysis);

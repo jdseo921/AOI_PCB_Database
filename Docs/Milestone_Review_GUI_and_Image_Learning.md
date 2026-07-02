@@ -1,6 +1,8 @@
 # Milestone Review: GUI Readiness and Stage 1 Image-Learning
 
 Review date: 2026-07-02.
+
+> **Status update (same day):** GUI defects G1-G6 from Section 3.1 and the demo-semantics items (amber/green demo chips to purple, font-preset px labeling, over-trimmed Home/alarm chips, synchronous learning-report export) were fixed on this branch — see the follow-up commit for the file list. The learning-pipeline items L1-L8 (Section 4.3) and the P1/P2 plan items remain open and are the next priority.
 Scope: full static review of the WPF GUI (all views, shell, styles, code-behind), the image-only PCB learning pipeline and its tests, and traceability against the three client documents (PCBA Defect Classification Table v1.0, AOI PoC Software GUI Concept & Functional Specification, Development Roadmap & Commercialization Plan).
 Method: line-by-line code reading with geometry checks for layout claims. This review environment cannot run Windows/WPF builds; `dotnet build/test` and the quality-gate scripts were not executed here. CI on `windows-latest` remains the authoritative build/test evidence.
 

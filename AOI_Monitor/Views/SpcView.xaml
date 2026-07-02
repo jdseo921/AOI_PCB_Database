@@ -37,6 +37,7 @@
       </Style.Triggers>
     </Style>
   </UserControl.Resources>
+  <ScrollViewer Style="{StaticResource FactoryScrollablePage}">
   <StackPanel Margin="8">
     <Grid Margin="0,0,0,8">
       <Grid.ColumnDefinitions>
@@ -49,8 +50,8 @@
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
-              <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
-                <TextBlock Text="Prototype Trend" Foreground="#FFE0A7" FontWeight="Bold" FontSize="14"/>
+              <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
+                <TextBlock Text="Demo Trend / Not Live Data" Foreground="#F1D8FF" FontWeight="Bold" FontSize="14"/>
               </Border>
               <TextBlock Text="SPC / SQLite Summary" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
             </DockPanel>
@@ -107,5 +108,6 @@
                  Foreground="#F27777" FontWeight="ExtraBold" TextAlignment="Center" FontSize="14" TextWrapping="Wrap"/>
     </Border>
   </StackPanel>
+  </ScrollViewer>
 </UserControl>
 

@@ -27,9 +27,9 @@
   <Border Margin="8" BorderBrush="#343D44" BorderThickness="1" Background="#11161A">
     <Grid>
       <Grid.RowDefinitions>
-        <RowDefinition Height="82"/>
+        <RowDefinition Height="Auto" MinHeight="82"/>
         <RowDefinition Height="*"/>
-        <RowDefinition Height="48"/>
+        <RowDefinition Height="Auto" MinHeight="48"/>
       </Grid.RowDefinitions>
 
       <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="12,10">

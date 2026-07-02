@@ -47,11 +47,12 @@
       <Setter Property="LineHeight" Value="18"/>
     </Style>
   </UserControl.Resources>
+  <ScrollViewer Style="{StaticResource FactoryScrollablePage}">
   <Grid Margin="8" MinHeight="665">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="*"/>
       <ColumnDefinition Width="8"/>
-      <ColumnDefinition Width="430"/>
+      <ColumnDefinition Width="0.62*" MinWidth="330" MaxWidth="520"/>
       <ColumnDefinition Width="8"/>
       <ColumnDefinition Width="*"/>
     </Grid.ColumnDefinitions>
@@ -80,15 +81,15 @@
                          VerticalAlignment="Center"
                          TextWrapping="NoWrap"
                          TextTrimming="CharacterEllipsis"
-                         MaxWidth="150"
+                         MaxWidth="210"
                          ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
               <TextBlock Text="Defect Sample" FontWeight="ExtraBold" Foreground="#E8EDF2" FontSize="14" VerticalAlignment="Center"/>
-              <Border Style="{StaticResource Chip}" Background="#372914" BorderBrush="#8C6C35" Margin="8,0,0,0">
-                <TextBlock Text="Demo Board" Foreground="#FFE0A7" FontSize="14" FontWeight="Bold"/>
+              <Border Style="{StaticResource ChipPurple}" Margin="8,0,0,0">
+                <TextBlock Text="Demo Board" Foreground="#F1D8FF" FontSize="14" FontWeight="Bold"/>
               </Border>
-            </StackPanel>
+            </WrapPanel>
           </DockPanel>
         </Border>
         <!-- Defect PCB view -->
@@ -226,8 +227,8 @@
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
-              <Border x:Name="FindingsSourceChip" DockPanel.Dock="Right" Style="{StaticResource Chip}" Background="#372914" BorderBrush="#8C6C35">
-                <TextBlock x:Name="FindingsSourceText" Text="Demo Data" Foreground="#FFE0A7" FontSize="14" FontWeight="Bold"/>
+              <Border x:Name="FindingsSourceChip" DockPanel.Dock="Right" Style="{StaticResource Chip}" Background="#2A1740" BorderBrush="#8F5FD1">
+                <TextBlock x:Name="FindingsSourceText" Text="Demo Data" Foreground="#F1D8FF" FontSize="14" FontWeight="Bold"/>
               </Border>
               <TextBlock Text="Comparison Findings" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14" VerticalAlignment="Center"/>
             </DockPanel>
@@ -236,6 +237,7 @@
                     x:Name="FindingsGrid"
                     BorderThickness="0"
                     MinWidth="0"
+                    MaxHeight="480"
                     Style="{StaticResource HmiDenseTable}">
               <DataGrid.Columns>
                 <DataGridTextColumn Header="Region"  Binding="{Binding Region}"   Width="105" MinWidth="105" ElementStyle="{StaticResource {x:Type TextBlock}}"/>
@@ -280,15 +282,15 @@
                          VerticalAlignment="Center"
                          TextWrapping="NoWrap"
                          TextTrimming="CharacterEllipsis"
-                         MaxWidth="150"
+                         MaxWidth="210"
                          ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
               <TextBlock Text="Golden Reference" FontWeight="ExtraBold" Foreground="#E8EDF2" FontSize="14" VerticalAlignment="Center"/>
-              <Border Style="{StaticResource Chip}" Background="#372914" BorderBrush="#8C6C35" Margin="8,0,0,0">
-                <TextBlock Text="Demo Board" Foreground="#FFE0A7" FontSize="14" FontWeight="Bold"/>
+              <Border Style="{StaticResource ChipPurple}" Margin="8,0,0,0">
+                <TextBlock Text="Demo Board" Foreground="#F1D8FF" FontSize="14" FontWeight="Bold"/>
               </Border>
-            </StackPanel>
+            </WrapPanel>
           </DockPanel>
         </Border>
         <!-- Golden PCB view (slightly desaturated) -->
@@ -316,9 +318,9 @@
             <Border Canvas.Left="165" Canvas.Top="142" Width="168" Height="82" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="U107" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="#CAD4DA"/></Border>
             <Border Canvas.Left="220" Canvas.Top="180" Width="142" Height="64" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="SH1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="#CAD4DA"/></Border>
             <Border Canvas.Left="95"  Canvas.Top="185" Width="88"  Height="52" Background="#20272B" BorderBrush="#8C9BA4" BorderThickness="1"><TextBlock Text="D12" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="#CAD4DA"/></Border>
-            <!-- Golden ROI (dashed green) -->
-            <Rectangle Canvas.Left="153" Canvas.Top="133" Width="202" Height="108" Stroke="#50F56E" StrokeThickness="1.5" Fill="#0A50F56E" StrokeDashArray="4 3"/>
-            <Rectangle Canvas.Left="232" Canvas.Top="153" Width="62"  Height="46"  Stroke="#50F56E" StrokeThickness="1.5" Fill="#0A50F56E" StrokeDashArray="4 3"/>
+            <!-- Golden ROI (dashed purple: demo illustration, not validated evidence) -->
+            <Rectangle Canvas.Left="153" Canvas.Top="133" Width="202" Height="108" Stroke="#C084FC" StrokeThickness="1.5" Fill="#14C084FC" StrokeDashArray="4 3"/>
+            <Rectangle Canvas.Left="232" Canvas.Top="153" Width="62"  Height="46"  Stroke="#C084FC" StrokeThickness="1.5" Fill="#14C084FC" StrokeDashArray="4 3"/>
             <Line X1="0" Y1="173" X2="500" Y2="173" Stroke="#3C6480" StrokeThickness="1" Opacity="0.5"/>
             <Line X1="290" Y1="0" X2="290" Y2="380" Stroke="#3C6480" StrokeThickness="1" Opacity="0.5"/>
           </Canvas>
@@ -331,7 +333,7 @@
           <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5"><StackPanel><TextBlock Text="Sample" Style="{StaticResource CompareFooterLabelText}"/><TextBlock Text="IMG_GOLD_0241" Style="{StaticResource CompareFooterValueText}"/></StackPanel></Border>
           <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5"><StackPanel><TextBlock Text="RefDes" Style="{StaticResource CompareFooterLabelText}"/><TextBlock Text="U107" Style="{StaticResource CompareFooterValueText}"/></StackPanel></Border>
           <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5"><StackPanel><TextBlock Text="FOV" Style="{StaticResource CompareFooterLabelText}"/><TextBlock Text="TOP-03" Style="{StaticResource CompareFooterValueText}"/></StackPanel></Border>
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0"><StackPanel><TextBlock Text="Status" Style="{StaticResource CompareFooterLabelText}"/><TextBlock Text="Verified OK" Style="{StaticResource CompareFooterValueText}" Foreground="#50F56E"/></StackPanel></Border>
+          <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0"><StackPanel><TextBlock Text="Status" Style="{StaticResource CompareFooterLabelText}"/><TextBlock Text="Demo OK" Style="{StaticResource CompareFooterValueText}" Foreground="#C084FC"/></StackPanel></Border>
           <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0"><StackPanel><TextBlock Text="Program" Style="{StaticResource CompareFooterLabelText}"/><TextBlock Text="TBOX_TOP_V1.2" Style="{StaticResource CompareFooterValueText}"/></StackPanel></Border>
           <Border Style="{StaticResource FieldBox}" Margin="0"><StackPanel><TextBlock Text="Captured" Style="{StaticResource CompareFooterLabelText}"/><TextBlock Text="Baseline" Style="{StaticResource CompareFooterValueText}"/></StackPanel></Border>
         </UniformGrid>
@@ -339,5 +341,6 @@
     </Border>
 
   </Grid>
+  </ScrollViewer>
 </UserControl>
 

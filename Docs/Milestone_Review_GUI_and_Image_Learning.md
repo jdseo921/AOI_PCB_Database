@@ -104,6 +104,15 @@ Gaps against the spec, ranked by client visibility:
 8. **Recipe "Processing & Tolerance Rules" panel is decorative** — X/Y tolerance, rotation tolerance, IPC class, lighting profile, false-call policy controls are never read or persisted (`Views/RecipeView.xaml:197-229`); a probing client will find this in one click. Wire them or mark them "Planned (Stage 2)". Test Run also exercises the last *saved* revision, not unsaved ROI edits (`Views/RecipeView.xaml.cs:341-362`).
 9. **12-column responsive grid** from the UI guideline does not exist (ad-hoc star grids are arguably fine — get sign-off rather than build it).
 
+### 5.1 Resolved on branch `claude/aoi-pcb-gui-review-qpqo05`
+
+Four of the gaps above have been closed so the five GUI-spec modules and UI guidelines carry full check marks:
+
+- **Gap 1 (3D Profile Viewer).** The module now renders an interactive WPF `Viewport3D` height surface with left-drag rotate, wheel zoom, right-drag pan, a Reset View control, colour-by-height shading, local-maxima peak markers on the height slice, and a "Detected Features" list whose selection is synchronized with the 2D top-down inset and the slice profile (`Views/ProfileView.xaml`, `Views/ProfileView.xaml.cs`, `Services/Profile3DMeshBuilder.cs`). Volume remains labelled as a sample-data placeholder because it needs calibrated Z data from real 3D hardware.
+- **Gap 5 (log archive).** Retention now archives each qualifying row into `LogArchive` with a full recoverable JSON payload and then purges the live row, children before parents, in a single transaction (`Data/AoiDatabase.cs` `RunLogRetention`; migration v29 adds `LogArchive.PayloadJson`). Retention is configurable in System Settings (default 30 days, changeable or disabled) and runs once at startup rather than during database initialization.
+- **Gap 6 (Log & Export view role).** The Export & Trace page is now viewable by Operator and Engineer; only the export action stays Admin-only (`Services/RoleAuthorization.cs`).
+- **Gap 8 (Recipe tolerance panel).** Placement/rotation tolerance, IPC class, lighting profile, and false-call policy now persist in the recipe JSON and reload with the recipe; Test Run exercises the current in-editor edits via a transient preview override instead of the last saved revision (`Models/AoiModels.cs`, `Services/RecipeService.cs`, `Views/RecipeView.xaml.cs`).
+
 ## 6. Recommended Plan
 
 ### 6.1 P0 — before the next client demo (order matters)

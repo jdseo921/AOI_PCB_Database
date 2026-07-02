@@ -83,6 +83,11 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
 
             RecipeNameText.Text = snapshot.Document.RecipeName;
             _backgroundImagePath = snapshot.Document.BackgroundImagePath;
+            PlacementToleranceText.Text = FormatDouble(snapshot.Document.PlacementToleranceMm);
+            RotationToleranceText.Text = FormatDouble(snapshot.Document.RotationToleranceDeg);
+            SelectComboByContent(IpcClassCombo, snapshot.Document.IpcClass);
+            SelectComboByContent(LightingProfileCombo, snapshot.Document.LightingProfile);
+            SelectComboByContent(FalseCallPolicyCombo, snapshot.Document.FalseCallPolicy);
             if (snapshot.BackgroundBitmap is not null)
                 ApplyBackground(snapshot.Document.BackgroundImagePath, snapshot.BackgroundBitmap);
 
@@ -346,18 +351,73 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
             return;
         }
 
+        var state = WorkflowState.Instance;
         try
         {
-            var state = WorkflowState.Instance;
-            state.SetSampleImage(_backgroundImagePath);
-            var analysis = ImageAnalysisService.Analyze(_backgroundImagePath, state.GoldenImagePath, state.DetectionPriority);
-            state.SetAnalysis(analysis);
-            RecipeStatusText.Text = $"Test run complete: {analysis.Verdict}, score {analysis.DifferenceScore:F1}%.";
-            MessageBox.Show(RecipeStatusText.Text, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Test Run exercises the current in-editor recipe (including unsaved ROI/parameter
+            // edits) by publishing a transient preview override the inspection engine reads,
+            // instead of the last saved revision. Always cleared in finally.
+            var document = BuildRecipeDocument();
+            var preview = RecipeService.ParseDocument(
+                document,
+                "IN-EDITOR PREVIEW",
+                WorkflowState.ToDisplay(state.DetectionPriority),
+                state.BoardProgram,
+                _backgroundImagePath,
+                document.RecipeName,
+                "in-editor preview");
+            RecipeService.SetPreviewOverride(state.BoardProgram, preview);
+            try
+            {
+                state.SetSampleImage(_backgroundImagePath);
+                var analysis = ImageAnalysisService.Analyze(_backgroundImagePath, state.GoldenImagePath, state.DetectionPriority);
+                state.SetAnalysis(analysis);
+                RecipeStatusText.Text = $"Test run (current unsaved edits): {analysis.Verdict}, score {analysis.DifferenceScore:F1}%.";
+                MessageBox.Show(RecipeStatusText.Text, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            finally
+            {
+                RecipeService.ClearPreviewOverride();
+            }
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Test run failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private RecipeDocument BuildRecipeDocument()
+    {
+        var state = WorkflowState.Instance;
+        return new RecipeDocument
+        {
+            RecipeName = string.IsNullOrWhiteSpace(RecipeNameText.Text) ? "AOI_RECIPE" : RecipeNameText.Text.Trim(),
+            BoardProgram = state.BoardProgram,
+            BackgroundImagePath = _backgroundImagePath,
+            Rois = _rois.Select(r => r.ToDocument()).ToList(),
+            PlacementToleranceMm = ParseDouble(PlacementToleranceText.Text, 0.020),
+            RotationToleranceDeg = ParseDouble(RotationToleranceText.Text, 1.0),
+            IpcClass = ComboText(IpcClassCombo, "IPC Class 2"),
+            LightingProfile = ComboText(LightingProfileCombo, "Top bright field"),
+            FalseCallPolicy = ComboText(FalseCallPolicyCombo, "Balanced: review benign visual noise"),
+        };
+    }
+
+    private static string ComboText(ComboBox combo, string fallback)
+        => (combo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? fallback;
+
+    private static void SelectComboByContent(ComboBox combo, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+        foreach (var item in combo.Items)
+        {
+            if (item is ComboBoxItem candidate &&
+                string.Equals(candidate.Content?.ToString(), value, StringComparison.OrdinalIgnoreCase))
+            {
+                combo.SelectedItem = item;
+                return;
+            }
         }
     }
 
@@ -373,13 +433,7 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
         }
 
         var state = WorkflowState.Instance;
-        var doc = new RecipeDocument
-        {
-            RecipeName = string.IsNullOrWhiteSpace(RecipeNameText.Text) ? "AOI_RECIPE" : RecipeNameText.Text.Trim(),
-            BoardProgram = state.BoardProgram,
-            BackgroundImagePath = _backgroundImagePath,
-            Rois = _rois.Select(r => r.ToDocument()).ToList(),
-        };
+        var doc = BuildRecipeDocument();
 
         var json = JsonSerializer.Serialize(doc, _jsonOptions);
         var id = AoiDatabase.SaveRecipeRevision(

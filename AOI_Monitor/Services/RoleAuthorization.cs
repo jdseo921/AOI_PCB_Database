@@ -35,7 +35,7 @@ public static class RoleAuthorization
             "modeltest" => true,
             "spc" => CanRunModelTests(role),
             "pilot" => role >= UserRole.Engineer,
-            "reports" => CanExportLogs(role),
+            "reports" => role >= UserRole.Operator,
             "settings" => role >= UserRole.Engineer,
             "install" => CanManageSettings(role),
             _ => true,

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Windows;
@@ -5,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Media.Media3D;
 using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
@@ -14,7 +16,11 @@ namespace AOI_Monitor.Views;
 
 public partial class ProfileView : UserControl, IReleasablePageResources
 {
+    private const double SurfaceHeightScale = 0.4;
+    private const int MaxSurfaceDimension = 160;
+
     private readonly Dictionary<(int X, int Y), double> _points = new();
+    private readonly ObservableCollection<Profile3DDefectRow> _defectRows = new();
     private int _minX;
     private int _maxX;
     private int _minY;
@@ -27,9 +33,21 @@ public partial class ProfileView : UserControl, IReleasablePageResources
     private Profile3DAcceptanceRun? _lastAcceptanceRun;
     private CancellationTokenSource? _acceptanceCancellation;
 
+    // Interactive 3D view state (rotate / zoom / pan).
+    private double _yaw;
+    private double _pitch;
+    private double _zoom = 1.0;
+    private double _panX;
+    private double _panY;
+    private bool _isRotating;
+    private bool _isPanning;
+    private Point _lastMouse;
+    private bool _suppressListSync;
+
     public ProfileView()
     {
         InitializeComponent();
+        DefectListGrid.ItemsSource = _defectRows;
         UpdateSourceEvidenceBadges();
     }
 
@@ -84,6 +102,8 @@ public partial class ProfileView : UserControl, IReleasablePageResources
         MapStatusText.Text = $"{_points.Count:N0} height samples";
         EmptyMapText.Visibility = Visibility.Collapsed;
         HeightMapImage.Source = BuildHeatMapBitmap();
+        BuildSurfaceModel();
+        BuildDefectRows();
         RefreshSelectionUi();
         DrawProfileLine();
         StatusText.Text = "Sample height-map loaded. Sample Data Mode only; 3D Camera Not Connected.";
@@ -304,11 +324,201 @@ public partial class ProfileView : UserControl, IReleasablePageResources
         return Color.FromRgb(r, g, b);
     }
 
+    /// <summary>
+    /// Builds the interactive 3D surface mesh from the loaded height grid and resets the camera view.
+    /// Large grids are decimated to keep mesh construction responsive on the UI thread.
+    /// </summary>
+    private void BuildSurfaceModel()
+    {
+        if (_points.Count == 0)
+        {
+            SurfaceModel.Geometry = null;
+            return;
+        }
+
+        var fullWidth = _maxX - _minX + 1;
+        var fullHeight = _maxY - _minY + 1;
+        var stepX = Math.Max(1, (int)Math.Ceiling(fullWidth / (double)MaxSurfaceDimension));
+        var stepY = Math.Max(1, (int)Math.Ceiling(fullHeight / (double)MaxSurfaceDimension));
+        var width = ((fullWidth - 1) / stepX) + 1;
+        var height = ((fullHeight - 1) / stepY) + 1;
+
+        var heights = new double[width * height];
+        for (var gy = 0; gy < height; gy++)
+        {
+            for (var gx = 0; gx < width; gx++)
+            {
+                var srcX = _minX + (gx * stepX);
+                var srcY = _minY + (gy * stepY);
+                heights[(gy * width) + gx] = _points.TryGetValue((srcX, srcY), out var value) ? value : double.NaN;
+            }
+        }
+
+        MeshGeometry3D mesh = Profile3DMeshBuilder.BuildSurface(heights, width, height, _minHeight, _maxHeight, SurfaceHeightScale);
+        mesh.Freeze();
+        SurfaceModel.Geometry = mesh;
+        ResetSurfaceView();
+    }
+
+    private void ResetSurfaceView()
+    {
+        _yaw = 0;
+        _pitch = 0;
+        _zoom = 1.0;
+        _panX = 0;
+        _panY = 0;
+        ApplySurfaceTransforms();
+    }
+
+    private void ApplySurfaceTransforms()
+    {
+        SurfaceYaw.Angle = _yaw;
+        SurfacePitch.Angle = _pitch;
+        SurfaceScale.ScaleX = _zoom;
+        SurfaceScale.ScaleY = _zoom;
+        SurfaceScale.ScaleZ = _zoom;
+        SurfacePan.OffsetX = _panX;
+        SurfacePan.OffsetY = _panY;
+    }
+
+    private void OnResetViewClick(object sender, RoutedEventArgs e) => ResetSurfaceView();
+
+    private void OnSurfaceMouseLeftDown(object sender, MouseButtonEventArgs e)
+    {
+        if (SurfaceModel.Geometry is null)
+            return;
+
+        _isRotating = true;
+        _lastMouse = e.GetPosition(SurfaceHost);
+        SurfaceHost.CaptureMouse();
+    }
+
+    private void OnSurfaceMouseLeftUp(object sender, MouseButtonEventArgs e)
+    {
+        _isRotating = false;
+        if (!_isPanning)
+            SurfaceHost.ReleaseMouseCapture();
+    }
+
+    private void OnSurfaceMouseRightDown(object sender, MouseButtonEventArgs e)
+    {
+        if (SurfaceModel.Geometry is null)
+            return;
+
+        _isPanning = true;
+        _lastMouse = e.GetPosition(SurfaceHost);
+        SurfaceHost.CaptureMouse();
+    }
+
+    private void OnSurfaceMouseRightUp(object sender, MouseButtonEventArgs e)
+    {
+        _isPanning = false;
+        if (!_isRotating)
+            SurfaceHost.ReleaseMouseCapture();
+    }
+
+    private void OnSurfaceMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_isRotating && !_isPanning)
+            return;
+
+        var pos = e.GetPosition(SurfaceHost);
+        var dx = pos.X - _lastMouse.X;
+        var dy = pos.Y - _lastMouse.Y;
+        _lastMouse = pos;
+
+        if (_isRotating)
+        {
+            _yaw = (_yaw + (dx * 0.4)) % 360.0;
+            _pitch = Math.Clamp(_pitch + (dy * 0.4), -85.0, 85.0);
+        }
+        else if (_isPanning)
+        {
+            _panX = Math.Clamp(_panX + (dx * 0.0028), -1.5, 1.5);
+            _panY = Math.Clamp(_panY - (dy * 0.0028), -1.5, 1.5);
+        }
+
+        ApplySurfaceTransforms();
+    }
+
+    private void OnSurfaceMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (SurfaceModel.Geometry is null)
+            return;
+
+        var factor = e.Delta > 0 ? 1.1 : 1.0 / 1.1;
+        _zoom = Math.Clamp(_zoom * factor, 0.4, 4.0);
+        ApplySurfaceTransforms();
+    }
+
+    private void BuildDefectRows()
+    {
+        _suppressListSync = true;
+        _defectRows.Clear();
+
+        // Rank sample points by deviation from the mean surface and surface the most notable ones.
+        var ranked = _points
+            .Select(kvp => (kvp.Key.X, kvp.Key.Y, Height: kvp.Value, Deviation: Math.Abs(kvp.Value - _meanHeight)))
+            .OrderByDescending(p => p.Deviation)
+            .ThenByDescending(p => p.Height)
+            .Take(15)
+            .ToList();
+
+        var index = 0;
+        foreach (var p in ranked)
+        {
+            index++;
+            var point = (p.X, p.Y, p.Height);
+            _defectRows.Add(new Profile3DDefectRow
+            {
+                Feature = $"#{index}",
+                Type = GetDefectType(p.Height),
+                HeightDisplay = p.Height.ToString("F3", CultureInfo.InvariantCulture),
+                VolumeDisplay = ComputeVolumePlaceholder(point).ToString("F3", CultureInfo.InvariantCulture),
+                X = p.X,
+                Y = p.Y,
+                Height = p.Height,
+            });
+        }
+
+        DefectCountText.Text = _defectRows.Count == 1 ? "1 feature" : $"{_defectRows.Count} features";
+        _suppressListSync = false;
+        SyncListSelectionToPoint();
+    }
+
+    private void OnDefectListSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressListSync)
+            return;
+
+        if (DefectListGrid.SelectedItem is Profile3DDefectRow row)
+            SelectPoint((row.X, row.Y, row.Height));
+    }
+
+    private void SyncListSelectionToPoint()
+    {
+        if (_selectedPoint is not { } point)
+            return;
+
+        var match = _defectRows.FirstOrDefault(r => r.X == point.X && r.Y == point.Y);
+        if (ReferenceEquals(DefectListGrid.SelectedItem, match))
+            return;
+
+        _suppressListSync = true;
+        DefectListGrid.SelectedItem = match;
+        if (match is not null)
+            DefectListGrid.ScrollIntoView(match);
+        _suppressListSync = false;
+    }
+
     public void ReleasePageResources()
     {
         HeightMapImage.Source = null;
         SelectionOverlay.Children.Clear();
         ProfileCanvas.Children.Clear();
+        SurfaceModel.Geometry = null;
+        _defectRows.Clear();
+        DefectCountText.Text = "0 features";
         EmptyMapText.Visibility = Visibility.Visible;
     }
 
@@ -323,6 +533,9 @@ public partial class ProfileView : UserControl, IReleasablePageResources
 
     private void OnHeightMapMouseMove(object sender, MouseEventArgs e)
     {
+        if (e.LeftButton != MouseButtonState.Pressed)
+            return;
+
         if (HeightMapImage.Source is not BitmapSource bitmap || _points.Count == 0)
             return;
 
@@ -335,6 +548,7 @@ public partial class ProfileView : UserControl, IReleasablePageResources
         _selectedPoint = point;
         RefreshSelectionUi();
         DrawProfileLine();
+        SyncListSelectionToPoint();
     }
 
     private void RefreshSelectionUi()
@@ -358,17 +572,27 @@ public partial class ProfileView : UserControl, IReleasablePageResources
         DrawSelectionMarker(point);
     }
 
+    private void OnProfileCanvasSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_selectedPoint is not null)
+            DrawProfileLine();
+    }
+
     private void DrawProfileLine()
     {
         ProfileCanvas.Children.Clear();
         if (_selectedPoint is not { } point || _points.Count == 0)
+        {
+            SliceRowText.Text = "--";
             return;
+        }
 
         var row = Enumerable.Range(_minX, _maxX - _minX + 1)
             .Select(x => (X: x, Height: _points.TryGetValue((x, point.Y), out var value) ? value : double.NaN))
             .Where(p => !double.IsNaN(p.Height))
             .ToArray();
 
+        SliceRowText.Text = $"row y={point.Y}";
         if (row.Length < 2)
             return;
 
@@ -380,20 +604,60 @@ public partial class ProfileView : UserControl, IReleasablePageResources
             height = 240;
         }
 
+        double MapX(int x) => (x - _minX) / Math.Max(1.0, _maxX - _minX) * width;
+        double MapY(double h) => height - ((h - _minHeight) / Math.Max(0.000001, _maxHeight - _minHeight) * height);
+
         var polyline = new System.Windows.Shapes.Polyline
         {
             Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5CA0D3")),
             StrokeThickness = 2,
         };
-
         foreach (var sample in row)
+            polyline.Points.Add(new Point(MapX(sample.X), MapY(sample.Height)));
+        ProfileCanvas.Children.Add(polyline);
+
+        // Mark prominent local maxima (peaks) along the selected slice.
+        var sliceHeights = row.Select(r => r.Height).ToArray();
+        foreach (var peakIndex in Profile3DMeshBuilder.FindPeakIndices(sliceHeights))
         {
-            var x = (sample.X - _minX) / Math.Max(1.0, _maxX - _minX) * width;
-            var y = height - ((sample.Height - _minHeight) / Math.Max(0.000001, _maxHeight - _minHeight) * height);
-            polyline.Points.Add(new Point(x, y));
+            var sample = row[peakIndex];
+            var cx = MapX(sample.X);
+            var cy = MapY(sample.Height);
+            var marker = new System.Windows.Shapes.Ellipse
+            {
+                Width = 8,
+                Height = 8,
+                Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0x82, 0x30)),
+                Stroke = Brushes.White,
+                StrokeThickness = 1,
+            };
+            Canvas.SetLeft(marker, cx - 4);
+            Canvas.SetTop(marker, cy - 4);
+            ProfileCanvas.Children.Add(marker);
+
+            var label = new TextBlock
+            {
+                Text = sample.Height.ToString("F2", CultureInfo.InvariantCulture),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xCF, 0x9A)),
+                FontSize = 12,
+            };
+            Canvas.SetLeft(label, Math.Min(width - 36, cx + 5));
+            Canvas.SetTop(label, Math.Max(0, cy - 17));
+            ProfileCanvas.Children.Add(label);
         }
 
-        ProfileCanvas.Children.Add(polyline);
+        // Highlight the selected column position.
+        var selectedX = MapX(point.X);
+        var cursor = new System.Windows.Shapes.Line
+        {
+            X1 = selectedX,
+            X2 = selectedX,
+            Y1 = 0,
+            Y2 = height,
+            Stroke = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255)),
+            StrokeThickness = 1,
+        };
+        ProfileCanvas.Children.Add(cursor);
     }
 
     private bool TryGetMapPoint(Point position, BitmapSource bitmap, out (int X, int Y, double Height) point)
@@ -525,4 +789,19 @@ public partial class ProfileView : UserControl, IReleasablePageResources
         cells.Add(sb.ToString());
         return cells;
     }
+}
+
+/// <summary>
+/// Row model for the "Detected Features" list in the 3D Profile Viewer. Carries the underlying grid
+/// coordinates so list selection stays synchronized with the 2D inset and the height-slice profile.
+/// </summary>
+public sealed class Profile3DDefectRow
+{
+    public string Feature { get; init; } = string.Empty;
+    public string Type { get; init; } = string.Empty;
+    public string HeightDisplay { get; init; } = string.Empty;
+    public string VolumeDisplay { get; init; } = string.Empty;
+    public int X { get; init; }
+    public int Y { get; init; }
+    public double Height { get; init; }
 }

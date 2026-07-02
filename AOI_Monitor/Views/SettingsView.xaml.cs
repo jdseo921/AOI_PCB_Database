@@ -1460,6 +1460,7 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
             ? "--"
             : $"{state.Training.LastValidationScore:F1}%";
         StorageRootText.Text = AoiDatabase.StorageRoot;
+        RefreshRetentionUi();
 
         RefreshRoleControls();
         RefreshInspectionConfigurationUi();
@@ -3003,6 +3004,45 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
     }
 
     private string TextFor(string english, string korean) => _isKorean ? korean : english;
+
+    private void RefreshRetentionUi()
+    {
+        var settings = LogRetentionSettingsService.LoadSettings();
+        RetentionEnabledCheck.IsChecked = settings.Enabled;
+        RetentionDaysText.Text = settings.RetentionDays.ToString(CultureInfo.InvariantCulture);
+        RetentionWarningCheck.IsChecked = settings.WarningEnabled;
+        RetentionStatusText.Text = settings.Enabled
+            ? $"Retention policy: archive and purge logs older than {settings.RetentionDays} day(s); warning {(settings.WarningEnabled ? $"on ({settings.WarningLeadDays}-day lead)" : "off")}."
+            : "Retention policy: automatic purge is disabled. Logs are kept indefinitely in the live tables.";
+    }
+
+    private void OnApplyRetentionClick(object sender, RoutedEventArgs e)
+    {
+        if (!Authorize(RoleAuthorization.CanManageSettings, "Changing the data retention policy"))
+            return;
+
+        if (!int.TryParse(RetentionDaysText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var days) || days < 1)
+        {
+            MessageBox.Show("Enter a whole number of retention days (1 or more).", "Data Retention", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var current = LogRetentionSettingsService.LoadSettings();
+        var settings = new LogRetentionSettings
+        {
+            Enabled = RetentionEnabledCheck.IsChecked == true,
+            RetentionDays = days,
+            WarningEnabled = RetentionWarningCheck.IsChecked == true,
+            WarningLeadDays = current.WarningLeadDays,
+        };
+        LogRetentionSettingsService.Save(settings, WorkflowState.Instance.OperatorWithRole);
+        RefreshRetentionUi();
+        MessageBox.Show(
+            "Data retention policy saved. Archive and purge run at application startup; the recoverable archive keeps the full record of purged logs.",
+            "Data Retention",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
 
     private static bool Authorize(Func<UserRole, bool> permission, string action)
     {

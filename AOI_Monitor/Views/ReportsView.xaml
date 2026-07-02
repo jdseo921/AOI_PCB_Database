@@ -16,7 +16,21 @@
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Log Filters" Style="{StaticResource HmiSectionHeaderText}"/>
+          <DockPanel LastChildFill="True">
+            <TextBlock x:Name="RetentionWarningText"
+                       DockPanel.Dock="Right"
+                       Text=""
+                       Foreground="#FFE0A7"
+                       FontSize="14"
+                       FontWeight="Bold"
+                       VerticalAlignment="Center"
+                       TextWrapping="NoWrap"
+                       TextTrimming="CharacterEllipsis"
+                       MaxWidth="640"
+                       Visibility="Collapsed"
+                       ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+            <TextBlock Text="Log Filters" Style="{StaticResource HmiSectionHeaderText}"/>
+          </DockPanel>
         </Border>
         <ScrollViewer Grid.Row="1" Margin="8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="128">
           <WrapPanel>

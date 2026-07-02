@@ -1,5 +1,4 @@
 using System.IO;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -481,7 +480,7 @@ public static class Stage2CameraPilotEvidencePackageService
                 RelativePath = NormalizeRelative(Path.GetRelativePath(packageFolder, path)),
                 FileType = Classify(path),
                 Bytes = new FileInfo(path).Length,
-                Sha256 = ComputeSha256(path),
+                Sha256 = HashUtil.ComputeSha256(path),
             })
             .ToList();
 
@@ -566,12 +565,6 @@ public static class Stage2CameraPilotEvidencePackageService
 
     private static string NormalizeRelative(string path)
         => path.Replace('\\', '/').TrimStart('/');
-
-    private static string ComputeSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
-    }
 
     private static string FormatLines(IReadOnlyCollection<string> lines)
         => lines.Count == 0 ? "- None recorded." : string.Join(Environment.NewLine, lines.Select(line => $"- {line}"));

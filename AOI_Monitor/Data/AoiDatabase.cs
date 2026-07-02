@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows.Media.Imaging;
 using AOI_Monitor.Models;
@@ -78,7 +77,7 @@ public static class AoiDatabase
             throw new FileNotFoundException("Image file was not found.", sourcePath);
 
         var importedAt = DateTime.UtcNow;
-        var hash = ComputeSha256(sourcePath);
+        var hash = HashUtil.ComputeSha256(sourcePath);
         var originalName = Path.GetFileName(sourcePath);
         var safeName = MakeVaultFileName(importedAt, viewType, originalName);
         var vaultPath = Path.Combine(ImageVaultPath, safeName);
@@ -159,7 +158,7 @@ public static class AoiDatabase
 
         try
         {
-            var hash = ComputeSha256(sourcePath);
+            var hash = HashUtil.ComputeSha256(sourcePath);
             if (TryGetImageByHash(hash) is { } existing)
             {
                 RecordAuditEvent(
@@ -4536,13 +4535,6 @@ public static class AoiDatabase
             return Path.Combine(localAppData, AppFolderName);
 
         return Path.Combine(AppContext.BaseDirectory, "data");
-    }
-
-    private static string ComputeSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        var hash = SHA256.HashData(stream);
-        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private static ImportedImage? TryGetImageByHash(string hash)

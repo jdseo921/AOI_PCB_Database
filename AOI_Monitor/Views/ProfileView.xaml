@@ -57,7 +57,7 @@
       <Border Grid.Column="0" Style="{StaticResource Panel}">
         <Grid>
           <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" MinHeight="32"/>
+            <RowDefinition Height="Auto" MinHeight="34"/>
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
           <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
@@ -196,7 +196,7 @@
         <Border Grid.Row="0" Style="{StaticResource Panel}">
           <Grid>
             <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" MinHeight="32"/>
+              <RowDefinition Height="Auto" MinHeight="34"/>
               <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
@@ -240,7 +240,7 @@
         <Border Grid.Row="2" Style="{StaticResource Panel}">
           <Grid>
             <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" MinHeight="32"/>
+              <RowDefinition Height="Auto" MinHeight="34"/>
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
@@ -265,7 +265,7 @@
         <Border Grid.Row="4" Style="{StaticResource Panel}">
           <Grid>
             <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" MinHeight="32"/>
+              <RowDefinition Height="Auto" MinHeight="34"/>
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">

@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Media.Imaging;
@@ -436,10 +435,4 @@ public static class BenchmarkInspectionService
 
     private static string Html(string value)
         => System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
-
-    private static string ComputeSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
-    }
 }

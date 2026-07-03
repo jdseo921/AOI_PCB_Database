@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AOI_Monitor.Data;
@@ -217,11 +216,7 @@ public static class ModelRegistryService
         };
     }
 
-    public static string ComputeSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
-    }
+    public static string ComputeSha256(string path) => HashUtil.ComputeSha256(path);
 
     internal static ModelRegistryRecord ToRecord(ModelRegistryEntry entry)
         => new(

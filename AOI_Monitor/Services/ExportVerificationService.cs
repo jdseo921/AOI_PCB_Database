@@ -148,7 +148,7 @@ public static class ExportVerificationService
     {
         var info = new FileInfo(path);
         result.SizeBytes = info.Length;
-        result.Sha256 = ComputeSha256(path);
+        result.Sha256 = HashUtil.ComputeSha256(path);
         result.ArtifactChecksums[Path.GetFileName(path)] = result.Sha256;
 
         Add(result, ExportVerificationStatus.OK, "File exists.");
@@ -194,7 +194,7 @@ public static class ExportVerificationService
         foreach (var file in files)
         {
             var relative = NormalizeRelative(Path.GetRelativePath(folder, file));
-            var hash = ComputeSha256(file);
+            var hash = HashUtil.ComputeSha256(file);
             result.ArtifactChecksums[relative] = hash;
             result.SizeBytes += new FileInfo(file).Length;
         }
@@ -484,12 +484,6 @@ public static class ExportVerificationService
             result.Status = status;
 
         result.Messages.Add(message);
-    }
-
-    private static string ComputeSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
 
     private static string ComputeAggregateSha256(IReadOnlyDictionary<string, string> checksums)

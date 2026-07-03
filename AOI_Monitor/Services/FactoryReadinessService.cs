@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AOI_Monitor.Data;
@@ -906,7 +905,7 @@ public static class FactoryReadinessService
                 RelativePath = Path.GetRelativePath(packageFolder, path).Replace('\\', '/'),
                 FileType = Classify(path),
                 Bytes = new FileInfo(path).Length,
-                Sha256 = ComputeSha256(path),
+                Sha256 = HashUtil.ComputeSha256(path),
             })
             .ToList();
 
@@ -942,12 +941,6 @@ public static class FactoryReadinessService
         if (fileName.Equals("README.txt", StringComparison.OrdinalIgnoreCase))
             return "README";
         return "Factory readiness evidence";
-    }
-
-    private static string ComputeSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
 
     private static string BuildReadme(FactoryReadinessReport report)

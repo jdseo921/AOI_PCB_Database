@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Media;
@@ -1045,8 +1044,7 @@ public static class ImageOnlyPcbLearningService
     {
         try
         {
-            using var stream = File.OpenRead(path);
-            return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+            return HashUtil.ComputeSha256(path);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

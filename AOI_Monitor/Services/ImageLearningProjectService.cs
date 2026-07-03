@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.IO;
-using System.Security.Cryptography;
 using System.Windows.Media.Imaging;
 using AOI_Monitor.Data;
 using AOI_Monitor.Models;
@@ -227,7 +226,7 @@ public static class ImageLearningProjectService
         string hash;
         try
         {
-            hash = ComputeSha256(fullPath);
+            hash = HashUtil.ComputeSha256(fullPath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -314,12 +313,6 @@ public static class ImageLearningProjectService
 
         var frame = decoder.Frames[0];
         return new ImageDimensions(frame.PixelWidth, frame.PixelHeight);
-    }
-
-    private static string ComputeSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
 
     private static string ResolveImageLevelTruth(ImageLearningImageRole role, string? truth)

@@ -253,7 +253,7 @@ public static class ImageLearningProjectService
         {
             dimensions = ReadImageDimensions(fullPath);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException or FileFormatException or ArgumentException or System.Runtime.InteropServices.COMException)
         {
             return new ImageLearningImportResult(null, false, false, "Invalid", ex.Message);
         }

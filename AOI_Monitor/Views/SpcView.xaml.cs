@@ -51,7 +51,20 @@ public partial class SpcView : UserControl, IAsyncNavigationPage
         DatabaseWarningText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(snapshot.BrokenLinks > 0 ? "#F27777" : "#E1A334"));
     }
 
-    public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);
+    public void RefreshFromState() => _ = RefreshSafeAsync();
+
+    private async Task RefreshSafeAsync()
+    {
+        try
+        {
+            await RefreshAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            DatabaseWarningText.Text = $"SQLite summary could not be loaded: {ex.Message}";
+            DatabaseWarningText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F13B3F"));
+        }
+    }
 
     public void CancelWork()
     {

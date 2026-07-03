@@ -182,6 +182,30 @@ public sealed class ImageOnlyPcbLearningServiceTests : IDisposable
     }
 
     [Fact]
+    public void ImageOnlyPcbLearningSkipsTruncatedImageWithoutAbortingRun()
+    {
+        // L4 regression: a truncated-but-recognized PNG makes WPF's BitmapDecoder throw
+        // FileFormatException / COMException. These previously escaped the skip filter and
+        // aborted the entire training run. Training must now skip the file and continue.
+        var project = CreateLearningProject("Truncated image skip");
+        ImportStandardTrainingSet(project);
+        var truncated = ImportImages(
+            project,
+            ImageLearningImageRole.OkValidation,
+            WriteBoardPng("ok-validation-truncated.png", variant: 34)).Single();
+
+        var bytes = File.ReadAllBytes(truncated.Image!.VaultPath);
+        File.WriteAllBytes(truncated.Image!.VaultPath, bytes.Take(Math.Min(40, bytes.Length)).ToArray());
+
+        var result = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options);
+
+        var skipped = Assert.Single(result.SkippedImages);
+        Assert.Equal("ok-validation-truncated.png", skipped.FileName);
+        Assert.Equal(ImageLearningImageRole.OkValidation, skipped.Role);
+        Assert.Contains(result.Warnings, warning => warning.Contains("skipped", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void ImageOnlyPcbLearningMissingOkLearningImagesFailClearly()
     {
         var project = CreateLearningProject("Missing minimum set");

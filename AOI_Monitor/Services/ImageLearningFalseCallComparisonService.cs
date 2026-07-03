@@ -54,6 +54,9 @@ public static class ImageLearningFalseCallComparisonService
             warnings.Add("No OK Validation, Inspection, or NG Validation images were available for before/after comparison.");
         if (targetImages.All(image => image.Role != ImageLearningImageRole.OkValidation))
             warnings.Add("No OK Validation images were available; false-call reduction cannot be measured yet.");
+        var okValidationImageCount = targetImages.Count(image => image.Role == ImageLearningImageRole.OkValidation);
+        if (okValidationImageCount > 0 && okValidationImageCount < MinimumOkValidationForRate)
+            warnings.Add($"Only {okValidationImageCount} OK Validation image(s) were available (minimum {MinimumOkValidationForRate} recommended). The false-call percentage is not statistically meaningful; rely on the measured false-call count instead of the rate.");
         if (targetImages.All(image => image.Role != ImageLearningImageRole.NgValidation))
             warnings.Add("No NG Validation images were provided; missed-defect rate cannot yet be proven.");
 
@@ -261,6 +264,10 @@ public static class ImageLearningFalseCallComparisonService
                 .First();
     }
 
+    // Minimum OK Validation sample size before a false-call percentage is reported.
+    // Below this, the measured count is shown instead of a statistically hollow rate.
+    public const int MinimumOkValidationForRate = 20;
+
     private static ImageLearningFalseCallComparisonMetrics BuildMetrics(
         IReadOnlyList<ImageLearningFalseCallImageResult> imageResults,
         IReadOnlyList<ImageLearningFalseCallThresholdSweepRow> sweep,
@@ -382,7 +389,10 @@ public static class ImageLearningFalseCallComparisonService
         sb.AppendLine("<div class=\"card sim\"><strong>Image-only Stage 1 learning.</strong> Not live camera validation. Formal acceptance requires customer/evaluator dataset.</div>");
         sb.AppendLine($"<p>Project: {Html(project.ProjectName)} / {Html(project.ProjectId)}<br>Board model: {Html(project.BoardModel)}<br>Model: {Html(model.ModelId)}<br>Baseline reference: {Html(referenceImage.FileName)}</p>");
         sb.AppendLine($"<h2>Before / After</h2><div class=\"card\"><strong>False calls reduced from {metrics.FalseCallsBeforeLearning} to {metrics.FalseCallsAfterLearning}</strong><br>");
-        sb.AppendLine($"False-call rate before: {metrics.FalseCallRateBeforeLearning:P1}; after: {metrics.FalseCallRateAfterLearning:P1}; reduction: {metrics.FalseCallReductionPercentage:P1}.<br>");
+        if (metrics.OkValidationCount >= MinimumOkValidationForRate)
+            sb.AppendLine($"False-call rate before: {metrics.FalseCallRateBeforeLearning:P1}; after: {metrics.FalseCallRateAfterLearning:P1}; reduction: {metrics.FalseCallReductionPercentage:P1}.<br>");
+        else
+            sb.AppendLine($"Measured false calls: {metrics.FalseCallsBeforeLearning} before / {metrics.FalseCallsAfterLearning} after on {metrics.OkValidationCount} OK Validation image(s). Percentage withheld below the {MinimumOkValidationForRate}-image minimum (not statistically meaningful).<br>");
         sb.AppendLine($"Possible escapes: {metrics.PossibleEscapes}<br>");
         sb.AppendLine($"Recommended threshold: {(metrics.RecommendedThreshold.HasValue ? metrics.RecommendedThreshold.Value.ToString("F2", CultureInfo.InvariantCulture) : "No safe threshold")}<br>");
         sb.AppendLine($"{Html(metrics.MissedDefectEvidenceNote)}</div>");

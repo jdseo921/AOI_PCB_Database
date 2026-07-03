@@ -146,7 +146,13 @@ public static class ImageLearningFolderImportService
                 viewType,
                 importedBy,
                 truthRecord?.Truth,
-                truthRecord?.Notes ?? string.Empty).Single();
+                truthRecord?.Notes ?? string.Empty).FirstOrDefault();
+            if (result is null)
+            {
+                warnings.Add($"{DisplayRole(role)}: {Path.GetFileName(file)} produced no import result and was skipped.");
+                continue;
+            }
+
             results.Add(result);
 
             if (!result.Imported)

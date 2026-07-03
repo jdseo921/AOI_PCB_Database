@@ -129,6 +129,25 @@ public sealed class ImageLearningFalseCallComparisonServiceTests : IDisposable
         Assert.Single(AoiDatabase.GetAuditEvents(new LogFilter { ActionCategory = "IMAGE_LEARNING_FALSE_CALL_COMPARISON" }));
     }
 
+    [Fact]
+    public void ImageLearningFalseCallReportWithholdsRateBelowMinimumSampleSize()
+    {
+        var project = CreateLearningProject("Small-sample rate gate");
+        ImportStandardTrainingSet(project);
+        ImportImages(project, ImageLearningImageRole.OkValidation, WriteBoardPng("ok-validation-small.png", brightnessShift: 10, variant: 24));
+
+        var learning = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options, "Engineer01 [Engineer]");
+        var comparison = ImageLearningFalseCallComparisonService.RunComparison(project.ProjectId, learning.Model.ModelId, _options, "Engineer01 [Engineer]");
+
+        // The tiny synthetic set is below the minimum, so the percentage must be withheld.
+        Assert.True(comparison.Metrics.OkValidationCount < ImageLearningFalseCallComparisonService.MinimumOkValidationForRate);
+
+        var html = File.ReadAllText(comparison.HtmlReportPath);
+        Assert.Contains("not statistically meaningful", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Percentage withheld", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("False-call rate before:", html, StringComparison.OrdinalIgnoreCase);
+    }
+
     private ImageLearningProject CreateLearningProject(string name)
         => ImageLearningProjectService.CreateProject(name, "BOARD-FALSE-CALL", ImageLearningEvidenceMode.SyntheticDemo, "Engineer01 [Engineer]");
 

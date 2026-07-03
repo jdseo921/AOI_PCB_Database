@@ -150,8 +150,21 @@ public partial class CompareView : UserControl
             return;
         }
 
-        var result = InspectionEngineFactory.Create().Analyze(state.SampleImagePath!, state.GoldenImagePath, state.DetectionPriority);
-        state.SetAnalysis(result);
+        try
+        {
+            var result = InspectionEngineFactory.Create().Analyze(state.SampleImagePath!, state.GoldenImagePath, state.DetectionPriority);
+            state.SetAnalysis(result);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or FileFormatException or ArgumentException or InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            MessageBox.Show(
+                $"Could not analyze the images. One of them may be unreadable or corrupt.\n\n{ex.Message}",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
         RefreshFromState();
     }
 
@@ -178,18 +191,29 @@ public partial class CompareView : UserControl
 
         if (dialog.ShowDialog() != true) return;
 
-        var rtb = new RenderTargetBitmap((int)Math.Max(1, ActualWidth), (int)Math.Max(1, ActualHeight), 96, 96, PixelFormats.Pbgra32);
-        rtb.Render(this);
-
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(rtb));
-        using (var fs = File.Create(dialog.FileName))
+        try
         {
-            encoder.Save(fs);
-        }
+            var rtb = new RenderTargetBitmap((int)Math.Max(1, ActualWidth), (int)Math.Max(1, ActualHeight), 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(this);
 
-        var verified = ExportVerificationService.RecordVerifiedExport("ComparisonSnapshot", dialog.FileName);
-        WorkflowState.Instance.AddEvent("EXPORT", $"Comparison pair exported: {Path.GetFileName(dialog.FileName)}; verification={verified.Verification.Status}.");
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(rtb));
+            using (var fs = File.Create(dialog.FileName))
+            {
+                encoder.Save(fs);
+            }
+
+            var verified = ExportVerificationService.RecordVerifiedExport("ComparisonSnapshot", dialog.FileName);
+            WorkflowState.Instance.AddEvent("EXPORT", $"Comparison pair exported: {Path.GetFileName(dialog.FileName)}; verification={verified.Verification.Status}.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
+        {
+            MessageBox.Show(
+                $"Could not export the comparison snapshot. The destination may be locked or not writable.\n\n{ex.Message}",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void ApplyLearnedVisualComparison(AnalysisResult? analysis)

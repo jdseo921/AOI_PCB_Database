@@ -69,29 +69,40 @@ public partial class ReviewView : UserControl
             return;
         }
 
-        var bmp = LoadBitmapOnLoad(sample!);
-        int x = (int)(bmp.PixelWidth * 0.35);
-        int y = (int)(bmp.PixelHeight * 0.35);
-        int w = (int)(bmp.PixelWidth * 0.3);
-        int h = (int)(bmp.PixelHeight * 0.3);
-        var roi = new CroppedBitmap(bmp, new Int32Rect(x, y, Math.Max(1, w), Math.Max(1, h)));
-
-        var dialog = new SaveFileDialog
+        try
         {
-            Filter = "PNG image|*.png",
-            FileName = $"roi_{DateTime.Now:yyyyMMdd_HHmmss}.png",
-            Title = "Save ROI crop",
-        };
+            var bmp = LoadBitmapOnLoad(sample!);
+            int x = (int)(bmp.PixelWidth * 0.35);
+            int y = (int)(bmp.PixelHeight * 0.35);
+            int w = (int)(bmp.PixelWidth * 0.3);
+            int h = (int)(bmp.PixelHeight * 0.3);
+            var roi = new CroppedBitmap(bmp, new Int32Rect(x, y, Math.Max(1, w), Math.Max(1, h)));
 
-        if (dialog.ShowDialog() != true) return;
+            var dialog = new SaveFileDialog
+            {
+                Filter = "PNG image|*.png",
+                FileName = $"roi_{DateTime.Now:yyyyMMdd_HHmmss}.png",
+                Title = "Save ROI crop",
+            };
 
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(roi));
-        using var fs = File.Create(dialog.FileName);
-        encoder.Save(fs);
+            if (dialog.ShowDialog() != true) return;
 
-        WorkflowState.Instance.AddEvent("ROI", $"ROI crop saved: {Path.GetFileName(dialog.FileName)}");
-        MessageBox.Show("ROI crop saved.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(roi));
+            using var fs = File.Create(dialog.FileName);
+            encoder.Save(fs);
+
+            WorkflowState.Instance.AddEvent("ROI", $"ROI crop saved: {Path.GetFileName(dialog.FileName)}");
+            MessageBox.Show("ROI crop saved.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or FileFormatException or ArgumentException or System.Runtime.InteropServices.COMException)
+        {
+            MessageBox.Show(
+                $"Could not create the ROI crop. The image may be unreadable or the destination is not writable.\n\n{ex.Message}",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private static BitmapImage LoadBitmapOnLoad(string path)
@@ -132,14 +143,25 @@ public partial class ReviewView : UserControl
             return;
         }
 
-        var targetDir = AoiDatabase.TrainingVaultPath;
-        Directory.CreateDirectory(targetDir);
+        try
+        {
+            var targetDir = AoiDatabase.TrainingVaultPath;
+            Directory.CreateDirectory(targetDir);
 
-        var target = Path.Combine(targetDir, $"review_{DateTime.Now:yyyyMMdd_HHmmss}_{Path.GetFileName(sample)}");
-        File.Copy(sample, target, true);
-        AoiDatabase.RecordTrainingSample(target, "review_candidate", "Queued from Review candidate action.");
-        WorkflowState.Instance.QueueTrainingSample(Path.GetFileName(target));
-        MessageBox.Show("Sample copied to the local candidate queue.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+            var target = Path.Combine(targetDir, $"review_{DateTime.Now:yyyyMMdd_HHmmss}_{Path.GetFileName(sample)}");
+            File.Copy(sample, target, true);
+            AoiDatabase.RecordTrainingSample(target, "review_candidate", "Queued from Review candidate action.");
+            WorkflowState.Instance.QueueTrainingSample(Path.GetFileName(target));
+            MessageBox.Show("Sample copied to the local candidate queue.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(
+                $"Could not copy the sample to the training queue. The file may be locked or the destination is not writable.\n\n{ex.Message}",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void LogDisposition(string action)
@@ -178,28 +200,41 @@ public partial class ReviewView : UserControl
         Directory.CreateDirectory(logDir);
         var file = Path.Combine(logDir, "review_disposition_log.csv");
 
-        if (!File.Exists(file))
+        try
         {
-            File.WriteAllText(
-                file,
-                "TimestampUtc,StationId,OperatorId,Sample,Golden,Verdict,Confidence,Policy,ModelVersion,DecisionReason,Action\n");
-        }
+            if (!File.Exists(file))
+            {
+                File.WriteAllText(
+                    file,
+                    "TimestampUtc,StationId,OperatorId,Sample,Golden,Verdict,Confidence,Policy,ModelVersion,DecisionReason,Action\n");
+            }
 
-        File.AppendAllText(
-            file,
-            string.Join(",",
-                DateTime.UtcNow.ToString("O"),
-                EscapeCsv(state.StationId),
-                EscapeCsv(state.OperatorWithRole),
-                EscapeCsv(Path.GetFileName(analysis.SamplePath)),
-                EscapeCsv(analysis.GoldenPath is null ? "none" : Path.GetFileName(analysis.GoldenPath)),
-                EscapeCsv(analysis.Verdict),
-                analysis.Confidence.ToString("F4"),
-                EscapeCsv(analysis.PolicyName),
-                EscapeCsv(analysis.ModelVersion),
-                EscapeCsv(analysis.DecisionReason),
-                EscapeCsv(action)) + Environment.NewLine);
-        ExportVerificationService.RecordVerifiedExport("ReviewDispositionLog", file);
+            File.AppendAllText(
+                file,
+                string.Join(",",
+                    DateTime.UtcNow.ToString("O"),
+                    EscapeCsv(state.StationId),
+                    EscapeCsv(state.OperatorWithRole),
+                    EscapeCsv(Path.GetFileName(analysis.SamplePath)),
+                    EscapeCsv(analysis.GoldenPath is null ? "none" : Path.GetFileName(analysis.GoldenPath)),
+                    EscapeCsv(analysis.Verdict),
+                    analysis.Confidence.ToString("F4"),
+                    EscapeCsv(analysis.PolicyName),
+                    EscapeCsv(analysis.ModelVersion),
+                    EscapeCsv(analysis.DecisionReason),
+                    EscapeCsv(action)) + Environment.NewLine);
+            ExportVerificationService.RecordVerifiedExport("ReviewDispositionLog", file);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            state.AddEvent("EXPORT", $"Disposition log write failed: {ex.Message}");
+            MessageBox.Show(
+                $"The disposition was recorded in this session, but the CSV log could not be written. It may be open in Excel or read-only.\n\n{ex.Message}",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
 
         try
         {

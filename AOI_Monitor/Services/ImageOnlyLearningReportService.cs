@@ -492,14 +492,28 @@ public static class ImageOnlyLearningReportService
         sb.AppendLine("<h2>Before Learning: Baseline False Calls</h2>");
         sb.AppendLine("<div class=\"grid\">");
         MetricCard("False calls before learning", metrics?.FalseCallsBeforeLearning.ToString(CultureInfo.InvariantCulture) ?? "Not measured", "Pixel Difference Prototype Engine on OK Validation images.");
-        MetricCard("False-call rate before", metrics?.FalseCallRateBeforeLearning.ToString("P1", CultureInfo.InvariantCulture) ?? "Not measured", "Rate on OK Validation images.");
+        MetricCard(
+            "False-call rate before",
+            metrics is null
+                ? "Not measured"
+                : metrics.OkValidationCount >= ImageLearningFalseCallComparisonService.MinimumOkValidationForRate
+                    ? metrics.FalseCallRateBeforeLearning.ToString("P1", CultureInfo.InvariantCulture)
+                    : $"{metrics.FalseCallsBeforeLearning} of {metrics.OkValidationCount} (% withheld below {ImageLearningFalseCallComparisonService.MinimumOkValidationForRate})",
+            "Rate on OK Validation images; percentage shown only at or above the minimum sample size.");
         MetricCard("Anomaly regions before", metrics?.AnomalyRegionsBeforeLearning.ToString(CultureInfo.InvariantCulture) ?? "Not measured", "Baseline review burden.");
         sb.AppendLine("</div>");
 
         sb.AppendLine("<h2>After Learning: Learned Model False Calls</h2>");
         sb.AppendLine("<div class=\"grid\">");
         MetricCard("False calls after learning", metrics?.FalseCallsAfterLearning.ToString(CultureInfo.InvariantCulture) ?? "Not measured", "Learned PCB Visual Model v1 on OK Validation images.");
-        MetricCard("False-call rate after", metrics?.FalseCallRateAfterLearning.ToString("P1", CultureInfo.InvariantCulture) ?? "Not measured", "Calibrated false-call behavior.");
+        MetricCard(
+            "False-call rate after",
+            metrics is null
+                ? "Not measured"
+                : metrics.OkValidationCount >= ImageLearningFalseCallComparisonService.MinimumOkValidationForRate
+                    ? metrics.FalseCallRateAfterLearning.ToString("P1", CultureInfo.InvariantCulture)
+                    : $"{metrics.FalseCallsAfterLearning} of {metrics.OkValidationCount} (% withheld below {ImageLearningFalseCallComparisonService.MinimumOkValidationForRate})",
+            "Calibrated false-call behavior; percentage shown only at or above the minimum sample size.");
         MetricCard("False-call reduction", metrics?.FalseCallReductionPercentage.ToString("P1", CultureInfo.InvariantCulture) ?? "Not measured", "Reduction compared with baseline.");
         sb.AppendLine("</div>");
 

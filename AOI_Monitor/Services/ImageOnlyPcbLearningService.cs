@@ -531,7 +531,7 @@ public static class ImageOnlyPcbLearningService
             {
                 loaded.Add(LoadImage(path, options, image));
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or NotSupportedException or FileFormatException or ArgumentException or System.Runtime.InteropServices.COMException)
             {
                 skippedImages.Add(new ImageLearningSkippedImage(image.Id, image.FileName, image.Role, path, ex.Message));
             }

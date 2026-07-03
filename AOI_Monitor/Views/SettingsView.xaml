@@ -168,7 +168,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="LanguageLabelText" Text="Language" Style="{StaticResource SettingsLabel}"/>
-                    <ComboBox Grid.Column="1" x:Name="LangCombo" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                    <ComboBox Grid.Column="1" x:Name="LangCombo" AutomationProperties.Name="Language" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}">English</ComboBoxItem>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}">Korean</ComboBoxItem>
                     </ComboBox>
@@ -180,7 +180,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="ResolutionLabelText" Text="Resolution" Style="{StaticResource SettingsLabel}"/>
-                    <ComboBox Grid.Column="1" x:Name="ResolutionCombo" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                    <ComboBox Grid.Column="1" x:Name="ResolutionCombo" AutomationProperties.Name="Resolution" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="1920 x 1080 minimum HMI"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="2560 x 1440 engineering monitor"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="3840 x 2160 wall display"/>
@@ -193,7 +193,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="ThemeLabelText" Text="Theme" Style="{StaticResource SettingsLabel}"/>
-                    <ComboBox Grid.Column="1" x:Name="ThemeCombo" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                    <ComboBox Grid.Column="1" x:Name="ThemeCombo" AutomationProperties.Name="Theme" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Industrial Dark"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Industrial Light"/>
                     </ComboBox>
@@ -205,7 +205,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="FontSizeLabelText" Text="Font Size" Style="{StaticResource SettingsLabel}"/>
-                    <ComboBox Grid.Column="1" x:Name="FontCombo" SelectedIndex="1" Style="{StaticResource SettingsCombo}"
+                    <ComboBox Grid.Column="1" x:Name="FontCombo" AutomationProperties.Name="Base font size" SelectedIndex="1" Style="{StaticResource SettingsCombo}"
                               ToolTip="Base window font size in pixels. Page text that sets its own HMI size is not scaled by this preset.">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}">Compact 14 px base</ComboBoxItem>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}">Standard 15 px base</ComboBoxItem>
@@ -231,7 +231,7 @@
                       <ColumnDefinition Width="98"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="StoragePathLabelText" Text="Storage Path" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="StorageRootText" Grid.Column="1" MinHeight="34" ToolTip="Local database, image vault, settings, and export storage root."/>
+                    <TextBox x:Name="StorageRootText" AutomationProperties.Name="Storage path" Grid.Column="1" MinHeight="34" ToolTip="Local database, image vault, settings, and export storage root."/>
                     <Button x:Name="BrowseStorageRootBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseStorageRootClick"/>
                   </Grid>
 
@@ -241,7 +241,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Deployment Target" Style="{StaticResource SettingsLabel}" ToolTip="Selects the evidence stage expected by Factory Readiness. It does not certify production release by itself."/>
-                    <ComboBox x:Name="DeploymentProfileCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                    <ComboBox x:Name="DeploymentProfileCombo" AutomationProperties.Name="Deployment target" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 1 Customer Data Validation"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 2 Camera Pilot"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Stage 3 Robot Cell Pilot"/>
@@ -256,7 +256,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Operating Mode" Style="{StaticResource SettingsLabel}" ToolTip="Demo allows sample/mock sources. Pilot requires clear labels. Production blocks demo/fallback evidence where possible."/>
-                    <ComboBox x:Name="OperatingModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                    <ComboBox x:Name="OperatingModeCombo" AutomationProperties.Name="Operating mode" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Demo"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pilot"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Production"/>
@@ -282,7 +282,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="ConsoleTitleLabelText" Text="Console Title" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="ConsoleTitleText" Grid.Column="1" MinHeight="34" ToolTip="Client-visible title in the persistent header."/>
+                    <TextBox x:Name="ConsoleTitleText" AutomationProperties.Name="Console title" Grid.Column="1" MinHeight="34" ToolTip="Client-visible title in the persistent header."/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
@@ -291,7 +291,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="StationLabelText" Text="Station Label" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="StationNameText" Grid.Column="1" MinHeight="34" ToolTip="Short station label shown in the sidebar."/>
+                    <TextBox x:Name="StationNameText" AutomationProperties.Name="Station label" Grid.Column="1" MinHeight="34" ToolTip="Short station label shown in the sidebar."/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
@@ -300,7 +300,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="StationSubtitleLabelText" Text="Station Subtitle" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="StationSubtitleText" Grid.Column="1" MinHeight="34" ToolTip="Secondary station description shown under the station label."/>
+                    <TextBox x:Name="StationSubtitleText" AutomationProperties.Name="Station subtitle" Grid.Column="1" MinHeight="34" ToolTip="Secondary station description shown under the station label."/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
@@ -309,7 +309,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="AccentColorLabelText" Text="Accent Color" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="AccentColorText" Grid.Column="1" MinHeight="34" ToolTip="Hex color used for client branding accents. Example: #5CA0D3."/>
+                    <TextBox x:Name="AccentColorText" AutomationProperties.Name="Accent color" Grid.Column="1" MinHeight="34" ToolTip="Hex color used for client branding accents. Example: #5CA0D3."/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
@@ -319,7 +319,7 @@
                       <ColumnDefinition Width="98"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="LogoImageLabelText" Text="Logo Image" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="BrandLogoPathText" Grid.Column="1" MinHeight="34" ToolTip="Optional PNG/JPG logo used in the persistent header."/>
+                    <TextBox x:Name="BrandLogoPathText" AutomationProperties.Name="Logo image path" Grid.Column="1" MinHeight="34" ToolTip="Optional PNG/JPG logo used in the persistent header."/>
                     <Button x:Name="BrowseBrandLogoBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseBrandLogoClick"/>
                   </Grid>
 
@@ -344,7 +344,7 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Retention days" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="RetentionDaysText" Grid.Column="1" MinHeight="34" Text="30"
+                    <TextBox x:Name="RetentionDaysText" AutomationProperties.Name="Retention days" Grid.Column="1" MinHeight="34" Text="30"
                              ToolTip="Age in days after which logs are archived and purged from the live tables. Default 30."/>
                   </Grid>
 
@@ -385,7 +385,7 @@
                     <ColumnDefinition Width="*"/>
                   </Grid.ColumnDefinitions>
                   <TextBlock x:Name="ReviewDefaultLabelText" Text="Review Default" Style="{StaticResource SettingsLabel}"/>
-                  <TextBox x:Name="ReviewDefaultText" Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="Minimize False Positives"/>
+                  <TextBox x:Name="ReviewDefaultText" AutomationProperties.Name="Review default" Grid.Column="1" Style="{StaticResource ReadonlyInput}" Text="Minimize False Positives"/>
                 </Grid>
 
                 <Grid>
@@ -394,7 +394,7 @@
                     <ColumnDefinition Width="*"/>
                   </Grid.ColumnDefinitions>
                   <TextBlock x:Name="DetectionPriorityLabelText" Text="Detection Priority" Style="{StaticResource SettingsLabel}"/>
-                  <ComboBox x:Name="DetectionPriorityCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                  <ComboBox x:Name="DetectionPriorityCombo" AutomationProperties.Name="Detection priority" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Minimize False Positives"/>
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Balanced"/>
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Maximize Defect Recall"/>
@@ -435,7 +435,7 @@
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Selected Engine" Style="{StaticResource SettingsLabel}"/>
-                    <ComboBox x:Name="InspectionEngineCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}" ToolTip="ONNX is the supported ML model format. Pixel Difference is a prototype fallback engine.">
+                    <ComboBox x:Name="InspectionEngineCombo" AutomationProperties.Name="Selected inspection engine" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}" ToolTip="ONNX is the supported ML model format. Pixel Difference is a prototype fallback engine.">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Pixel Difference Prototype Engine"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="ONNX ML Model"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Learned PCB Visual Model"/>
@@ -445,46 +445,46 @@
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Model Path" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="ModelPathText" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="ModelPathText" AutomationProperties.Name="Model path" Grid.Column="1" MinHeight="34"/>
                     <Button x:Name="BrowseModelBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseModelClick"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Model Version" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="ModelVersionText" Grid.Column="1" MinHeight="34" Text="UNCONFIGURED"/>
+                    <TextBox x:Name="ModelVersionText" AutomationProperties.Name="Model version" Grid.Column="1" MinHeight="34" Text="UNCONFIGURED"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Label Map Path" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="LabelMapPathText" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="LabelMapPathText" AutomationProperties.Name="Label map path" Grid.Column="1" MinHeight="34"/>
                     <Button x:Name="BrowseLabelMapBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseLabelMapClick"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Confidence" Style="{StaticResource SettingsLabel}" ToolTip="Threshold: the score limit used to decide OK, REVIEW, or NG."/>
-                    <TextBox x:Name="ConfidenceThresholdText" Grid.Column="1" MinHeight="34" Text="0.65" ToolTip="Threshold value. Higher values usually reduce false calls but may increase possible escapes."/>
+                    <TextBox x:Name="ConfidenceThresholdText" AutomationProperties.Name="Confidence threshold" Grid.Column="1" MinHeight="34" Text="0.65" ToolTip="Threshold value. Higher values usually reduce false calls but may increase possible escapes."/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Input Size" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="InputWidthText" Grid.Column="1" MinHeight="34" Text="640"/>
-                    <TextBox x:Name="InputHeightText" Grid.Column="3" MinHeight="34" Text="640"/>
+                    <TextBox x:Name="InputWidthText" AutomationProperties.Name="Model input width" Grid.Column="1" MinHeight="34" Text="640"/>
+                    <TextBox x:Name="InputHeightText" AutomationProperties.Name="Model input height" Grid.Column="3" MinHeight="34" Text="640"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Input Tensor" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="InputTensorNameText" Grid.Column="1" MinHeight="34" ToolTip="Required for model readiness test."/>
+                    <TextBox x:Name="InputTensorNameText" AutomationProperties.Name="Input tensor name" Grid.Column="1" MinHeight="34" ToolTip="Required for model readiness test."/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Output Tensor" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="OutputTensorNameText" Grid.Column="1" MinHeight="34" ToolTip="Required for model readiness test."/>
+                    <TextBox x:Name="OutputTensorNameText" AutomationProperties.Name="Output tensor name" Grid.Column="1" MinHeight="34" ToolTip="Required for model readiness test."/>
                   </Grid>
 
                   <UniformGrid Columns="2" Margin="0,4,0,0">
@@ -630,7 +630,7 @@
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Mode" Style="{StaticResource SettingsLabel}"/>
-                    <ComboBox x:Name="CameraSourceCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                    <ComboBox x:Name="CameraSourceCombo" AutomationProperties.Name="Camera source mode" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="No Camera / Not Connected"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Folder Simulation"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Generic Vision Adapter (Real Hardware)"/>
@@ -640,53 +640,53 @@
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Top Folder" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraTopFolderText" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="CameraTopFolderText" AutomationProperties.Name="Camera top folder" Grid.Column="1" MinHeight="34"/>
                     <Button x:Name="BrowseCameraTopBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseCameraTopClick"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Side Folder" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraSideFolderText" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="CameraSideFolderText" AutomationProperties.Name="Camera side folder" Grid.Column="1" MinHeight="34"/>
                     <Button x:Name="BrowseCameraSideBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseCameraSideClick"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Bottom Folder" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraBottomFolderText" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="CameraBottomFolderText" AutomationProperties.Name="Camera bottom folder" Grid.Column="1" MinHeight="34"/>
                     <Button x:Name="BrowseCameraBottomBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseCameraBottomClick"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Top Device ID" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraTopDeviceIdText" Grid.Column="1" MinHeight="34" ToolTip="Stage 2 generic adapter device identifier. This does not imply camera connection."/>
+                    <TextBox x:Name="CameraTopDeviceIdText" AutomationProperties.Name="Camera top device ID" Grid.Column="1" MinHeight="34" ToolTip="Stage 2 generic adapter device identifier. This does not imply camera connection."/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Side Device ID" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraSideDeviceIdText" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="CameraSideDeviceIdText" AutomationProperties.Name="Camera side device ID" Grid.Column="1" MinHeight="34"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Bottom Device ID" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraBottomDeviceIdText" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="CameraBottomDeviceIdText" AutomationProperties.Name="Camera bottom device ID" Grid.Column="1" MinHeight="34"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="98"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Adapter Folder" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraAdapterFolderText" Grid.Column="1" MinHeight="34" ToolTip="External folder containing a camera_adapter_manifest.json or *.camera-adapter.json manifest."/>
+                    <TextBox x:Name="CameraAdapterFolderText" AutomationProperties.Name="Camera adapter folder" Grid.Column="1" MinHeight="34" ToolTip="External folder containing a camera_adapter_manifest.json or *.camera-adapter.json manifest."/>
                     <Button x:Name="BrowseCameraAdapterBtn" Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Browse" Margin="8,0,0,0" Click="OnBrowseCameraAdapterClick"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Acquisition" Style="{StaticResource SettingsLabel}"/>
-                    <ComboBox x:Name="CameraAcquisitionModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                    <ComboBox x:Name="CameraAcquisitionModeCombo" AutomationProperties.Name="Camera acquisition mode" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Continuous"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Software Trigger"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Hardware Trigger"/>
@@ -696,27 +696,27 @@
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Exposure / Gain" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraExposureMsText" Grid.Column="1" MinHeight="34" Text="5.0" ToolTip="Exposure in milliseconds."/>
-                    <TextBox x:Name="CameraGainText" Grid.Column="3" MinHeight="34" Text="1.0"/>
+                    <TextBox x:Name="CameraExposureMsText" AutomationProperties.Name="Camera exposure milliseconds" Grid.Column="1" MinHeight="34" Text="5.0" ToolTip="Exposure in milliseconds."/>
+                    <TextBox x:Name="CameraGainText" AutomationProperties.Name="Camera gain" Grid.Column="3" MinHeight="34" Text="1.0"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Timeouts ms" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraTriggerTimeoutMsText" Grid.Column="1" MinHeight="34" Text="250" ToolTip="Trigger timeout in milliseconds."/>
-                    <TextBox x:Name="CameraFrameTimeoutMsText" Grid.Column="3" MinHeight="34" Text="1000" ToolTip="Frame timeout in milliseconds."/>
+                    <TextBox x:Name="CameraTriggerTimeoutMsText" AutomationProperties.Name="Camera trigger timeout milliseconds" Grid.Column="1" MinHeight="34" Text="250" ToolTip="Trigger timeout in milliseconds."/>
+                    <TextBox x:Name="CameraFrameTimeoutMsText" AutomationProperties.Name="Camera frame timeout milliseconds" Grid.Column="3" MinHeight="34" Text="1000" ToolTip="Frame timeout in milliseconds."/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Board Model" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraBoardModelText" Grid.Column="1" MinHeight="34" Text="TBOX-MAIN"/>
+                    <TextBox x:Name="CameraBoardModelText" AutomationProperties.Name="Camera board model" Grid.Column="1" MinHeight="34" Text="TBOX-MAIN"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Lot ID" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="CameraLotIdText" Grid.Column="1" MinHeight="34" Text="POC-LOT"/>
+                    <TextBox x:Name="CameraLotIdText" AutomationProperties.Name="Camera lot ID" Grid.Column="1" MinHeight="34" Text="POC-LOT"/>
                   </Grid>
 
                   <UniformGrid Columns="2">
@@ -750,7 +750,7 @@
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Mode" Style="{StaticResource SettingsLabel}"/>
-                    <ComboBox x:Name="LightingModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                    <ComboBox x:Name="LightingModeCombo" AutomationProperties.Name="Lighting mode" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="None / Not Connected"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Simulated"/>
                       <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="TCP Text Protocol (Real Hardware)"/>
@@ -761,35 +761,35 @@
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
                     <TextBlock Text="TCP Host / Port" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="LightingTcpHostText" Grid.Column="1" MinHeight="34"/>
-                    <TextBox x:Name="LightingTcpPortText" Grid.Column="3" MinHeight="34" Text="5025"/>
+                    <TextBox x:Name="LightingTcpHostText" AutomationProperties.Name="Lighting TCP host" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="LightingTcpPortText" AutomationProperties.Name="Lighting TCP port" Grid.Column="3" MinHeight="34" Text="5025"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Serial / Baud" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="LightingSerialPortText" Grid.Column="1" MinHeight="34"/>
-                    <TextBox x:Name="LightingBaudRateText" Grid.Column="3" MinHeight="34" Text="9600"/>
+                    <TextBox x:Name="LightingSerialPortText" AutomationProperties.Name="Lighting serial port" Grid.Column="1" MinHeight="34"/>
+                    <TextBox x:Name="LightingBaudRateText" AutomationProperties.Name="Lighting baud rate" Grid.Column="3" MinHeight="34" Text="9600"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Programs" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="LightingTopProgramText" Grid.Column="1" MinHeight="34" Text="TOP"/>
-                    <TextBox x:Name="LightingSideProgramText" Grid.Column="3" MinHeight="34" Text="SIDE"/>
-                    <TextBox x:Name="LightingBottomProgramText" Grid.Column="5" MinHeight="34" Text="BOTTOM"/>
+                    <TextBox x:Name="LightingTopProgramText" AutomationProperties.Name="Lighting top program" Grid.Column="1" MinHeight="34" Text="TOP"/>
+                    <TextBox x:Name="LightingSideProgramText" AutomationProperties.Name="Lighting side program" Grid.Column="3" MinHeight="34" Text="SIDE"/>
+                    <TextBox x:Name="LightingBottomProgramText" AutomationProperties.Name="Lighting bottom program" Grid.Column="5" MinHeight="34" Text="BOTTOM"/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Command" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="LightingCommandTemplateText" Grid.Column="1" MinHeight="34" Text="SET {view} {program}\n" ToolTip="Template supports {view}, {program}, \n and \r."/>
+                    <TextBox x:Name="LightingCommandTemplateText" AutomationProperties.Name="Lighting command template" Grid.Column="1" MinHeight="34" Text="SET {view} {program}\n" ToolTip="Template supports {view}, {program}, \n and \r."/>
                   </Grid>
 
                   <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                     <TextBlock Text="Timeout ms" Style="{StaticResource SettingsLabel}"/>
-                    <TextBox x:Name="LightingTimeoutMsText" Grid.Column="1" MinHeight="34" Text="500"/>
+                    <TextBox x:Name="LightingTimeoutMsText" AutomationProperties.Name="Lighting timeout milliseconds" Grid.Column="1" MinHeight="34" Text="500"/>
                   </Grid>
 
                   <UniformGrid Columns="2">
@@ -850,7 +850,7 @@
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="MES Mode" Style="{StaticResource SettingsLabel}"/>
-                  <ComboBox x:Name="MesModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}" ToolTip="Not Connected is blue/gray. Mock REST is purple and cannot be treated as production MES.">
+                  <ComboBox x:Name="MesModeCombo" AutomationProperties.Name="MES mode" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}" ToolTip="Not Connected is blue/gray. Mock REST is purple and cannot be treated as production MES.">
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Not Connected"/>
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Mock Local / REST"/>
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Production REST"/>
@@ -860,26 +860,26 @@
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="Mock Endpoint" Style="{StaticResource SettingsLabel}"/>
-                  <TextBox x:Name="MesEndpointText" Grid.Column="1" MinHeight="34" ToolTip="Optional. If blank, mock uploads are written to local JSON."/>
+                  <TextBox x:Name="MesEndpointText" AutomationProperties.Name="MES mock endpoint" Grid.Column="1" MinHeight="34" ToolTip="Optional. If blank, mock uploads are written to local JSON."/>
                 </Grid>
 
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="REST Base URL" Style="{StaticResource SettingsLabel}"/>
-                  <TextBox x:Name="MesRestBaseUrlText" Grid.Column="1" MinHeight="34" ToolTip="Explicit REST mode only. Example: https://mes.example.local"/>
+                  <TextBox x:Name="MesRestBaseUrlText" AutomationProperties.Name="MES REST base URL" Grid.Column="1" MinHeight="34" ToolTip="Explicit REST mode only. Example: https://mes.example.local"/>
                 </Grid>
 
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="REST Paths" Style="{StaticResource SettingsLabel}"/>
-                  <TextBox x:Name="MesResultPathText" Grid.Column="1" MinHeight="34" Text="/api/aoi/results"/>
-                  <TextBox x:Name="MesImagePathText" Grid.Column="3" MinHeight="34" Text="/api/aoi/images"/>
+                  <TextBox x:Name="MesResultPathText" AutomationProperties.Name="MES result path" Grid.Column="1" MinHeight="34" Text="/api/aoi/results"/>
+                  <TextBox x:Name="MesImagePathText" AutomationProperties.Name="MES image path" Grid.Column="3" MinHeight="34" Text="/api/aoi/images"/>
                 </Grid>
 
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="Auth Mode" Style="{StaticResource SettingsLabel}"/>
-                  <ComboBox x:Name="MesAuthModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
+                  <ComboBox x:Name="MesAuthModeCombo" AutomationProperties.Name="MES authentication mode" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}">
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="None"/>
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="API Key"/>
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Bearer"/>
@@ -890,29 +890,29 @@
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="API Key" Style="{StaticResource SettingsLabel}"/>
-                  <TextBox x:Name="MesApiKeyHeaderText" Grid.Column="1" MinHeight="34" Text="X-API-Key"/>
-                  <PasswordBox x:Name="MesApiKeyBox" Grid.Column="3" Style="{StaticResource SettingsPasswordBox}"/>
+                  <TextBox x:Name="MesApiKeyHeaderText" AutomationProperties.Name="MES API key header" Grid.Column="1" MinHeight="34" Text="X-API-Key"/>
+                  <PasswordBox x:Name="MesApiKeyBox" AutomationProperties.Name="MES API key" Grid.Column="3" Style="{StaticResource SettingsPasswordBox}"/>
                 </Grid>
 
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="Bearer Token" Style="{StaticResource SettingsLabel}"/>
-                  <PasswordBox x:Name="MesBearerTokenBox" Grid.Column="1" Style="{StaticResource SettingsPasswordBox}"/>
+                  <PasswordBox x:Name="MesBearerTokenBox" AutomationProperties.Name="MES bearer token" Grid.Column="1" Style="{StaticResource SettingsPasswordBox}"/>
                 </Grid>
 
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="Basic Auth" Style="{StaticResource SettingsLabel}"/>
-                  <TextBox x:Name="MesUsernameText" Grid.Column="1" MinHeight="34"/>
-                  <PasswordBox x:Name="MesPasswordBox" Grid.Column="3" Style="{StaticResource SettingsPasswordBox}"/>
+                  <TextBox x:Name="MesUsernameText" AutomationProperties.Name="MES basic auth username" Grid.Column="1" MinHeight="34"/>
+                  <PasswordBox x:Name="MesPasswordBox" AutomationProperties.Name="MES basic auth password" Grid.Column="3" Style="{StaticResource SettingsPasswordBox}"/>
                 </Grid>
 
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="Retry" Style="{StaticResource SettingsLabel}"/>
-                  <TextBox x:Name="MesTimeoutText" Grid.Column="1" MinHeight="34" Text="10"/>
-                  <TextBox x:Name="MesMaxRetryText" Grid.Column="3" MinHeight="34" Text="2"/>
-                  <TextBox x:Name="MesRetryBackoffText" Grid.Column="5" MinHeight="34" Text="500"/>
+                  <TextBox x:Name="MesTimeoutText" AutomationProperties.Name="MES timeout seconds" Grid.Column="1" MinHeight="34" Text="10"/>
+                  <TextBox x:Name="MesMaxRetryText" AutomationProperties.Name="MES max retry count" Grid.Column="3" MinHeight="34" Text="2"/>
+                  <TextBox x:Name="MesRetryBackoffText" AutomationProperties.Name="MES retry backoff milliseconds" Grid.Column="5" MinHeight="34" Text="500"/>
                 </Grid>
 
                 <CheckBox x:Name="MesAutoUploadCheck" Content="Automatic upload when inspection result is saved" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,8"/>
@@ -936,7 +936,7 @@
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="Mode" Style="{StaticResource SettingsLabel}"/>
-                  <ComboBox x:Name="CentralSyncModeCombo" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}" ToolTip="Endpoint summaries and folders may be redacted in exported reports.">
+                  <ComboBox x:Name="CentralSyncModeCombo" AutomationProperties.Name="Central sync mode" Grid.Column="1" SelectedIndex="0" Style="{StaticResource SettingsCombo}" ToolTip="Endpoint summaries and folders may be redacted in exported reports.">
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="Disabled"/>
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="File Drop"/>
                     <ComboBoxItem Style="{StaticResource SettingsComboItem}" Content="REST API Boundary"/>
@@ -947,21 +947,21 @@
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="Endpoint/Folder" Style="{StaticResource SettingsLabel}"/>
-                  <TextBox x:Name="CentralSyncEndpointText" Grid.Column="1" MinHeight="34" ToolTip="FileDrop folder, REST endpoint, or future central database endpoint summary."/>
+                  <TextBox x:Name="CentralSyncEndpointText" AutomationProperties.Name="Central sync endpoint or folder" Grid.Column="1" MinHeight="34" ToolTip="FileDrop folder, REST endpoint, or future central database endpoint summary."/>
                 </Grid>
 
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="Station / Interval" Style="{StaticResource SettingsLabel}"/>
-                  <TextBox x:Name="CentralSyncStationIdText" Grid.Column="1" MinHeight="34"/>
-                  <TextBox x:Name="CentralSyncIntervalText" Grid.Column="3" MinHeight="34" Text="300"/>
+                  <TextBox x:Name="CentralSyncStationIdText" AutomationProperties.Name="Central sync station ID" Grid.Column="1" MinHeight="34"/>
+                  <TextBox x:Name="CentralSyncIntervalText" AutomationProperties.Name="Central sync interval seconds" Grid.Column="3" MinHeight="34" Text="300"/>
                 </Grid>
 
                 <Grid Margin="0,0,0,8">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <TextBlock Text="Retry / Secret" Style="{StaticResource SettingsLabel}"/>
-                  <TextBox x:Name="CentralSyncMaxRetryText" Grid.Column="1" MinHeight="34" Text="5"/>
-                  <PasswordBox x:Name="CentralSyncSecretBox" Grid.Column="3" Style="{StaticResource SettingsPasswordBox}"/>
+                  <TextBox x:Name="CentralSyncMaxRetryText" AutomationProperties.Name="Central sync max retry count" Grid.Column="1" MinHeight="34" Text="5"/>
+                  <PasswordBox x:Name="CentralSyncSecretBox" AutomationProperties.Name="Central sync secret" Grid.Column="3" Style="{StaticResource SettingsPasswordBox}"/>
                 </Grid>
 
                 <CheckBox x:Name="CentralSyncIncludeImagesCheck" Content="Include image file references only when explicitly enabled" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,4"/>

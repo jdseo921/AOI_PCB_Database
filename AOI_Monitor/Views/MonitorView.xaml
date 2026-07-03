@@ -100,7 +100,7 @@
           <WrapPanel Grid.Row="1" Margin="8">
             <StackPanel Orientation="Horizontal" Margin="0,0,12,6">
               <TextBlock Text="View" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0"/>
-              <ComboBox x:Name="ViewSelector" Width="110" SelectedIndex="0" SelectionChanged="OnViewSelectionChanged">
+              <ComboBox x:Name="ViewSelector" Width="110" SelectedIndex="0" AutomationProperties.Name="Inspection view" SelectionChanged="OnViewSelectionChanged">
                 <ComboBoxItem Content="Top"/>
                 <ComboBoxItem Content="Side"/>
                 <ComboBoxItem Content="Bottom"/>
@@ -223,6 +223,7 @@
               <TextBlock Grid.Row="6" Grid.Column="1" x:Name="LearnedModelEvidenceText" Text="Learned visual model: not active." Style="{StaticResource MonitorStatusWrappedValue}" Foreground="#C084FC"/>
               <TextBlock Grid.Row="7" Text="2D Cal Profile" Style="{StaticResource MonitorStatusLabel}"/>
               <ComboBox Grid.Row="7" Grid.Column="1" x:Name="CalibrationProfileCombo" MinHeight="34"
+                        AutomationProperties.Name="2D calibration profile"
                         SelectionChanged="OnCalibrationProfileSelectionChanged"
                         ToolTip="2D calibration profile / Stage 2 preparation only. Approximate board-mm coordinates are not robot-ready.">
                 <ComboBox.ItemTemplate>
@@ -258,6 +259,7 @@
             </Border>
             <DataGrid Grid.Row="1"
                       x:Name="DefectGrid"
+                      AutomationProperties.Name="Defect list"
                       ItemsSource="{Binding}"
                       AutoGenerateColumns="False"
                       Style="{StaticResource HmiDenseTable}"
@@ -296,7 +298,7 @@
             <TextBlock Text="Alarm / Event Log" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </DockPanel>
         </Border>
-        <DataGrid Grid.Row="1" x:Name="AlarmGrid" AutoGenerateColumns="False" Style="{StaticResource HmiTable}" MaxHeight="300">
+        <DataGrid Grid.Row="1" x:Name="AlarmGrid" AutomationProperties.Name="Alarm and event log" AutoGenerateColumns="False" Style="{StaticResource HmiTable}" MaxHeight="300">
           <DataGrid.Columns>
             <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="96" MinWidth="96"/>
             <DataGridTextColumn Header="Event" Binding="{Binding Event}" Width="150" MinWidth="150"/>

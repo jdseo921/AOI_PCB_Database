@@ -1,0 +1,50 @@
+name: Build Windows App
+
+# Produces a downloadable, self-contained Windows x64 build of the WPF app so a
+# reviewer can run it without installing the .NET SDK. Isolated from the .NET CI
+# quality gate on purpose: this job only publishes and uploads an artifact.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/aoi-pcb-gui-review-qpqo05
+
+jobs:
+  publish:
+    name: Publish self-contained Windows build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish self-contained win-x64
+        shell: pwsh
+        run: dotnet publish AOI_Monitor/AOI_Monitor.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=false --output publish/AOI_Monitor
+
+      - name: Stage run instructions
+        shell: pwsh
+        run: |
+          @(
+            'AOI Monitor - self-contained Windows x64 test build',
+            '',
+            'How to run:',
+            '1. Unzip this artifact to a writable folder such as C:\AOI\AOI_Monitor.',
+            '2. Run AOI_Monitor.exe. No .NET install is required; the runtime is bundled.',
+            '3. On first launch the app creates local storage (SQLite database, image vault, settings).',
+            '',
+            'This is a prototype test build. Camera, lighting, robot, and MES stay Not Connected or',
+            'Simulated by design. See Docs/Manual_Test_Plan.md and Docs/Image_Learning_Quickstart_Test.md.'
+          ) | Set-Content -Path publish/AOI_Monitor/HOW_TO_RUN.txt -Encoding UTF8
+
+      - name: Upload Windows build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AOI_Monitor-windows-x64
+          path: publish/AOI_Monitor/**
+          if-no-files-found: error

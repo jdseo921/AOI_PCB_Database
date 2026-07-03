@@ -13,7 +13,7 @@
       <WrapPanel Margin="8">
         <StackPanel Style="{StaticResource HmiAdaptiveFilterField}" Width="170">
           <TextBlock Text="Recipe ID" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,3"/>
-          <TextBox x:Name="RecipeNameText" Text="TBOX_TOP"/>
+          <TextBox x:Name="RecipeNameText" AutomationProperties.Name="Recipe ID" Text="TBOX_TOP"/>
         </StackPanel>
         <StackPanel Style="{StaticResource HmiAdaptiveFilterField}" Width="170">
           <TextBlock Text="Board Program" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,3"/>
@@ -139,7 +139,7 @@
 
             <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
               <TextBlock Text="ROI Type" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,3"/>
-              <ComboBox x:Name="RoiTypeCombo" SelectionChanged="OnRoiParameterChanged">
+              <ComboBox x:Name="RoiTypeCombo" AutomationProperties.Name="ROI type" SelectionChanged="OnRoiParameterChanged">
                 <ComboBoxItem Content="Presence"/>
                 <ComboBoxItem Content="Polarity"/>
                 <ComboBoxItem Content="Placement"/>
@@ -153,25 +153,25 @@
 
             <StackPanel Grid.Row="2" Grid.Column="0">
               <TextBlock Text="AI Score Threshold" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,3"/>
-              <TextBox x:Name="AiThresholdText" TextChanged="OnRoiParameterChanged"/>
+              <TextBox x:Name="AiThresholdText" AutomationProperties.Name="AI score threshold" TextChanged="OnRoiParameterChanged"/>
             </StackPanel>
             <StackPanel Grid.Row="2" Grid.Column="2">
               <TextBlock Text="Height Min" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,3"/>
-              <TextBox x:Name="HeightMinText" TextChanged="OnRoiParameterChanged"/>
+              <TextBox x:Name="HeightMinText" AutomationProperties.Name="Height minimum" TextChanged="OnRoiParameterChanged"/>
             </StackPanel>
 
             <StackPanel Grid.Row="4" Grid.Column="0">
               <TextBlock Text="Height Max" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,3"/>
-              <TextBox x:Name="HeightMaxText" TextChanged="OnRoiParameterChanged"/>
+              <TextBox x:Name="HeightMaxText" AutomationProperties.Name="Height maximum" TextChanged="OnRoiParameterChanged"/>
             </StackPanel>
             <StackPanel Grid.Row="4" Grid.Column="2">
               <TextBlock Text="Volume Min" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,3"/>
-              <TextBox x:Name="VolumeMinText" TextChanged="OnRoiParameterChanged"/>
+              <TextBox x:Name="VolumeMinText" AutomationProperties.Name="Volume minimum" TextChanged="OnRoiParameterChanged"/>
             </StackPanel>
 
             <StackPanel Grid.Row="6" Grid.Column="0">
               <TextBlock Text="Volume Max" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,3"/>
-              <TextBox x:Name="VolumeMaxText" TextChanged="OnRoiParameterChanged"/>
+              <TextBox x:Name="VolumeMaxText" AutomationProperties.Name="Volume maximum" TextChanged="OnRoiParameterChanged"/>
             </StackPanel>
             <WrapPanel Grid.Row="6" Grid.Column="2" VerticalAlignment="Bottom" HorizontalAlignment="Right">
               <Button Style="{StaticResource ActionBtnRed}" Content="Delete ROI" Click="OnDeleteRoiClick"/>
@@ -196,15 +196,15 @@
                 </Grid.RowDefinitions>
                 <StackPanel Grid.Row="0" Grid.Column="0">
                   <TextBlock Text="X/Y tolerance mm" Foreground="#9AA6AF" FontSize="14"/>
-                  <TextBox x:Name="PlacementToleranceText" Text="0.020" MinHeight="34" ToolTip="Dimensional tolerance for placement offset evidence."/>
+                  <TextBox x:Name="PlacementToleranceText" Text="0.020" MinHeight="34" AutomationProperties.Name="X/Y placement tolerance millimeters" ToolTip="Dimensional tolerance for placement offset evidence."/>
                 </StackPanel>
                 <StackPanel Grid.Row="0" Grid.Column="2">
                   <TextBlock Text="Rotation tolerance deg" Foreground="#9AA6AF" FontSize="14"/>
-                  <TextBox x:Name="RotationToleranceText" Text="1.0" MinHeight="34" ToolTip="Skew tolerance for component placement evidence."/>
+                  <TextBox x:Name="RotationToleranceText" Text="1.0" MinHeight="34" AutomationProperties.Name="Rotation tolerance degrees" ToolTip="Skew tolerance for component placement evidence."/>
                 </StackPanel>
                 <StackPanel Grid.Row="2" Grid.Column="0">
                   <TextBlock Text="IPC acceptability class" Foreground="#9AA6AF" FontSize="14"/>
-                  <ComboBox x:Name="IpcClassCombo" SelectedIndex="1" MinHeight="34">
+                  <ComboBox x:Name="IpcClassCombo" SelectedIndex="1" MinHeight="34" AutomationProperties.Name="IPC acceptability class">
                     <ComboBoxItem Content="IPC Class 1"/>
                     <ComboBoxItem Content="IPC Class 2"/>
                     <ComboBoxItem Content="IPC Class 3"/>
@@ -212,7 +212,7 @@
                 </StackPanel>
                 <StackPanel Grid.Row="2" Grid.Column="2">
                   <TextBlock Text="Lighting profile" Foreground="#9AA6AF" FontSize="14"/>
-                  <ComboBox x:Name="LightingProfileCombo" SelectedIndex="0" MinHeight="34">
+                  <ComboBox x:Name="LightingProfileCombo" SelectedIndex="0" MinHeight="34" AutomationProperties.Name="Lighting profile">
                     <ComboBoxItem Content="Top bright field"/>
                     <ComboBoxItem Content="Low-angle dark field"/>
                     <ComboBoxItem Content="Side marking light"/>
@@ -221,7 +221,7 @@
                 </StackPanel>
                 <StackPanel Grid.Row="4" Grid.ColumnSpan="3">
                   <TextBlock Text="False-call policy" Foreground="#9AA6AF" FontSize="14"/>
-                  <ComboBox x:Name="FalseCallPolicyCombo" SelectedIndex="1" MinHeight="34">
+                  <ComboBox x:Name="FalseCallPolicyCombo" SelectedIndex="1" MinHeight="34" AutomationProperties.Name="False-call policy">
                     <ComboBoxItem Content="Strict: hold every suspected defect"/>
                     <ComboBoxItem Content="Balanced: review benign visual noise"/>
                     <ComboBoxItem Content="Sensitive: reduce possible escapes"/>

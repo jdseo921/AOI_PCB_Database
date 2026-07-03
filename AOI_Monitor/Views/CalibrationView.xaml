@@ -57,22 +57,22 @@
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
               <TextBlock Text="Saved Profile" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
-              <ComboBox x:Name="ProfileCombo" Grid.Column="1" MinHeight="34" DisplayMemberPath="DisplayName" SelectionChanged="OnProfileSelectionChanged" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=SelectionBoxItem}"/>
+              <ComboBox x:Name="ProfileCombo" Grid.Column="1" MinHeight="34" AutomationProperties.Name="Saved calibration profile" DisplayMemberPath="DisplayName" SelectionChanged="OnProfileSelectionChanged" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=SelectionBoxItem}"/>
             </Grid>
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
               <TextBlock Text="Profile Name" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
-              <TextBox x:Name="ProfileNameText" Grid.Column="1" MinHeight="34" Text="TBOX 2D Top Calibration"/>
+              <TextBox x:Name="ProfileNameText" Grid.Column="1" MinHeight="34" AutomationProperties.Name="Profile name" Text="TBOX 2D Top Calibration"/>
             </Grid>
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
               <TextBlock Text="Board Model" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
-              <TextBox x:Name="BoardModelText" Grid.Column="1" MinHeight="34" Text="TBOX-MAIN"/>
+              <TextBox x:Name="BoardModelText" Grid.Column="1" MinHeight="34" AutomationProperties.Name="Board model" Text="TBOX-MAIN"/>
             </Grid>
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
               <TextBlock Text="View" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
-              <ComboBox x:Name="ViewTypeCombo" Grid.Column="1" MinHeight="34" SelectedIndex="0">
+              <ComboBox x:Name="ViewTypeCombo" Grid.Column="1" MinHeight="34" AutomationProperties.Name="Calibration view" SelectedIndex="0">
                 <ComboBoxItem Content="Top"/>
                 <ComboBoxItem Content="Side"/>
                 <ComboBoxItem Content="Bottom"/>
@@ -81,7 +81,7 @@
             <Grid Margin="0,0,0,8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
               <TextBlock Text="Sample Image" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
-              <TextBox x:Name="SampleImagePathText" Grid.Column="1" MinHeight="34" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+              <TextBox x:Name="SampleImagePathText" Grid.Column="1" MinHeight="34" AutomationProperties.Name="Sample image path" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
               <Button Style="{StaticResource MiniBtn}" Grid.Column="2" Content="Browse" Margin="6,0,0,0" Click="OnBrowseSampleImageClick"/>
             </Grid>
 
@@ -89,10 +89,10 @@
               <StackPanel>
                 <TextBlock Text="Add Calibration Point" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,8"/>
                 <UniformGrid Columns="4" Margin="0,0,0,8">
-                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Image X" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="ImageXText" MinHeight="34"/></StackPanel>
-                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Image Y" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="ImageYText" MinHeight="34"/></StackPanel>
-                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Board X mm" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="BoardXText" MinHeight="34"/></StackPanel>
-                  <StackPanel><TextBlock Text="Board Y mm" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="BoardYText" MinHeight="34"/></StackPanel>
+                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Image X" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="ImageXText" MinHeight="34" AutomationProperties.Name="New point image X pixels"/></StackPanel>
+                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Image Y" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="ImageYText" MinHeight="34" AutomationProperties.Name="New point image Y pixels"/></StackPanel>
+                  <StackPanel Margin="0,0,6,0"><TextBlock Text="Board X mm" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="BoardXText" MinHeight="34" AutomationProperties.Name="New point board X millimeters"/></StackPanel>
+                  <StackPanel><TextBlock Text="Board Y mm" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="BoardYText" MinHeight="34" AutomationProperties.Name="New point board Y millimeters"/></StackPanel>
                 </UniformGrid>
                 <StackPanel Orientation="Horizontal">
                   <Button Style="{StaticResource ActionBtnBlue}" Content="Add Point" Margin="0,0,6,0" Click="OnAddPointClick"/>

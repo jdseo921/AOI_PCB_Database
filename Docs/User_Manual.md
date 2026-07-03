@@ -35,7 +35,7 @@ The app uses a simple local role selector. It is not MES login.
 | Engineer | Operator permissions plus edit recipes, run AI Model Test, change inspection thresholds. |
 | Admin | Engineer permissions plus export logs, manage settings, change database/vault/model paths, and access maintenance actions. |
 
-Restricted actions show permission-denied messages and are recorded in the local event log.
+Restricted actions show permission-denied messages and are recorded in the local event log. Operator and Engineer roles can review `Log & Export` in read-only mode; exporting and deleting logs remain Admin-only.
 
 ## Main Inspection Workflow
 
@@ -124,11 +124,13 @@ Recipe editing is restricted to Engineer and Admin roles.
 2. Load a background image.
 3. Draw rectangular ROIs.
 4. Select and adjust ROI position and size.
-5. Choose ROI type, such as Presence, Polarity, Solder Bridge, Height, or Anomaly.
-6. Set ML score threshold and optional height/volume limits.
-7. Save the recipe revision.
-8. The revision is written to SQLite with board program, operator, role, detection priority, background image path, and JSON ROI data.
-9. Use recipe lock/unlock to prevent accidental edits during evaluation.
+5. Choose ROI type, such as Presence, Polarity, Placement, Solder Bridge, Solder Volume, Height, Surface Defect, or Anomaly.
+6. Set the AI score threshold and optional height/volume limits.
+7. Set the Processing & Tolerance Rules that apply to the whole recipe: X/Y placement tolerance (mm), rotation tolerance (deg), IPC acceptability class, lighting profile, and false-call policy. These values persist with the recipe revision and are restored when the recipe is reloaded.
+8. Click `Test Run` to analyze the loaded image against the current in-editor edits, including unsaved ROI and tolerance changes, before committing a revision. The status line notes that the run used current unsaved edits.
+9. Click `Save Recipe` to write the recipe revision.
+10. The revision is written to SQLite with board program, operator, role, detection priority, background image path, tolerance/IPC/lighting/false-call rules, and JSON ROI data.
+11. Use recipe lock/unlock to prevent accidental edits during evaluation.
 
 The recipe editor is a local Stage 1 recipe proof of concept. It is not yet synchronized with a production recipe server or MES.
 
@@ -183,7 +185,7 @@ Bad files, missing images, unsupported images, invalid CSV rows, and database wr
 
 ## Log & Export Workflow
 
-Log & Export is available for audit review and evidence generation. Some export actions are restricted to Admin.
+Log & Export is available for audit review and evidence generation. Operator and Engineer roles can open it and review Inspection History, Review/Disposition Events, Export History, and the Audit Trail in read-only mode. Export, delete, Mock MES upload, and Soak Test actions remain restricted to Admin.
 
 Common actions:
 
@@ -212,28 +214,40 @@ The Soak Test tool is Admin-only. It repeatedly inspects images from a selected 
 
 The Mock MES upload action is Admin-only and is not production MES/ERP integration. It creates a MES-style traceability payload with lot ID, board model, station, operator, result, timestamp, defect summary, and image path. In `Mock REST` mode the app attempts to POST the payload to the configured mock endpoint; if no endpoint is configured, it writes the payload to local JSON. Each attempt is recorded in SQLite.
 
+### Data Retention
+
+By default, AOI Monitor keeps live log rows for 30 days. At startup, rows older than the retention window are first copied into a recoverable local archive with their full row payload, then purged from the live tables. This keeps the database from growing without bound while the audit history stays recoverable. When the pre-purge warning is enabled, Log & Export shows an advisory a configurable number of days before the affected rows are archived and purged (default 7 days).
+
+Retention is configured in `System Settings > Data Retention` by an Engineer or Admin: enable or disable automatic purge, set the retention window in days, and enable or disable the pre-purge warning and its lead time. Disabling purge keeps all live rows in place. The recoverable archive itself is retained indefinitely, so it can be used to reconstruct purged history for audits.
+
 ## 3D Sample-Data Workflow
 
-The 3D Profile Viewer is implemented only in Sample Data Mode.
+The 3D Profile Viewer runs in Sample Data Mode only. It renders an interactive 3D height surface from a sample CSV. It does not connect to a real 3D camera.
 
 1. Open `3D Profile Viewer`.
 2. Confirm the screen clearly shows:
    - Sample Data Mode
    - 3D Camera Not Connected
    - Stage 2 hardware integration required for live 3D profile inspection
-3. Click `Load Height CSV`.
+3. Leave the source set to `Sample CSV`, then click `Load Height CSV`.
 4. Select a CSV with columns:
 
 ```text
 x,y,height
 ```
 
-5. Review the 2D color-coded height map.
-6. Use hover or click to select a point.
-7. Review min height, max height, selected point height, height legend, and height slice/profile line.
-8. Review defect details: Type, Height, Volume placeholder, X, and Y.
-9. Click `Accept Defect` or `Reject Defect`.
-10. The action is recorded as a SQLite review event.
+5. Review the interactive 3D height surface:
+   - Left-drag to rotate (yaw and pitch).
+   - Mouse wheel to zoom.
+   - Right-drag or middle-drag to pan.
+   - Click `Reset View` to return to the default camera angle.
+6. Use the small 2D top-down height map inset to see the whole board at once. Click the inset to select a point. The 3D surface, the inset, and the height slice stay in sync with the selected point.
+7. Review the height legend (min/max), the selected-point height, and the height slice/profile line. Notable peaks along the slice are marked automatically.
+8. Review the feature/defect list: Type, Height, Volume placeholder, X, and Y. Selecting a row highlights the matching point on the surface and inset; selecting a point on the surface or inset selects the matching row.
+9. Click `Accept Defect` or `Reject Defect` for the selected feature.
+10. The disposition is recorded as a SQLite review event.
+
+Optional: `Run 3D Acceptance Test` records a sample-data acceptance evidence run and `Export 3D Report` writes the acceptance summary. Both are labeled as sample-data evidence, not live 3D sensor acceptance.
 
 This workflow does not connect to a real 3D camera and does not claim live height inspection.
 
@@ -252,5 +266,6 @@ Use Settings to:
 - Configure MES mode as Not Connected, Mock REST, or Future Production planned.
 - Configure a mock endpoint URL and upload timeout for mock REST tests. Leave the endpoint blank to generate local JSON payload evidence only.
 - Change the local storage root where Admin permissions allow it. This controls the SQLite database, image vault, local settings, and local export storage root. Existing folders are left in place when a new root is selected.
+- Configure Data Retention: enable or disable automatic archive-and-purge of old log rows, set the retention window in days (default 30), and enable or disable the pre-purge warning and its lead time (default 7 days). Old rows are archived to a recoverable local store before they are purged.
 
 MES authentication and production ERP/MES writeback are planned for Stage 4 and are not implemented in the local role selector or mock upload tool.

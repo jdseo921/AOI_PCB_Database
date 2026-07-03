@@ -164,20 +164,20 @@
                 </Grid>
                 <TextBlock Grid.Row="1" x:Name="ActiveAlarmSummaryText" Text="No active alarms." Foreground="#DCE5EB" FontSize="14" TextWrapping="Wrap" Margin="0,6,0,8"/>
                 <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
-                  <ComboBox x:Name="AlarmSeverityFilterCombo" Width="154" MinHeight="34" Margin="0,0,6,6" SelectionChanged="OnAlarmFilterChanged">
+                  <ComboBox x:Name="AlarmSeverityFilterCombo" Width="154" MinHeight="34" Margin="0,0,6,6" AutomationProperties.Name="Alarm severity filter" SelectionChanged="OnAlarmFilterChanged">
                     <ComboBoxItem Content="All severities" IsSelected="True"/>
                     <ComboBoxItem Content="Info"/>
                     <ComboBoxItem Content="Warning"/>
                     <ComboBoxItem Content="Alarm"/>
                     <ComboBoxItem Content="Critical"/>
                   </ComboBox>
-                  <ComboBox x:Name="AlarmSortCombo" Width="178" MinHeight="34" Margin="0,0,6,6" SelectionChanged="OnAlarmFilterChanged">
+                  <ComboBox x:Name="AlarmSortCombo" Width="178" MinHeight="34" Margin="0,0,6,6" AutomationProperties.Name="Alarm sort order" SelectionChanged="OnAlarmFilterChanged">
                     <ComboBoxItem Content="Severity high first" IsSelected="True"/>
                     <ComboBoxItem Content="Newest first"/>
                     <ComboBoxItem Content="Oldest first"/>
                     <ComboBoxItem Content="Severity low first"/>
                   </ComboBox>
-                  <TextBox x:Name="AlarmSourceFilterText" Width="150" MinHeight="34" Margin="0,0,0,6" TextChanged="OnAlarmSourceFilterTextChanged" ToolTip="Filter by alarm source."/>
+                  <TextBox x:Name="AlarmSourceFilterText" Width="150" MinHeight="34" Margin="0,0,0,6" AutomationProperties.Name="Alarm source filter" TextChanged="OnAlarmSourceFilterTextChanged" ToolTip="Filter by alarm source."/>
                 </WrapPanel>
                 <ListBox x:Name="AlarmListBox"
                          Grid.Row="3"
@@ -234,7 +234,7 @@
                         <ColumnDefinition Width="*"/>
                       </Grid.ColumnDefinitions>
                       <TextBlock Text="User" Foreground="#AAB4BB" FontSize="14" VerticalAlignment="Center"/>
-                      <TextBox Grid.Column="1" x:Name="UserIdText" Text="Engineer01" Margin="6,0,0,0"/>
+                      <TextBox Grid.Column="1" x:Name="UserIdText" Text="Engineer01" Margin="6,0,0,0" AutomationProperties.Name="User ID"/>
                     </Grid>
                   </Border>
                   <Border Width="190" BorderBrush="#2D343A" BorderThickness="1" Padding="8,4" Margin="0,0,6,6">
@@ -244,7 +244,7 @@
                         <ColumnDefinition Width="*"/>
                       </Grid.ColumnDefinitions>
                       <TextBlock Text="Role" Foreground="#E1A334" FontSize="14" VerticalAlignment="Center"/>
-                      <ComboBox Grid.Column="1" x:Name="RoleCombo" SelectedIndex="2" Margin="4,0,0,0" SelectionChanged="OnRoleSelectionChanged">
+                      <ComboBox Grid.Column="1" x:Name="RoleCombo" SelectedIndex="2" Margin="4,0,0,0" AutomationProperties.Name="User role" SelectionChanged="OnRoleSelectionChanged">
                         <ComboBoxItem Content="Operator"/>
                         <ComboBoxItem Content="Engineer"/>
                         <ComboBoxItem Content="Admin"/>
@@ -258,7 +258,7 @@
                         <ColumnDefinition Width="*"/>
                       </Grid.ColumnDefinitions>
                       <TextBlock Text="Auth" Foreground="#AAB4BB" FontSize="14" VerticalAlignment="Center"/>
-                      <ComboBox Grid.Column="1" x:Name="AuthModeCombo" SelectedIndex="0" Margin="4,0,0,0" SelectionChanged="OnAuthModeSelectionChanged">
+                      <ComboBox Grid.Column="1" x:Name="AuthModeCombo" SelectedIndex="0" Margin="4,0,0,0" AutomationProperties.Name="Authentication mode" SelectionChanged="OnAuthModeSelectionChanged">
                         <ComboBoxItem Content="DemoLocalRoleSelector"/>
                         <ComboBoxItem Content="LocalUsers"/>
                         <ComboBoxItem Content="MesAuthenticationBoundary"/>
@@ -273,7 +273,7 @@
                     <ColumnDefinition Width="Auto"/>
                   </Grid.ColumnDefinitions>
                   <TextBlock Text="PW" Foreground="#AAB4BB" FontSize="14" VerticalAlignment="Center"/>
-                  <PasswordBox Grid.Column="1" x:Name="LoginPasswordBox" MinHeight="34" Margin="4,0,8,0"/>
+                  <PasswordBox Grid.Column="1" x:Name="LoginPasswordBox" MinHeight="34" Margin="4,0,8,0" AutomationProperties.Name="Login password"/>
                   <Button Grid.Column="2" Style="{StaticResource MiniBtn}" Content="Login" Click="OnLocalLoginClick"/>
                 </Grid>
                 <WrapPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">

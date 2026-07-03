@@ -65,6 +65,7 @@ The codebase has meaningful Stage 2 camera-pilot architecture. These items suppo
 - `FactoryReadinessService` has deployment profiles including `Stage2CameraPilot`, with camera, lighting, 3D profile, export verification, build/test, and known-limitation categories.
 - `CompletionAssessmentService` separately scores real camera acceptance, real lighting acceptance, real 3D profile acceptance, and simulated boundary exercise evidence.
 - Vendor adapter templates and tests exist to guide external customer/vendor adapter implementation without committing vendor SDK binaries to the main app.
+- An automated contract test (`CameraSourceContractTests`) locks the runtime drop-in seam: a stub `IVisionCameraAdapter` is delivered through `GenericVisionCameraSource` and the shared `ICameraSource` contract exactly as `MonitorView` consumes it at runtime (StartAcquisition, GetNextFrame, StopAcquisition), and the source defaults safely to a not-connected null adapter when no vendor adapter is injected. This is architecture confidence that a future vendor SDK adapter drops in without UI or inspection-workflow changes; simulated frames stay labeled and are never treated as real hardware evidence. It does not by itself satisfy any real camera acceptance blocker below.
 
 ## Stage 2 Blockers
 

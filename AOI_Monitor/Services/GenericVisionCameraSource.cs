@@ -2,6 +2,14 @@ using AOI_Monitor.Models;
 
 namespace AOI_Monitor.Services;
 
+/// <summary>
+/// Bridges any vendor <see cref="IVisionCameraAdapter"/> to the <see cref="ICameraSource"/> that the
+/// inspection UI consumes, so a real GigE/USB3 Vision SDK can be dropped in later (via constructor
+/// injection or the plugin loader) without changing the WPF views or the saved camera configuration.
+/// The parameterless constructor falls back to <see cref="NullVisionCameraAdapter"/>, which reports
+/// "not connected" and never produces frames, so an unconfigured source can never masquerade as a
+/// real camera.
+/// </summary>
 public sealed class GenericVisionCameraSource : ICameraSource, ICameraStatusDiagnostics
 {
     private readonly CameraSourceSettings _settings;
@@ -29,6 +37,7 @@ public sealed class GenericVisionCameraSource : ICameraSource, ICameraStatusDiag
         var deviceId = DeviceIdForView(SelectedView);
         if (string.IsNullOrWhiteSpace(deviceId))
         {
+            // No device is mapped to the selected view; stay disconnected rather than acquire blindly.
             IsAcquiring = false;
             return;
         }
@@ -61,6 +70,8 @@ public sealed class GenericVisionCameraSource : ICameraSource, ICameraStatusDiag
         if (!IsAcquiring)
             return null;
 
+        // Software-trigger mode must fire a trigger before a frame exists; a failed or timed-out trigger
+        // yields no frame this cycle rather than a stale one.
         if (_settings.AcquisitionMode == CameraAcquisitionMode.SoftwareTrigger &&
             !_adapter.Trigger(_settings.TriggerTimeoutMs))
         {
@@ -82,6 +93,11 @@ public sealed class GenericVisionCameraSource : ICameraSource, ICameraStatusDiag
             : diagnostics.Details;
     }
 
+    /// <summary>
+    /// Stamps the frame with this source's view and name and backfills board/lot/camera metadata from
+    /// settings when the adapter left them blank. <see cref="CameraFrame.IsSimulated"/> is passed through
+    /// unchanged so a simulated frame can never be silently relabeled as real hardware evidence.
+    /// </summary>
     private CameraFrame NormalizeFrame(CameraFrame frame)
     {
         var capturedAtUtc = frame.CapturedAtUtc ?? frame.CapturedAt.ToUniversalTime();

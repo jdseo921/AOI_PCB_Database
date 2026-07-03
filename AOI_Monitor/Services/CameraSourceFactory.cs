@@ -2,6 +2,13 @@ using AOI_Monitor.Models;
 
 namespace AOI_Monitor.Services;
 
+/// <summary>
+/// Builds and tracks the active <see cref="ICameraSource"/> from saved <see cref="CameraSourceSettings"/>.
+/// Three source kinds are supported: a safe no-op null source, a folder simulation for image playback,
+/// and the generic vision adapter that fronts a real vendor SDK. When no adapter is injected for the
+/// generic source, the plugin loader is consulted and falls back to a diagnostic null adapter, so an
+/// unavailable plugin degrades safely instead of throwing.
+/// </summary>
 public static class CameraSourceFactory
 {
     public const string NullSourceKey = "none";
@@ -24,6 +31,8 @@ public static class CameraSourceFactory
         if (adapter is not null)
             return new GenericVisionCameraSource(settings, adapter);
 
+        // No adapter injected: load one from the configured plugin folder. CreateAdapterOrNull never
+        // returns null -- it yields a diagnostic null adapter when no plugin is available.
         var loaded = VisionCameraPluginLoader.CreateAdapterOrNull(settings, out _);
         return new GenericVisionCameraSource(settings, loaded);
     }

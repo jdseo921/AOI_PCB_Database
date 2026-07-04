@@ -158,11 +158,13 @@ public sealed class UiNavigationPerformanceTests : IDisposable
 
                         var overlay = GetPrivateField<FrameworkElement>(shell, "LoadingOverlay");
                         var pageTitle = GetPrivateField<TextBlock>(shell, "PageTitleText").Text;
-                        var activeNav = viewModel.NavPages.Single(page => page.Key == route);
+                        // Home has no module-map tile (the map lives on Home), so no nav state to assert.
+                        var activeNav = viewModel.NavPages.SingleOrDefault(page => page.Key == route);
                         var content = GetPrivateField<ContentControl>(shell, "PageContent").Content;
 
                         Assert.Equal(Visibility.Collapsed, overlay.Visibility);
-                        Assert.True(activeNav.IsActive, $"Active nav state was not set for {route}.");
+                        if (activeNav is not null)
+                            Assert.True(activeNav.IsActive, $"Active nav state was not set for {route}.");
                         Assert.Equal(ExpectedPageTitles[route], pageTitle);
                         Assert.NotNull(content);
                         switchResults.Add(new UiNavigationSwitchResult(route, pass, stopwatch.ElapsedMilliseconds, route));

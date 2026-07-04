@@ -55,28 +55,29 @@ public class MainViewModel : ViewModelBase
         set => SetField(ref _clockText, value);
     }
 
+    // Home itself is not listed: the module map lives on the Home page, so a self-referential
+    // tile would do nothing. The "home" route stays valid via the shell Home button.
     public ObservableCollection<NavPage> NavPages { get; } = new()
     {
-        new NavPage { Key="home",        Number="01", Title="Home",               Subtitle="module map" },
-        new NavPage { Key="library",     Number="02", Title="Board & Images",     Subtitle="library, folders, golden refs" },
-        new NavPage { Key="monitor",     Number="03", Title="Run Inspection",     Subtitle="embedded run, large image view" },
-        new NavPage { Key="compare",     Number="04", Title="Golden Compare",     Subtitle="embedded compare, large image view" },
-        new NavPage { Key="review",      Number="05", Title="Defect Review",      Subtitle="queue, evidence, disposition" },
-        new NavPage { Key="recipe",      Number="06", Title="Recipe Rules",       Subtitle="ROI, masks, tolerances" },
-        new NavPage { Key="modeltest",   Number="07", Title="AI / Models",        Subtitle="model checks, false calls" },
-        new NavPage { Key="spc",         Number="08", Title="Yield Analytics",    Subtitle="SPC, Pareto, trends" },
-        new NavPage { Key="reports",     Number="09", Title="Export & Trace",     Subtitle="CSV, PDF, audit, MES" },
-        new NavPage { Key="calibration", Number="10", Title="Calibration",        Subtitle="2D transform, Stage 2 prep" },
-        new NavPage { Key="profile",     Number="11", Title="3D Profile",         Subtitle="height data, acceptance" },
-        new NavPage { Key="pilot",       Number="12", Title="Hardware Readiness", Subtitle="camera, lighting, robot gates" },
-        new NavPage { Key="settings",    Number="13", Title="System Settings",    Subtitle="display, storage, security" },
+        new NavPage { Key="library",     Number="01", Title="Board & Images",     Subtitle="library, folders, golden refs" },
+        new NavPage { Key="monitor",     Number="02", Title="Run Inspection",     Subtitle="embedded run, large image view" },
+        new NavPage { Key="compare",     Number="03", Title="Golden Compare",     Subtitle="embedded compare, large image view" },
+        new NavPage { Key="review",      Number="04", Title="Defect Review",      Subtitle="queue, evidence, disposition" },
+        new NavPage { Key="recipe",      Number="05", Title="Recipe Rules",       Subtitle="ROI, masks, tolerances" },
+        new NavPage { Key="modeltest",   Number="06", Title="AI / Models",        Subtitle="model checks, false calls" },
+        new NavPage { Key="spc",         Number="07", Title="Yield Analytics",    Subtitle="SPC, Pareto, trends" },
+        new NavPage { Key="reports",     Number="08", Title="Export & Trace",     Subtitle="CSV, PDF, audit, MES" },
+        new NavPage { Key="calibration", Number="09", Title="Calibration",        Subtitle="2D transform, Stage 2 prep" },
+        new NavPage { Key="profile",     Number="10", Title="3D Profile",         Subtitle="height data, acceptance" },
+        new NavPage { Key="pilot",       Number="11", Title="Hardware Readiness", Subtitle="camera, lighting, robot gates" },
+        new NavPage { Key="settings",    Number="12", Title="System Settings",    Subtitle="display, storage, security" },
     };
 
     public RelayCommand NavigateCommand { get; }
 
     public MainViewModel()
     {
-        NavPages[0].IsActive = true;
+        // Startup page is Home; no destination tile is active until the operator navigates.
         RefreshLanguage(UiPreferencesService.Load().Language);
         RefreshRolePermissions(WorkflowState.Instance.CurrentRole);
         NavigateCommand = new RelayCommand(key =>
@@ -101,7 +102,6 @@ public class MainViewModel : ViewModelBase
         {
             (page.Title, page.Subtitle) = page.Key switch
             {
-                "home" => T(language, "Home", "module map", "\uD648", "\uBAA8\uB4C8 \uB9F5"),
                 "library" => T(language, "Board & Images", "library, folders, golden refs", "\uBCF4\uB4DC / \uC774\uBBF8\uC9C0", "\uB77C\uC774\uBE0C\uB7EC\uB9AC/\uD3F4\uB354/\uAE30\uC900 \uC774\uBBF8\uC9C0"),
                 "monitor" => T(language, "Run Inspection", "embedded run, large image view", "\uAC80\uC0AC \uC2E4\uD589", "\uB0B4\uC7A5 \uC2E4\uD589/\uD070 \uC774\uBBF8\uC9C0 \uBCF4\uAE30"),
                 "compare" => T(language, "Golden Compare", "embedded compare, large image view", "\uAE30\uC900 \uBE44\uAD50", "\uB0B4\uC7A5 \uBE44\uAD50/\uD070 \uC774\uBBF8\uC9C0 \uBCF4\uAE30"),

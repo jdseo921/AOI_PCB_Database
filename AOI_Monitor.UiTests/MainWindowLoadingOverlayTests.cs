@@ -50,12 +50,11 @@ public sealed class MainWindowLoadingOverlayTests
             var panel = Assert.IsType<UniformGrid>(navItems.ItemsPanel.LoadContent());
             var keys = viewModel.NavPages.Select(page => page.Key).ToArray();
 
-            Assert.Equal(13, viewModel.NavPages.Count);
+            Assert.Equal(12, viewModel.NavPages.Count);
             Assert.Equal(4, panel.Columns);
             Assert.Equal(
                 new[]
                 {
-                    "home",
                     "library",
                     "monitor",
                     "compare",
@@ -91,7 +90,7 @@ public sealed class MainWindowLoadingOverlayTests
                     ?? throw new InvalidOperationException("CreatePage was not found.");
                 var keys = viewModel.NavPages
                     .Select(page => page.Key)
-                    .Concat(new[] { "install", "guide" })
+                    .Concat(new[] { "home", "install", "guide" })
                     .ToArray();
 
                 foreach (var key in keys)

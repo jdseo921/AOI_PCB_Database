@@ -1242,7 +1242,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
     }
 
     private string SelectedView()
-        => (ViewSelector.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Top";
+        => ComboBoxTokens.SelectedToken(ViewSelector, "Top");
 
     private CameraViewType SelectedCameraView()
         => SelectedView() switch

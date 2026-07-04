@@ -73,9 +73,9 @@
               <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
               <TextBlock Text="View" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
               <ComboBox x:Name="ViewTypeCombo" Grid.Column="1" MinHeight="34" AutomationProperties.Name="Calibration view" SelectedIndex="0">
-                <ComboBoxItem Content="Top"/>
-                <ComboBoxItem Content="Side"/>
-                <ComboBoxItem Content="Bottom"/>
+                <ComboBoxItem Content="Top" Tag="Top"/>
+                <ComboBoxItem Content="Side" Tag="Side"/>
+                <ComboBoxItem Content="Bottom" Tag="Bottom"/>
               </ComboBox>
             </Grid>
             <Grid Margin="0,0,0,8">

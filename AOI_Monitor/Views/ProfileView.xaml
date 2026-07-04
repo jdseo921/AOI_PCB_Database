@@ -26,9 +26,9 @@
           <WrapPanel HorizontalAlignment="Right">
             <TextBlock Text="Source" Foreground="#9AA6AF" VerticalAlignment="Center" Margin="0,0,6,6"/>
             <ComboBox x:Name="ProfileSourceCombo" Width="210" SelectedIndex="0" Margin="0,0,8,6" SelectionChanged="OnProfileSourceChanged">
-              <ComboBoxItem Content="Sample CSV"/>
-              <ComboBoxItem Content="Pilot Hardware Adapter"/>
-              <ComboBoxItem Content="None"/>
+              <ComboBoxItem Content="Sample CSV" Tag="Sample CSV"/>
+              <ComboBoxItem Content="Pilot Hardware Adapter" Tag="Pilot Hardware Adapter"/>
+              <ComboBoxItem Content="None" Tag="None"/>
             </ComboBox>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Load Height CSV" Margin="0,0,8,6" Click="OnLoadCsvClick"/>
             <Border x:Name="ProfileSourceBadge" Style="{StaticResource HmiEvidenceSampleData}" VerticalAlignment="Center" Margin="0,0,6,6">

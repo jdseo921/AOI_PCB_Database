@@ -102,9 +102,9 @@
             <StackPanel Orientation="Horizontal" Margin="{StaticResource HmiButtonGap}">
               <TextBlock Text="View" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0"/>
               <ComboBox x:Name="ViewSelector" Width="110" SelectedIndex="0" AutomationProperties.Name="Inspection view" SelectionChanged="OnViewSelectionChanged">
-                <ComboBoxItem Content="Top"/>
-                <ComboBoxItem Content="Side"/>
-                <ComboBoxItem Content="Bottom"/>
+                <ComboBoxItem Content="Top" Tag="Top"/>
+                <ComboBoxItem Content="Side" Tag="Side"/>
+                <ComboBoxItem Content="Bottom" Tag="Bottom"/>
               </ComboBox>
             </StackPanel>
             <CheckBox x:Name="OverlayCheck" Content="Defect overlay layer" IsChecked="True"

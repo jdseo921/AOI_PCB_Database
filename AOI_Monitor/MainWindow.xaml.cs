@@ -777,7 +777,7 @@ public partial class MainWindow : Window
 
         var severityCombo = new ComboBox { MinWidth = 160, SelectedIndex = 1 };
         foreach (var severity in new[] { "Low", "Medium", "High", "Critical" })
-            severityCombo.Items.Add(new ComboBoxItem { Content = severity });
+            severityCombo.Items.Add(new ComboBoxItem { Content = severity, Tag = severity });
 
         var pageText = new TextBox { Text = LocalizedPageTitle(CurrentPageKey), MinWidth = 360 };
         var stepsText = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 70, MinWidth = 520 };
@@ -838,7 +838,7 @@ public partial class MainWindow : Window
         var selectedCategory = (categoryCombo.SelectedItem as ComboBoxItem)?.Tag is PilotIssueCategory selected
             ? selected
             : PilotIssueCategory.Other;
-        var selectedSeverity = (severityCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Medium";
+        var selectedSeverity = ComboBoxTokens.SelectedToken(severityCombo, "Medium");
         return new PilotIssue
         {
             Category = selectedCategory,

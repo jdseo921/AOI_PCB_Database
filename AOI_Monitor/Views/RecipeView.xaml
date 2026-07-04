@@ -141,14 +141,14 @@
             <StackPanel Grid.Row="0" Grid.ColumnSpan="3">
               <TextBlock Text="ROI Type" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,3"/>
               <ComboBox x:Name="RoiTypeCombo" AutomationProperties.Name="ROI type" SelectionChanged="OnRoiParameterChanged">
-                <ComboBoxItem Content="Presence"/>
-                <ComboBoxItem Content="Polarity"/>
-                <ComboBoxItem Content="Placement"/>
-                <ComboBoxItem Content="Solder Bridge"/>
-                <ComboBoxItem Content="Solder Volume"/>
-                <ComboBoxItem Content="Height"/>
-                <ComboBoxItem Content="Surface Defect"/>
-                <ComboBoxItem Content="Anomaly"/>
+                <ComboBoxItem Content="Presence" Tag="Presence"/>
+                <ComboBoxItem Content="Polarity" Tag="Polarity"/>
+                <ComboBoxItem Content="Placement" Tag="Placement"/>
+                <ComboBoxItem Content="Solder Bridge" Tag="Solder Bridge"/>
+                <ComboBoxItem Content="Solder Volume" Tag="Solder Volume"/>
+                <ComboBoxItem Content="Height" Tag="Height"/>
+                <ComboBoxItem Content="Surface Defect" Tag="Surface Defect"/>
+                <ComboBoxItem Content="Anomaly" Tag="Anomaly"/>
               </ComboBox>
             </StackPanel>
 
@@ -206,26 +206,26 @@
                 <StackPanel Grid.Row="2" Grid.Column="0">
                   <TextBlock Text="IPC acceptability class" Foreground="#9AA6AF" FontSize="14"/>
                   <ComboBox x:Name="IpcClassCombo" SelectedIndex="1" MinHeight="34" AutomationProperties.Name="IPC acceptability class">
-                    <ComboBoxItem Content="IPC Class 1"/>
-                    <ComboBoxItem Content="IPC Class 2"/>
-                    <ComboBoxItem Content="IPC Class 3"/>
+                    <ComboBoxItem Content="IPC Class 1" Tag="IPC Class 1"/>
+                    <ComboBoxItem Content="IPC Class 2" Tag="IPC Class 2"/>
+                    <ComboBoxItem Content="IPC Class 3" Tag="IPC Class 3"/>
                   </ComboBox>
                 </StackPanel>
                 <StackPanel Grid.Row="2" Grid.Column="2">
                   <TextBlock Text="Lighting profile" Foreground="#9AA6AF" FontSize="14"/>
                   <ComboBox x:Name="LightingProfileCombo" SelectedIndex="0" MinHeight="34" AutomationProperties.Name="Lighting profile">
-                    <ComboBoxItem Content="Top bright field"/>
-                    <ComboBoxItem Content="Low-angle dark field"/>
-                    <ComboBoxItem Content="Side marking light"/>
-                    <ComboBoxItem Content="Solder fillet highlight"/>
+                    <ComboBoxItem Content="Top bright field" Tag="Top bright field"/>
+                    <ComboBoxItem Content="Low-angle dark field" Tag="Low-angle dark field"/>
+                    <ComboBoxItem Content="Side marking light" Tag="Side marking light"/>
+                    <ComboBoxItem Content="Solder fillet highlight" Tag="Solder fillet highlight"/>
                   </ComboBox>
                 </StackPanel>
                 <StackPanel Grid.Row="4" Grid.ColumnSpan="3">
                   <TextBlock Text="False-call policy" Foreground="#9AA6AF" FontSize="14"/>
                   <ComboBox x:Name="FalseCallPolicyCombo" SelectedIndex="1" MinHeight="34" AutomationProperties.Name="False-call policy">
-                    <ComboBoxItem Content="Strict: hold every suspected defect"/>
-                    <ComboBoxItem Content="Balanced: review benign visual noise"/>
-                    <ComboBoxItem Content="Sensitive: reduce possible escapes"/>
+                    <ComboBoxItem Content="Strict: hold every suspected defect" Tag="Strict: hold every suspected defect"/>
+                    <ComboBoxItem Content="Balanced: review benign visual noise" Tag="Balanced: review benign visual noise"/>
+                    <ComboBoxItem Content="Sensitive: reduce possible escapes" Tag="Sensitive: reduce possible escapes"/>
                   </ComboBox>
                 </StackPanel>
               </Grid>

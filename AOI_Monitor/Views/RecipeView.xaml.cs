@@ -85,9 +85,9 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
             _backgroundImagePath = snapshot.Document.BackgroundImagePath;
             PlacementToleranceText.Text = FormatDouble(snapshot.Document.PlacementToleranceMm);
             RotationToleranceText.Text = FormatDouble(snapshot.Document.RotationToleranceDeg);
-            SelectComboByContent(IpcClassCombo, snapshot.Document.IpcClass);
-            SelectComboByContent(LightingProfileCombo, snapshot.Document.LightingProfile);
-            SelectComboByContent(FalseCallPolicyCombo, snapshot.Document.FalseCallPolicy);
+            ComboBoxTokens.SelectByToken(IpcClassCombo, snapshot.Document.IpcClass);
+            ComboBoxTokens.SelectByToken(LightingProfileCombo, snapshot.Document.LightingProfile);
+            ComboBoxTokens.SelectByToken(FalseCallPolicyCombo, snapshot.Document.FalseCallPolicy);
             if (snapshot.BackgroundBitmap is not null)
                 ApplyBackground(snapshot.Document.BackgroundImagePath, snapshot.BackgroundBitmap);
 
@@ -455,28 +455,10 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
             Rois = _rois.Select(r => r.ToDocument()).ToList(),
             PlacementToleranceMm = ParseDouble(PlacementToleranceText.Text, 0.020),
             RotationToleranceDeg = ParseDouble(RotationToleranceText.Text, 1.0),
-            IpcClass = ComboText(IpcClassCombo, "IPC Class 2"),
-            LightingProfile = ComboText(LightingProfileCombo, "Top bright field"),
-            FalseCallPolicy = ComboText(FalseCallPolicyCombo, "Balanced: review benign visual noise"),
+            IpcClass = ComboBoxTokens.SelectedToken(IpcClassCombo, "IPC Class 2"),
+            LightingProfile = ComboBoxTokens.SelectedToken(LightingProfileCombo, "Top bright field"),
+            FalseCallPolicy = ComboBoxTokens.SelectedToken(FalseCallPolicyCombo, "Balanced: review benign visual noise"),
         };
-    }
-
-    private static string ComboText(ComboBox combo, string fallback)
-        => (combo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? fallback;
-
-    private static void SelectComboByContent(ComboBox combo, string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return;
-        foreach (var item in combo.Items)
-        {
-            if (item is ComboBoxItem candidate &&
-                string.Equals(candidate.Content?.ToString(), value, StringComparison.OrdinalIgnoreCase))
-            {
-                combo.SelectedItem = item;
-                return;
-            }
-        }
     }
 
     private void OnSaveRecipeClick(object sender, RoutedEventArgs e)
@@ -668,7 +650,7 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
     }
 
     private string SelectedRoiType()
-        => (RoiTypeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Presence";
+        => ComboBoxTokens.SelectedToken(RoiTypeCombo, "Presence");
 
     private void PopulateRoiTypeCombo()
     {
@@ -676,7 +658,7 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
         RoiTypeCombo.Items.Clear();
         foreach (var roiType in new[] { "Presence", "Polarity" }.Concat(DefectTaxonomyService.ActiveCanonicalClasses()).Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            RoiTypeCombo.Items.Add(new ComboBoxItem { Content = roiType });
+            RoiTypeCombo.Items.Add(new ComboBoxItem { Content = roiType, Tag = roiType });
         }
 
         SetComboText(string.IsNullOrWhiteSpace(selected) ? "Presence" : selected);
@@ -684,16 +666,8 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
 
     private void SetComboText(string value)
     {
-        foreach (var item in RoiTypeCombo.Items.OfType<ComboBoxItem>())
-        {
-            if (string.Equals(item.Content?.ToString(), value, StringComparison.OrdinalIgnoreCase))
-            {
-                RoiTypeCombo.SelectedItem = item;
-                return;
-            }
-        }
-
-        RoiTypeCombo.SelectedIndex = 0;
+        if (!ComboBoxTokens.SelectByToken(RoiTypeCombo, value))
+            RoiTypeCombo.SelectedIndex = 0;
     }
 
     private static double ParseDouble(string text, double fallback)

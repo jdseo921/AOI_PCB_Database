@@ -235,9 +235,9 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
         {
             Category = (PilotIssueCategoryFilterCombo?.SelectedItem as ComboBoxItem)?.Tag is PilotIssueCategory category ? category : null,
             Status = (PilotIssueStatusFilterCombo?.SelectedItem as ComboBoxItem)?.Tag is PilotIssueStatus status ? status : null,
-            Severity = (PilotIssueSeverityFilterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString() == "All"
+            Severity = ComboBoxTokens.SelectedToken(PilotIssueSeverityFilterCombo, "All") == "All"
                 ? string.Empty
-                : (PilotIssueSeverityFilterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? string.Empty,
+                : ComboBoxTokens.SelectedToken(PilotIssueSeverityFilterCombo, string.Empty),
             BoardModel = BoardFilterText.Text.Trim(),
             LotId = ManagementLotFilterText?.Text.Trim() ?? string.Empty,
         };
@@ -265,7 +265,7 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
     {
         var filter = BuildFilter();
         var pilotIssueFilter = BuildPilotIssueFilter();
-        var mesQueueStatus = (MesQueueStatusFilter?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All";
+        var mesQueueStatus = ComboBoxTokens.SelectedToken(MesQueueStatusFilter, "All");
         var acceptanceProfile = SelectedFactoryAcceptanceProfile();
         var managementFilter = BuildManagementDashboardFilter();
         StatusText.Text = "Loading logs and factory readiness...";
@@ -737,8 +737,8 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
             ToDate = ToDatePicker.SelectedDate,
             BoardProgram = NullIfBlank(BoardFilterText.Text),
             OperatorId = NullIfBlank(OperatorFilterText.Text),
-            Result = (ResultFilterCombo.SelectedItem as ComboBoxItem)?.Content?.ToString(),
-            UserRole = (RoleFilterCombo.SelectedItem as ComboBoxItem)?.Content?.ToString(),
+            Result = ComboBoxTokens.Token(ResultFilterCombo.SelectedItem as ComboBoxItem),
+            UserRole = ComboBoxTokens.Token(RoleFilterCombo.SelectedItem as ComboBoxItem),
             ActionCategory = NullIfBlank(ActionTypeFilterText.Text),
         };
     }

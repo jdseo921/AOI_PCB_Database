@@ -345,21 +345,12 @@ public partial class CalibrationView : UserControl, IReleasablePageResources, IA
     }
 
     private string SelectedViewType()
-        => (ViewTypeCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Top";
+        => ComboBoxTokens.SelectedToken(ViewTypeCombo, "Top");
 
     private void SetSelectedViewType(string viewType)
     {
-        for (var i = 0; i < ViewTypeCombo.Items.Count; i++)
-        {
-            if (ViewTypeCombo.Items[i] is ComboBoxItem item &&
-                string.Equals(item.Content?.ToString(), viewType, StringComparison.OrdinalIgnoreCase))
-            {
-                ViewTypeCombo.SelectedIndex = i;
-                return;
-            }
-        }
-
-        ViewTypeCombo.SelectedIndex = 0;
+        if (!ComboBoxTokens.SelectByToken(ViewTypeCombo, viewType))
+            ViewTypeCombo.SelectedIndex = 0;
     }
 
     private static bool TryParseDouble(string text, out double value)

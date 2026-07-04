@@ -248,7 +248,7 @@ public partial class ProfileView : UserControl, IReleasablePageResources
         };
 
     private string GetSelectedSourceMode()
-        => (ProfileSourceCombo.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Sample CSV";
+        => ComboBoxTokens.SelectedToken(ProfileSourceCombo, "Sample CSV");
 
     public static List<(int X, int Y, double Height)> ParseHeightMap(string path)
     {

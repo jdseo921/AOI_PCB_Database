@@ -53,19 +53,19 @@
           <StackPanel Width="132" Margin="0,0,8,8">
             <TextBlock Text="Result" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <ComboBox x:Name="ResultFilterCombo" SelectedIndex="0">
-              <ComboBoxItem Content="ALL"/>
-              <ComboBoxItem Content="OK"/>
-              <ComboBoxItem Content="REVIEW"/>
-              <ComboBoxItem Content="NG"/>
+              <ComboBoxItem Content="ALL" Tag="ALL"/>
+              <ComboBoxItem Content="OK" Tag="OK"/>
+              <ComboBoxItem Content="REVIEW" Tag="REVIEW"/>
+              <ComboBoxItem Content="NG" Tag="NG"/>
             </ComboBox>
           </StackPanel>
           <StackPanel Width="140" Margin="0,0,8,8">
             <TextBlock Text="User Role" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <ComboBox x:Name="RoleFilterCombo" SelectedIndex="0">
-              <ComboBoxItem Content="ALL"/>
-              <ComboBoxItem Content="Operator"/>
-              <ComboBoxItem Content="Engineer"/>
-              <ComboBoxItem Content="Admin"/>
+              <ComboBoxItem Content="ALL" Tag="ALL"/>
+              <ComboBoxItem Content="Operator" Tag="Operator"/>
+              <ComboBoxItem Content="Engineer" Tag="Engineer"/>
+              <ComboBoxItem Content="Admin" Tag="Admin"/>
             </ComboBox>
           </StackPanel>
           <StackPanel Width="270" Margin="0,0,8,8">
@@ -155,11 +155,11 @@
               <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                 <TextBlock Text="Status" Foreground="#8B969E" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <ComboBox x:Name="MesQueueStatusFilter" Width="150" SelectionChanged="OnMesQueueStatusFilterChanged" SelectedIndex="0">
-                  <ComboBoxItem Content="All"/>
-                  <ComboBoxItem Content="Pending"/>
-                  <ComboBoxItem Content="Failed"/>
-                  <ComboBoxItem Content="Sent"/>
-                  <ComboBoxItem Content="Abandoned"/>
+                  <ComboBoxItem Content="All" Tag="All"/>
+                  <ComboBoxItem Content="Pending" Tag="Pending"/>
+                  <ComboBoxItem Content="Failed" Tag="Failed"/>
+                  <ComboBoxItem Content="Sent" Tag="Sent"/>
+                  <ComboBoxItem Content="Abandoned" Tag="Abandoned"/>
                 </ComboBox>
               </StackPanel>
               <DataGrid x:Name="MesSpoolGrid" CanUserSortColumns="True" SelectionMode="Extended" Style="{StaticResource HmiDenseTable}" MinWidth="1120" ToolTip="Endpoint and last-error text may be long; hover the row/cell to inspect the full value.">
@@ -204,11 +204,11 @@
                 <ComboBox x:Name="PilotIssueStatusFilterCombo" Width="125" SelectedIndex="0" Margin="0,0,8,0" SelectionChanged="OnPilotIssueFilterChanged"/>
                 <TextBlock Text="Severity" Foreground="#9AA6AF" VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <ComboBox x:Name="PilotIssueSeverityFilterCombo" Width="115" SelectedIndex="0" Margin="0,0,12,0" SelectionChanged="OnPilotIssueFilterChanged">
-                  <ComboBoxItem Content="All"/>
-                  <ComboBoxItem Content="Critical"/>
-                  <ComboBoxItem Content="High"/>
-                  <ComboBoxItem Content="Medium"/>
-                  <ComboBoxItem Content="Low"/>
+                  <ComboBoxItem Content="All" Tag="All"/>
+                  <ComboBoxItem Content="Critical" Tag="Critical"/>
+                  <ComboBoxItem Content="High" Tag="High"/>
+                  <ComboBoxItem Content="Medium" Tag="Medium"/>
+                  <ComboBoxItem Content="Low" Tag="Low"/>
                 </ComboBox>
                 <Button Style="{StaticResource ActionBtnGreen}" Content="Good Board Marked Defect" Margin="0,0,6,0" Click="OnCreateFalseCallIssueClick" ToolTip="False Call: the system marked a good board as a defect."/>
                 <Button Style="{StaticResource ActionBtnAmber}" Content="Possible Missed Defect" Margin="0,0,6,0" Click="OnCreatePossibleEscapeIssueClick" ToolTip="Possible Escape: the system may have missed a real defect."/>

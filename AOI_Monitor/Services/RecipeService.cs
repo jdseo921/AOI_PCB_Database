@@ -85,6 +85,7 @@ public static class RecipeService
             if (document is null)
                 return new RecipeLoadResult(null, new[] { $"Recipe revision {revision.Id} JSON parsed to an empty document." });
 
+            HealLocalizedTokens(document);
             return ParseDocument(
                 document,
                 revision.Revision,
@@ -102,6 +103,22 @@ public static class RecipeService
         {
             return new RecipeLoadResult(null, new[] { $"Recipe revision {revision.Id} JSON could not be parsed: {ex.Message}" });
         }
+    }
+
+    /// <summary>
+    /// Rewrites Korean display strings back to English tokens in a deserialized recipe
+    /// document. Builds that predate ComboBoxTokens let the localization walker rewrite
+    /// ComboBoxItem.Content, so recipes saved in Korean mode may carry Korean ROI types
+    /// and rule tokens that the rest of the pipeline compares against English.
+    /// </summary>
+    public static void HealLocalizedTokens(RecipeDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        document.IpcClass = UiPreferencesService.ToEnglishUiToken(document.IpcClass);
+        document.LightingProfile = UiPreferencesService.ToEnglishUiToken(document.LightingProfile);
+        document.FalseCallPolicy = UiPreferencesService.ToEnglishUiToken(document.FalseCallPolicy);
+        foreach (var roi in document.Rois)
+            roi.RoiType = UiPreferencesService.ToEnglishUiToken(roi.RoiType);
     }
 
     public static RecipeLoadResult ParseDocument(

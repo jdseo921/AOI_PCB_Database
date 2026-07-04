@@ -771,6 +771,47 @@ public static class UiPreferencesService
             ? translated
             : original;
 
+    private static readonly Lazy<Dictionary<string, string>> KoreanToEnglish = new(() =>
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        var ambiguous = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (english, korean) in KoreanText)
+        {
+            if (string.Equals(english, korean, StringComparison.Ordinal) || ambiguous.Contains(korean))
+                continue;
+
+            if (map.TryGetValue(korean, out var existing))
+            {
+                if (!string.Equals(existing, english, StringComparison.Ordinal))
+                {
+                    map.Remove(korean);
+                    ambiguous.Add(korean);
+                }
+            }
+            else
+            {
+                map[korean] = english;
+            }
+        }
+
+        return map;
+    });
+
+    /// <summary>
+    /// Maps a Korean UI display string back to the English token it was translated from.
+    /// Returns the input unchanged when the value is not a uniquely reversible Korean
+    /// translation. Used to heal data persisted by builds that predate ComboBoxTokens,
+    /// where the localization walker rewrote ComboBoxItem.Content and views persisted the
+    /// translated string (e.g. recipe ROI types saved in Korean mode).
+    /// </summary>
+    public static string ToEnglishUiToken(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return value ?? string.Empty;
+
+        return KoreanToEnglish.Value.TryGetValue(value, out var english) ? english : value;
+    }
+
     public static Brush AccentBrush(UiPreferences? preferences = null)
     {
         var current = preferences ?? Load();

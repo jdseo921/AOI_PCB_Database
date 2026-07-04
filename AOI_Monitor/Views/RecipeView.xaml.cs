@@ -125,6 +125,10 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
         if (doc is null)
             return null;
 
+        // Recipes saved by builds that predate ComboBoxTokens may carry Korean combo
+        // tokens; heal them so token selection matches and the next save persists English.
+        RecipeService.HealLocalizedTokens(doc);
+
         BitmapSource? bitmap = null;
         if (!string.IsNullOrWhiteSpace(doc.BackgroundImagePath) && File.Exists(doc.BackgroundImagePath))
             bitmap = ImageCacheService.LoadBitmap(doc.BackgroundImagePath, decodePixelWidth: 1600);

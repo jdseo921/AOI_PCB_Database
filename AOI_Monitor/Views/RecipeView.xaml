@@ -32,7 +32,7 @@
           <Button Style="{StaticResource ActionBtn}" Content="Load Image" Margin="{StaticResource HmiButtonGap}" Click="OnLoadImageClick"/>
           <Button Style="{StaticResource MiniBtn}" Content="Import Centroid CSV" Margin="{StaticResource HmiButtonGap}" Click="OnImportCentroidClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Test Run" Margin="{StaticResource HmiButtonGap}" Click="OnTestRunClick"/>
-          <Button Style="{StaticResource ActionBtnGreen}" Content="Save Recipe" Margin="{StaticResource HmiButtonGap}" Click="OnSaveRecipeClick"/>
+          <Button x:Name="SaveRecipeButton" Style="{StaticResource ActionBtnGreen}" Content="Save Recipe" Margin="{StaticResource HmiButtonGap}" Click="OnSaveRecipeClick"/>
         </WrapPanel>
       </WrapPanel>
     </Border>

@@ -70,6 +70,13 @@ Preferred wording:
 - Keep normal workflow navigation and noncritical readiness summaries on Home. Keep the persistent top banner compact so Home can show the workflow menu map without unnecessary scrolling. Workflow pages should fill the workspace between the persistent top banner and bottom evidence footer; only active critical/alarm status and the Home return button stay persistent outside pages.
 - Keep image-heavy inspection and comparison workflows embedded in the main shell. Use separate image viewer windows only when an operator asks to enlarge a camera, screening, overlay, or comparison image; viewer windows must include zoom, fit, 100% view, PNG save, active critical/alarm status, and prototype/simulation boundary labels.
 
+## Spacing and Alignment
+
+- Use the shared spacing scale instead of ad-hoc pixel margins so gaps stay even across every screen: `HmiSpaceXS`=4, `HmiSpaceS`=8, `HmiSpaceM`=12, `HmiSpaceL`=16, `HmiSpaceXL`=24 (in `AOI_Monitor/Styles/FactoryHmiLayout.xaml`).
+- For margins, use the gap tokens: `HmiButtonGap` (horizontal button spacing), `HmiRowGap` (vertical spacing between stacked rows), `HmiFieldGap` (wrapped filter fields), `HmiPageMargin` (page root).
+- Put horizontal button rows in `HmiRightActionBand` (bottom/top-right action rows) or `HmiInlineActionBand` (toolbars), and give each button `Margin="{StaticResource HmiButtonGap}"` for even spacing. Right-aligned action rows must not touch the container edge.
+- Prefer `Auto`, `*`, or `MinWidth` over fixed pixel `Width` on layout containers and columns. Fixed pixel widths leave dead space and clip under DPI scaling and localization. The PR quality gate warns (`PR-HMI-WIDTH-001`) on new fixed `Width` >= 80 outside `Styles/`.
+
 ## Clipping Prevention Gate
 
 - Every UI/layout change must pass the HMI layout audit before handoff: `dotnet test AOI_Monitor.UiTests\AOI_Monitor.UiTests.csproj --configuration Release --filter FullyQualifiedName~HmiLayoutAuditTests`.

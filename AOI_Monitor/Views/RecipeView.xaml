@@ -27,11 +27,11 @@
           <TextBlock Text="Revision Lock" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,3"/>
           <TextBlock x:Name="LockStatusText" Text="UNLOCKED" FontWeight="Bold" Foreground="#C1FFCB"/>
         </StackPanel>
-        <TextBlock x:Name="RecipeStatusText" Text="Load a PCB image to start editing." Foreground="#9AA6AF" FontSize="14" TextWrapping="Wrap" VerticalAlignment="Bottom" Width="360" Margin="0,0,12,8"/>
-        <WrapPanel VerticalAlignment="Bottom">
-          <Button Style="{StaticResource ActionBtn}" Content="Load Image" Margin="0,0,6,6" Click="OnLoadImageClick"/>
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Test Run" Margin="0,0,6,6" Click="OnTestRunClick"/>
-          <Button Style="{StaticResource ActionBtnGreen}" Content="Save Recipe" Margin="0,0,6,6" Click="OnSaveRecipeClick"/>
+        <TextBlock x:Name="RecipeStatusText" Text="Load a PCB image to start editing." Foreground="#9AA6AF" FontSize="14" TextWrapping="Wrap" VerticalAlignment="Bottom" Width="360" Margin="{StaticResource HmiFieldGap}"/>
+        <WrapPanel VerticalAlignment="Bottom" Style="{StaticResource HmiInlineActionBand}">
+          <Button Style="{StaticResource ActionBtn}" Content="Load Image" Margin="{StaticResource HmiButtonGap}" Click="OnLoadImageClick"/>
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Test Run" Margin="{StaticResource HmiButtonGap}" Click="OnTestRunClick"/>
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Save Recipe" Margin="{StaticResource HmiButtonGap}" Click="OnSaveRecipeClick"/>
         </WrapPanel>
       </WrapPanel>
     </Border>
@@ -56,10 +56,10 @@
               <TextBlock Text="Recipe Background + ROI Editor" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
             </DockPanel>
           </Border>
-          <WrapPanel Grid.Row="1" Margin="8">
-            <Button Style="{StaticResource MiniBtn}" Content="Zoom -" Margin="0,0,6,0" Click="OnZoomOutClick"/>
-            <Button Style="{StaticResource MiniBtn}" Content="Zoom +" Margin="0,0,6,0" Click="OnZoomInClick"/>
-            <Button Style="{StaticResource MiniBtn}" Content="Fit" Margin="0,0,6,0" Click="OnFitClick"/>
+          <WrapPanel Grid.Row="1" Margin="8" Style="{StaticResource HmiInlineActionBand}">
+            <Button Style="{StaticResource MiniBtn}" Content="Zoom -" Margin="{StaticResource HmiButtonGap}" Click="OnZoomOutClick"/>
+            <Button Style="{StaticResource MiniBtn}" Content="Zoom +" Margin="{StaticResource HmiButtonGap}" Click="OnZoomInClick"/>
+            <Button Style="{StaticResource MiniBtn}" Content="Fit" Margin="{StaticResource HmiButtonGap}" Click="OnFitClick"/>
             <TextBlock x:Name="ZoomText" Text="100%" Foreground="#DCE5EB" VerticalAlignment="Center"/>
           </WrapPanel>
           <Border Grid.Row="2" Margin="8" Background="#050607" BorderBrush="#343D44" BorderThickness="1" ClipToBounds="True">

@@ -110,7 +110,7 @@
               <TextBlock Text="Default: closest known false-negative cases first"
                          Foreground="#81909A" FontSize="14" Margin="0,0,0,4"/>
               <!-- Sim card 1 -->
-              <Border Background="#141A1E" BorderBrush="#3A444B" BorderThickness="1" Padding="6" Margin="0,0,0,6">
+              <Border Background="#141A1E" BorderBrush="#3A444B" BorderThickness="1" Padding="6" Margin="{StaticResource HmiRowGap}">
                 <Grid>
                   <Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <Border Background="#183D22" BorderBrush="#52605A" BorderThickness="1" MinHeight="56">
@@ -171,10 +171,10 @@
         <!-- Toolbar -->
         <Border Grid.Row="1" Background="#151B1F" BorderBrush="#343D44" BorderThickness="0,0,0,1">
           <StackPanel Orientation="Horizontal" Margin="5">
-            <Button Style="{StaticResource MiniBtn}" Content="Overlay: AI+GT" Margin="0,0,5,0" Click="OnOverlayClick"/>
-            <Button Style="{StaticResource MiniBtn}" Content="Zoom 125%" Margin="0,0,5,0" Click="OnZoomClick"/>
-            <Button Style="{StaticResource MiniBtn}" Content="Golden Compare" Margin="0,0,5,0" Click="OnGoldenCompareClick"/>
-            <Button Style="{StaticResource MiniBtn}" Content="ROI Crop" Margin="0,0,5,0" Click="OnRoiCropClick"/>
+            <Button Style="{StaticResource MiniBtn}" Content="Overlay: AI+GT" Margin="{StaticResource HmiButtonGap}" Click="OnOverlayClick"/>
+            <Button Style="{StaticResource MiniBtn}" Content="Zoom 125%" Margin="{StaticResource HmiButtonGap}" Click="OnZoomClick"/>
+            <Button Style="{StaticResource MiniBtn}" Content="Golden Compare" Margin="{StaticResource HmiButtonGap}" Click="OnGoldenCompareClick"/>
+            <Button Style="{StaticResource MiniBtn}" Content="ROI Crop" Margin="{StaticResource HmiButtonGap}" Click="OnRoiCropClick"/>
             <Button Style="{StaticResource MiniBtn}" Content="History" Click="OnHistoryClick"/>
           </StackPanel>
         </Border>
@@ -253,19 +253,19 @@
 
         <!-- Image footer: metadata fields -->
         <UniformGrid Grid.Row="3" Columns="4" Margin="8" Rows="1">
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+          <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiButtonGap}">
             <StackPanel>
               <TextBlock Text="Sample ID"   Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/>
               <TextBlock Text="IMG_0241"    FontWeight="Bold" Foreground="#EEF3F7" FontSize="14"/>
             </StackPanel>
           </Border>
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+          <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiButtonGap}">
             <StackPanel>
               <TextBlock Text="Board"       Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/>
               <TextBlock Text="TBOX-MAIN"   FontWeight="Bold" Foreground="#EEF3F7" FontSize="14"/>
             </StackPanel>
           </Border>
-          <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
+          <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiButtonGap}">
             <StackPanel>
               <TextBlock Text="RefDes"      Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/>
               <TextBlock Text="U107"        FontWeight="Bold" Foreground="#EEF3F7" FontSize="14"/>
@@ -303,31 +303,31 @@
           </Border>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
           <UniformGrid Columns="2" Margin="8" Rows="4">
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5">
+            <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiFieldGap}">
               <StackPanel><TextBlock Text="Sample ID" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/>
               <TextBlock Text="IMG_0241" FontWeight="Bold" FontSize="14" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/></StackPanel>
             </Border>
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5">
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
               <StackPanel><TextBlock Text="Board" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/>
               <TextBlock Text="TBOX-MAIN" FontWeight="Bold" FontSize="14" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/></StackPanel>
             </Border>
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5">
+            <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiFieldGap}">
               <StackPanel><TextBlock Text="RefDes" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/>
               <TextBlock Text="U107" FontWeight="Bold" FontSize="14"/></StackPanel>
             </Border>
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5">
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
               <StackPanel><TextBlock Text="FOV" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/>
               <TextBlock Text="TOP-03" FontWeight="Bold" FontSize="14"/></StackPanel>
             </Border>
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5">
+            <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiFieldGap}">
               <StackPanel><TextBlock Text="Inspection Result" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/>
               <TextBlock Text="OK" FontWeight="Bold" FontSize="14"/></StackPanel>
             </Border>
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5">
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
               <StackPanel><TextBlock Text="Ground Truth" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/>
               <TextBlock Text="NG" FontWeight="Bold" Foreground="#F13B3F" FontSize="14"/></StackPanel>
             </Border>
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0">
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,8,0">
               <StackPanel><TextBlock Text="Risk" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/>
               <TextBlock Text="Possible Escape" FontWeight="Bold" Foreground="#F13B3F" FontSize="14"/></StackPanel>
             </Border>
@@ -348,10 +348,10 @@
             <TextBlock Text="Disposition Controls" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
           <StackPanel Grid.Row="1" Margin="8">
-            <Button Style="{StaticResource ActionBtnRed}" Content="Confirm NG" Margin="0,0,0,6" Click="OnConfirmNgClick"/>
-            <Button Style="{StaticResource ActionBtnAmber}" Content="Mark False Call" Margin="0,0,0,6" Click="OnFalseCallClick"/>
-            <Button Style="{StaticResource ActionBtnRed}" Content="Mark Possible Escape" Margin="0,0,0,6" Click="OnPossibleEscapeClick"/>
-            <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Candidate" Margin="0,0,0,6" Click="OnSendTrainingClick"/>
+            <Button Style="{StaticResource ActionBtnRed}" Content="Confirm NG" Margin="{StaticResource HmiRowGap}" Click="OnConfirmNgClick"/>
+            <Button Style="{StaticResource ActionBtnAmber}" Content="Mark False Call" Margin="{StaticResource HmiRowGap}" Click="OnFalseCallClick"/>
+            <Button Style="{StaticResource ActionBtnRed}" Content="Mark Possible Escape" Margin="{StaticResource HmiRowGap}" Click="OnPossibleEscapeClick"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Candidate" Margin="{StaticResource HmiRowGap}" Click="OnSendTrainingClick"/>
             <Button Style="{StaticResource ActionBtn}" Content="Hold for 2nd Review" Click="OnHoldClick"/>
           </StackPanel>
         </Grid>

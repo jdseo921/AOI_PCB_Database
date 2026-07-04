@@ -98,7 +98,7 @@
           </Border>
 
           <WrapPanel Grid.Row="1" Margin="8">
-            <StackPanel Orientation="Horizontal" Margin="0,0,12,6">
+            <StackPanel Orientation="Horizontal" Margin="{StaticResource HmiButtonGap}">
               <TextBlock Text="View" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0"/>
               <ComboBox x:Name="ViewSelector" Width="110" SelectedIndex="0" AutomationProperties.Name="Inspection view" SelectionChanged="OnViewSelectionChanged">
                 <ComboBoxItem Content="Top"/>
@@ -108,10 +108,10 @@
             </StackPanel>
             <CheckBox x:Name="OverlayCheck" Content="Defect overlay layer" IsChecked="True"
                       VerticalAlignment="Center" Foreground="#DCE5EB" Checked="OnOverlayChanged" Unchecked="OnOverlayChanged"
-                      Margin="0,0,12,6"/>
-            <Button Style="{StaticResource MiniBtn}" Content="Top Folder" Margin="0,0,6,6" Click="OnSelectTopFolderClick"/>
-            <Button Style="{StaticResource MiniBtn}" Content="Side Folder" Margin="0,0,6,6" Click="OnSelectSideFolderClick"/>
-            <Button Style="{StaticResource MiniBtn}" Content="Bottom Folder" Margin="0,0,6,6" Click="OnSelectBottomFolderClick"/>
+                      Margin="{StaticResource HmiButtonGap}"/>
+            <Button Style="{StaticResource MiniBtn}" Content="Top Folder" Margin="{StaticResource HmiButtonGap}" Click="OnSelectTopFolderClick"/>
+            <Button Style="{StaticResource MiniBtn}" Content="Side Folder" Margin="{StaticResource HmiButtonGap}" Click="OnSelectSideFolderClick"/>
+            <Button Style="{StaticResource MiniBtn}" Content="Bottom Folder" Margin="{StaticResource HmiButtonGap}" Click="OnSelectBottomFolderClick"/>
             <CheckBox x:Name="AutoSaveCheck" Content="Auto-save" Foreground="#DCE5EB" VerticalAlignment="Center" Margin="0,0,0,6"/>
           </WrapPanel>
 
@@ -142,14 +142,14 @@
                 <TextBlock x:Name="RobotFaultText" Text="Fault: none" Foreground="#9AA6AF" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
               </StackPanel>
               <WrapPanel Grid.Row="1" HorizontalAlignment="Left" Margin="0,8,0,0">
-                <Button x:Name="RobotLoadButton" Style="{StaticResource MiniBtn}" Content="Load" Margin="0,0,5,0" Click="OnRobotLoadClick" ToolTip="Simulated handler load step only."/>
-                <Button x:Name="RobotInspectButton" Style="{StaticResource MiniBtn}" Content="Inspect" Margin="0,0,5,0" Click="OnRobotInspectClick" ToolTip="Simulated handler inspect step only."/>
-                <Button x:Name="RobotUnloadButton" Style="{StaticResource MiniBtn}" Content="Unload" Margin="0,0,5,0" Click="OnRobotUnloadClick" ToolTip="Simulated handler unload step only."/>
-                <Button x:Name="RobotCancelButton" Style="{StaticResource MiniBtn}" Content="Cancel" Margin="0,0,5,0" Click="OnRobotCancelClick"/>
-                <Button x:Name="RobotResetButton" Style="{StaticResource MiniBtn}" Content="Reset" Margin="0,0,5,0" Click="OnRobotResetClick"/>
-                <Button x:Name="RobotEmergencyStopButton" Style="{StaticResource MiniBtnRed}" Content="E-Stop Sim" Margin="0,0,5,0" Click="OnRobotEmergencyStopClick" ToolTip="Simulated emergency-stop behavior. This is not wired to real safety hardware."/>
-                <Button x:Name="RunRobotCycleButton" Style="{StaticResource MiniBtn}" Content="Run Cycle" Margin="0,0,5,0" Click="OnRobotCycleClick"/>
-                <Button x:Name="RunRobotAcceptanceButton" Style="{StaticResource MiniBtn}" Content="Run Robot Cell Acceptance Test" Margin="0,0,5,0" Click="OnRobotAcceptanceClick" ToolTip="Acceptance means evidence review against configured criteria; it does not certify production readiness by itself."/>
+                <Button x:Name="RobotLoadButton" Style="{StaticResource MiniBtn}" Content="Load" Margin="{StaticResource HmiButtonGap}" Click="OnRobotLoadClick" ToolTip="Simulated handler load step only."/>
+                <Button x:Name="RobotInspectButton" Style="{StaticResource MiniBtn}" Content="Inspect" Margin="{StaticResource HmiButtonGap}" Click="OnRobotInspectClick" ToolTip="Simulated handler inspect step only."/>
+                <Button x:Name="RobotUnloadButton" Style="{StaticResource MiniBtn}" Content="Unload" Margin="{StaticResource HmiButtonGap}" Click="OnRobotUnloadClick" ToolTip="Simulated handler unload step only."/>
+                <Button x:Name="RobotCancelButton" Style="{StaticResource MiniBtn}" Content="Cancel" Margin="{StaticResource HmiButtonGap}" Click="OnRobotCancelClick"/>
+                <Button x:Name="RobotResetButton" Style="{StaticResource MiniBtn}" Content="Reset" Margin="{StaticResource HmiButtonGap}" Click="OnRobotResetClick"/>
+                <Button x:Name="RobotEmergencyStopButton" Style="{StaticResource MiniBtnRed}" Content="E-Stop Sim" Margin="{StaticResource HmiButtonGap}" Click="OnRobotEmergencyStopClick" ToolTip="Simulated emergency-stop behavior. This is not wired to real safety hardware."/>
+                <Button x:Name="RunRobotCycleButton" Style="{StaticResource MiniBtn}" Content="Run Cycle" Margin="{StaticResource HmiButtonGap}" Click="OnRobotCycleClick"/>
+                <Button x:Name="RunRobotAcceptanceButton" Style="{StaticResource MiniBtn}" Content="Run Robot Cell Acceptance Test" Margin="{StaticResource HmiButtonGap}" Click="OnRobotAcceptanceClick" ToolTip="Acceptance means evidence review against configured criteria; it does not certify production readiness by itself."/>
                 <Button x:Name="ExportRobotAcceptanceButton" Style="{StaticResource MiniBtn}" Content="Export Report" Click="OnExportRobotAcceptanceClick"/>
               </WrapPanel>
             </Grid>

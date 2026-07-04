@@ -95,8 +95,8 @@
           </WrapPanel>
         </Grid>
 
-        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="4,3,6,3">
-          <Border Style="{StaticResource HmiPersistentBanner}" Background="#14262E" BorderBrush="#4C6A7D">
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="8,3,12,3">
+          <Border Style="{StaticResource HmiPersistentBanner}" Background="#14262E" BorderBrush="#4C6A7D" Margin="{StaticResource HmiButtonGap}">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="User " Foreground="#AAB4BB" FontSize="14"/>
               <TextBlock x:Name="HeaderUserText" Text="Engineer01" Foreground="#E8EEF2" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="112" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
@@ -104,7 +104,7 @@
               <TextBlock x:Name="HeaderRoleText" Text="Admin" Foreground="#E8EEF2" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="74" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             </StackPanel>
           </Border>
-          <Border Style="{StaticResource HmiPersistentBanner}" Background="#14262E" BorderBrush="#4C6A7D">
+          <Border Style="{StaticResource HmiPersistentBanner}" Background="#14262E" BorderBrush="#4C6A7D" Margin="{StaticResource HmiButtonGap}">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="Engine " Foreground="#AAB4BB" FontSize="14"/>
               <TextBlock x:Name="HeaderEngineText" Text="Pixel Diff Prototype" Foreground="#E8EEF2" FontSize="14" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="165" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
@@ -115,7 +115,7 @@
                   MinWidth="238"
                   MinHeight="34"
                   Padding="8,3"
-                  Margin="4,0,0,0"
+                  Margin="{StaticResource HmiButtonGap}"
                   Click="OnActiveAlarmsButtonClick"
                   ToolTip="Open active alarm list.">
             <Grid MinWidth="210">
@@ -208,7 +208,7 @@
                   Content="Access"
                   MinWidth="92"
                   MinHeight="34"
-                  Margin="4,0,0,0"
+                  Margin="0"
                   Click="OnAccessPanelButtonClick"
                   ToolTip="Open access, login, and local user controls."/>
           <Popup x:Name="AccessPanelPopup"

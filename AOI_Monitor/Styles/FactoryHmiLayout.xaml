@@ -40,6 +40,19 @@
   <Thickness x:Key="HmiCardPadding">12</Thickness>
   <Thickness x:Key="HmiPanelGap">8</Thickness>
 
+  <!-- Spacing scale. Use these tokens instead of ad-hoc pixel margins so gaps stay
+       consistent across every screen: XS=4, S=8, M=12, L=16, XL=24.
+       *Space* doubles feed StackPanel.Spacing / gaps; *Gap* thicknesses feed Margins. -->
+  <sys:Double x:Key="HmiSpaceXS" xmlns:sys="clr-namespace:System;assembly=mscorlib">4</sys:Double>
+  <sys:Double x:Key="HmiSpaceS" xmlns:sys="clr-namespace:System;assembly=mscorlib">8</sys:Double>
+  <sys:Double x:Key="HmiSpaceM" xmlns:sys="clr-namespace:System;assembly=mscorlib">12</sys:Double>
+  <sys:Double x:Key="HmiSpaceL" xmlns:sys="clr-namespace:System;assembly=mscorlib">16</sys:Double>
+  <sys:Double x:Key="HmiSpaceXL" xmlns:sys="clr-namespace:System;assembly=mscorlib">24</sys:Double>
+  <Thickness x:Key="HmiPageMargin">16</Thickness>
+  <Thickness x:Key="HmiRowGap">0,0,0,8</Thickness>
+  <Thickness x:Key="HmiFieldGap">0,0,8,8</Thickness>
+  <Thickness x:Key="HmiButtonGap">0,0,8,0</Thickness>
+
   <Style x:Key="FactoryPageContainer" TargetType="Grid">
     <Setter Property="Margin" Value="10"/>
     <Setter Property="MinWidth" Value="0"/>
@@ -554,6 +567,21 @@
     <Setter Property="Margin" Value="0,8,0,0"/>
     <Setter Property="ItemHeight" Value="{x:Static sys:Double.NaN}" xmlns:sys="clr-namespace:System;assembly=mscorlib"/>
     <Setter Property="ItemWidth" Value="{x:Static sys:Double.NaN}" xmlns:sys="clr-namespace:System;assembly=mscorlib"/>
+  </Style>
+
+  <!-- Right-aligned action band: buttons sit bottom/top-right and never touch the
+       container edge. Use for page and dialog action rows to stop corner-cramping.
+       Buttons inside carry Margin="{StaticResource HmiButtonGap}" for even spacing. -->
+  <Style x:Key="HmiRightActionBand" TargetType="WrapPanel">
+    <Setter Property="Orientation" Value="Horizontal"/>
+    <Setter Property="HorizontalAlignment" Value="Right"/>
+    <Setter Property="Margin" Value="0,8,0,0"/>
+  </Style>
+
+  <!-- Inline (left) action band for toolbars. Buttons inside carry HmiButtonGap. -->
+  <Style x:Key="HmiInlineActionBand" TargetType="WrapPanel">
+    <Setter Property="Orientation" Value="Horizontal"/>
+    <Setter Property="HorizontalAlignment" Value="Left"/>
   </Style>
 
   <Style x:Key="HmiPrimaryActionButton" TargetType="Button" BasedOn="{StaticResource HmiOperatorActionButton}">

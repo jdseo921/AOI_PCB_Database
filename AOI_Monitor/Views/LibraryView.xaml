@@ -85,12 +85,12 @@
             </StackPanel>
           </WrapPanel>
           <WrapPanel Style="{StaticResource HmiAdaptiveFilterActionBand}">
-            <Button Style="{StaticResource ActionBtn}" Content="Open Record" Margin="0,0,6,6" Click="OnOpenRecordClick"/>
-            <Button Style="{StaticResource ActionBtnBlue}" Content="Batch Import" Margin="0,0,6,6" Click="OnBatchImportClick"/>
-            <Button Style="{StaticResource ActionBtn}" Content="Compare Golden" Margin="0,0,6,6" Click="OnCompareGoldenClick"/>
-            <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Candidate" Margin="0,0,6,6" Click="OnAddToTrainingClick"/>
-            <Button Style="{StaticResource ActionBtnAmber}" Content="Batch Relabel" Margin="0,0,6,6" Click="OnBatchRelabelClick"/>
-            <Button Style="{StaticResource ActionBtnGreen}" Content="Export Selected" Margin="0,0,6,6" Click="OnExportSelectedClick"/>
+            <Button Style="{StaticResource ActionBtn}" Content="Open Record" Margin="{StaticResource HmiButtonGap}" Click="OnOpenRecordClick"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Batch Import" Margin="{StaticResource HmiButtonGap}" Click="OnBatchImportClick"/>
+            <Button Style="{StaticResource ActionBtn}" Content="Compare Golden" Margin="{StaticResource HmiButtonGap}" Click="OnCompareGoldenClick"/>
+            <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Candidate" Margin="{StaticResource HmiButtonGap}" Click="OnAddToTrainingClick"/>
+            <Button Style="{StaticResource ActionBtnAmber}" Content="Batch Relabel" Margin="{StaticResource HmiButtonGap}" Click="OnBatchRelabelClick"/>
+            <Button Style="{StaticResource ActionBtnGreen}" Content="Export Selected" Margin="{StaticResource HmiButtonGap}" Click="OnExportSelectedClick"/>
           </WrapPanel>
           <TextBlock x:Name="ImportStatusText"
                      Text="Imported images are loaded from the local SQLite image table."

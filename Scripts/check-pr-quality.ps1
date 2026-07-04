@@ -449,6 +449,19 @@ foreach ($group in $linesByPath) {
                 Add-Issue "FAIL" "PR-HMI-SIZE-001" $group.Name "XAML adds MinHeight $height below the compact HMI control baseline."
             }
         }
+
+        # Fixed pixel widths on layout elements are brittle: they leave dead space and clip
+        # under DPI scaling and localization. Nudge toward Auto/*/MinWidth or a shared token.
+        # Styles/ is exempt (control templates legitimately fix sizes); MinWidth/MaxWidth are
+        # allowed; star (2*) and resource/binding widths do not match. WARN so it surfaces in
+        # review without blocking.
+        if ($group.Name -notmatch '(?i)/Styles/' -and
+            $line.text -match '(?<![A-Za-z])Width\s*=\s*"(?<w>[0-9]+(?:\.[0-9]+)?)"') {
+            $w = [double]::Parse($Matches["w"], [Globalization.CultureInfo]::InvariantCulture)
+            if ($w -ge 80) {
+                Add-Issue "WARN" "PR-HMI-WIDTH-001" $group.Name "XAML adds fixed Width $w; prefer Auto, *, MinWidth, or a shared spacing token so layouts flex under DPI/localization and avoid dead space."
+            }
+        }
     }
 }
 
@@ -551,6 +564,11 @@ $report = [pscustomobject]@{
             id = "PR-HMI-SIZE-001"
             description = "New XAML must not add tiny explicit MinHeight values for HMI controls."
             result = if (@($script:issues | Where-Object { $_.ruleId -eq "PR-HMI-SIZE-001" }).Count -gt 0) { "FAIL" } else { "PASS" }
+        },
+        [pscustomobject]@{
+            id = "PR-HMI-WIDTH-001"
+            description = "New XAML should avoid fixed pixel Width >= 80 outside Styles/; prefer Auto, *, MinWidth, or a shared spacing token."
+            result = if (@($script:issues | Where-Object { $_.ruleId -eq "PR-HMI-WIDTH-001" }).Count -gt 0) { "WARN" } else { "PASS" }
         },
         [pscustomobject]@{
             id = "PR-SEC-001"

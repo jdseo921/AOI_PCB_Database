@@ -27,9 +27,9 @@
                        TextWrapping="Wrap"/>
           </Border>
         </StackPanel>
-        <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
-          <Button Style="{StaticResource ActionBtnBlue}" Content="Reload Profiles" Margin="0,0,6,6" Click="OnReloadProfilesClick"/>
-          <Button Style="{StaticResource ActionBtnGreen}" Content="Save Profile" Margin="0,0,0,6" Click="OnSaveProfileClick"/>
+        <WrapPanel Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource HmiRightActionBand}">
+          <Button Style="{StaticResource ActionBtnBlue}" Content="Reload Profiles" Margin="{StaticResource HmiButtonGap}" Click="OnReloadProfilesClick"/>
+          <Button Style="{StaticResource ActionBtnGreen}" Content="Save Profile" Margin="{StaticResource HmiButtonGap}" Click="OnSaveProfileClick"/>
         </WrapPanel>
       </Grid>
     </Border>
@@ -95,7 +95,7 @@
                   <StackPanel><TextBlock Text="Board Y mm" Foreground="#9AA6AF" FontSize="14"/><TextBox x:Name="BoardYText" MinHeight="34" AutomationProperties.Name="New point board Y millimeters"/></StackPanel>
                 </UniformGrid>
                 <StackPanel Orientation="Horizontal">
-                  <Button Style="{StaticResource ActionBtnBlue}" Content="Add Point" Margin="0,0,6,0" Click="OnAddPointClick"/>
+                  <Button Style="{StaticResource ActionBtnBlue}" Content="Add Point" Margin="{StaticResource HmiButtonGap}" Click="OnAddPointClick"/>
                   <Button Style="{StaticResource ActionBtn}" Content="Remove Selected" Click="OnRemoveSelectedPointClick"/>
                 </StackPanel>
               </StackPanel>

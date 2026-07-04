@@ -1,7 +1,8 @@
 <UserControl x:Class="AOI_Monitor.Views.ReviewView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="#0B0E10">
+             Background="#0B0E10"
+             PreviewKeyDown="OnReviewPreviewKeyDown">
   <UserControl.Resources>
     <Style x:Key="RiskChipBorder" TargetType="Border" BasedOn="{StaticResource Chip}">
       <Style.Triggers>
@@ -348,11 +349,12 @@
             <TextBlock Text="Disposition Controls" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
           <StackPanel Grid.Row="1" Margin="8">
-            <Button Style="{StaticResource ActionBtnRed}" Content="Confirm NG" Margin="{StaticResource HmiRowGap}" Click="OnConfirmNgClick"/>
-            <Button Style="{StaticResource ActionBtnAmber}" Content="Mark False Call" Margin="{StaticResource HmiRowGap}" Click="OnFalseCallClick"/>
-            <Button Style="{StaticResource ActionBtnRed}" Content="Mark Possible Escape" Margin="{StaticResource HmiRowGap}" Click="OnPossibleEscapeClick"/>
+            <TextBlock Text="Keyboard: 1 Confirm NG · 2 False Call · 3 Possible Escape · 4 Hold" Foreground="#8B969E" FontSize="14" TextWrapping="Wrap" Margin="{StaticResource HmiRowGap}"/>
+            <Button Style="{StaticResource ActionBtnRed}" Content="Confirm NG (1)" Margin="{StaticResource HmiRowGap}" Click="OnConfirmNgClick"/>
+            <Button Style="{StaticResource ActionBtnAmber}" Content="Mark False Call (2)" Margin="{StaticResource HmiRowGap}" Click="OnFalseCallClick"/>
+            <Button Style="{StaticResource ActionBtnRed}" Content="Mark Possible Escape (3)" Margin="{StaticResource HmiRowGap}" Click="OnPossibleEscapeClick"/>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Queue Candidate" Margin="{StaticResource HmiRowGap}" Click="OnSendTrainingClick"/>
-            <Button Style="{StaticResource ActionBtn}" Content="Hold for 2nd Review" Click="OnHoldClick"/>
+            <Button Style="{StaticResource ActionBtn}" Content="Hold for 2nd Review (4)" Click="OnHoldClick"/>
           </StackPanel>
         </Grid>
       </Border>

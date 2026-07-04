@@ -130,7 +130,7 @@ public sealed class ImageLearningFalseCallComparisonServiceTests : IDisposable
     }
 
     [Fact]
-    public void ImageLearningFalseCallReportWithholdsRateBelowMinimumSampleSize()
+    public void ImageLearningFalseCallReportShowsConfidenceIntervalAndSmallSampleWarning()
     {
         var project = CreateLearningProject("Small-sample rate gate");
         ImportStandardTrainingSet(project);
@@ -139,13 +139,15 @@ public sealed class ImageLearningFalseCallComparisonServiceTests : IDisposable
         var learning = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options, "Engineer01 [Engineer]");
         var comparison = ImageLearningFalseCallComparisonService.RunComparison(project.ProjectId, learning.Model.ModelId, _options, "Engineer01 [Engineer]");
 
-        // The tiny synthetic set is below the minimum, so the percentage must be withheld.
-        Assert.True(comparison.Metrics.OkValidationCount < ImageLearningFalseCallComparisonService.MinimumOkValidationForRate);
+        var n = comparison.Metrics.OkValidationCount;
+        Assert.True(n < ImageLearningFalseCallComparisonService.MinimumOkValidationForRate);
 
         var html = File.ReadAllText(comparison.HtmlReportPath);
+        // The rate is reported with an exact binomial confidence interval (rigorous at any n)...
+        Assert.Contains("95% CI", html, StringComparison.Ordinal);
+        Assert.Contains($"n={n}", html, StringComparison.Ordinal);
+        // ...plus an explicit small-sample warning so the wide interval is not misread.
         Assert.Contains("not statistically meaningful", html, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Percentage withheld", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("False-call rate before:", html, StringComparison.OrdinalIgnoreCase);
     }
 
     private ImageLearningProject CreateLearningProject(string name)

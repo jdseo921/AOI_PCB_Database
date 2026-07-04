@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AOI_Monitor.Data;
@@ -133,6 +134,29 @@ public partial class ReviewView : UserControl
     private void OnFalseCallClick(object sender, RoutedEventArgs e) => LogDisposition("Mark False Call");
     private void OnPossibleEscapeClick(object sender, RoutedEventArgs e) => LogDisposition("Mark Possible Escape");
     private void OnHoldClick(object sender, RoutedEventArgs e) => LogDisposition("Hold for 2nd Review");
+
+    // Operator hotkeys (verification-station ergonomics): 1=Confirm NG, 2=False Call,
+    // 3=Possible Escape, 4=Hold. Suppressed while a text/editable field has focus so typing
+    // is never hijacked. Calls the same handlers as the buttons — no separate logic.
+    private void OnReviewPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (IsEditableElementFocused()) return;
+        switch (e.Key)
+        {
+            case Key.D1 or Key.NumPad1: OnConfirmNgClick(this, new RoutedEventArgs()); e.Handled = true; break;
+            case Key.D2 or Key.NumPad2: OnFalseCallClick(this, new RoutedEventArgs()); e.Handled = true; break;
+            case Key.D3 or Key.NumPad3: OnPossibleEscapeClick(this, new RoutedEventArgs()); e.Handled = true; break;
+            case Key.D4 or Key.NumPad4: OnHoldClick(this, new RoutedEventArgs()); e.Handled = true; break;
+        }
+    }
+
+    private static bool IsEditableElementFocused()
+    {
+        var focused = Keyboard.FocusedElement;
+        return focused is System.Windows.Controls.Primitives.TextBoxBase
+            || focused is PasswordBox
+            || (focused is ComboBox { IsEditable: true });
+    }
 
     private void OnSendTrainingClick(object sender, RoutedEventArgs e)
     {

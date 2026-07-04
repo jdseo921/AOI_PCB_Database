@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AOI_Monitor.Data;
@@ -233,6 +234,36 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         ModeText.Text = "STOPPED";
         ModeText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E1A334"));
         LogEvent("STOP", "Simulated inspection mode paused.");
+    }
+
+    // Operator hotkeys (verification-station ergonomics): F5=Start, F6=Stop, F7=Next Board,
+    // Ctrl+S=Save Result. Suppressed while a text/editable field has focus. Calls the same
+    // handlers as the buttons — no separate logic.
+    private void OnMonitorPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (IsEditableElementFocused()) return;
+
+        if (e.Key == Key.S && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            OnSaveResultClick(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.F5: OnStartClick(this, new RoutedEventArgs()); e.Handled = true; break;
+            case Key.F6: OnStopClick(this, new RoutedEventArgs()); e.Handled = true; break;
+            case Key.F7: OnNextBoardClick(this, new RoutedEventArgs()); e.Handled = true; break;
+        }
+    }
+
+    private static bool IsEditableElementFocused()
+    {
+        var focused = Keyboard.FocusedElement;
+        return focused is System.Windows.Controls.Primitives.TextBoxBase
+            || focused is PasswordBox
+            || (focused is ComboBox { IsEditable: true });
     }
 
     private async void OnNextBoardClick(object sender, RoutedEventArgs e)

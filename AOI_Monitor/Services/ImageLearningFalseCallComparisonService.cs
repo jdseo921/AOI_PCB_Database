@@ -388,23 +388,29 @@ public static class ImageLearningFalseCallComparisonService
         sb.AppendLine("<h1>Image-only False-call Comparison</h1>");
         sb.AppendLine("<div class=\"card sim\"><strong>Image-only Stage 1 learning.</strong> Not live camera validation. Formal acceptance requires customer/evaluator dataset.</div>");
         sb.AppendLine($"<p>Project: {Html(project.ProjectName)} / {Html(project.ProjectId)}<br>Board model: {Html(project.BoardModel)}<br>Model: {Html(model.ModelId)}<br>Baseline reference: {Html(referenceImage.FileName)}</p>");
+        var fcBefore = new RateEstimate(metrics.FalseCallsBeforeLearning, metrics.OkValidationCount);
+        var fcAfter = new RateEstimate(metrics.FalseCallsAfterLearning, metrics.OkValidationCount);
+        var escape = new RateEstimate(metrics.PossibleEscapes, metrics.NgValidationCount);
         sb.AppendLine($"<h2>Before / After</h2><div class=\"card\"><strong>False calls reduced from {metrics.FalseCallsBeforeLearning} to {metrics.FalseCallsAfterLearning}</strong><br>");
-        if (metrics.OkValidationCount >= MinimumOkValidationForRate)
-            sb.AppendLine($"False-call rate before: {metrics.FalseCallRateBeforeLearning:P1}; after: {metrics.FalseCallRateAfterLearning:P1}; reduction: {metrics.FalseCallReductionPercentage:P1}.<br>");
-        else
-            sb.AppendLine($"Measured false calls: {metrics.FalseCallsBeforeLearning} before / {metrics.FalseCallsAfterLearning} after on {metrics.OkValidationCount} OK Validation image(s). Percentage withheld below the {MinimumOkValidationForRate}-image minimum (not statistically meaningful).<br>");
-        sb.AppendLine($"Possible escapes: {metrics.PossibleEscapes}<br>");
+        sb.AppendLine($"False-call rate before: {fcBefore.DescribeRate()}<br>");
+        sb.AppendLine($"False-call rate after: {fcAfter.DescribeRate()}<br>");
+        sb.AppendLine($"False calls per million OK boards (after learning): {fcAfter.DescribePpm()}<br>");
+        sb.AppendLine(metrics.NgValidationCount > 0
+            ? $"Possible escapes: {escape.DescribeUpperBound()}<br>"
+            : $"Possible escapes: {metrics.PossibleEscapes}; missed-defect rate not provable without NG Validation images<br>");
         sb.AppendLine($"Recommended threshold: {(metrics.RecommendedThreshold.HasValue ? metrics.RecommendedThreshold.Value.ToString("F2", CultureInfo.InvariantCulture) : "No safe threshold")}<br>");
         sb.AppendLine($"{Html(metrics.MissedDefectEvidenceNote)}</div>");
         sb.AppendLine("<h2>Metric Summary</h2><table><tr><th>Metric</th><th>Value</th></tr>");
         Row("OK validation count", metrics.OkValidationCount.ToString(CultureInfo.InvariantCulture));
         Row("False calls before learning", metrics.FalseCallsBeforeLearning.ToString(CultureInfo.InvariantCulture));
         Row("False calls after learning", metrics.FalseCallsAfterLearning.ToString(CultureInfo.InvariantCulture));
+        Row("False-call rate after learning (exact 95% CI)", fcAfter.DescribeRate());
+        Row("False calls PPM after learning (exact 95% CI)", fcAfter.DescribePpm());
         Row("Anomaly regions before learning", metrics.AnomalyRegionsBeforeLearning.ToString(CultureInfo.InvariantCulture));
         Row("Anomaly regions after learning", metrics.AnomalyRegionsAfterLearning.ToString(CultureInfo.InvariantCulture));
         Row("Review burden before learning", $"{metrics.ReviewBurdenBeforeLearning} ({metrics.ReviewBurdenRateBeforeLearning:P1})");
         Row("Review burden after learning", $"{metrics.ReviewBurdenAfterLearning} ({metrics.ReviewBurdenRateAfterLearning:P1})");
-        Row("Possible escape rate", metrics.PossibleEscapeRate.HasValue ? metrics.PossibleEscapeRate.Value.ToString("P1", CultureInfo.InvariantCulture) : "Not proven without NG Validation images");
+        Row("Possible escape rate", metrics.NgValidationCount > 0 ? escape.DescribeUpperBound() : "Not proven without NG Validation images");
         Row("Recommendation status", metrics.RecommendationStatus);
         sb.AppendLine("</table>");
 

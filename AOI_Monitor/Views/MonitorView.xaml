@@ -1,7 +1,8 @@
 <UserControl x:Class="AOI_Monitor.Views.MonitorView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="#0B0E10">
+             Background="#0B0E10"
+             PreviewKeyDown="OnMonitorPreviewKeyDown">
   <UserControl.Resources>
     <Style x:Key="MonitorStatusLabel" TargetType="TextBlock">
       <Setter Property="Foreground" Value="#9AA6AF"/>
@@ -116,10 +117,10 @@
           </WrapPanel>
 
           <UniformGrid Grid.Row="2" Columns="4" Margin="8,0,8,8">
-            <Button x:Name="StartInspectionButton" Style="{StaticResource ActionBtnGreen}" Content="Start" Margin="0,0,6,0" Click="OnStartClick"/>
-            <Button x:Name="StopInspectionButton" Style="{StaticResource ActionBtnRed}" Content="Stop" Margin="0,0,6,0" Click="OnStopClick"/>
-            <Button x:Name="NextBoardButton" Style="{StaticResource ActionBtnBlue}" Content="Next Board" Margin="0,0,6,0" Click="OnNextBoardClick"/>
-            <Button x:Name="SaveResultButton" Style="{StaticResource ActionBtnAmber}" Content="Save Result" Click="OnSaveResultClick"/>
+            <Button x:Name="StartInspectionButton" Style="{StaticResource ActionBtnGreen}" Content="Start (F5)" Margin="{StaticResource HmiButtonGap}" Click="OnStartClick"/>
+            <Button x:Name="StopInspectionButton" Style="{StaticResource ActionBtnRed}" Content="Stop (F6)" Margin="{StaticResource HmiButtonGap}" Click="OnStopClick"/>
+            <Button x:Name="NextBoardButton" Style="{StaticResource ActionBtnBlue}" Content="Next Board (F7)" Margin="{StaticResource HmiButtonGap}" Click="OnNextBoardClick"/>
+            <Button x:Name="SaveResultButton" Style="{StaticResource ActionBtnAmber}" Content="Save Result (Ctrl+S)" Click="OnSaveResultClick"/>
           </UniformGrid>
 
           <Border Grid.Row="3" Margin="8,0,8,8" Style="{StaticResource HmiStatusSimulated}" Padding="10" Visibility="Collapsed">

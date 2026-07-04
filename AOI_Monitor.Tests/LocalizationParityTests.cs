@@ -77,24 +77,10 @@ public class LocalizationParityTests
         "No folder selected",
         "No CSV selected",
 
-        // -- RecipeView ComboBoxItem contents that code-behind round-trips as PERSISTED
-        //    recipe data (SelectedRoiType()/ComboContent()/SelectComboByContent compare and
-        //    store the Content strings). Translating them would corrupt saved recipes.
-        "Presence",
-        "Polarity",
-        "Solder Bridge",
-        "Height",
-        "Anomaly",
-        "IPC Class 1",
-        "IPC Class 2",
-        "IPC Class 3",
-        "Top bright field",
-        "Low-angle dark field",
-        "Side marking light",
-        "Solder fillet highlight",
-        "Strict: hold every suspected defect",
-        "Balanced: review benign visual noise",
-        "Sensitive: reduce possible escapes",
+        // Note: RecipeView ComboBoxItem contents (ROI types, IPC class, lighting profile,
+        // false-call policy) used to live here because code-behind persisted the Content
+        // strings. Persistence now round-trips through invariant Tag tokens (ComboBoxTokens),
+        // so those literals are translated normally; see ComboBoxLocalizationRegressionTests.
     };
 
     [Fact]

@@ -1,0 +1,250 @@
+using System.Text.RegularExpressions;
+using AOI_Monitor.Services;
+using Xunit;
+
+namespace AOI_Monitor.Tests;
+
+/// <summary>
+/// English/Korean localization parity tests for the operator-facing screens.
+///
+/// Scope note: only UI chrome translated by UiPreferencesService.ApplyLocalization is
+/// covered (TextBlock.Text, ContentControl.Content, headers, tooltips, DataGrid column
+/// headers). HTML evidence reports intentionally remain English by design and are NOT
+/// covered by these tests.
+/// </summary>
+public class LocalizationParityTests
+{
+    private static readonly string[] OperatorScreens =
+    {
+        "MonitorView.xaml",
+        "ReviewView.xaml",
+        "RecipeView.xaml",
+        "AIModelTestView.xaml",
+    };
+
+    /// <summary>
+    /// Dictionary keys whose Korean value legitimately contains no Hangul because the
+    /// term is identical in both languages (technical tokens shown as-is).
+    /// </summary>
+    private static readonly HashSet<string> IdenticalValueKeys = new(StringComparer.Ordinal)
+    {
+        "AI",
+        "X",
+        "Y",
+        "ROI",
+    };
+
+    /// <summary>
+    /// The honest ledger of operator-screen literals that are deliberately NOT translated.
+    /// Every entry needs a reason; if a literal can be translated safely, translate it
+    /// instead of adding it here.
+    /// </summary>
+    private static readonly HashSet<string> IntentionallyUntranslated = new(StringComparer.Ordinal)
+    {
+        // -- Sample/demo data shown as data, not UI chrome (station ids, board models,
+        //    lot ids, operator ids, sample image ids, silkscreen reference designators).
+        "AOI-LIB-01",
+        "TBOX-MAIN",
+        "TBOX_TOP",
+        "POC-LOT",
+        "Engineer01",
+        "PIXEL_DIFF_0.1",
+        "IMG_0241",
+        "IMG_0114 / 96%",
+        "IMG_0088 / 92%",
+        "RefDes: U107",
+        "RefDes: U109",
+        "U101",
+        "U107",
+        "U107 BRIDGE",
+        "TOP-03",
+
+        // -- Engine/product display names (proper nouns, kept in English).
+        "Pixel Difference Prototype Engine",
+        "Pixel Difference Prototype Engine 0.1",
+
+        // -- Industry-standard verdict/state tokens (OK/NG/REVIEW convention; LOCKED/
+        //    UNLOCKED is rewritten in English by RecipeView code-behind at runtime).
+        "REVIEW",
+        "UNLOCKED",
+
+        // -- Industry-standard abbreviation used verbatim in Korean SMT lines.
+        "RefDes",
+
+        // -- TextBox.Text placeholders: the localization walker translates TextBlock/
+        //    ContentControl/headers/tooltips but intentionally never rewrites TextBox.Text
+        //    (editable inputs hold data), so translating these keys would have no effect.
+        "No folder selected",
+        "No CSV selected",
+
+        // -- RecipeView ComboBoxItem contents that code-behind round-trips as PERSISTED
+        //    recipe data (SelectedRoiType()/ComboContent()/SelectComboByContent compare and
+        //    store the Content strings). Translating them would corrupt saved recipes.
+        "Presence",
+        "Polarity",
+        "Solder Bridge",
+        "Height",
+        "Anomaly",
+        "IPC Class 1",
+        "IPC Class 2",
+        "IPC Class 3",
+        "Top bright field",
+        "Low-angle dark field",
+        "Side marking light",
+        "Solder fillet highlight",
+        "Strict: hold every suspected defect",
+        "Balanced: review benign visual noise",
+        "Sensitive: reduce possible escapes",
+    };
+
+    [Fact]
+    public void AllDictionaryValuesAreNonEmptyKoreanText()
+    {
+        var offenders = new List<string>();
+
+        foreach (var (english, korean) in UiPreferencesService.KoreanTranslations)
+        {
+            if (string.IsNullOrWhiteSpace(english))
+                offenders.Add("<empty key>");
+
+            if (string.IsNullOrWhiteSpace(korean))
+            {
+                offenders.Add($"'{english}' has an empty translation");
+                continue;
+            }
+
+            if (IdenticalValueKeys.Contains(english))
+                continue;
+
+            if (!korean.Any(IsHangulSyllable))
+                offenders.Add($"'{english}' -> '{korean}' contains no Hangul syllable");
+        }
+
+        Assert.True(offenders.Count == 0,
+            "Korean dictionary quality violations:\n" + string.Join("\n", offenders));
+    }
+
+    [Fact]
+    public void CriticalOperatorStringsExistAsDictionaryKeys()
+    {
+        // Drift catcher: these keys must byte-match the XAML literals. Renaming a button
+        // in XAML without updating the KoreanText dictionary must fail this test.
+        var expectedKeys = new[]
+        {
+            // MonitorView hotkey buttons.
+            "Start (F5)",
+            "Stop (F6)",
+            "Next Board (F7)",
+            "Save Result (Ctrl+S)",
+            // ReviewView disposition controls.
+            "Confirm NG (1)",
+            "Mark False Call (2)",
+            "Mark Possible Escape (3)",
+            "Hold for 2nd Review (4)",
+            "Queue Candidate",
+            "Disposition Controls",
+            // ReviewView keyboard hint line. The separator is U+00B7 (middle dot), built
+            // from an escape so an editor/encoding change cannot silently diverge from
+            // the XAML literal.
+            "Keyboard: 1 Confirm NG \u00B7 2 False Call \u00B7 3 Possible Escape \u00B7 4 Hold",
+            // RecipeView centroid import.
+            "Import Centroid CSV",
+        };
+
+        var missing = expectedKeys
+            .Where(key => !UiPreferencesService.KoreanTranslations.ContainsKey(key))
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "Critical operator strings missing from KoreanText dictionary:\n" + string.Join("\n", missing));
+    }
+
+    [Fact]
+    public void OperatorScreenXamlLiteralsAreTranslatedOrExplicitlyAllowlisted()
+    {
+        var viewsDirectory = FindViewsDirectory();
+        var missing = new List<string>();
+
+        foreach (var screen in OperatorScreens)
+        {
+            var path = Path.Combine(viewsDirectory, screen);
+            Assert.True(File.Exists(path), $"Expected operator screen XAML not found: {path}");
+
+            foreach (var literal in ExtractDisplayLiterals(File.ReadAllText(path)))
+            {
+                if (UiPreferencesService.KoreanTranslations.ContainsKey(literal))
+                    continue;
+
+                if (IntentionallyUntranslated.Contains(literal))
+                    continue;
+
+                missing.Add($"{screen}: \"{literal}\"");
+            }
+        }
+
+        Assert.True(missing.Count == 0,
+            "Operator-facing XAML literals missing from the KoreanText dictionary " +
+            "(translate them, or add to IntentionallyUntranslated with a reason):\n" +
+            string.Join("\n", missing.Distinct(StringComparer.Ordinal)));
+    }
+
+    [Fact]
+    public void AllowlistDoesNotShadowDictionaryKeys()
+    {
+        // An allowlisted literal that is also a dictionary key means the ledger is stale.
+        var shadowed = IntentionallyUntranslated
+            .Where(UiPreferencesService.KoreanTranslations.ContainsKey)
+            .ToList();
+
+        Assert.True(shadowed.Count == 0,
+            "Allowlist entries are also dictionary keys (remove them from the allowlist):\n" +
+            string.Join("\n", shadowed));
+    }
+
+    private static bool IsHangulSyllable(char c)
+        => c >= '가' && c <= '힣';
+
+    private static IEnumerable<string> ExtractDisplayLiterals(string xaml)
+    {
+        // Text="..." and Content="..." attribute literals only; skip bindings/resources
+        // (anything containing '{'), pure numbers/symbols, and very short tokens.
+        var matches = Regex.Matches(xaml, "[\\s](?:Text|Content)=\"([^\"]*)\"");
+        foreach (Match match in matches)
+        {
+            var literal = DecodeXmlEntities(match.Groups[1].Value);
+            if (literal.Contains('{'))
+                continue;
+            if (literal.Length < 4)
+                continue;
+            if (!literal.Any(char.IsLetter))
+                continue;
+
+            yield return literal;
+        }
+    }
+
+    private static string DecodeXmlEntities(string value)
+        => value
+            .Replace("&lt;", "<", StringComparison.Ordinal)
+            .Replace("&gt;", ">", StringComparison.Ordinal)
+            .Replace("&quot;", "\"", StringComparison.Ordinal)
+            .Replace("&apos;", "'", StringComparison.Ordinal)
+            .Replace("&#xA;", "\n", StringComparison.Ordinal)
+            .Replace("&amp;", "&", StringComparison.Ordinal);
+
+    private static string FindViewsDirectory()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            var marker = Path.Combine(directory.FullName, "AOI_Monitor", "Views", "ReviewView.xaml");
+            if (File.Exists(marker))
+                return Path.Combine(directory.FullName, "AOI_Monitor", "Views");
+
+            directory = directory.Parent;
+        }
+
+        Assert.Fail($"Repository root containing AOI_Monitor\\Views\\ReviewView.xaml was not found above {AppContext.BaseDirectory}.");
+        return string.Empty; // unreachable
+    }
+}

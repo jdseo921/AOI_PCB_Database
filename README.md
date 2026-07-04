@@ -8,6 +8,11 @@ Home includes an explicit readiness panel for Database, Image Vault, Inspection 
 
 For the detailed feature inventory, see [IMPLEMENTED_FEATURES.md](IMPLEMENTED_FEATURES.md).
 
+Start here (brief, English + Korean / 영어·한국어 병기):
+
+- [Architecture Overview / 아키텍처 개요](Docs/Architecture_Overview.md)
+- [Roadmap & Stages / 로드맵 및 단계](Docs/Roadmap_and_Stages.md)
+
 Client/evaluator documents:
 
 - [Client Test Kit Guide](Docs/Client_Test_Kit_Guide.md)

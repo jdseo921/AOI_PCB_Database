@@ -174,6 +174,64 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
         RenderRois();
     }
 
+    private void OnImportCentroidClick(object sender, RoutedEventArgs e)
+    {
+        if (!EnsureUnlocked("Import centroid CSV"))
+            return;
+
+        if (_backgroundBitmap is null)
+        {
+            MessageBox.Show("Load a recipe background image before importing centroid data.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import pick-and-place centroid CSV",
+            Filter = "Centroid CSV files|*.csv;*.txt|All files|*.*",
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var parsed = CentroidRoiImportService.ParseCentroidCsv(File.ReadAllText(dialog.FileName));
+            var generated = CentroidRoiImportService.GenerateRois(
+                parsed.Records,
+                _backgroundBitmap.PixelWidth,
+                _backgroundBitmap.PixelHeight,
+                new CentroidRoiImportOptions());
+
+            var existingIds = new HashSet<string>(_rois.Select(r => r.Id), StringComparer.OrdinalIgnoreCase);
+            var imported = 0;
+            foreach (var roiDoc in generated)
+            {
+                if (!existingIds.Add(roiDoc.Id))
+                    continue;
+
+                _rois.Add(RecipeRoiRow.FromDocument(roiDoc, isSaved: false));
+                imported++;
+            }
+
+            _activeRoi = _rois.LastOrDefault();
+            RoiGrid.SelectedItem = _activeRoi;
+            UpdateFieldPanel();
+            RenderRois();
+
+            var skipped = generated.Count - imported;
+            RecipeStatusText.Text = $"Centroid import: {imported} ROI(s) added from {Path.GetFileName(dialog.FileName)}.";
+            var summary = $"{imported} ROIs imported from {parsed.Records.Count} rows ({parsed.Warnings.Count} warnings). Positions are approximate - review before saving.";
+            if (skipped > 0)
+                summary += $"\n{skipped} ROI(s) skipped because the recipe already contains their ids.";
+            MessageBox.Show(summary, "AOI Monitor", MessageBoxButton.OK, imported > 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
+        {
+            MessageBox.Show($"Centroid import failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     public void ReleasePageResources()
     {
         _refreshCancellation?.Cancel();

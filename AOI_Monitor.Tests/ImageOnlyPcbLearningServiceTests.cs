@@ -308,6 +308,52 @@ public sealed class ImageOnlyPcbLearningServiceTests : IDisposable
         Assert.Equal(16, decoder.Frames[0].Format.BitsPerPixel);
     }
 
+    [Fact]
+    public void ImageOnlyPcbLearningCoarseToFineAlignmentRecoversShiftOnLargeBoard()
+    {
+        // Coarse-to-fine alignment: at 192x192 the alignment search scores coarse candidates on a
+        // sparse pixel grid (sampleStep = 2), then refines the winner at full resolution. A
+        // whole-board (3,2) shift of an otherwise-OK copy must be recovered exactly, because
+        // without recovery the global checkerboard diff (verified below via the raw difference
+        // percent) would flag the board.
+        var options = new ImageOnlyPcbLearningOptions
+        {
+            InputWidth = 192,
+            InputHeight = 192,
+            AlignmentSearchRadiusPixels = 6,
+            MinimumAnomalyAreaPixels = 6,
+            DefaultLearnedThreshold = 4.0,
+            FalseCallTarget = 0.05,
+            MaxAllowedPossibleEscapeRate = 0.0,
+        };
+        var project = CreateLearningProject("Large board alignment refinement");
+        var goldenPath = WriteLargeBoardPng("large-golden.png", 192);
+        ImportImages(project, ImageLearningImageRole.GoldenReference, goldenPath);
+        for (var i = 0; i < 5; i++)
+            ImportImages(project, ImageLearningImageRole.OkLearning, WriteLargeBoardPng($"large-ok-{i}.png", 192, variant: i + 1));
+
+        var learning = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, options);
+        var shiftedOk = WriteLargeBoardPng("large-shifted-ok.png", 192, offsetX: 3, offsetY: 2, variant: 3);
+        var rawDifference = ImageOnlyPcbLearningService.CalculateRawDifferencePercentForTest(goldenPath, shiftedOk, options);
+
+        var first = ImageOnlyPcbLearningService.InspectImagePath(
+            learning.Model.ModelId, shiftedOk, options, "Operator01 [Operator]");
+        var second = ImageOnlyPcbLearningService.InspectImagePath(
+            learning.Model.ModelId, shiftedOk, options, "Operator01 [Operator]");
+
+        // Unaligned, the shifted checkerboard differs across a large share of the board.
+        Assert.True(rawDifference > 5.0);
+        // Alignment recovered the shift exactly (sign depends on search convention), so the
+        // shifted OK copy passes.
+        Assert.Equal(3, Math.Abs(first.AlignmentOffsetX));
+        Assert.Equal(2, Math.Abs(first.AlignmentOffsetY));
+        Assert.Equal("OK", first.InspectionResult.Verdict);
+        // Determinism: two identical inspections yield bit-identical scores and offsets.
+        Assert.Equal(first.InspectionResult.AnomalyScore, second.InspectionResult.AnomalyScore);
+        Assert.Equal(first.AlignmentOffsetX, second.AlignmentOffsetX);
+        Assert.Equal(first.AlignmentOffsetY, second.AlignmentOffsetY);
+    }
+
     private ImageLearningProject CreateLearningProject(string name)
         => ImageLearningProjectService.CreateProject(name, "BOARD-IMAGE-ONLY", ImageLearningEvidenceMode.SyntheticDemo, "Engineer01 [Engineer]");
 
@@ -395,6 +441,72 @@ public sealed class ImageOnlyPcbLearningServiceTests : IDisposable
             value = 132 + brightnessShift - variant % 4;
 
         return ClampByte(value);
+    }
+
+    private string WriteLargeBoardPng(
+        string fileName,
+        int size,
+        int offsetX = 0,
+        int offsetY = 0,
+        int variant = 0)
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, fileName);
+        var pixels = new byte[size * size * 4];
+
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var value = LargeBoardPattern(x - offsetX, y - offsetY, size, variant);
+                var index = (y * size + x) * 4;
+                pixels[index] = value;
+                pixels[index + 1] = value;
+                pixels[index + 2] = value;
+                pixels[index + 3] = 255;
+            }
+        }
+
+        var bitmap = BitmapSource.Create(
+            size,
+            size,
+            96,
+            96,
+            PixelFormats.Bgra32,
+            null,
+            pixels,
+            size * 4);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(path);
+        encoder.Save(stream);
+        return path;
+    }
+
+    private static byte LargeBoardPattern(int x, int y, int size, int variant)
+    {
+        // Fine high-frequency texture: a checkerboard of 3px cells covering every coordinate
+        // (biased by a multiple of the cell size so small negative pattern positions produced
+        // by shifting keep the same cell grid).
+        var cellX = (x + 3 * size) / 3;
+        var cellY = (y + 3 * size) / 3;
+        var value = ((cellX + cellY) & 1) == 0 ? 88 : 168;
+
+        // A few distinct solid blocks break the 6px checkerboard periodicity so the translation
+        // search has a unique optimum; variant nudges their brightness like WriteBoardPng does.
+        if (InBlock(x, y, size / 8, size / 8, size / 6))
+            value = 214 + variant % 3;
+        if (InBlock(x, y, size * 5 / 8, size / 4, size / 6))
+            value = 34 + variant % 2;
+        if (InBlock(x, y, size / 4, size * 5 / 8, size / 6))
+            value = 240 - variant % 4;
+        if (InBlock(x, y, size * 2 / 3, size * 2 / 3, size / 5))
+            value = 130 + variant % 5;
+
+        return ClampByte(value);
+
+        static bool InBlock(int patternX, int patternY, int left, int top, int extent)
+            => patternX >= left && patternX < left + extent && patternY >= top && patternY < top + extent;
     }
 
     private static byte ClampByte(int value)

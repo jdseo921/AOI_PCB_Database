@@ -38,8 +38,6 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
     private long? _currentRunId;
     private DateTime? _currentRunCreatedAtUtc;
     private string _currentEngineDisplay = "Pixel Difference Prototype Engine / PIXEL_DIFF_0.1";
-    private string _lastAnnotatedImageFolder = string.Empty;
-    private string _lastReportPath = string.Empty;
     private bool _currentRunUsedFormalManifest;
     private FalseCallReductionRun? _currentFalseCallRun;
     private DatasetQualitySummary? _currentDatasetQuality;
@@ -343,8 +341,6 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
             _currentRunCreatedAtUtc = DateTime.UtcNow;
             _currentEngineDisplay = batch.EngineDisplay;
             _currentRunUsedFormalManifest = batch.IsFormalManifest;
-            _lastAnnotatedImageFolder = string.Empty;
-            _lastReportPath = string.Empty;
             _currentFalseCallRun = null;
             _falseCallPoints.Clear();
             FalseCallRecommendationText.Text = "Batch complete. Analyze false calls to generate threshold candidates.";
@@ -529,7 +525,6 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
                 "Stage1AnnotatedImages",
                 dialog.FolderName,
                 result.Errors.Count == 0 ? "OK" : "WARN");
-            _lastAnnotatedImageFolder = dialog.FolderName;
             StatusText.Text = $"Annotated image export complete: {result.Count} file(s), {result.Errors.Count} issue(s). Verification: {verified.Verification.Status}.";
             WorkflowState.Instance.AddEvent("EXPORT", $"Stage 1 annotated images exported: {result.Count} file(s), {result.Errors.Count} issue(s).");
             foreach (var error in result.Errors.Take(20))
@@ -703,8 +698,6 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
         {
             var request = BuildPackageRequest(metrics);
             var package = CustomerValidationPackageService.CreatePackage(request);
-            _lastReportPath = package.ReportPath;
-            _lastAnnotatedImageFolder = package.AnnotatedImagesFolder;
             ReportPathText.Text = $"Package: {package.PackageFolder}";
             StatusText.Text = $"Validation package exported: {package.Acceptance.Status} / {package.PackageId}. Manifest: {package.ManifestPath}";
             WorkflowState.Instance.AddEvent("EXPORT", $"Stage 1 validation package exported for run {_currentRunId}: {package.PackageId}; status={package.Acceptance.Status}.");
@@ -767,67 +760,6 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
         };
     }
 
-    private CustomerValidationReportContext BuildCustomerValidationReportContext(
-        BatchMetrics metrics,
-        IReadOnlyList<ReportImageReference> sampleImages,
-        IReadOnlyList<string> warnings)
-    {
-        var configuration = InspectionModelConfigurationService.Load();
-        var state = WorkflowState.Instance;
-        var testTimestamp = _currentRunCreatedAtUtc is { } runTime
-            ? (runTime.Kind == DateTimeKind.Utc ? runTime.ToLocalTime() : runTime)
-            : DateTime.Now;
-        var boardModel = CustomerValidationReportService.SummarizeDistinct(_rows.Select(row => row.BoardModel));
-        if (string.Equals(boardModel, "Not provided", StringComparison.OrdinalIgnoreCase))
-            boardModel = state.BoardProgram;
-        var performance = BatchValidationService.CalculatePerformanceSummary(_rows);
-        var datasetQuality = _currentDatasetQuality ?? DatasetQualityService.Analyze(_rows, TryLoadManifest(_groundTruthCsvPath, _selectedFolder ?? string.Empty));
-        var acceptance = CustomerValidationPackageService.EvaluateAcceptance(
-            metrics,
-            performance,
-            _rows.Count,
-            _currentRunUsedFormalManifest,
-            datasetQuality: datasetQuality);
-
-        return new CustomerValidationReportContext
-        {
-            StationId = state.StationId,
-            UserId = state.CurrentUser.UserId,
-            UserRole = state.CurrentRole.ToString(),
-            RunId = _currentRunId?.ToString(CultureInfo.InvariantCulture) ?? "Not available",
-            TestTimestamp = testTimestamp,
-            BoardModel = boardModel,
-            LotId = CustomerValidationReportService.SummarizeDistinct(_rows.Select(row => row.LotId)),
-            ModelId = string.IsNullOrWhiteSpace(configuration.ActiveModelId) ? "Not selected" : configuration.ActiveModelId,
-            ModelSha256 = string.IsNullOrWhiteSpace(configuration.ActiveModelSha256) ? "Not available" : configuration.ActiveModelSha256,
-            ModelValidationStatus = string.IsNullOrWhiteSpace(configuration.ActiveModelValidationStatus) ? ModelConfigurationTestStatus.NotTested.ToString() : configuration.ActiveModelValidationStatus,
-            EngineName = GetEngineNamePart(),
-            ModelVersion = GetEngineVersionPart(),
-            ModelFileName = string.IsNullOrWhiteSpace(configuration.ModelFilePath)
-                ? "Not configured"
-                : Path.GetFileName(configuration.ModelFilePath),
-            ConfidenceThreshold = configuration.ConfidenceThreshold,
-            DatasetFolder = string.IsNullOrWhiteSpace(_selectedFolder) ? "Not available" : _selectedFolder,
-            GroundTruthFile = string.IsNullOrWhiteSpace(_groundTruthCsvPath) ? "Not selected" : _groundTruthCsvPath,
-            Metrics = metrics,
-            PerformanceSummary = performance,
-            AcceptanceStatus = acceptance.Status,
-            AcceptanceMessages = acceptance.Messages,
-            AcceptanceCriteria = new ValidationAcceptanceCriteria(),
-            Rows = _rows.ToArray(),
-            SampleAnnotatedImages = sampleImages,
-            Warnings = warnings,
-            FalseCallRecommendation = FalseCallReductionService.ToSummary(_currentFalseCallRun ?? AoiDatabase.GetLatestFalseCallReductionRun(_currentRunId)),
-            LearnedVisualModel = LearnedVisualModelRegistryService.GetActiveSummary(),
-            ThresholdProfileEvidence = ThresholdProfileService.GetActiveEvidenceSummary(boardModel, state.BoardProgram, "ANY"),
-            BreakdownSummary = ClassMetricsService.Calculate(_rows),
-            DatasetQualitySummary = datasetQuality,
-            CameraAcceptanceSummary = CameraAcceptanceTestService.ToSummary(AoiDatabase.GetLatestCameraAcceptanceRun(realHardwareOnly: true)),
-            RobotAcceptanceSummary = RobotAcceptanceTestService.ToSummary(AoiDatabase.GetLatestRobotAcceptanceRun()),
-            MesReadinessSummary = MesSpoolService.EvaluateReadiness(),
-        };
-    }
-
     private async Task LoadLatestRunAsync(CancellationToken cancellationToken)
     {
         try
@@ -847,7 +779,6 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
             _selectedFolder = run.ImageFolder;
             _groundTruthCsvPath = run.GroundTruthCsvPath;
             _currentRunUsedFormalManifest = snapshot.UsedFormalManifest;
-            _lastReportPath = string.Empty;
             ReportPathText.Text = "Report: not generated";
             FolderPathText.Text = run.ImageFolder;
             GroundTruthPathText.Text = string.IsNullOrWhiteSpace(run.GroundTruthCsvPath)
@@ -1047,130 +978,6 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
             : Brushes.White;
     }
 
-    private string BuildMarkdownReport(BatchMetrics metrics)
-    {
-        var failed = _rows.Where(r => r.PassFail == "FAIL").ToArray();
-        var configuration = InspectionModelConfigurationService.Load();
-        var generatedAt = _currentRunCreatedAtUtc is { } runTime
-            ? (runTime.Kind == DateTimeKind.Utc ? runTime.ToLocalTime() : runTime)
-            : DateTime.Now;
-
-        var sb = new StringBuilder();
-        sb.AppendLine("# Stage 1 Customer Validation Report");
-        sb.AppendLine();
-        sb.AppendLine($"- Run ID: {_currentRunId}");
-        sb.AppendLine($"- Date/time: {generatedAt:yyyy-MM-dd HH:mm:ss}");
-        sb.AppendLine($"- Operator: {EscapeMarkdown(WorkflowState.Instance.OperatorWithRole)}");
-        sb.AppendLine($"- Board model: {EscapeMarkdown(SummarizeDistinct(_rows.Select(r => r.BoardModel)))}");
-        sb.AppendLine($"- Lot ID: {EscapeMarkdown(SummarizeDistinct(_rows.Select(r => r.LotId)))}");
-        sb.AppendLine($"- Model/engine name: {EscapeMarkdown(GetEngineNamePart())}");
-        sb.AppendLine($"- Model version: {EscapeMarkdown(GetEngineVersionPart())}");
-        sb.AppendLine($"- Confidence threshold: {configuration.ConfidenceThreshold.ToString("P0", CultureInfo.InvariantCulture)}");
-        sb.AppendLine($"- Dataset folder: {EscapeMarkdown(_selectedFolder ?? string.Empty)}");
-        sb.AppendLine($"- Ground truth file: {EscapeMarkdown(_groundTruthCsvPath ?? "Not selected")}");
-        sb.AppendLine($"- Total images: {_rows.Count}");
-        sb.AppendLine($"- Passed count: {_rows.Count(r => r.PassFail == "PASS")}");
-        sb.AppendLine($"- Failed count: {failed.Length}");
-        sb.AppendLine($"- Accuracy: {FormatPercent(metrics.Accuracy)}");
-        sb.AppendLine($"- Precision: {FormatPercent(metrics.Precision)}");
-        sb.AppendLine($"- Recall: {FormatPercent(metrics.Recall)}");
-        sb.AppendLine($"- False call rate: {FormatPercent(metrics.FalseCallRate)}");
-        sb.AppendLine($"- Annotated-image folder: {EscapeMarkdown(string.IsNullOrWhiteSpace(_lastAnnotatedImageFolder) ? "Not exported" : _lastAnnotatedImageFolder)}");
-        sb.AppendLine();
-        sb.AppendLine("## Confusion Matrix");
-        sb.AppendLine();
-        sb.AppendLine("| TP | TN | FP | FN |");
-        sb.AppendLine("|---:|---:|---:|---:|");
-        sb.AppendLine($"| {metrics.TruePositive} | {metrics.TrueNegative} | {metrics.FalsePositive} | {metrics.FalseNegative} |");
-        sb.AppendLine();
-        sb.AppendLine("## Review Categories");
-        sb.AppendLine();
-        sb.AppendLine("| OK | NG | REVIEW | False Call | Possible Escape | Unknown / Unlabeled |");
-        sb.AppendLine("|---:|---:|---:|---:|---:|---:|");
-        sb.AppendLine($"| {metrics.OkCount} | {metrics.NgCount} | {metrics.ReviewCount} | {metrics.FalseCall} | {metrics.PossibleEscape} | {metrics.Unknown} |");
-        sb.AppendLine();
-        sb.AppendLine("## Failed Samples");
-        sb.AppendLine();
-        if (failed.Length == 0)
-        {
-            sb.AppendLine("No failed samples.");
-        }
-        else
-        {
-            sb.AppendLine("| Image | Ground Truth | Engine Result | Pass/Fail | Defect Type | ROI ID | ROI Type | Recipe | Side | RefDes | Lot ID | Board Model | Notes |");
-            sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
-            foreach (var row in failed)
-            {
-                sb.AppendLine($"| {EscapeMarkdown(row.Image)} | {EscapeMarkdown(row.GroundTruth)} | {EscapeMarkdown(row.EngineResult)} | {EscapeMarkdown(row.PassFail)} | {EscapeMarkdown(row.DefectType)} | {EscapeMarkdown(row.RoiId)} | {EscapeMarkdown(row.RoiType)} | {EscapeMarkdown(RecipeDisplay(row))} | {EscapeMarkdown(row.Side)} | {EscapeMarkdown(row.RefDes)} | {EscapeMarkdown(row.LotId)} | {EscapeMarkdown(row.BoardModel)} | {EscapeMarkdown(row.Notes)} |");
-            }
-        }
-
-        return sb.ToString();
-    }
-
-    private string BuildHtmlReport(BatchMetrics metrics)
-    {
-        var failedRows = _rows.Where(r => r.PassFail == "FAIL")
-            .Select(row => $"<tr class=\"failed\"><td>{EscapeHtml(row.Image)}</td><td>{EscapeHtml(row.GroundTruth)}</td><td>{EscapeHtml(row.EngineResult)}</td><td>{EscapeHtml(row.PassFail)}</td><td>{EscapeHtml(row.DefectType)}</td><td>{EscapeHtml(row.RoiId)}</td><td>{EscapeHtml(row.RoiType)}</td><td>{EscapeHtml(RecipeDisplay(row))}</td><td>{EscapeHtml(row.Side)}</td><td>{EscapeHtml(row.RefDes)}</td><td>{EscapeHtml(row.LotId)}</td><td>{EscapeHtml(row.BoardModel)}</td><td>{EscapeHtml(row.Notes)}</td></tr>");
-
-        var failedTableRows = string.Join(Environment.NewLine, failedRows);
-        if (string.IsNullOrWhiteSpace(failedTableRows))
-            failedTableRows = "<tr><td colspan=\"13\">No failed samples.</td></tr>";
-
-        var failedCount = _rows.Count(r => r.PassFail == "FAIL");
-        var configuration = InspectionModelConfigurationService.Load();
-        var runDateTime = _currentRunCreatedAtUtc is { } runTime
-            ? (runTime.Kind == DateTimeKind.Utc ? runTime.ToLocalTime() : runTime)
-            : DateTime.Now;
-
-        return $$"""
-        <!doctype html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Stage 1 Customer Validation Report</title>
-          <style>
-            body { font-family: Segoe UI, Arial, sans-serif; margin: 32px; color: #1d252c; }
-            table { border-collapse: collapse; width: 100%; margin: 14px 0 24px; }
-            th, td { border: 1px solid #b8c1c8; padding: 7px 9px; text-align: left; }
-            th { background: #edf2f5; }
-            .metrics td:first-child { font-weight: 700; width: 240px; }
-            .failed td { background: #fff0f1; }
-          </style>
-        </head>
-        <body>
-          <h1>Stage 1 Customer Validation Report</h1>
-          <table class="metrics">
-            <tr><td>Run ID</td><td>{{_currentRunId}}</td></tr>
-            <tr><td>Date/time</td><td>{{runDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}}</td></tr>
-            <tr><td>Operator</td><td>{{EscapeHtml(WorkflowState.Instance.OperatorWithRole)}}</td></tr>
-            <tr><td>Board model</td><td>{{EscapeHtml(SummarizeDistinct(_rows.Select(r => r.BoardModel)))}}</td></tr>
-            <tr><td>Lot ID</td><td>{{EscapeHtml(SummarizeDistinct(_rows.Select(r => r.LotId)))}}</td></tr>
-            <tr><td>Model/engine name</td><td>{{EscapeHtml(GetEngineNamePart())}}</td></tr>
-            <tr><td>Model version</td><td>{{EscapeHtml(GetEngineVersionPart())}}</td></tr>
-            <tr><td>Confidence threshold</td><td>{{configuration.ConfidenceThreshold.ToString("P0", CultureInfo.InvariantCulture)}}</td></tr>
-            <tr><td>Dataset folder</td><td>{{EscapeHtml(_selectedFolder ?? string.Empty)}}</td></tr>
-            <tr><td>Ground truth file</td><td>{{EscapeHtml(_groundTruthCsvPath ?? "Not selected")}}</td></tr>
-            <tr><td>Total images</td><td>{{_rows.Count}}</td></tr>
-            <tr><td>Passed count</td><td>{{_rows.Count(r => r.PassFail == "PASS")}}</td></tr>
-            <tr><td>Failed count</td><td>{{failedCount}}</td></tr>
-            <tr><td>Accuracy</td><td>{{FormatPercent(metrics.Accuracy)}}</td></tr>
-            <tr><td>Precision</td><td>{{FormatPercent(metrics.Precision)}}</td></tr>
-            <tr><td>Recall</td><td>{{FormatPercent(metrics.Recall)}}</td></tr>
-            <tr><td>False call rate</td><td>{{FormatPercent(metrics.FalseCallRate)}}</td></tr>
-            <tr><td>Annotated-image folder</td><td>{{EscapeHtml(string.IsNullOrWhiteSpace(_lastAnnotatedImageFolder) ? "Not exported" : _lastAnnotatedImageFolder)}}</td></tr>
-          </table>
-          <h2>Confusion Matrix</h2>
-          <table><tr><th>TP</th><th>TN</th><th>FP</th><th>FN</th></tr><tr><td>{{metrics.TruePositive}}</td><td>{{metrics.TrueNegative}}</td><td>{{metrics.FalsePositive}}</td><td>{{metrics.FalseNegative}}</td></tr></table>
-          <h2>Review Categories</h2>
-          <table><tr><th>OK</th><th>NG</th><th>REVIEW</th><th>False Call</th><th>Possible Escape</th><th>Unknown / Unlabeled</th></tr><tr><td>{{metrics.OkCount}}</td><td>{{metrics.NgCount}}</td><td>{{metrics.ReviewCount}}</td><td>{{metrics.FalseCall}}</td><td>{{metrics.PossibleEscape}}</td><td>{{metrics.Unknown}}</td></tr></table>
-          <h2>Failed Samples</h2>
-          <table><tr><th>Image</th><th>Ground Truth</th><th>Engine Result</th><th>Pass/Fail</th><th>Defect Type</th><th>ROI ID</th><th>ROI Type</th><th>Recipe</th><th>Side</th><th>RefDes</th><th>Lot ID</th><th>Board Model</th><th>Notes</th></tr>{{failedTableRows}}</table>
-        </body>
-        </html>
-        """;
-    }
-
     private string GetEngineNamePart()
         => _currentEngineDisplay.Split(" / ", StringSplitOptions.None).FirstOrDefault() ?? _currentEngineDisplay;
 
@@ -1178,18 +985,6 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
     {
         var parts = _currentEngineDisplay.Split(" / ", StringSplitOptions.None);
         return parts.Length > 1 ? parts[1] : "UNKNOWN";
-    }
-
-    private static string SummarizeDistinct(IEnumerable<string> values)
-    {
-        var distinct = values
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .ToArray();
-
-        return distinct.Length == 0 ? "Not provided" : string.Join(", ", distinct);
     }
 
     private void PreviewRow(BatchTestRow row)
@@ -1281,24 +1076,6 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
 
     private static string FormatMilliseconds(double value)
         => value <= 0 ? "--" : $"{value:F0} ms";
-
-    private static string RecipeDisplay(BatchTestRow row)
-        => string.IsNullOrWhiteSpace(row.RecipeName) && string.IsNullOrWhiteSpace(row.RecipeRevision)
-            ? string.Empty
-            : $"{row.RecipeName} {row.RecipeRevision}".Trim();
-
-    private static string EscapeCsv(string value)
-        => $"\"{value.Replace("\"", "\"\"")}\"";
-
-    private static string EscapeMarkdown(string value)
-        => value.Replace("|", "\\|", StringComparison.Ordinal).Replace(Environment.NewLine, " ", StringComparison.Ordinal);
-
-    private static string EscapeHtml(string value)
-        => value
-            .Replace("&", "&amp;", StringComparison.Ordinal)
-            .Replace("<", "&lt;", StringComparison.Ordinal)
-            .Replace(">", "&gt;", StringComparison.Ordinal)
-            .Replace("\"", "&quot;", StringComparison.Ordinal);
 
     private CancellationTokenSource BeginWork(string message)
     {

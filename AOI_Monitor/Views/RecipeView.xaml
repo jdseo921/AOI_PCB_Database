@@ -30,6 +30,7 @@
         <TextBlock x:Name="RecipeStatusText" Text="Load a PCB image to start editing." Foreground="#9AA6AF" FontSize="14" TextWrapping="Wrap" VerticalAlignment="Bottom" Width="360" Margin="{StaticResource HmiFieldGap}"/>
         <WrapPanel VerticalAlignment="Bottom" Style="{StaticResource HmiInlineActionBand}">
           <Button Style="{StaticResource ActionBtn}" Content="Load Image" Margin="{StaticResource HmiButtonGap}" Click="OnLoadImageClick"/>
+          <Button Style="{StaticResource MiniBtn}" Content="Import Centroid CSV" Margin="{StaticResource HmiButtonGap}" Click="OnImportCentroidClick"/>
           <Button Style="{StaticResource ActionBtnBlue}" Content="Test Run" Margin="{StaticResource HmiButtonGap}" Click="OnTestRunClick"/>
           <Button Style="{StaticResource ActionBtnGreen}" Content="Save Recipe" Margin="{StaticResource HmiButtonGap}" Click="OnSaveRecipeClick"/>
         </WrapPanel>

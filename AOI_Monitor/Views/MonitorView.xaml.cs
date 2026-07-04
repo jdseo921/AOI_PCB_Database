@@ -42,7 +42,6 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
     private string _lastLightingResult = "Lighting: Disabled / Not Connected";
     private bool _currentIsSimulatedSource;
     private BitmapSource? _currentBitmap;
-    private ImportedImage? _currentImportedImage;
     private AnalysisResult? _currentAnalysis;
     private InspectionLatencyTraceBuilder? _currentLatencyTrace;
     private InspectionLatencyTrace? _lastLatencyTrace;
@@ -595,7 +594,6 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
             }
 
             _currentImagePath = nextBoard.ImagePath;
-            _currentImportedImage = nextBoard.ImportedImage;
             _currentBoardModel = nextBoard.BoardModel;
             _currentLotId = nextBoard.LotId;
             _currentSourceFrameId = nextBoard.SourceFrameId;
@@ -841,30 +839,6 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         return LearnedVisualModelRegistryService.GetActiveLearnedVisualModel() is { } active
             ? string.Join(" ", LearnedVisualModelRegistryService.BuildEvidenceLines(active.Model).Take(3))
             : "Learned PCB Visual Model selected, but no active model metadata is available. Review required.";
-    }
-
-    private void RefreshCalibrationProfiles(long? preferredProfileId = null)
-    {
-        try
-        {
-            _updatingCalibrationProfiles = true;
-            var selectedId = preferredProfileId ?? _selectedCalibrationProfile?.Id;
-            var profileItems = AoiDatabase.GetCalibrationProfiles()
-                .Select(profile => new CalibrationProfileListItem(profile.DisplayName, profile))
-                .ToList();
-
-            profileItems.Insert(0, new CalibrationProfileListItem("No 2D profile (Stage 2 prep)", null));
-            ApplyCalibrationProfiles(profileItems, selectedId);
-        }
-        catch (Exception ex)
-        {
-            _selectedCalibrationProfile = null;
-            LogEvent("CALIBRATION ERROR", $"Could not load calibration profiles: {ex.Message}");
-        }
-        finally
-        {
-            _updatingCalibrationProfiles = false;
-        }
     }
 
     private void ApplyCalibrationProfiles(IReadOnlyList<CalibrationProfileListItem> profileItems, long? selectedId)

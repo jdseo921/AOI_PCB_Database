@@ -679,6 +679,36 @@ public static class ImageOnlyPcbLearningService
             }
         }
 
+        // Coarse-to-fine refinement: the exhaustive pass above scores each offset on a sparse
+        // sampleStep pixel grid, which can lock onto a slightly wrong offset when the sampled
+        // pixels land on locally dominant texture. Re-score the +/-2 neighborhood of the coarse
+        // winner at full resolution (sampleStep 1) and return that refined offset with its
+        // full-resolution error. Small images already ran the coarse pass at sampleStep 1
+        // (full resolution), so refinement is skipped there and their behavior is unchanged.
+        if (sampleStep > 1)
+        {
+            var refined = new AlignmentOffset(0, 0, double.PositiveInfinity);
+            var minYOffset = Math.Max(-radius, best.OffsetY - 2);
+            var maxYOffset = Math.Min(radius, best.OffsetY + 2);
+            var minXOffset = Math.Max(-radius, best.OffsetX - 2);
+            var maxXOffset = Math.Min(radius, best.OffsetX + 2);
+            for (var yOffset = minYOffset; yOffset <= maxYOffset; yOffset++)
+            {
+                for (var xOffset = minXOffset; xOffset <= maxXOffset; xOffset++)
+                {
+                    var error = AlignmentError(reference, candidate, xOffset, yOffset, sampleStep: 1);
+                    if (error < refined.Error - 0.000001 ||
+                        (Math.Abs(error - refined.Error) <= 0.000001 &&
+                         Math.Abs(xOffset) + Math.Abs(yOffset) < Math.Abs(refined.OffsetX) + Math.Abs(refined.OffsetY)))
+                    {
+                        refined = new AlignmentOffset(xOffset, yOffset, error);
+                    }
+                }
+            }
+
+            best = refined;
+        }
+
         return best;
     }
 

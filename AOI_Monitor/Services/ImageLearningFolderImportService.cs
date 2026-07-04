@@ -16,13 +16,6 @@ public static class ImageLearningFolderImportService
             [ImageLearningImageRole.NgValidation] = "ng_validation",
         };
 
-    private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".png",
-        ".jpg",
-        ".jpeg",
-    };
-
     private const string TruthFileName = "image_truth.csv";
     private const string NextSuggestedCommand = "Open AOI Monitor > AI / Models > AI Training Setup, then click Learn Normal PCB Appearance.";
 

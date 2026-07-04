@@ -72,6 +72,22 @@ ONNX Runtime behavior:
 
 If no golden image is supplied, the result remains `REVIEW` because the program does not have enough reference data for differential judgment.
 
+Image-only learning pipeline quality measures:
+
+- Coarse-to-fine alignment: the learned-model pipeline recovers sample-to-reference
+  translation with an exhaustive integer-offset search scored on a sparse pixel grid,
+  then re-scores a small neighborhood around the winner at full resolution
+  (`ImageOnlyPcbLearningService.FindAlignment`). Deterministic; small images already
+  score at full resolution and are unchanged.
+- Statistical evidence reporting: false-call and possible-escape rates are reported with
+  exact Clopper-Pearson 95% confidence intervals and PPM via `BinomialConfidence` /
+  `RateEstimate`, instead of bare percentages.
+- Robustness/stability study (`RobustnessStudyService`): an MSA-adapted perturbation
+  study that re-inspects images under controlled brightness shifts, pixel offsets, and
+  seeded pseudo-noise, then reports verdict stability, OK false-call flips, and NG
+  detection retention with confidence intervals (JSON/CSV/HTML). Explicitly labeled as
+  a synthetic study, not a substitute for a physical Gage R&R with repeated captures.
+
 Implemented policy thresholds:
 
 | Detection Priority | Review Threshold | NG Threshold | Intent |
@@ -233,6 +249,12 @@ Implemented behavior:
 - Reload the latest saved recipe revision for the active board program on startup.
 - Run a local test inspection against the selected image using the current pixel-difference engine.
 - Enforce the global recipe lock before unsafe edits and saves.
+- Import pick-and-place centroid CSV files (KiCad/Altium header variants, comma/semicolon/tab,
+  mil-to-mm conversion) and auto-generate one Presence ROI per component via
+  `CentroidRoiImportService`: board-mm extents are auto-fit into the loaded image (Y-axis
+  flipped from CAD bottom-up to image top-down) with package-size hints for chip packages.
+  Positions are uncalibrated approximations and must be reviewed before saving; the import
+  summary states this explicitly.
 
 Active ROI is shown in yellow, saved ROI in green, and unsaved inactive ROI in blue.
 

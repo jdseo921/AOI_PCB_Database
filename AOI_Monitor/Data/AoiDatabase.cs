@@ -6397,7 +6397,9 @@ public static class AoiDatabase
         catch (Exception ex)
         {
             System.Diagnostics.Trace.WriteLine($"String-list JSON deserialize fallback used: {ex.Message}");
-            return Array.Empty<string>();
+            // Acceptance-run warnings/failures feed exported evidence. An empty list would
+            // make a stored FAIL run look clean; keep a visible marker instead.
+            return new List<string> { $"[Stored list could not be read: {ex.Message}]" };
         }
     }
 

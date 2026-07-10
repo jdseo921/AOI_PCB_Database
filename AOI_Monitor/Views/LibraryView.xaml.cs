@@ -53,7 +53,23 @@ public partial class LibraryView : UserControl, IAsyncNavigationPage
     public async Task RefreshAsync(CancellationToken cancellationToken)
         => await LoadRecordsFromDatabaseAsync(null, cancellationToken);
 
-    public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);
+    public void RefreshFromState() => _ = RefreshSafeAsync();
+
+    private async Task RefreshSafeAsync()
+    {
+        try
+        {
+            await RefreshAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer refresh/navigation.
+        }
+        catch (Exception ex)
+        {
+            ImportStatusText.Text = $"Library refresh failed: {ex.Message}";
+        }
+    }
 
     public void CancelWork()
     {

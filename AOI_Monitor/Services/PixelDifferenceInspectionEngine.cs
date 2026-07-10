@@ -525,7 +525,16 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
             ra.CopyPixels(pa, stride, 0);
             rb.CopyPixels(pb, stride, 0);
 
+            // Recover small sample-to-golden translation before diffing: unaligned captures
+            // shift every high-contrast edge and inflate the difference score on good boards.
+            // The search is deliberately tight (~2% of frame) and keeps (0,0) unless the best
+            // offset is a clear improvement, so a gross defect cannot drag the alignment.
+            var grayGolden = ToGray(pb, w, h, stride);
+            var graySample = ToGray(pa, w, h, stride);
+            var (dx, dy) = FindTranslation(grayGolden, graySample, w, h);
+
             double total = 0;
+            long overlap = 0;
             const int gridX = 8;
             const int gridY = 8;
             var bins = new double[gridX * gridY];
@@ -534,19 +543,30 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
 
             for (int y = 0; y < h; y++)
             {
+                int sy = y - dy;
+                if (sy < 0 || sy >= h)
+                    continue;
+
                 int gy = Math.Min(gridY - 1, y / ch);
-                int row = y * stride;
+                int goldenRow = y * stride;
+                int sampleRow = sy * stride;
                 for (int x = 0; x < w; x++)
                 {
-                    int gx = Math.Min(gridX - 1, x / cw);
-                    int i = row + x * 4;
+                    int sx = x - dx;
+                    if (sx < 0 || sx >= w)
+                        continue;
 
-                    double dr = Math.Abs(pa[i + 2] - pb[i + 2]);
-                    double dg = Math.Abs(pa[i + 1] - pb[i + 1]);
-                    double db = Math.Abs(pa[i] - pb[i]);
+                    int gx = Math.Min(gridX - 1, x / cw);
+                    int gi = goldenRow + x * 4;
+                    int si = sampleRow + sx * 4;
+
+                    double dr = Math.Abs(pa[si + 2] - pb[gi + 2]);
+                    double dg = Math.Abs(pa[si + 1] - pb[gi + 1]);
+                    double db = Math.Abs(pa[si] - pb[gi]);
                     double d = (dr + dg + db) / 3.0;
 
                     total += d;
+                    overlap++;
                     bins[gy * gridX + gx] += d;
                 }
             }
@@ -570,7 +590,7 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
                 1.0 / gridX,
                 1.0 / gridY);
 
-            var mad = total / (w * h);
+            var mad = overlap == 0 ? 0 : total / overlap;
             return Math.Min(100.0, mad / 255.0 * 100.0);
         }
         finally
@@ -578,6 +598,112 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
             pool.Return(pa);
             pool.Return(pb);
         }
+    }
+
+    private static double[] ToGray(byte[] bgra, int width, int height, int stride)
+    {
+        var gray = new double[width * height];
+        for (var y = 0; y < height; y++)
+        {
+            var row = y * stride;
+            for (var x = 0; x < width; x++)
+            {
+                var i = row + x * 4;
+                gray[y * width + x] = 0.114 * bgra[i] + 0.587 * bgra[i + 1] + 0.299 * bgra[i + 2];
+            }
+        }
+
+        return gray;
+    }
+
+    private static (int OffsetX, int OffsetY) FindTranslation(double[] golden, double[] sample, int width, int height)
+    {
+        // Coarse-to-fine integer translation search, mirroring the learned-model pipeline.
+        // Radius stays tight (~2% of a 384px frame): this engine has no brightness
+        // normalization, so wide searches would chase lighting differences.
+        var radius = Math.Min(8, Math.Min(width, height) / 16);
+        if (radius <= 0)
+            return (0, 0);
+
+        var sampleStep = Math.Max(1, Math.Max(width, height) / 96);
+        var bestX = 0;
+        var bestY = 0;
+        var bestError = double.PositiveInfinity;
+
+        for (var dy = -radius; dy <= radius; dy++)
+        {
+            for (var dx = -radius; dx <= radius; dx++)
+            {
+                var error = TranslationError(golden, sample, dx, dy, width, height, sampleStep);
+                if (error < bestError - 0.000001 ||
+                    (Math.Abs(error - bestError) <= 0.000001 &&
+                     Math.Abs(dx) + Math.Abs(dy) < Math.Abs(bestX) + Math.Abs(bestY)))
+                {
+                    bestX = dx;
+                    bestY = dy;
+                    bestError = error;
+                }
+            }
+        }
+
+        if (sampleStep > 1)
+        {
+            var refinedX = bestX;
+            var refinedY = bestY;
+            var refinedError = double.PositiveInfinity;
+            for (var dy = Math.Max(-radius, bestY - 2); dy <= Math.Min(radius, bestY + 2); dy++)
+            {
+                for (var dx = Math.Max(-radius, bestX - 2); dx <= Math.Min(radius, bestX + 2); dx++)
+                {
+                    var error = TranslationError(golden, sample, dx, dy, width, height, 1);
+                    if (error < refinedError - 0.000001 ||
+                        (Math.Abs(error - refinedError) <= 0.000001 &&
+                         Math.Abs(dx) + Math.Abs(dy) < Math.Abs(refinedX) + Math.Abs(refinedY)))
+                    {
+                        refinedX = dx;
+                        refinedY = dy;
+                        refinedError = error;
+                    }
+                }
+            }
+
+            bestX = refinedX;
+            bestY = refinedY;
+            bestError = refinedError;
+        }
+
+        if (bestX == 0 && bestY == 0)
+            return (0, 0);
+
+        // Keep (0,0) unless the shifted match is a clear improvement: a gross defect can bias
+        // the search toward "eating" its own edge, and marginal gains are not worth that risk.
+        var zeroError = TranslationError(golden, sample, 0, 0, width, height, 1);
+        return bestError < zeroError * 0.98 ? (bestX, bestY) : (0, 0);
+    }
+
+    private static double TranslationError(double[] golden, double[] sample, int offsetX, int offsetY, int width, int height, int sampleStep)
+    {
+        var sum = 0.0;
+        var count = 0;
+        for (var y = 0; y < height; y += sampleStep)
+        {
+            var sourceY = y - offsetY;
+            if (sourceY < 0 || sourceY >= height)
+                continue;
+
+            for (var x = 0; x < width; x += sampleStep)
+            {
+                var sourceX = x - offsetX;
+                if (sourceX < 0 || sourceX >= width)
+                    continue;
+
+                var delta = golden[y * width + x] - sample[sourceY * width + sourceX];
+                sum += delta * delta;
+                count++;
+            }
+        }
+
+        return count == 0 ? double.PositiveInfinity : sum / count;
     }
 
     private static double CompareRegion(BitmapSource a, BitmapSource b, Rect normalizedRegion)

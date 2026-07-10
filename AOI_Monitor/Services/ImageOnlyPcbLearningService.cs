@@ -656,7 +656,46 @@ public static class ImageOnlyPcbLearningService
         for (var i = 0; i < tolerance.Length; i++)
             tolerance[i] = Math.Max(minimumTolerance, Math.Sqrt(tolerance[i] / Math.Max(1, images.Count - 1)));
 
+        // 1-px max dilation: alignment is integer-only, so a genuine sub-pixel offset leaves
+        // razor-thin high-difference lines along high-contrast edges. Judging each pixel against
+        // its neighborhood's tolerance (classic AOI edge relief) removes that false-call class;
+        // escape exposure is limited to defects within 1 px of a high-variance edge.
+        tolerance = DilateMax3x3(tolerance, reference.Width, reference.Height);
+
         return new ImageMatrix(reference.Width, reference.Height, tolerance);
+    }
+
+    private static double[] DilateMax3x3(double[] values, int width, int height)
+    {
+        var dilated = new double[values.Length];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var best = double.MinValue;
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    var ny = y + dy;
+                    if (ny < 0 || ny >= height)
+                        continue;
+
+                    for (var dx = -1; dx <= 1; dx++)
+                    {
+                        var nx = x + dx;
+                        if (nx < 0 || nx >= width)
+                            continue;
+
+                        var value = values[ny * width + nx];
+                        if (value > best)
+                            best = value;
+                    }
+                }
+
+                dilated[y * width + x] = best;
+            }
+        }
+
+        return dilated;
     }
 
     private static AlignmentOffset FindAlignment(ImageMatrix reference, ImageMatrix candidate, int searchRadiusPixels)
@@ -818,6 +857,7 @@ public static class ImageOnlyPcbLearningService
             calibration.Result.Status,
             toleranceArtifactScale = ToleranceArtifactScaleGray16,
             toleranceArtifactBitDepth = 16,
+            toleranceDilation = "Max3x3",
             skippedImages,
             note = "Image-only learning uses OK images and optional image-level validation truth; no defect labels or training boxes are required.",
         };

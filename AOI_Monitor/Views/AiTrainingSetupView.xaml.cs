@@ -153,9 +153,11 @@ public partial class AiTrainingSetupView : UserControl
         {
             var currentRole = WorkflowState.Instance.CurrentRole;
             var operatorId = WorkflowState.Instance.OperatorWithRole;
+            AiTrainingSetupLearningOutcome? outcome = null;
             await RunLongActionAsync(
-                () => AiTrainingSetupService.RunLearning(currentRole, createdBy: operatorId),
+                () => outcome = AiTrainingSetupService.RunLearning(currentRole, createdBy: operatorId),
                 "Learn Normal PCB Appearance");
+            ShowLearningWarnings(outcome);
         }
         catch (Exception ex)
         {
@@ -169,9 +171,11 @@ public partial class AiTrainingSetupView : UserControl
         {
             var currentRole = WorkflowState.Instance.CurrentRole;
             var operatorId = WorkflowState.Instance.OperatorWithRole;
+            AiTrainingSetupLearningOutcome? outcome = null;
             await RunLongActionAsync(
-                () => AiTrainingSetupService.RunLearning(currentRole, createdBy: operatorId),
+                () => outcome = AiTrainingSetupService.RunLearning(currentRole, createdBy: operatorId),
                 "Calibrate False Calls");
+            ShowLearningWarnings(outcome);
         }
         catch (Exception ex)
         {
@@ -474,6 +478,19 @@ public partial class AiTrainingSetupView : UserControl
 
         _viewModel.StatusText = $"Folder import completed with {result.Warnings.Count} warning(s). {string.Join(" ", result.Warnings.Take(3))}";
         MessageBox.Show(string.Join(Environment.NewLine, result.Warnings.Take(12)), "AI Training Setup Import Warnings", MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+
+    private void ShowLearningWarnings(AiTrainingSetupLearningOutcome? outcome)
+    {
+        var warnings = outcome?.LearningResult.Warnings;
+        if (warnings is null || warnings.Count == 0)
+            return;
+
+        // Learning warnings can hide real evidence gaps (e.g. every NG validation image was
+        // skipped as unreadable, making the possible-escape rate trivially 0%). They must be
+        // shown, not just written into learning_summary.json.
+        _viewModel.StatusText = $"Learning completed with {warnings.Count} warning(s). {string.Join(" ", warnings.Take(3))}";
+        MessageBox.Show(string.Join(Environment.NewLine, warnings.Take(12)), "AI Training Warnings", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private static void OpenPath(string path, string title)

@@ -131,7 +131,18 @@ public sealed class WorkflowState
             }
             catch (Exception ex)
             {
+                // latest_decision.json still holds the PREVIOUS board's verdict; anything
+                // polling the machine-interface folder would act on stale data. Surface it
+                // as an alarm so the operator sees it on the Monitor page, not only in the
+                // audit log.
                 AddEvent("INTEGRATION", $"Contract export failed: {ex.Message}");
+                AlarmEventService.Raise(
+                    AlarmSeverity.Alarm,
+                    "Machine Interface Export",
+                    "Machine-interface decision export failed; downstream consumers may still see the previous board's verdict.",
+                    "Check the exports/machine_interface folder is writable, then re-run or re-save the inspection.",
+                    engineerDetails: ex.Message,
+                    idempotencyKey: "MACHINE_INTERFACE_EXPORT_FAILED");
             }
 
             QueueAutomaticTraceabilityUpload(result);
@@ -170,6 +181,13 @@ public sealed class WorkflowState
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Net.Http.HttpRequestException)
             {
                 AddEvent("MES_UPLOAD_ERROR", $"Automatic MES traceability upload failed safely: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                // Last-resort catch: this task is fire-and-forget, so an escaped exception
+                // (e.g. SqliteException on a locked DB) would otherwise vanish and auto-upload
+                // would look healthy while silently dead.
+                AddEvent("MES_UPLOAD_ERROR", $"Automatic MES traceability upload failed unexpectedly: {ex.Message}");
             }
         });
     }

@@ -81,7 +81,25 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
             IntegrationBoundaryRegistry.EmergencyStopMonitor = new NullEmergencyStopMonitor();
     }
 
-    private void OnWorkflowStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, () => _ = RefreshAsync(CancellationToken.None));
+    private void OnWorkflowStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, () => _ = RefreshSafeAsync());
+
+    private async Task RefreshSafeAsync()
+    {
+        try
+        {
+            await RefreshAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // Navigation raced the refresh; the next navigation refreshes again.
+        }
+        catch (Exception ex)
+        {
+            // Fire-and-forget refresh: without this the exception is discarded and the
+            // imported-image queue / calibration profiles silently go stale.
+            LogEvent("ERROR", $"Page refresh failed: {ex.Message}");
+        }
+    }
     private void OnEngineConfigurationChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshHeader);
     private void OnLightingSettingsChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, RefreshHeader);
     private void OnRobotCycleStateChanged(RobotCycleState state) => UiDispatcher.InvokeIfAvailable(Dispatcher, UpdateRobotSimulationStatus);
@@ -620,6 +638,15 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         }
         catch (Exception ex)
         {
+            // The board identity/image may already point at the NEW board; never leave the
+            // PREVIOUS board's verdict, defects, or overlay on screen (and never let Save
+            // re-persist the stale analysis as if it belonged to this board).
+            _currentAnalysis = null;
+            _currentResultSaved = true;
+            _defects.Clear();
+            DefectOverlayCanvas.Children.Clear();
+            TimingText.Text = "--";
+            SetResultStatus("REVIEW");
             LogEvent("ERROR", $"Next board failed: {ex.Message}");
             MessageBox.Show($"Next board failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
@@ -759,6 +786,17 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         if (analysis.Timing.IsOverOneSecond)
             LogEvent("PERFORMANCE WARNING", $"Visualization target exceeded: {analysis.Timing.TotalInspectionMilliseconds:F0} ms (limit 1000 ms).");
 
+        // A corrupt/empty recipe silently downgrades to whole-image diff; the engine records
+        // it only in the evidence lines, which this page does not display. Make it visible.
+        foreach (var recipeWarning in analysis.Evidence.Where(line =>
+                     line.Contains("recipe", StringComparison.OrdinalIgnoreCase) &&
+                     (line.Contains("warning", StringComparison.OrdinalIgnoreCase) ||
+                      line.Contains("fallback", StringComparison.OrdinalIgnoreCase) ||
+                      line.Contains("no valid ROI", StringComparison.OrdinalIgnoreCase))))
+        {
+            LogEvent("RECIPE WARNING", recipeWarning);
+        }
+
         if (autoSave)
             _currentLatencyTrace.StartSpan("resultPersist");
         state.SetAnalysis(analysis, persist: autoSave);
@@ -779,7 +817,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         return analysis;
     }
 
-    public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);
+    public void RefreshFromState() => _ = RefreshSafeAsync();
 
     private void RefreshHeader()
     {

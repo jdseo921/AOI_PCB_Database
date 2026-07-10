@@ -89,7 +89,7 @@ public sealed class LearnedPcbVisualInspectionEngine : IInspectionEngine
                 .ToList();
             result.Timing.RecalculateTotal();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException or NotSupportedException or System.IO.FileFormatException or ArgumentException or System.Runtime.InteropServices.COMException)
         {
             result.ErrorCode = "IMAGE_LEARNING_INSPECTION_FAILED";
             result.ErrorMessage = ex.Message;

@@ -108,7 +108,9 @@ public static class ImageLearningFalseCallComparisonService
             relatedEntityType: "ImageLearningProject",
             relatedEntityId: project.ProjectId,
             relatedPath: outputFolder);
-        ImageLearningProjectService.RecordReportExport(project.ProjectId, paths.HtmlReportPath, "OK", normalizedOperator);
+        // Auditors read this status: a comparison with skipped images or no safe threshold
+        // is recorded as WARN, matching the overlay exporter's convention.
+        ImageLearningProjectService.RecordReportExport(project.ProjectId, paths.HtmlReportPath, warnings.Count == 0 ? "OK" : "WARN", normalizedOperator);
 
         return new ImageLearningFalseCallComparisonResult(
             project.ProjectId,

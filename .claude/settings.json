@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File .claude/hooks/push-gate.ps1",
+            "timeout": 300,
+            "statusMessage": "Push gate: build + hygiene + code quality"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File .claude/hooks/stop-build-check.ps1",
+            "timeout": 240,
+            "statusMessage": "Verifying the Release build still compiles"
+          }
+        ]
+      }
+    ]
+  }
+}

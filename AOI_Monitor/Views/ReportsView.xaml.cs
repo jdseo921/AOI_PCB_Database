@@ -16,7 +16,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class ReportsView : UserControl, IAsyncNavigationPage
+public partial class ReportsView : UserControl, IAsyncNavigationPage, IDisposable
 {
     private static readonly Encoding CsvEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -3593,5 +3593,31 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage
                 RelatedPath = record.RelatedPath,
             };
         }
+    }
+
+    public void Dispose()
+    {
+        DisposeCancellation(ref _workCts);
+        DisposeCancellation(ref _refreshCts);
+        GC.SuppressFinalize(this);
+    }
+
+    private static void DisposeCancellation(ref CancellationTokenSource? cancellation)
+    {
+        var source = cancellation;
+        cancellation = null;
+        if (source is null)
+            return;
+
+        try
+        {
+            source.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed elsewhere; disposal must stay idempotent.
+        }
+
+        source.Dispose();
     }
 }

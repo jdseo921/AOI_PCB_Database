@@ -214,7 +214,7 @@ public static class ModelConfigurationValidator
         foreach (var rawLine in File.ReadLines(path))
         {
             var line = rawLine.Trim();
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
                 continue;
 
             var parts = line.Split(',', 2);

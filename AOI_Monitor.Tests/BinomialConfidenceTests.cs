@@ -27,13 +27,13 @@ public class BinomialConfidenceTests
     public void ClopperPearsonIntervalAlwaysContainsThePointEstimate()
     {
         for (var n = 1; n <= 60; n++)
-        for (var k = 0; k <= n; k++)
-        {
-            var (lower, upper) = BinomialConfidence.ClopperPearson(k, n);
-            var point = (double)k / n;
-            Assert.True(lower >= 0.0 && upper <= 1.0 && lower <= upper, $"malformed interval for {k}/{n}");
-            Assert.True(lower <= point + 1e-9 && point <= upper + 1e-9, $"CI [{lower},{upper}] must contain {point} for {k}/{n}");
-        }
+            for (var k = 0; k <= n; k++)
+            {
+                var (lower, upper) = BinomialConfidence.ClopperPearson(k, n);
+                var point = (double)k / n;
+                Assert.True(lower >= 0.0 && upper <= 1.0 && lower <= upper, $"malformed interval for {k}/{n}");
+                Assert.True(lower <= point + 1e-9 && point <= upper + 1e-9, $"CI [{lower},{upper}] must contain {point} for {k}/{n}");
+            }
     }
 
     [Fact]

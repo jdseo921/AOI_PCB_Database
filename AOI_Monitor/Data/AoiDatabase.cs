@@ -7832,8 +7832,8 @@ public static class AoiDatabase
         if (string.IsNullOrWhiteSpace(operatorWithRole))
             return null;
 
-        var start = operatorWithRole.LastIndexOf("[", StringComparison.Ordinal);
-        var end = operatorWithRole.LastIndexOf("]", StringComparison.Ordinal);
+        var start = operatorWithRole.LastIndexOf('[');
+        var end = operatorWithRole.LastIndexOf(']');
         if (start < 0 || end <= start)
             return null;
 

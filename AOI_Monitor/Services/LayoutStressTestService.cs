@@ -138,7 +138,7 @@ public static class LayoutStressTestService
         foreach (var rawLine in report.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
         {
             var line = rawLine.Trim();
-            if (line.StartsWith("[", StringComparison.Ordinal) && line.EndsWith("]", StringComparison.Ordinal))
+            if (line.StartsWith('[') && line.EndsWith(']'))
             {
                 currentPage = line.Trim('[', ']');
                 continue;

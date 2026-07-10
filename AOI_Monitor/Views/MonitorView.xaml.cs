@@ -15,7 +15,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class MonitorView : UserControl, IReleasablePageResources, IAsyncNavigationPage
+public partial class MonitorView : UserControl, IReleasablePageResources, IAsyncNavigationPage, IDisposable
 {
     private readonly ObservableCollection<DefectRow> _defects = new();
     private readonly ObservableCollection<AlarmRow> _alarms = new();
@@ -1415,4 +1415,11 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         RobotAcceptanceRun? LatestRobotAcceptance,
         string SamplePath,
         bool SampleExists);
+
+    public void Dispose()
+    {
+        CancelAndDispose(ref _robotCycleCancellation);
+        CancelAndDispose(ref _refreshCancellation);
+        GC.SuppressFinalize(this);
+    }
 }

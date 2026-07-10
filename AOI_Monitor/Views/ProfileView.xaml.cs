@@ -14,7 +14,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class ProfileView : UserControl, IReleasablePageResources
+public partial class ProfileView : UserControl, IReleasablePageResources, IDisposable
 {
     private const double SurfaceHeightScale = 0.4;
     private const int MaxSurfaceDimension = 160;
@@ -788,6 +788,27 @@ public partial class ProfileView : UserControl, IReleasablePageResources
 
         cells.Add(sb.ToString());
         return cells;
+    }
+
+    public void Dispose()
+    {
+        var source = _acceptanceCancellation;
+        _acceptanceCancellation = null;
+        if (source is not null)
+        {
+            try
+            {
+                source.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed elsewhere; disposal must stay idempotent.
+            }
+
+            source.Dispose();
+        }
+
+        GC.SuppressFinalize(this);
     }
 }
 

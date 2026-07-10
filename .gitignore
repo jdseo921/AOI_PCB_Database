@@ -105,3 +105,6 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 .DS_Store
+
+# Claude Code hook state
+.claude/hooks/.last-verified-build

@@ -15,7 +15,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class SettingsView : UserControl, IAsyncNavigationPage
+public partial class SettingsView : UserControl, IAsyncNavigationPage, IDisposable
 {
     private readonly MainViewModel _vm;
     private readonly ObservableCollection<ModelRegistryRow> _modelRegistryRows = new();
@@ -3318,5 +3318,33 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage
         public string Deployed { get; }
         public string SourceFalseCallReductionRunDisplay { get; }
         public string SourceValidationRunDisplay { get; }
+    }
+
+    public void Dispose()
+    {
+        DisposeCancellation(ref _modelAcceptanceCancellation);
+        DisposeCancellation(ref _cameraAcceptanceCancellation);
+        DisposeCancellation(ref _lightingAcceptanceCancellation);
+        DisposeCancellation(ref _robotAcceptanceCancellation);
+        GC.SuppressFinalize(this);
+    }
+
+    private static void DisposeCancellation(ref CancellationTokenSource? cancellation)
+    {
+        var source = cancellation;
+        cancellation = null;
+        if (source is null)
+            return;
+
+        try
+        {
+            source.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed elsewhere; disposal must stay idempotent.
+        }
+
+        source.Dispose();
     }
 }

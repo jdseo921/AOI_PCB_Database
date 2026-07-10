@@ -211,7 +211,7 @@ public static class MesIntegrationSettingsService
     private static string NormalizePath(string? path, string fallback)
     {
         var value = string.IsNullOrWhiteSpace(path) ? fallback : path.Trim();
-        return value.StartsWith("/", StringComparison.Ordinal) ? value : $"/{value}";
+        return value.StartsWith('/') ? value : $"/{value}";
     }
 
     private static string RedactedSecretMarker(MesIntegrationSettings settings)

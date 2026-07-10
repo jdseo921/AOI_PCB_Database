@@ -14,7 +14,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class AIModelTestView : UserControl, IAsyncNavigationPage
+public partial class AIModelTestView : UserControl, IAsyncNavigationPage, IDisposable
 {
     private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -1168,4 +1168,29 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage
             => new(Array.Empty<BatchTestRow>(), new BatchMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), false, string.Empty, 0, errors, message);
     }
 
+    public void Dispose()
+    {
+        DisposeCancellation(ref _workCts);
+        DisposeCancellation(ref _refreshCts);
+        GC.SuppressFinalize(this);
+    }
+
+    private static void DisposeCancellation(ref CancellationTokenSource? cancellation)
+    {
+        var source = cancellation;
+        cancellation = null;
+        if (source is null)
+            return;
+
+        try
+        {
+            source.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed elsewhere; disposal must stay idempotent.
+        }
+
+        source.Dispose();
+    }
 }

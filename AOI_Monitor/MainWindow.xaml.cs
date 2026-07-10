@@ -16,7 +16,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor;
 
-public partial class MainWindow : Window
+public partial class MainWindow : Window, IDisposable
 {
     private readonly Dictionary<string, UserControl> _pageCache = new();
     private readonly ObservableCollection<AlarmEvent> _alarmRows = new();
@@ -1698,5 +1698,31 @@ public partial class MainWindow : Window
             dialog.Close();
         };
         return dialog.ShowDialog() == true ? password.Password : string.Empty;
+    }
+
+    public void Dispose()
+    {
+        DisposeCancellation(ref _navigationCts);
+        DisposeCancellation(ref _footerCts);
+        GC.SuppressFinalize(this);
+    }
+
+    private static void DisposeCancellation(ref CancellationTokenSource? cancellation)
+    {
+        var source = cancellation;
+        cancellation = null;
+        if (source is null)
+            return;
+
+        try
+        {
+            source.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed elsewhere; disposal must stay idempotent.
+        }
+
+        source.Dispose();
     }
 }

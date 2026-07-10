@@ -12,7 +12,7 @@ using Microsoft.Win32;
 
 namespace AOI_Monitor.Views;
 
-public partial class LibraryView : UserControl, IAsyncNavigationPage
+public partial class LibraryView : UserControl, IAsyncNavigationPage, IDisposable
 {
     private static readonly HashSet<string> SupportedImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -588,4 +588,25 @@ public partial class LibraryView : UserControl, IAsyncNavigationPage
     }
 
     private sealed record ImportProgress(int Completed, int Total, string Message);
+
+    public void Dispose()
+    {
+        var source = _importCts;
+        _importCts = null;
+        if (source is not null)
+        {
+            try
+            {
+                source.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed elsewhere; disposal must stay idempotent.
+            }
+
+            source.Dispose();
+        }
+
+        GC.SuppressFinalize(this);
+    }
 }

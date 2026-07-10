@@ -296,39 +296,51 @@ public static class HmiLayoutAuditService
 
     private static FrameworkElement CreateShellRoute(string route)
     {
-        var window = new MainWindow();
-        if (window.DataContext is MainViewModel viewModel)
-            viewModel.CurrentPage = route;
-
-        SetText(window, "BrandTitleText", "PCBA AOI REVIEW CONSOLE - CUSTOMER VALIDATION LINE WITH LONG PROGRAM TITLE");
-        SetText(window, "StationNameText", "AOI-LIB-LINE-02-STATION-WEST-REVIEW-CELL-WITH-LONG-NAME");
-        SetText(window, "StationSubtitleText", "local review console / prototype / customer validation workstation / long subtitle");
-        SetText(window, "HeaderUserText", "Engineer01.CustomerValidationShiftLeadWithLongName");
-        SetText(window, "HeaderRoleText", "Admin / Shift Lead");
-        SetText(window, "HeaderEngineText", "Pixel Difference Prototype Engine With ONNX Candidate Adapter Boundary");
-        SetText(window, "ActiveAlarmHeaderText", "none");
-        SetText(window, "ActiveAlarmSummaryText", "No active alarms.");
-        SetText(window, "FooterRecordCountText", "123456");
-        SetText(window, "FooterImageLinkText", "123456/123456");
-        SetText(window, "FooterDbRevText", "SQLite local revision");
-        SetText(window, "FooterStationText", "AOI-LIB-LINE-02-STATION-WEST");
-        SetText(window, "FooterIndexText", "Images OK / Long Index Status");
-        SetText(window, "FooterDbUpdatedText", "06-23 12:30");
-        if (FindByName(window, "ActiveAlarmsPopup") is Popup alarmPopup)
-            alarmPopup.IsOpen = false;
-        if (FindByName(window, "AccessPanelPopup") is Popup accessPopup)
-            accessPopup.IsOpen = false;
-
-        if (window.Content is FrameworkElement root)
+        // MainWindow is IDisposable (owns cancellation sources). Dispose it on the path where
+        // only its extracted content root is returned; transfer ownership (null the local)
+        // when the window itself is the audited element.
+        MainWindow? window = new MainWindow();
+        try
         {
-            if (root.DataContext is null)
-                root.DataContext = window.DataContext;
-            window.Content = null;
-            window.Close();
-            return root;
-        }
+            if (window.DataContext is MainViewModel viewModel)
+                viewModel.CurrentPage = route;
 
-        return window;
+            SetText(window, "BrandTitleText", "PCBA AOI REVIEW CONSOLE - CUSTOMER VALIDATION LINE WITH LONG PROGRAM TITLE");
+            SetText(window, "StationNameText", "AOI-LIB-LINE-02-STATION-WEST-REVIEW-CELL-WITH-LONG-NAME");
+            SetText(window, "StationSubtitleText", "local review console / prototype / customer validation workstation / long subtitle");
+            SetText(window, "HeaderUserText", "Engineer01.CustomerValidationShiftLeadWithLongName");
+            SetText(window, "HeaderRoleText", "Admin / Shift Lead");
+            SetText(window, "HeaderEngineText", "Pixel Difference Prototype Engine With ONNX Candidate Adapter Boundary");
+            SetText(window, "ActiveAlarmHeaderText", "none");
+            SetText(window, "ActiveAlarmSummaryText", "No active alarms.");
+            SetText(window, "FooterRecordCountText", "123456");
+            SetText(window, "FooterImageLinkText", "123456/123456");
+            SetText(window, "FooterDbRevText", "SQLite local revision");
+            SetText(window, "FooterStationText", "AOI-LIB-LINE-02-STATION-WEST");
+            SetText(window, "FooterIndexText", "Images OK / Long Index Status");
+            SetText(window, "FooterDbUpdatedText", "06-23 12:30");
+            if (FindByName(window, "ActiveAlarmsPopup") is Popup alarmPopup)
+                alarmPopup.IsOpen = false;
+            if (FindByName(window, "AccessPanelPopup") is Popup accessPopup)
+                accessPopup.IsOpen = false;
+
+            if (window.Content is FrameworkElement root)
+            {
+                if (root.DataContext is null)
+                    root.DataContext = window.DataContext;
+                window.Content = null;
+                window.Close();
+                return root;
+            }
+
+            var transferred = window;
+            window = null;
+            return transferred;
+        }
+        finally
+        {
+            window?.Dispose();
+        }
     }
 
     private static FrameworkElement CreateImageViewerRoute()

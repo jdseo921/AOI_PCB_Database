@@ -182,7 +182,7 @@ public static class TraceabilityUploadService
             return string.Empty;
 
         var baseUrl = settings.BaseUrl.TrimEnd('/');
-        var path = settings.UploadResultPath.StartsWith("/", StringComparison.Ordinal)
+        var path = settings.UploadResultPath.StartsWith('/')
             ? settings.UploadResultPath
             : $"/{settings.UploadResultPath}";
         return $"{baseUrl}{path}";

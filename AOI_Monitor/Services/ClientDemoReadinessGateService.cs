@@ -463,13 +463,26 @@ public static class ClientDemoReadinessGateService
     private static string Html(string value)
         => System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
 
+    private static string? _artifactRootOverrideForTests;
+
+    /// <summary>
+    /// Tests point artifact discovery at an isolated folder. The default roots include the
+    /// repository TestResults folder, which other test processes (e.g. the UI test project
+    /// running concurrently in a full-solution run) write real reports into — reading it
+    /// from tests makes gate outcomes depend on test execution order.
+    /// </summary>
+    public static void OverrideArtifactRootForTests(string? directory)
+        => _artifactRootOverrideForTests = directory;
+
     private static string? FindLatestArtifact(string fileName)
     {
-        var roots = new[]
-        {
-            Path.Combine(FindRepositoryRoot(), "TestResults"),
-            Path.Combine(AppContext.BaseDirectory, "TestResults"),
-        };
+        var roots = _artifactRootOverrideForTests is not null
+            ? new[] { _artifactRootOverrideForTests }
+            : new[]
+            {
+                Path.Combine(FindRepositoryRoot(), "TestResults"),
+                Path.Combine(AppContext.BaseDirectory, "TestResults"),
+            };
 
         return roots
             .Where(Directory.Exists)

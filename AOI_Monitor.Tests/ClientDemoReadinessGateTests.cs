@@ -19,10 +19,19 @@ public sealed class ClientDemoReadinessGateTests : IDisposable
         DeploymentProfileSettingsService.ResetForTests();
         OperatingModeSettingsService.ResetForTests();
         CrashReportService.ClearForTests();
+        // Gate outcomes must not depend on artifacts other tests (or a concurrently running
+        // UI-test process) leave in the shared repository TestResults folder, nor on alarm
+        // state carried over from earlier test classes in this process.
+        ClientDemoReadinessGateService.OverrideArtifactRootForTests(ArtifactRoot);
+        AlarmEventService.ClearForTests();
     }
+
+    private string ArtifactRoot => Path.Combine(_root, "TestResults");
 
     public void Dispose()
     {
+        ClientDemoReadinessGateService.OverrideArtifactRootForTests(null);
+        AlarmEventService.ClearForTests();
         CrashReportService.ClearForTests();
         DeploymentProfileSettingsService.ResetForTests();
         OperatingModeSettingsService.ResetForTests();
@@ -193,19 +202,19 @@ public sealed class ClientDemoReadinessGateTests : IDisposable
         ExportVerificationService.RecordVerifiedExport("ClientDemoGateEvidence", path, "OK", "GateAdmin [Admin]");
     }
 
-    private static void WritePassingHmiLayoutAudit()
+    private void WritePassingHmiLayoutAudit()
     {
         WriteHmiLayoutAudit(passed: true, failCount: 0);
     }
 
-    private static void WriteFailingHmiLayoutAudit()
+    private void WriteFailingHmiLayoutAudit()
     {
         WriteHmiLayoutAudit(passed: false, failCount: 1);
     }
 
-    private static void WriteHmiLayoutAudit(bool passed, int failCount)
+    private void WriteHmiLayoutAudit(bool passed, int failCount)
     {
-        var folder = Path.Combine(FindRepositoryRoot(), "TestResults");
+        var folder = ArtifactRoot;
         Directory.CreateDirectory(folder);
         var issue = failCount > 0
             ? """
@@ -226,19 +235,19 @@ public sealed class ClientDemoReadinessGateTests : IDisposable
         """);
     }
 
-    private static void WritePassingNavigationPerformanceReport()
+    private void WritePassingNavigationPerformanceReport()
     {
         WriteNavigationPerformanceReport(visualMs: 40, cachedMs: 120);
     }
 
-    private static void WriteNavigationPerformanceReportWithWarning()
+    private void WriteNavigationPerformanceReportWithWarning()
     {
         WriteNavigationPerformanceReport(visualMs: 150, cachedMs: 350);
     }
 
-    private static void WriteNavigationPerformanceReport(long visualMs, long cachedMs)
+    private void WriteNavigationPerformanceReport(long visualMs, long cachedMs)
     {
-        var folder = Path.Combine(FindRepositoryRoot(), "TestResults");
+        var folder = ArtifactRoot;
         Directory.CreateDirectory(folder);
         File.WriteAllText(Path.Combine(folder, "ui_navigation_performance.json"), $$"""
         {
@@ -282,19 +291,6 @@ public sealed class ClientDemoReadinessGateTests : IDisposable
         });
 
         UiNavigationSoakTestService.WriteReports(result, UiNavigationSoakTestService.DefaultOutputRoot);
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null)
-        {
-            if (File.Exists(Path.Combine(current.FullName, "AOI_PCB_Database.slnx")))
-                return current.FullName;
-            current = current.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not find repository root.");
     }
 
     private static string FormatBlockingIssues(ClientDemoReadinessGateReport report)

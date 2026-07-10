@@ -474,7 +474,7 @@ public partial class ProfileView : UserControl, IReleasablePageResources, IDispo
                 Feature = $"#{index}",
                 Type = GetDefectType(p.Height),
                 HeightDisplay = p.Height.ToString("F3", CultureInfo.InvariantCulture),
-                VolumeDisplay = ComputeVolumePlaceholder(point).ToString("F3", CultureInfo.InvariantCulture),
+                VolumeDisplay = ComputeRegionVolume(point).ToString("F3", CultureInfo.InvariantCulture),
                 X = p.X,
                 Y = p.Y,
                 Height = p.Height,
@@ -566,7 +566,7 @@ public partial class ProfileView : UserControl, IReleasablePageResources, IDispo
 
         DefectTypeText.Text = GetDefectType(point.Height);
         DefectHeightText.Text = point.Height.ToString("F3", CultureInfo.InvariantCulture);
-        DefectVolumeText.Text = ComputeVolumePlaceholder(point).ToString("F3", CultureInfo.InvariantCulture);
+        DefectVolumeText.Text = ComputeRegionVolume(point).ToString("F3", CultureInfo.InvariantCulture);
         DefectXText.Text = point.X.ToString(CultureInfo.InvariantCulture);
         DefectYText.Text = point.Y.ToString(CultureInfo.InvariantCulture);
         DrawSelectionMarker(point);
@@ -735,8 +735,46 @@ public partial class ProfileView : UserControl, IReleasablePageResources, IDispo
         return "Coplanarity Review";
     }
 
-    private double ComputeVolumePlaceholder((int X, int Y, double Height) point)
-        => Math.Abs(point.Height - _meanHeight);
+    /// <summary>
+    /// Region volume estimate in grid units cubed: flood-fills the contiguous cells that
+    /// exceed the same defect threshold as the selected point (4-connectivity) and sums
+    /// each cell's height deviation from the mean plane (cell area = 1 grid unit squared).
+    /// A point inside tolerance contributes only its own deviation.
+    /// </summary>
+    private double ComputeRegionVolume((int X, int Y, double Height) point)
+    {
+        var highLimit = _meanHeight + ((_maxHeight - _meanHeight) * 0.60);
+        var lowLimit = _meanHeight - ((_meanHeight - _minHeight) * 0.60);
+        var isHigh = point.Height >= highLimit;
+        var isLow = point.Height <= lowLimit;
+        if (!isHigh && !isLow)
+            return Math.Abs(point.Height - _meanHeight);
+
+        bool InRegion(double height) => isHigh ? height >= highLimit : height <= lowLimit;
+
+        var visited = new HashSet<(int X, int Y)>();
+        var queue = new Queue<(int X, int Y)>();
+        queue.Enqueue((point.X, point.Y));
+        visited.Add((point.X, point.Y));
+        var volume = 0.0;
+        const int cellCap = 100_000;
+
+        while (queue.Count > 0 && visited.Count <= cellCap)
+        {
+            var cell = queue.Dequeue();
+            if (!_points.TryGetValue(cell, out var height) || !InRegion(height))
+                continue;
+
+            volume += Math.Abs(height - _meanHeight);
+            foreach (var next in new[] { (cell.X + 1, cell.Y), (cell.X - 1, cell.Y), (cell.X, cell.Y + 1), (cell.X, cell.Y - 1) })
+            {
+                if (visited.Add(next))
+                    queue.Enqueue(next);
+            }
+        }
+
+        return volume;
+    }
 
     private void OnAcceptDefectClick(object sender, RoutedEventArgs e) => RecordDisposition("Accept Defect");
     private void OnRejectDefectClick(object sender, RoutedEventArgs e) => RecordDisposition("Reject Defect");
@@ -749,7 +787,7 @@ public partial class ProfileView : UserControl, IReleasablePageResources, IDispo
             return;
         }
 
-        var message = $"{action}: 3D sample-data defect type={GetDefectType(point.Height)}, x={point.X}, y={point.Y}, height={point.Height:F3}, volume-placeholder={ComputeVolumePlaceholder(point):F3}, file={Path.GetFileName(_currentCsvPath)}. 3D camera not connected; Stage 2 hardware integration required for live profile inspection.";
+        var message = $"{action}: 3D sample-data defect type={GetDefectType(point.Height)}, x={point.X}, y={point.Y}, height={point.Height:F3}, regionVolumeEst={ComputeRegionVolume(point):F3} (grid units^3), file={Path.GetFileName(_currentCsvPath)}. 3D camera not connected; Stage 2 hardware integration required for live profile inspection.";
         WorkflowState.Instance.AddDisposition(message);
         StatusText.Text = $"{action} recorded in SQLite review events.";
     }

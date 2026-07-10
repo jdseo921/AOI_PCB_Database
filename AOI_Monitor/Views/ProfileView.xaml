@@ -223,8 +223,8 @@
               <TextBlock Grid.Row="1" Grid.Column="1" x:Name="DefectTypeText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
               <TextBlock Grid.Row="2" Text="Height" Foreground="#9AA6AF" VerticalAlignment="Center"/>
               <TextBlock Grid.Row="2" Grid.Column="1" x:Name="DefectHeightText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="3" Text="Volume" Foreground="#9AA6AF" VerticalAlignment="Center"/>
-              <TextBlock Grid.Row="3" Grid.Column="1" x:Name="DefectVolumeText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
+              <TextBlock Grid.Row="3" Text="Volume" Foreground="#9AA6AF" VerticalAlignment="Center" ToolTip="Region volume estimate: sum of height deviation over the contiguous defect region, in grid units cubed (sample data)."/>
+              <TextBlock Grid.Row="3" Grid.Column="1" x:Name="DefectVolumeText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center" ToolTip="Region volume estimate: sum of height deviation over the contiguous defect region, in grid units cubed (sample data)."/>
               <TextBlock Grid.Row="4" Text="X" Foreground="#9AA6AF" VerticalAlignment="Center"/>
               <TextBlock Grid.Row="4" Grid.Column="1" x:Name="DefectXText" Text="--" Foreground="#DCE5EB" FontWeight="Bold" VerticalAlignment="Center"/>
               <TextBlock Grid.Row="5" Text="Y" Foreground="#9AA6AF" VerticalAlignment="Center"/>

@@ -250,6 +250,30 @@ public sealed class ImageOnlyPcbLearningOptions
     public double FalseCallTarget { get; set; } = 0.05;
     public double MaxAllowedPossibleEscapeRate { get; set; } = 0.0;
     public int MinimumAnomalyAreaPixels { get; set; } = 16;
+
+    /// <summary>
+    /// Downscale with area averaging (box filter) instead of nearest-neighbor point sampling.
+    /// Point sampling makes every target pixel flip its source pixel under half-pixel physical
+    /// motion, inflating the tolerance map with sampling noise on real camera images. Recorded
+    /// in the model's preprocessing mode; inspection honors whatever the model was trained with.
+    /// </summary>
+    public bool UseBoxAverageResampling { get; set; } = true;
+
+    /// <summary>
+    /// Subtract a large-kernel local illumination estimate (kernel much larger than the minimum
+    /// anomaly area, so defect signal is preserved) and re-add the global mean, flattening
+    /// lighting gradients and vignetting that global mean scaling cannot absorb. Recorded in the
+    /// model's preprocessing mode; inspection honors whatever the model was trained with.
+    /// </summary>
+    public bool FlattenIllumination { get; set; } = true;
+
+    /// <summary>
+    /// Pseudo-observation count for pooling per-pixel variance toward the global mean variance.
+    /// With few OK learning images a per-pixel standard deviation is itself noisy; shrinkage
+    /// stabilizes the tolerance map. 0 disables. Training-time only (the tolerance artifact is
+    /// what runtime loads), so no model versioning is needed.
+    /// </summary>
+    public double ToleranceShrinkagePseudoCount { get; set; } = 3.0;
 }
 
 public sealed record ImageOnlyPcbLearningResult(

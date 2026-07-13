@@ -121,8 +121,9 @@ public sealed class RobustnessStudyServiceTests : IDisposable
 
         var result = RunStudy(modelId, images, "study-trials");
 
-        // Default design: 4 brightness shifts + 4 pixel offsets + 2 noise amplitudes.
-        Assert.Equal(10, result.VariantsPerImage);
+        // Default design: 4 brightness shifts + 4 pixel offsets + 2 noise amplitudes
+        // + 4 rotations + 1 blur radius.
+        Assert.Equal(15, result.VariantsPerImage);
         Assert.Equal(3, result.ImageCount);
         Assert.Equal(result.VariantsPerImage * result.ImageCount, result.TotalVariantTrials);
         Assert.Equal(result.TotalVariantTrials, result.OverallStability.Trials);
@@ -150,19 +151,23 @@ public sealed class RobustnessStudyServiceTests : IDisposable
     }
 
     [Fact]
-    public void RobustnessStudyFamilyBreakdownCoversBrightnessOffsetAndNoise()
+    public void RobustnessStudyFamilyBreakdownCoversAllPerturbationFamilies()
     {
         var (modelId, images) = TrainModelAndCreateStudySet();
 
         var result = RunStudy(modelId, images, "study-families");
 
-        Assert.Equal(3, result.FamilyBreakdowns.Count);
+        Assert.Equal(5, result.FamilyBreakdowns.Count);
         var brightness = Assert.Single(result.FamilyBreakdowns, breakdown => breakdown.Family == RobustnessStudyService.BrightnessFamily);
         var offset = Assert.Single(result.FamilyBreakdowns, breakdown => breakdown.Family == RobustnessStudyService.OffsetFamily);
         var noise = Assert.Single(result.FamilyBreakdowns, breakdown => breakdown.Family == RobustnessStudyService.NoiseFamily);
+        var rotation = Assert.Single(result.FamilyBreakdowns, breakdown => breakdown.Family == RobustnessStudyService.RotationFamily);
+        var blur = Assert.Single(result.FamilyBreakdowns, breakdown => breakdown.Family == RobustnessStudyService.BlurFamily);
         Assert.Equal(4 * result.ImageCount, brightness.Stability.Trials);
         Assert.Equal(4 * result.ImageCount, offset.Stability.Trials);
         Assert.Equal(2 * result.ImageCount, noise.Stability.Trials);
+        Assert.Equal(4 * result.ImageCount, rotation.Stability.Trials);
+        Assert.Equal(1 * result.ImageCount, blur.Stability.Trials);
     }
 
     [Fact]
@@ -173,10 +178,12 @@ public sealed class RobustnessStudyServiceTests : IDisposable
         var result = RunStudy(modelId, images, "study-csv");
         var lines = File.ReadAllLines(result.CsvReportPath).Where(line => !string.IsNullOrWhiteSpace(line)).ToArray();
 
-        // Header + per image: 1 original row + 10 variant rows.
+        // Header + per image: 1 original row + one row per variant.
         Assert.Equal(1 + result.ImageCount * (1 + result.VariantsPerImage), lines.Length);
         Assert.Contains("brightness+12", string.Join("\n", lines), StringComparison.Ordinal);
         Assert.Contains("offset(2,2)", string.Join("\n", lines), StringComparison.Ordinal);
+        Assert.Contains("rotation+1.5deg", string.Join("\n", lines), StringComparison.Ordinal);
+        Assert.Contains("blur-r1", string.Join("\n", lines), StringComparison.Ordinal);
         Assert.Contains("noise-amp8", string.Join("\n", lines), StringComparison.Ordinal);
     }
 

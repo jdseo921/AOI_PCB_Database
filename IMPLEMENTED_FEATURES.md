@@ -83,10 +83,19 @@ Image-only learning pipeline quality measures:
   exact Clopper-Pearson 95% confidence intervals and PPM via `BinomialConfidence` /
   `RateEstimate`, instead of bare percentages.
 - Robustness/stability study (`RobustnessStudyService`): an MSA-adapted perturbation
-  study that re-inspects images under controlled brightness shifts, pixel offsets, and
-  seeded pseudo-noise, then reports verdict stability, OK false-call flips, and NG
-  detection retention with confidence intervals (JSON/CSV/HTML). Explicitly labeled as
-  a synthetic study, not a substitute for a physical Gage R&R with repeated captures.
+  study that re-inspects images under controlled brightness shifts, pixel offsets,
+  seeded pseudo-noise, small rotations, and focus blur, then reports verdict stability,
+  OK false-call flips, and NG detection retention with confidence intervals
+  (JSON/CSV/HTML). Explicitly labeled as a synthetic study, not a substitute for a
+  physical Gage R&R with repeated captures.
+- Photometric and sampling rigor: images are downscaled with area averaging instead of
+  nearest-neighbor point sampling (removes half-pixel sampling noise from the tolerance
+  map), lighting gradients/vignetting are removed by large-kernel illumination
+  flattening (kernel far larger than the minimum anomaly area, so defect signal is
+  preserved), and small-sample tolerance maps are stabilized by pooling per-pixel
+  variance toward the global mean (James-Stein-style shrinkage). The preprocessing
+  pipeline is recorded on each model and honored at inspection time, so models trained
+  before these upgrades keep their original preprocessing and stay score-compatible.
 
 Implemented policy thresholds:
 

@@ -74,7 +74,7 @@ public static class ImageOnlyPcbLearningService
         }
 
         var reference = BuildMeanImage(alignedTraining);
-        var tolerance = BuildToleranceImage(alignedTraining, reference, normalizedOptions.MinimumTolerance);
+        var tolerance = BuildToleranceImage(alignedTraining, reference, normalizedOptions.MinimumTolerance, normalizedOptions.ToleranceShrinkagePseudoCount);
         var package = new LearnedVisualModelPackage(
             new LearnedPcbVisualModel
             {
@@ -89,7 +89,7 @@ public static class ImageOnlyPcbLearningService
                 AlignmentMode = normalizedOptions.RotationSearchDegrees > 0
                     ? $"DownscaledRigidSearch(+/-{normalizedOptions.AlignmentSearchRadiusPixels}px, +/-{normalizedOptions.RotationSearchDegrees:F1}deg)"
                     : $"DownscaledTranslationSearch(+/-{normalizedOptions.AlignmentSearchRadiusPixels}px)",
-                BrightnessNormalizationMode = $"MeanBrightnessTo{normalizedOptions.TargetMeanBrightness:F0}",
+                BrightnessNormalizationMode = BuildPreprocessingMode(normalizedOptions),
                 FalseCallTarget = normalizedOptions.FalseCallTarget,
                 EvidenceMode = project.EvidenceMode,
                 CreatedBy = string.IsNullOrWhiteSpace(createdBy) ? "UNKNOWN" : createdBy.Trim(),
@@ -157,6 +157,7 @@ public static class ImageOnlyPcbLearningService
     {
         var package = LoadModelPackage(modelId, options);
         var normalizedOptions = NormalizeOptions(options, package.Model.InputWidth, package.Model.InputHeight);
+        ApplyModelPreprocessingMode(normalizedOptions, package.Model);
         var image = LoadImage(imagePath, normalizedOptions);
         var evaluation = Evaluate(package, image.Matrix, normalizedOptions);
         var projectId = projectImage?.ProjectId ?? package.Model.ProjectId;
@@ -602,9 +603,15 @@ public static class ImageOnlyPcbLearningService
         try
         {
             converted.CopyPixels(pixels, stride, 0);
-            var matrix = ResizeToGrayscale(pixels, converted.PixelWidth, converted.PixelHeight, options.InputWidth, options.InputHeight);
+            var matrix = ResizeToGrayscale(pixels, converted.PixelWidth, converted.PixelHeight, options.InputWidth, options.InputHeight, options.UseBoxAverageResampling);
+            // normalizeBrightness == false is the artifact-reload path (learned_reference.png is
+            // already fully preprocessed), so illumination flattening is gated on the same flag.
             if (normalizeBrightness)
+            {
+                if (options.FlattenIllumination)
+                    FlattenIllumination(matrix);
                 NormalizeBrightness(matrix, options.TargetMeanBrightness);
+            }
             return new LoadedProjectImage(
                 source ?? new ImageLearningProjectImage
                 {
@@ -620,11 +627,44 @@ public static class ImageOnlyPcbLearningService
         }
     }
 
-    private static ImageMatrix ResizeToGrayscale(byte[] bgra, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight)
+    private static ImageMatrix ResizeToGrayscale(byte[] bgra, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight, bool useBoxAverage)
     {
         var output = new double[targetWidth * targetHeight];
         var scaleX = sourceWidth / (double)targetWidth;
         var scaleY = sourceHeight / (double)targetHeight;
+        var downscaling = sourceWidth > targetWidth || sourceHeight > targetHeight;
+
+        if (useBoxAverage && downscaling)
+        {
+            // Area-average decimation: each target pixel is the mean luma of its source cell.
+            // Point sampling would flip every target pixel's source under half-pixel physical
+            // motion, injecting frame-to-frame sampling noise into the tolerance map.
+            for (var y = 0; y < targetHeight; y++)
+            {
+                var y0 = Math.Clamp((int)(y * scaleY), 0, sourceHeight - 1);
+                var y1 = Math.Clamp((int)Math.Ceiling((y + 1) * scaleY), y0 + 1, sourceHeight);
+                for (var x = 0; x < targetWidth; x++)
+                {
+                    var x0 = Math.Clamp((int)(x * scaleX), 0, sourceWidth - 1);
+                    var x1 = Math.Clamp((int)Math.Ceiling((x + 1) * scaleX), x0 + 1, sourceWidth);
+                    var sum = 0.0;
+                    for (var sy = y0; sy < y1; sy++)
+                    {
+                        var row = sy * sourceWidth;
+                        for (var sx = x0; sx < x1; sx++)
+                        {
+                            var offset = (row + sx) * 4;
+                            sum += (0.114 * bgra[offset]) + (0.587 * bgra[offset + 1]) + (0.299 * bgra[offset + 2]);
+                        }
+                    }
+
+                    output[(y * targetWidth) + x] = sum / ((y1 - y0) * (x1 - x0));
+                }
+            }
+
+            return new ImageMatrix(targetWidth, targetHeight, output);
+        }
+
         for (var y = 0; y < targetHeight; y++)
         {
             var sourceY = Math.Clamp((int)((y + 0.5) * scaleY), 0, sourceHeight - 1);
@@ -637,6 +677,99 @@ public static class ImageOnlyPcbLearningService
         }
 
         return new ImageMatrix(targetWidth, targetHeight, output);
+    }
+
+    /// <summary>
+    /// Kernel for local illumination estimation: much larger than the minimum anomaly area so
+    /// real defects barely influence their own background estimate, always odd.
+    /// </summary>
+    private static int FlattenKernelSize(int width, int height)
+    {
+        var kernel = Math.Max(17, Math.Min(width, height) / 8);
+        return kernel % 2 == 0 ? kernel + 1 : kernel;
+    }
+
+    /// <summary>
+    /// Removes low-frequency illumination (lighting gradients, vignetting) by subtracting a
+    /// large-kernel local mean and re-adding the global mean. Separable box blur, O(n).
+    /// Defect-scale detail passes through nearly unchanged because the kernel is far larger
+    /// than the minimum anomaly area.
+    /// </summary>
+    private static void FlattenIllumination(ImageMatrix matrix)
+    {
+        var width = matrix.Width;
+        var height = matrix.Height;
+        if (width < 3 || height < 3)
+            return;
+
+        var kernel = FlattenKernelSize(width, height);
+        var half = kernel / 2;
+        var globalMean = matrix.Pixels.Average();
+
+        // Horizontal running-sum pass.
+        var horizontal = new double[matrix.Pixels.Length];
+        for (var y = 0; y < height; y++)
+        {
+            var row = y * width;
+            var sum = 0.0;
+            var count = 0;
+            for (var x = 0; x < Math.Min(half + 1, width); x++)
+            {
+                sum += matrix.Pixels[row + x];
+                count++;
+            }
+
+            for (var x = 0; x < width; x++)
+            {
+                horizontal[row + x] = sum / count;
+                var addIndex = x + half + 1;
+                if (addIndex < width)
+                {
+                    sum += matrix.Pixels[row + addIndex];
+                    count++;
+                }
+
+                var removeIndex = x - half;
+                if (removeIndex >= 0)
+                {
+                    sum -= matrix.Pixels[row + removeIndex];
+                    count--;
+                }
+            }
+        }
+
+        // Vertical running-sum pass over the horizontal means, then flatten in place.
+        for (var x = 0; x < width; x++)
+        {
+            var sum = 0.0;
+            var count = 0;
+            for (var y = 0; y < Math.Min(half + 1, height); y++)
+            {
+                sum += horizontal[(y * width) + x];
+                count++;
+            }
+
+            for (var y = 0; y < height; y++)
+            {
+                var background = sum / count;
+                var index = (y * width) + x;
+                matrix.Pixels[index] = Math.Clamp(matrix.Pixels[index] - background + globalMean, 0.0, 255.0);
+
+                var addIndex = y + half + 1;
+                if (addIndex < height)
+                {
+                    sum += horizontal[(addIndex * width) + x];
+                    count++;
+                }
+
+                var removeIndex = y - half;
+                if (removeIndex >= 0)
+                {
+                    sum -= horizontal[(removeIndex * width) + x];
+                    count--;
+                }
+            }
+        }
     }
 
     private static void NormalizeBrightness(ImageMatrix matrix, double targetMeanBrightness)
@@ -667,7 +800,7 @@ public static class ImageOnlyPcbLearningService
         return new ImageMatrix(width, height, reference);
     }
 
-    private static ImageMatrix BuildToleranceImage(IReadOnlyList<ImageMatrix> images, ImageMatrix reference, double minimumTolerance)
+    private static ImageMatrix BuildToleranceImage(IReadOnlyList<ImageMatrix> images, ImageMatrix reference, double minimumTolerance, double shrinkagePseudoCount = 0)
     {
         var tolerance = new double[reference.Pixels.Length];
         if (images.Count <= 1)
@@ -685,8 +818,24 @@ public static class ImageOnlyPcbLearningService
             }
         }
 
+        var degreesOfFreedom = Math.Max(1, images.Count - 1);
         for (var i = 0; i < tolerance.Length; i++)
-            tolerance[i] = Math.Max(minimumTolerance, Math.Sqrt(tolerance[i] / Math.Max(1, images.Count - 1)));
+            tolerance[i] /= degreesOfFreedom;
+
+        // Variance shrinkage: a per-pixel variance estimated from a handful of OK images is
+        // itself noisy (5 samples -> roughly +/-50% on the stddev), so part of the tolerance map
+        // is estimation noise rather than real process variation. Pool each pixel's variance
+        // toward the global mean variance with `shrinkagePseudoCount` pseudo-observations
+        // (James-Stein-style), stabilizing small-N maps; large sets are barely affected.
+        if (shrinkagePseudoCount > 0)
+        {
+            var globalVariance = tolerance.Average();
+            for (var i = 0; i < tolerance.Length; i++)
+                tolerance[i] = ((degreesOfFreedom * tolerance[i]) + (shrinkagePseudoCount * globalVariance)) / (degreesOfFreedom + shrinkagePseudoCount);
+        }
+
+        for (var i = 0; i < tolerance.Length; i++)
+            tolerance[i] = Math.Max(minimumTolerance, Math.Sqrt(tolerance[i]));
 
         // 1-px max dilation: alignment is integer-only, so a genuine sub-pixel offset leaves
         // razor-thin high-difference lines along high-contrast edges. Judging each pixel against
@@ -1038,6 +1187,9 @@ public static class ImageOnlyPcbLearningService
             toleranceArtifactScale = ToleranceArtifactScaleGray16,
             toleranceArtifactBitDepth = 16,
             toleranceDilation = "Max3x3",
+            resamplingMode = package.Options.UseBoxAverageResampling ? "BoxAverage" : "NearestNeighbor",
+            illuminationFlattening = package.Options.FlattenIllumination ? $"BoxBlur({FlattenKernelSize(package.Options.InputWidth, package.Options.InputHeight)})" : "Off",
+            toleranceShrinkagePseudoCount = package.Options.ToleranceShrinkagePseudoCount,
             skippedImages,
             note = "Image-only learning uses OK images and optional image-level validation truth; no defect labels or training boxes are required.",
         };
@@ -1162,11 +1314,39 @@ public static class ImageOnlyPcbLearningService
         return new ImageMatrix(width, height, values);
     }
 
+    /// <summary>
+    /// Records the preprocessing pipeline on the model so inspection always reproduces the
+    /// exact transform the model was trained with.
+    /// </summary>
+    private static string BuildPreprocessingMode(ImageOnlyPcbLearningOptions options)
+    {
+        var parts = new List<string>();
+        if (options.UseBoxAverageResampling)
+            parts.Add("BoxAverage");
+        if (options.FlattenIllumination)
+            parts.Add($"FlattenLocal({FlattenKernelSize(options.InputWidth, options.InputHeight)})");
+        parts.Add($"MeanBrightnessTo{options.TargetMeanBrightness:F0}");
+        return string.Join("+", parts);
+    }
+
+    /// <summary>
+    /// Inspection must preprocess exactly the way the model was trained, regardless of caller
+    /// options — legacy models (mode string without the newer tokens) keep nearest-neighbor
+    /// resampling and no flattening, so their persisted artifacts stay score-compatible.
+    /// </summary>
+    private static void ApplyModelPreprocessingMode(ImageOnlyPcbLearningOptions options, LearnedPcbVisualModel model)
+    {
+        var mode = model.BrightnessNormalizationMode ?? string.Empty;
+        options.UseBoxAverageResampling = mode.Contains("BoxAverage", StringComparison.Ordinal);
+        options.FlattenIllumination = mode.Contains("FlattenLocal", StringComparison.Ordinal);
+    }
+
     private static LearnedVisualModelPackage LoadModelPackage(string modelId, ImageOnlyPcbLearningOptions? options)
     {
         var model = AoiDatabase.GetLearnedPcbVisualModel(modelId)
             ?? throw new InvalidOperationException("Learned PCB visual model metadata does not exist.");
         var normalizedOptions = NormalizeOptions(options, model.InputWidth, model.InputHeight);
+        ApplyModelPreprocessingMode(normalizedOptions, model);
         var referencePath = FindArtifactPath(model, "learned_reference.png");
         var tolerancePath = FindArtifactPath(model, "tolerance_map.png");
         var reference = LoadImage(referencePath, normalizedOptions, normalizeBrightness: false).Matrix;
@@ -1234,6 +1414,9 @@ public static class ImageOnlyPcbLearningService
             MaxAllowedPossibleEscapeRate = Math.Clamp(source.MaxAllowedPossibleEscapeRate, 0.0, 1.0),
             MinimumAnomalyAreaPixels = Math.Max(1, source.MinimumAnomalyAreaPixels),
             RotationSearchDegrees = Math.Clamp(source.RotationSearchDegrees, 0.0, 5.0),
+            UseBoxAverageResampling = source.UseBoxAverageResampling,
+            FlattenIllumination = source.FlattenIllumination,
+            ToleranceShrinkagePseudoCount = Math.Clamp(source.ToleranceShrinkagePseudoCount, 0.0, 50.0),
         };
     }
 

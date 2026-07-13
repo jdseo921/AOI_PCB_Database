@@ -30,11 +30,15 @@ public static class RobustnessStudyService
     public const string BrightnessFamily = "brightness";
     public const string OffsetFamily = "offset";
     public const string NoiseFamily = "noise";
+    public const string RotationFamily = "rotation";
+    public const string BlurFamily = "blur";
     public const string OriginalFamily = "original";
 
     private static readonly int[] DefaultBrightnessShifts = { -24, -12, 12, 24 };
     private static readonly (int OffsetX, int OffsetY)[] DefaultPixelOffsets = { (1, 0), (0, 1), (-1, -1), (2, 2) };
     private static readonly int[] DefaultNoiseAmplitudes = { 4, 8 };
+    private static readonly double[] DefaultRotationDegrees = { -1.5, -0.75, 0.75, 1.5 };
+    private static readonly int[] DefaultBlurRadii = { 1 };
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -188,7 +192,7 @@ public static class RobustnessStudyService
         var ngDetectionRetentionRate = new RateEstimate(ngRetained, ngRetentionTrials);
 
         var familyBreakdowns = new List<RobustnessStudyFamilyBreakdown>();
-        foreach (var family in new[] { BrightnessFamily, OffsetFamily, NoiseFamily })
+        foreach (var family in new[] { BrightnessFamily, OffsetFamily, NoiseFamily, RotationFamily, BlurFamily })
         {
             if (familyTallies.TryGetValue(family, out var tally) && tally.Trials > 0)
                 familyBreakdowns.Add(new RobustnessStudyFamilyBreakdown(family, new RateEstimate(tally.Stable, tally.Trials)));
@@ -239,9 +243,16 @@ public static class RobustnessStudyService
         if (noiseAmplitudes.Length < requestedAmplitudes.Length)
             warnings.Add("Non-positive noise amplitudes were ignored; a noise amplitude must be at least 1 gray level.");
 
-        var design = new StudyDesign(brightnessShifts, pixelOffsets, noiseAmplitudes, provided.NoiseSeed);
+        var rotationDegrees = (provided.RotationDegreesVariants ?? DefaultRotationDegrees)
+            .Where(degrees => degrees != 0 && double.IsFinite(degrees))
+            .ToArray();
+        var blurRadii = (provided.BlurRadii ?? DefaultBlurRadii)
+            .Where(radius => radius > 0)
+            .ToArray();
+
+        var design = new StudyDesign(brightnessShifts, pixelOffsets, noiseAmplitudes, provided.NoiseSeed, rotationDegrees, blurRadii);
         if (design.VariantsPerImage == 0)
-            throw new InvalidOperationException("Robustness study requires at least one perturbation variant (brightness shift, pixel offset, or noise amplitude).");
+            throw new InvalidOperationException("Robustness study requires at least one perturbation variant (brightness shift, pixel offset, noise amplitude, rotation, or blur).");
 
         return design;
     }
@@ -274,6 +285,107 @@ public static class RobustnessStudyService
                 FormattableString.Invariant($"noise-amp{amplitude}"),
                 ApplyDeterministicNoise(source.Pixels, amplitude, DeriveNoiseSeed(design.NoiseSeed, imageIndex, amplitude)));
         }
+
+        foreach (var degrees in design.RotationDegrees)
+        {
+            yield return (
+                RotationFamily,
+                FormattableString.Invariant($"rotation{degrees:+0.##;-0.##}deg"),
+                ApplyRotation(source.Pixels, source.Width, source.Height, degrees));
+        }
+
+        foreach (var radius in design.BlurRadii)
+        {
+            yield return (
+                BlurFamily,
+                FormattableString.Invariant($"blur-r{radius}"),
+                ApplyBoxBlur(source.Pixels, source.Width, source.Height, radius));
+        }
+    }
+
+    // Rotates the image about its center (bilinear sampling, edge-replicated fill) —
+    // the fixture/hand-placement perturbation the alignment search is expected to absorb.
+    private static byte[] ApplyRotation(byte[] source, int width, int height, double degrees)
+    {
+        var output = new byte[source.Length];
+        var radians = degrees * Math.PI / 180.0;
+        var cos = Math.Cos(radians);
+        var sin = Math.Sin(radians);
+        var centerX = (width - 1) / 2.0;
+        var centerY = (height - 1) / 2.0;
+
+        for (var y = 0; y < height; y++)
+        {
+            var relY = y - centerY;
+            for (var x = 0; x < width; x++)
+            {
+                var relX = x - centerX;
+                var sourceX = Math.Clamp((cos * relX) + (sin * relY) + centerX, 0, width - 1);
+                var sourceY = Math.Clamp((-sin * relX) + (cos * relY) + centerY, 0, height - 1);
+                var x0 = (int)Math.Floor(sourceX);
+                var y0 = (int)Math.Floor(sourceY);
+                var x1 = Math.Min(x0 + 1, width - 1);
+                var y1 = Math.Min(y0 + 1, height - 1);
+                var fx = sourceX - x0;
+                var fy = sourceY - y0;
+                var targetOffset = ((y * width) + x) * 4;
+                for (var channel = 0; channel < 3; channel++)
+                {
+                    var topLeft = source[(((y0 * width) + x0) * 4) + channel];
+                    var topRight = source[(((y0 * width) + x1) * 4) + channel];
+                    var bottomLeft = source[(((y1 * width) + x0) * 4) + channel];
+                    var bottomRight = source[(((y1 * width) + x1) * 4) + channel];
+                    var top = topLeft + ((topRight - topLeft) * fx);
+                    var bottom = bottomLeft + ((bottomRight - bottomLeft) * fx);
+                    output[targetOffset + channel] = ClampToByte((int)Math.Round(top + ((bottom - top) * fy)));
+                }
+
+                output[targetOffset + 3] = source[targetOffset + 3];
+            }
+        }
+
+        return output;
+    }
+
+    // Box blur with the given radius — simulates focus softness / motion smear at capture.
+    private static byte[] ApplyBoxBlur(byte[] source, int width, int height, int radius)
+    {
+        var output = new byte[source.Length];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var sums = new int[3];
+                var count = 0;
+                for (var dy = -radius; dy <= radius; dy++)
+                {
+                    var sy = y + dy;
+                    if (sy < 0 || sy >= height)
+                        continue;
+
+                    for (var dx = -radius; dx <= radius; dx++)
+                    {
+                        var sx = x + dx;
+                        if (sx < 0 || sx >= width)
+                            continue;
+
+                        var offset = ((sy * width) + sx) * 4;
+                        sums[0] += source[offset];
+                        sums[1] += source[offset + 1];
+                        sums[2] += source[offset + 2];
+                        count++;
+                    }
+                }
+
+                var targetOffset = ((y * width) + x) * 4;
+                output[targetOffset] = ClampToByte(sums[0] / count);
+                output[targetOffset + 1] = ClampToByte(sums[1] / count);
+                output[targetOffset + 2] = ClampToByte(sums[2] / count);
+                output[targetOffset + 3] = source[targetOffset + 3];
+            }
+        }
+
+        return output;
     }
 
     private static byte[] ApplyBrightnessShift(byte[] source, int shift)
@@ -395,6 +507,8 @@ public static class RobustnessStudyService
                 pixelOffsets = design.PixelOffsets.Select(offset => FormatOffset(offset.OffsetX, offset.OffsetY)).ToArray(),
                 noiseAmplitudes = design.NoiseAmplitudes,
                 noiseSeed = design.NoiseSeed,
+                rotationDegrees = design.RotationDegrees,
+                blurRadii = design.BlurRadii,
                 variantsPerImage = design.VariantsPerImage,
             },
             counts = new
@@ -643,9 +757,11 @@ public static class RobustnessStudyService
         int[] BrightnessShifts,
         (int OffsetX, int OffsetY)[] PixelOffsets,
         int[] NoiseAmplitudes,
-        int NoiseSeed)
+        int NoiseSeed,
+        double[] RotationDegrees,
+        int[] BlurRadii)
     {
-        public int VariantsPerImage => BrightnessShifts.Length + PixelOffsets.Length + NoiseAmplitudes.Length;
+        public int VariantsPerImage => BrightnessShifts.Length + PixelOffsets.Length + NoiseAmplitudes.Length + RotationDegrees.Length + BlurRadii.Length;
     }
 }
 
@@ -666,6 +782,12 @@ public sealed class RobustnessStudyOptions
 
     /// <summary>Base seed for the deterministic noise generator.</summary>
     public int NoiseSeed { get; set; } = 12345;
+
+    /// <summary>Simulated fixture rotations in degrees (bilinear about the image center, edge-padded). Zero values are ignored.</summary>
+    public IReadOnlyList<double> RotationDegreesVariants { get; set; } = new[] { -1.5, -0.75, 0.75, 1.5 };
+
+    /// <summary>Box-blur radii in pixels simulating focus softness at capture. Non-positive values are ignored.</summary>
+    public IReadOnlyList<int> BlurRadii { get; set; } = new[] { 1 };
 }
 
 public sealed record RobustnessStudyVariantResult(

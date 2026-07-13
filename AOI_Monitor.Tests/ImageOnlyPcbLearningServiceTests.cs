@@ -133,7 +133,17 @@ public sealed class ImageOnlyPcbLearningServiceTests : IDisposable
         var brighterOk = WriteBoardPng("ok-validation-bright.png", brightnessShift: 30, variant: 12);
         ImportImages(project, ImageLearningImageRole.OkValidation, brighterOk);
 
-        var rawDifference = ImageOnlyPcbLearningService.CalculateRawDifferencePercentForTest(goldenPath, brighterOk, _options);
+        // Raw difference measured WITHOUT illumination flattening: the point of this test is
+        // that a naive pixel comparison flags the brightness-shifted OK board while the learned
+        // calibration does not. (Flattening now absorbs the shift even in the raw metric —
+        // which is the feature working, but it would hide the naive-baseline contrast.)
+        var rawOptions = new ImageOnlyPcbLearningOptions
+        {
+            InputWidth = 32,
+            InputHeight = 32,
+            FlattenIllumination = false,
+        };
+        var rawDifference = ImageOnlyPcbLearningService.CalculateRawDifferencePercentForTest(goldenPath, brighterOk, rawOptions);
         var result = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options);
 
         Assert.True(rawDifference > 5.0);
@@ -490,6 +500,166 @@ public sealed class ImageOnlyPcbLearningServiceTests : IDisposable
         value -= 35.0 * Math.Exp(-(((x - 132) * (x - 132)) + ((y - 150) * (y - 150))) / 220.0);
         value += variant % 3;
         return (byte)Math.Clamp(value, 0, 255);
+    }
+
+    [Fact]
+    public void BoxAverageResamplingRemovesPointSamplingNoiseOnDownscale()
+    {
+        // #5: a 1-px checkerboard downscaled 2x. Area averaging turns every 2x2 cell into the
+        // true mean (~127.5), matching a uniform mid-gray board; nearest-neighbor point
+        // sampling picks single source pixels (0 or 255) and reads as a massive difference.
+        var checkerboard = WriteRawPatternPng("checker-64.png", 64, (x, y) => (byte)(((x + y) & 1) == 0 ? 0 : 255));
+        var uniform = WriteRawPatternPng("uniform-64.png", 64, (_, _) => 128);
+
+        var boxOptions = new ImageOnlyPcbLearningOptions { InputWidth = 32, InputHeight = 32, UseBoxAverageResampling = true };
+        var pointOptions = new ImageOnlyPcbLearningOptions { InputWidth = 32, InputHeight = 32, UseBoxAverageResampling = false };
+
+        var boxDifference = ImageOnlyPcbLearningService.CalculateRawDifferencePercentForTest(checkerboard, uniform, boxOptions);
+        var pointDifference = ImageOnlyPcbLearningService.CalculateRawDifferencePercentForTest(checkerboard, uniform, pointOptions);
+
+        Assert.True(boxDifference < 2.0, $"Box-average difference should be near zero, got {boxDifference:F2}%.");
+        Assert.True(pointDifference > 30.0, $"Point-sampling difference should be large, got {pointDifference:F2}%.");
+    }
+
+    [Fact]
+    public void IlluminationFlatteningAbsorbsLightingGradient()
+    {
+        // #4: the same board with a strong horizontal lighting gradient. Global mean scaling
+        // cannot absorb a gradient; large-kernel flattening removes it while leaving the board
+        // pattern (defect-scale detail) intact.
+        var flat = WriteRawPatternPng("grad-base.png", 32, (x, y) => BoardPatternByte(x, y));
+        var gradient = WriteRawPatternPng("grad-lit.png", 32, (x, y) => (byte)Math.Clamp(BoardPatternByte(x, y) + ((x * 64 / 31) - 32), 0, 255));
+
+        var flattenOn = new ImageOnlyPcbLearningOptions { InputWidth = 32, InputHeight = 32, FlattenIllumination = true };
+        var flattenOff = new ImageOnlyPcbLearningOptions { InputWidth = 32, InputHeight = 32, FlattenIllumination = false };
+
+        var differenceOn = ImageOnlyPcbLearningService.CalculateRawDifferencePercentForTest(flat, gradient, flattenOn);
+        var differenceOff = ImageOnlyPcbLearningService.CalculateRawDifferencePercentForTest(flat, gradient, flattenOff);
+
+        Assert.True(differenceOff > 4.0, $"Unflattened gradient should register, got {differenceOff:F2}%.");
+        Assert.True(differenceOn < differenceOff / 2.0, $"Flattening should absorb most of the gradient: on={differenceOn:F2}%, off={differenceOff:F2}%.");
+    }
+
+    [Fact]
+    public void ToleranceShrinkageStabilizesSmallSampleVarianceSpikes()
+    {
+        // #6: with 5-6 OK images a single pixel's variance estimate is noisy. Shrinkage pools
+        // per-pixel variance toward the global mean, so the hottest tolerance pixel must come
+        // down relative to the unshrunk map trained on identical images.
+        var withShrinkage = TrainToleranceMax("shrink-on", new ImageOnlyPcbLearningOptions
+        {
+            InputWidth = 32,
+            InputHeight = 32,
+            ToleranceShrinkagePseudoCount = 5.0,
+        });
+        var withoutShrinkage = TrainToleranceMax("shrink-off", new ImageOnlyPcbLearningOptions
+        {
+            InputWidth = 32,
+            InputHeight = 32,
+            ToleranceShrinkagePseudoCount = 0.0,
+        });
+
+        Assert.True(
+            withShrinkage < withoutShrinkage,
+            $"Shrinkage should reduce the hottest tolerance pixel: with={withShrinkage:F2}, without={withoutShrinkage:F2}.");
+    }
+
+    [Fact]
+    public void ModelRecordsPreprocessingModeAndLegacyStringStaysCompatible()
+    {
+        // #4/#5 versioning: new models record the preprocessing pipeline; disabling both
+        // options reproduces the exact legacy mode string, so pre-upgrade models (which carry
+        // that string) keep nearest-neighbor + no flattening at inspection time.
+        var project = CreateLearningProject("Preprocessing mode recording");
+        ImportStandardTrainingSet(project);
+        var modern = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options);
+        Assert.Equal("BoxAverage+FlattenLocal(17)+MeanBrightnessTo128", modern.Model.BrightnessNormalizationMode);
+
+        var legacyProject = CreateLearningProject("Legacy preprocessing mode");
+        ImportStandardTrainingSet(legacyProject);
+        var legacyOptions = new ImageOnlyPcbLearningOptions
+        {
+            InputWidth = 32,
+            InputHeight = 32,
+            AlignmentSearchRadiusPixels = 6,
+            MinimumAnomalyAreaPixels = 6,
+            DefaultLearnedThreshold = 4.0,
+            UseBoxAverageResampling = false,
+            FlattenIllumination = false,
+        };
+        var legacy = ImageOnlyPcbLearningService.TrainProject(legacyProject.ProjectId, legacyOptions);
+        Assert.Equal("MeanBrightnessTo128", legacy.Model.BrightnessNormalizationMode);
+
+        // Round-trip: each model inspects one of its own training images as OK under the
+        // preprocessing it was trained with (mode honored regardless of caller options).
+        var sample = WriteBoardPng("mode-roundtrip.png", variant: 2);
+        Assert.Equal("OK", ImageOnlyPcbLearningService.InspectImagePath(modern.Model.ModelId, sample, _options).InspectionResult.Verdict);
+        Assert.Equal("OK", ImageOnlyPcbLearningService.InspectImagePath(legacy.Model.ModelId, sample, _options).InspectionResult.Verdict);
+    }
+
+    private double TrainToleranceMax(string namePrefix, ImageOnlyPcbLearningOptions options)
+    {
+        // One block region varies strongly across the OK set (values 100..190) so its per-pixel
+        // variance is far above the tolerance floor — otherwise the floor would clamp both the
+        // shrunk and unshrunk maps to the same value and hide the shrinkage effect.
+        string WriteVariant(string name, int step) => WriteRawPatternPng(name, 32, (x, y) =>
+            x is >= 20 and <= 26 && y is >= 6 and <= 12
+                ? (byte)(100 + (step * 18))
+                : BoardPatternByte(x, y));
+
+        var project = CreateLearningProject($"Tolerance shrinkage {namePrefix}");
+        ImportImages(project, ImageLearningImageRole.GoldenReference, WriteVariant($"{namePrefix}-golden.png", 0));
+        for (var i = 0; i < 5; i++)
+            ImportImages(project, ImageLearningImageRole.OkLearning, WriteVariant($"{namePrefix}-ok-{i}.png", i + 1));
+
+        var result = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, options);
+        var tolerancePath = Path.Combine(result.ArtifactFolder, "tolerance_map.png");
+        using var stream = File.OpenRead(tolerancePath);
+        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+        var frame = decoder.Frames[0];
+        var pixels = new ushort[frame.PixelWidth * frame.PixelHeight];
+        frame.CopyPixels(pixels, frame.PixelWidth * 2, 0);
+        return pixels.Max() / 256.0;
+    }
+
+    private static byte BoardPatternByte(int x, int y)
+    {
+        var value = 64;
+        if (x is >= 3 and <= 28 && y is >= 14 and <= 17)
+            value = 178;
+        if (y is >= 3 and <= 28 && x is >= 14 and <= 17)
+            value = 168;
+        if (x is >= 6 and <= 11 && y is >= 6 and <= 11)
+            value = 112;
+        if (x is >= 20 and <= 26 && y is >= 20 and <= 25)
+            value = 132;
+        return (byte)value;
+    }
+
+    private string WriteRawPatternPng(string fileName, int size, Func<int, int, byte> pattern)
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, fileName);
+        var pixels = new byte[size * size * 4];
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var value = pattern(x, y);
+                var index = (y * size + x) * 4;
+                pixels[index] = value;
+                pixels[index + 1] = value;
+                pixels[index + 2] = value;
+                pixels[index + 3] = 255;
+            }
+        }
+
+        var bitmap = BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(path);
+        encoder.Save(stream);
+        return path;
     }
 
     private ImageLearningProject CreateLearningProject(string name)

@@ -79,7 +79,7 @@
               </ComboBox>
             </Grid>
             <Grid Margin="0,0,0,8">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/><ColumnDefinition Width="74"/></Grid.ColumnDefinitions>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="128"/><ColumnDefinition Width="*"/><ColumnDefinition Width="92"/></Grid.ColumnDefinitions>
               <TextBlock Text="Sample Image" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center"/>
               <TextBox x:Name="SampleImagePathText" Grid.Column="1" MinHeight="34" AutomationProperties.Name="Sample image path" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
               <Button Style="{StaticResource MiniBtn}" Grid.Column="2" Content="Browse" Margin="6,0,0,0" Click="OnBrowseSampleImageClick"/>

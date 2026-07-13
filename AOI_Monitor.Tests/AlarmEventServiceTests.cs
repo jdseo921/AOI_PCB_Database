@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
@@ -135,6 +136,89 @@ public sealed class AlarmEventServiceTests : IDisposable
         Assert.Equal(ClientDemoGateStatus.Blocked, client.OverallStatus);
         Assert.Contains(client.Checks, check => check.Name == "Active critical alarms" && check.Status == ClientDemoGateStatus.Blocked);
         Assert.Contains(factory.Categories, category => category.Name == "Alarm/event status" && category.Status == "No-Go");
+    }
+
+    [Fact]
+    public void AcknowledgeAllActiveAcknowledgesEveryUnacknowledgedAlarm()
+    {
+        AlarmEventService.Raise(AlarmSeverity.Alarm, "Camera", "Camera link lost.", "Check the camera cable.");
+        AlarmEventService.Raise(AlarmSeverity.Warning, "MES", "MES queue has pending records.", "Retry the queue.");
+        AlarmEventService.Raise(AlarmSeverity.Critical, "Robot", "Emergency stop input is active.", "Clear the cell.");
+
+        var acknowledged = AlarmEventService.AcknowledgeAllActive("AlarmAdmin [Admin]");
+
+        Assert.Equal(3, acknowledged);
+        Assert.All(
+            AlarmEventService.GetEvents(new AlarmEventQuery { ActiveOnly = true, OperatorVisibleOnly = false }),
+            item => Assert.Equal(AlarmAcknowledgementState.Acknowledged, item.AcknowledgementState));
+        Assert.Equal(0, AlarmEventService.AcknowledgeAllActive("AlarmAdmin [Admin]"));
+    }
+
+    [Fact]
+    public void ExpireStaleActiveAlarmsResolvesOldNonCriticalOnly()
+    {
+        WriteAlarmSnapshot(
+            _root,
+            MakeAlarm("OLD-WARN", AlarmSeverity.Warning, ageDays: 30),
+            MakeAlarm("OLD-ALARM", AlarmSeverity.Alarm, ageDays: 20),
+            MakeAlarm("OLD-CRIT", AlarmSeverity.Critical, ageDays: 30),
+            MakeAlarm("FRESH-ALARM", AlarmSeverity.Alarm, ageDays: 1));
+        AlarmEventService.ReloadFromDiskForTests();
+
+        var expired = AlarmEventService.ExpireStaleActiveAlarms(TimeSpan.FromDays(14));
+
+        Assert.Equal(2, expired);
+        var active = AlarmEventService.GetEvents(new AlarmEventQuery { ActiveOnly = true, OperatorVisibleOnly = false });
+        Assert.Contains(active, item => item.AlarmId == "OLD-CRIT");
+        Assert.Contains(active, item => item.AlarmId == "FRESH-ALARM");
+        Assert.DoesNotContain(active, item => item.AlarmId == "OLD-WARN");
+        Assert.DoesNotContain(active, item => item.AlarmId == "OLD-ALARM");
+
+        var oldWarn = AlarmEventService.GetEvents(new AlarmEventQuery { ActiveOnly = false, OperatorVisibleOnly = false })
+            .Single(item => item.AlarmId == "OLD-WARN");
+        Assert.Equal(AlarmAcknowledgementState.Resolved, oldWarn.AcknowledgementState);
+        Assert.Contains("auto-expiry", oldWarn.ResolvedBy, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SnapshotLoadDropsResolvedAlarmsOlderThanRetentionButKeepsActiveOnes()
+    {
+        WriteAlarmSnapshot(
+            _root,
+            MakeAlarm("OLD-RESOLVED", AlarmSeverity.Alarm, ageDays: 120, resolved: true),
+            MakeAlarm("OLD-ACTIVE", AlarmSeverity.Alarm, ageDays: 120),
+            MakeAlarm("FRESH-RESOLVED", AlarmSeverity.Alarm, ageDays: 5, resolved: true));
+        AlarmEventService.ReloadFromDiskForTests();
+
+        var all = AlarmEventService.GetEvents(new AlarmEventQuery { ActiveOnly = false, OperatorVisibleOnly = false });
+
+        Assert.DoesNotContain(all, item => item.AlarmId == "OLD-RESOLVED");
+        Assert.Contains(all, item => item.AlarmId == "OLD-ACTIVE");
+        Assert.Contains(all, item => item.AlarmId == "FRESH-RESOLVED");
+    }
+
+    private static AlarmEvent MakeAlarm(string id, AlarmSeverity severity, int ageDays, bool resolved = false) => new()
+    {
+        AlarmId = id,
+        TimestampUtc = DateTime.UtcNow.AddDays(-ageDays),
+        Severity = severity,
+        Source = "Test",
+        Message = $"Test alarm {id}.",
+        RecommendedAction = "Review the test alarm.",
+        AcknowledgementState = resolved ? AlarmAcknowledgementState.Resolved : AlarmAcknowledgementState.Unacknowledged,
+        ResolvedAtUtc = resolved ? DateTime.UtcNow.AddDays(-ageDays) : null,
+        ResolvedBy = resolved ? "Test" : string.Empty,
+    };
+
+    // Mirrors AlarmEventService's snapshot format (camelCase, enums as numbers) so the service
+    // loads these fixtures exactly like a real persisted state file.
+    private static void WriteAlarmSnapshot(string root, params AlarmEvent[] alarms)
+    {
+        var path = Path.Combine(root, "exports", "alarm_events", "alarm_events_state.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, JsonSerializer.Serialize(
+            alarms.ToList(),
+            new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
     }
 
     [Fact]

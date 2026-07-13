@@ -41,7 +41,7 @@
   <StackPanel Margin="8">
     <Grid Margin="0,0,0,8">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="340"/>
+        <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="410"/>
       </Grid.ColumnDefinitions>
 
       <!-- SPC Chart + stats -->
@@ -85,7 +85,14 @@
           </Border>
           <DataGrid Grid.Row="1" x:Name="DbHealthGrid" Style="{StaticResource HmiTable}" MinWidth="340">
             <DataGrid.Columns>
-              <DataGridTextColumn Header="Table / Index" Binding="{Binding Table}"  Width="150" MinWidth="150"/>
+              <DataGridTextColumn Header="Table / Index" Binding="{Binding Table}"  Width="*" MinWidth="150">
+                <DataGridTextColumn.ElementStyle>
+                  <Style TargetType="TextBlock">
+                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                    <Setter Property="ToolTip" Value="{Binding Table}"/>
+                  </Style>
+                </DataGridTextColumn.ElementStyle>
+              </DataGridTextColumn>
               <DataGridTextColumn Header="Count"         Binding="{Binding Count}"  Width="90" MinWidth="90"/>
               <DataGridTemplateColumn Header="Status" Width="96" MinWidth="96">
                 <DataGridTemplateColumn.CellTemplate>

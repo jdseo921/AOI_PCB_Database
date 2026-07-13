@@ -40,7 +40,7 @@
           </WrapPanel>
           <WrapPanel HorizontalAlignment="Right">
             <Button x:Name="RunAcceptanceButton" Style="{StaticResource ActionBtnGreen}" Content="Run 3D Acceptance Test" Margin="0,0,8,0" Click="OnRunAcceptanceClick"/>
-            <Button x:Name="CancelAcceptanceButton" Style="{StaticResource ActionBtnAmber}" Content="Cancel" Margin="0,0,8,0" Click="OnCancelAcceptanceClick" IsEnabled="False"/>
+            <Button x:Name="CancelAcceptanceButton" Style="{StaticResource ActionBtn}" Content="Cancel" Margin="0,0,8,0" Click="OnCancelAcceptanceClick" IsEnabled="False"/>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Export 3D Report" Margin="0,0,0,0" Click="OnExportAcceptanceClick"/>
           </WrapPanel>
         </StackPanel>

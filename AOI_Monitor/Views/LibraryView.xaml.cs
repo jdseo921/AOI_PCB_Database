@@ -166,7 +166,7 @@ public partial class LibraryView : UserControl, IAsyncNavigationPage, IDisposabl
         ImportStatusText.Text = "Cancel requested. Finishing current file...";
     }
 
-    private void OnCompareGoldenClick(object sender, RoutedEventArgs e)
+    private async void OnCompareGoldenClick(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
         if (!EnsureSelectedRecordAsSample())
@@ -183,32 +183,47 @@ public partial class LibraryView : UserControl, IAsyncNavigationPage, IDisposabl
 
         if (dialog.ShowDialog() != true) return;
 
-        var result = ImportOne(dialog.FileName, "golden");
-        if (result.Image is null)
-        {
-            ShowImportStatus(new[] { result }, "Golden import");
-            LogImportIssues(new[] { result });
-            return;
-        }
-
-        state.SetGoldenImage(result.Image.VaultPath);
-        TryShowImagePreview(result.Image.VaultPath, "Golden Reference Image");
-        ShowImportStatus(new[] { result }, "Golden import");
-        LogImportIssues(new[] { result });
-
+        var compareGoldenButton = sender as Button;
+        if (compareGoldenButton is not null)
+            compareGoldenButton.IsEnabled = false;
         try
         {
-            var analysis = ImageAnalysisService.Analyze(state.SampleImagePath!, state.GoldenImagePath, state.DetectionPriority);
-            state.SetAnalysis(analysis);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Comparison could not run:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
+            var goldenSourcePath = dialog.FileName;
+            var result = await Task.Run(() => ImportOne(goldenSourcePath, "golden"));
+            if (result.Image is null)
+            {
+                ShowImportStatus(new[] { result }, "Golden import");
+                LogImportIssues(new[] { result });
+                return;
+            }
 
-        if (FindMainVm() is { } vm)
-            vm.CurrentPage = "compare";
+            state.SetGoldenImage(result.Image.VaultPath);
+            TryShowImagePreview(result.Image.VaultPath, "Golden Reference Image");
+            ShowImportStatus(new[] { result }, "Golden import");
+            LogImportIssues(new[] { result });
+
+            try
+            {
+                var sampleImagePath = state.SampleImagePath!;
+                var goldenImagePath = state.GoldenImagePath;
+                var analysis = await Task.Run(() =>
+                    ImageAnalysisService.Analyze(sampleImagePath, goldenImagePath, state.DetectionPriority));
+                state.SetAnalysis(analysis);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Comparison could not run:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (FindMainVm() is { } vm)
+                vm.CurrentPage = "compare";
+        }
+        finally
+        {
+            if (compareGoldenButton is not null)
+                compareGoldenButton.IsEnabled = true;
+        }
     }
 
     private void OnAddToTrainingClick(object sender, RoutedEventArgs e)

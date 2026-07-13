@@ -645,8 +645,10 @@
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
+            <!-- Horizontal scrolling is disabled so a wide tab set wraps to a second row
+                 instead of hiding tabs past the right edge with no visible affordance. -->
             <ScrollViewer x:Name="PART_TabHeaderScrollViewer"
-                          HorizontalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Disabled"
                           CanContentScroll="False"
                           Focusable="False"

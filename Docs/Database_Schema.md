@@ -57,6 +57,18 @@ Current application tables:
 
 Indexes are created with `CREATE INDEX IF NOT EXISTS` during initialization. They are part of the baseline schema and are safe to re-run. New index additions should either be included in a migration or added to the baseline after the migration that guarantees required columns exists.
 
+## Data Growth and Retention Boundary
+
+Startup log retention (Settings > Data Retention) archives and purges only the four log tables: `InspectionResults`, `ExportHistory`, `ReviewEvents`, and `AuditEvents`. The alarm snapshot (`exports/alarm_events/alarm_events_state.json`) additionally drops resolved alarms older than 90 days at load and auto-resolves non-critical active alarms older than 14 days at startup.
+
+Everything else grows without automatic pruning and is a known Stage-2 scalability boundary:
+
+- `image_vault/` binaries (every imported image is copied into the vault) and `image_vault/training/`
+- `Images`, `TrainingSamples`, `ImageLearningProjects`/`ImageLearningProjectImages` rows and their learned artifacts
+- `exports/` package folders
+
+For Stage 1 volumes (thousands of images) this is acceptable on workstation disks. Before pilot-line volumes (Stage 2+), plan vault retention: orphan-file sweep against the `Images` table, per-project artifact cleanup on project delete, and an export-folder age policy.
+
 ## Data Handling Warning
 
 Do not commit customer images, runtime SQLite databases, export packages, MES payloads, model files, or image vault contents to git. They are runtime artifacts under the configured storage root and may contain customer or process-sensitive data.

@@ -41,7 +41,7 @@
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="8"/>
-        <ColumnDefinition Width="330"/>
+        <ColumnDefinition Width="360"/>
       </Grid.ColumnDefinitions>
 
       <Border Grid.Column="0" Style="{StaticResource Panel}">
@@ -179,7 +179,7 @@
             </WrapPanel>
           </Grid>
 
-          <ScrollViewer Grid.Row="3" Margin="8" VerticalScrollBarVisibility="Auto">
+          <ScrollViewer Grid.Row="3" Margin="8" Padding="0,0,14,0" VerticalScrollBarVisibility="Auto">
             <StackPanel>
               <TextBlock Text="Processing &amp; Tolerance Rules" Foreground="#7F8C95" FontSize="14" FontWeight="Bold" Margin="0,0,0,6"/>
               <Grid>

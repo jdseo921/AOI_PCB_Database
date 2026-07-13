@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -7,12 +8,45 @@ namespace AOI_Monitor;
 
 public partial class App : Application
 {
+    // Two instances sharing the same SQLite database, alarm snapshot, and export folders
+    // race each other (last-writer-wins on the JSON snapshots), so the workstation app is
+    // strictly single-instance per user session.
+    private static Mutex? _singleInstanceMutex;
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        _singleInstanceMutex = new Mutex(initiallyOwned: true, @"Local\AOI_Monitor_SingleInstance", out var isFirstInstance);
+        if (!isFirstInstance)
+        {
+            MessageBox.Show(
+                "AOI Monitor is already running on this workstation. Use the existing window; a second instance would corrupt shared inspection data.",
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            Shutdown();
+            return;
+        }
+
         base.OnStartup(e);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+        }
+        catch (ApplicationException)
+        {
+            // The mutex belongs to the losing instance (never acquired); nothing to release.
+        }
+
+        _singleInstanceMutex?.Dispose();
+        _singleInstanceMutex = null;
+        base.OnExit(e);
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

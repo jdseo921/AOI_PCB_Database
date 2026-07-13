@@ -58,7 +58,9 @@ public partial class SettingsView : UserControl, IAsyncNavigationPage, IDisposab
         CentralSyncSettingsService.SettingsChanged += OnCentralSyncSettingsChanged;
         OperatingModeSettingsService.SettingsChanged += OnOperatingModeSettingsChanged;
         ApplyLanguageVisuals();
-        ApplyFontPreset();
+        // Do NOT ApplyFontPreset() here: page load must be side-effect free. Applying the
+        // UI-built preferences on load pushed staged-but-unapproved combo values to the whole
+        // application and re-ran shell-wide localization, resetting dynamic header/footer text.
         _ = RefreshAsync(CancellationToken.None);
     }
 

@@ -405,7 +405,7 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
         RecipeStatusText.Text = "ROI deleted.";
     }
 
-    private void OnTestRunClick(object sender, RoutedEventArgs e)
+    private async void OnTestRunClick(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(_backgroundImagePath) || !File.Exists(_backgroundImagePath))
         {
@@ -414,6 +414,9 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
         }
 
         var state = WorkflowState.Instance;
+        var testRunButton = sender as Button;
+        if (testRunButton is not null)
+            testRunButton.IsEnabled = false;
         try
         {
             // Test Run exercises the current in-editor recipe (including unsaved ROI/parameter
@@ -431,8 +434,11 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
             RecipeService.SetPreviewOverride(state.BoardProgram, preview);
             try
             {
-                state.SetSampleImage(_backgroundImagePath);
-                var analysis = ImageAnalysisService.Analyze(_backgroundImagePath, state.GoldenImagePath, state.DetectionPriority);
+                var sampleImagePath = _backgroundImagePath;
+                state.SetSampleImage(sampleImagePath);
+                RecipeStatusText.Text = "Test run in progress...";
+                var analysis = await Task.Run(() =>
+                    ImageAnalysisService.Analyze(sampleImagePath, state.GoldenImagePath, state.DetectionPriority));
                 state.SetAnalysis(analysis);
                 RecipeStatusText.Text = $"Test run (current unsaved edits): {analysis.Verdict}, score {analysis.DifferenceScore:F1}%.";
                 MessageBox.Show(RecipeStatusText.Text, "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -444,7 +450,13 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
         }
         catch (Exception ex)
         {
+            RecipeStatusText.Text = "Test run failed.";
             MessageBox.Show($"Test run failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            if (testRunButton is not null)
+                testRunButton.IsEnabled = true;
         }
     }
 

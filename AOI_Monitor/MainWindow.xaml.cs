@@ -64,6 +64,9 @@ public partial class MainWindow : Window, IDisposable
             StorageRootSettingsService.ApplySavedStorageRoot();
             AoiDatabase.Initialize();
             LogRetentionService.RunStartupRetention();
+            var expiredAlarms = AlarmEventService.ExpireStaleActiveAlarms(TimeSpan.FromDays(14));
+            if (expiredAlarms > 0)
+                WorkflowState.Instance.AddEvent("ALARM_EXPIRE", $"{expiredAlarms} stale non-critical alarm(s) older than 14 days were auto-resolved at startup.");
             CameraSourceSettingsService.ApplyActiveSource();
             LightingSettingsService.ApplyIntegrationBoundary();
             MesIntegrationSettingsService.ApplyIntegrationBoundary();
@@ -182,6 +185,11 @@ public partial class MainWindow : Window, IDisposable
 
         if (!EnsurePageAccess(key))
             return;
+
+        // Header flyouts must never survive a page change: an open popup sits above the new
+        // workspace, intercepts clicks, and reads as a frozen app to the operator.
+        SetActiveAlarmsFlyoutOpen(false, operatorInitiated: true);
+        AccessPanelPopup.IsOpen = false;
 
         _pendingNavigationKey = key;
         var navigationId = Interlocked.Increment(ref _navigationSequence);
@@ -528,6 +536,22 @@ public partial class MainWindow : Window, IDisposable
 
         if (AlarmEventService.Acknowledge(alarm.AlarmId, WorkflowState.Instance.OperatorWithRole))
             WorkflowState.Instance.AddEvent("ALARM_ACK", $"Alarm acknowledged: {alarm.AlarmId}; severity={alarm.Severity}; source={alarm.Source}.");
+    }
+
+    private void OnAcknowledgeAllAlarmsClick(object sender, RoutedEventArgs e)
+    {
+        var acknowledged = AlarmEventService.AcknowledgeAllActive(WorkflowState.Instance.OperatorWithRole);
+        if (acknowledged == 0)
+        {
+            MessageBox.Show(
+                UiPreferencesService.Text("No unacknowledged alarms.", "미확인 알람이 없습니다."),
+                "AOI Monitor",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        WorkflowState.Instance.AddEvent("ALARM_ACK", $"All active alarms acknowledged in one action: {acknowledged} alarm(s).");
     }
 
     private void OnAlarmDetailsClick(object sender, RoutedEventArgs e)
@@ -885,10 +909,14 @@ public partial class MainWindow : Window, IDisposable
         {
             UiPreferencesService.ApplyToApplication();
             _vm.RefreshLanguage(UiPreferencesService.Load().Language);
+            UiPreferencesService.ApplyLocalization(this);
+            // Dynamic chrome (banners, alarm chip, footer) must be rewritten after the
+            // localization walk so a preferences change can never leave stale shell status.
             ApplyShellLanguage();
             ApplyUiPreferencesToShell();
-            UiPreferencesService.ApplyLocalization(this);
             PageTitleText.Text = LocalizedPageTitle(_vm.CurrentPage);
+            RefreshAlarmPanel();
+            _ = UpdateFooterStatusAsync();
         });
     }
 

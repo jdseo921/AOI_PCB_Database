@@ -133,7 +133,7 @@ public partial class CompareView : UserControl
         _zoomed = false;
     }
 
-    private void OnShowDifferenceClick(object sender, RoutedEventArgs e)
+    private async void OnShowDifferenceClick(object sender, RoutedEventArgs e)
     {
         var state = WorkflowState.Instance;
         var configuration = InspectionModelConfigurationService.Load();
@@ -150,9 +150,15 @@ public partial class CompareView : UserControl
             return;
         }
 
+        var showDifferenceButton = sender as Button;
+        if (showDifferenceButton is not null)
+            showDifferenceButton.IsEnabled = false;
         try
         {
-            var result = InspectionEngineFactory.Create().Analyze(state.SampleImagePath!, state.GoldenImagePath, state.DetectionPriority);
+            var sampleImagePath = state.SampleImagePath!;
+            var goldenImagePath = state.GoldenImagePath;
+            var result = await Task.Run(() =>
+                InspectionEngineFactory.Create().Analyze(sampleImagePath, goldenImagePath, state.DetectionPriority));
             state.SetAnalysis(result);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or FileFormatException or ArgumentException or InvalidOperationException or System.Runtime.InteropServices.COMException)
@@ -163,6 +169,11 @@ public partial class CompareView : UserControl
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return;
+        }
+        finally
+        {
+            if (showDifferenceButton is not null)
+                showDifferenceButton.IsEnabled = true;
         }
 
         RefreshFromState();

@@ -68,6 +68,14 @@ public static class UiPreferencesService
         DependencyProperty.RegisterAttached("OriginalHeader", typeof(string), typeof(UiPreferencesService));
     private static readonly DependencyProperty OriginalToolTipProperty =
         DependencyProperty.RegisterAttached("OriginalToolTip", typeof(string), typeof(UiPreferencesService));
+    private static readonly DependencyProperty LastAppliedTextProperty =
+        DependencyProperty.RegisterAttached("LastAppliedText", typeof(string), typeof(UiPreferencesService));
+    private static readonly DependencyProperty LastAppliedContentProperty =
+        DependencyProperty.RegisterAttached("LastAppliedContent", typeof(string), typeof(UiPreferencesService));
+    private static readonly DependencyProperty LastAppliedHeaderProperty =
+        DependencyProperty.RegisterAttached("LastAppliedHeader", typeof(string), typeof(UiPreferencesService));
+    private static readonly DependencyProperty LastAppliedToolTipProperty =
+        DependencyProperty.RegisterAttached("LastAppliedToolTip", typeof(string), typeof(UiPreferencesService));
     private static readonly Dictionary<string, string> KoreanText = new(StringComparer.Ordinal)
     {
         ["PCBA AOI REVIEW CONSOLE"] = "PCBA AOI 검사 콘솔",
@@ -202,6 +210,7 @@ public static class UiPreferencesService
         ["Oldest first"] = "오래된 순",
         ["Severity low first"] = "심각도 낮은 순",
         ["Acknowledge"] = "확인",
+        ["Acknowledge All"] = "모두 확인",
         ["Details"] = "상세",
         ["Export Log"] = "로그 내보내기",
         ["Sample "] = "샘플 ",
@@ -706,32 +715,42 @@ public static class UiPreferencesService
 
         if (root is TextBlock textBlock && textBlock.Name != "PageTitleText")
         {
-            var original = GetOrStore(textBlock, OriginalTextProperty, textBlock.Text);
-            textBlock.Text = Translate(original, language);
+            var original = ResolveTranslationKey(textBlock, OriginalTextProperty, LastAppliedTextProperty, textBlock.Text);
+            var translated = Translate(original, language);
+            textBlock.Text = translated;
+            textBlock.SetValue(LastAppliedTextProperty, translated);
         }
 
         if (root is ContentControl contentControl && contentControl.Content is string content)
         {
-            var original = GetOrStore(contentControl, OriginalContentProperty, content);
-            contentControl.Content = Translate(original, language);
+            var original = ResolveTranslationKey(contentControl, OriginalContentProperty, LastAppliedContentProperty, content);
+            var translated = Translate(original, language);
+            contentControl.Content = translated;
+            contentControl.SetValue(LastAppliedContentProperty, translated);
         }
 
         if (root is HeaderedContentControl headered && headered.Header is string header)
         {
-            var original = GetOrStore(headered, OriginalHeaderProperty, header);
-            headered.Header = Translate(original, language);
+            var original = ResolveTranslationKey(headered, OriginalHeaderProperty, LastAppliedHeaderProperty, header);
+            var translated = Translate(original, language);
+            headered.Header = translated;
+            headered.SetValue(LastAppliedHeaderProperty, translated);
         }
 
         if (root is HeaderedItemsControl headeredItems && headeredItems.Header is string itemHeader)
         {
-            var original = GetOrStore(headeredItems, OriginalHeaderProperty, itemHeader);
-            headeredItems.Header = Translate(original, language);
+            var original = ResolveTranslationKey(headeredItems, OriginalHeaderProperty, LastAppliedHeaderProperty, itemHeader);
+            var translated = Translate(original, language);
+            headeredItems.Header = translated;
+            headeredItems.SetValue(LastAppliedHeaderProperty, translated);
         }
 
         if (root is FrameworkElement element && element.ToolTip is string toolTip)
         {
-            var original = GetOrStore(element, OriginalToolTipProperty, toolTip);
-            element.ToolTip = Translate(original, language);
+            var original = ResolveTranslationKey(element, OriginalToolTipProperty, LastAppliedToolTipProperty, toolTip);
+            var translated = Translate(original, language);
+            element.ToolTip = translated;
+            element.SetValue(LastAppliedToolTipProperty, translated);
         }
 
         if (root is DataGrid dataGrid)
@@ -741,8 +760,10 @@ public static class UiPreferencesService
                 if (column.Header is not string columnHeader)
                     continue;
 
-                var original = GetOrStore(column, OriginalHeaderProperty, columnHeader);
-                column.Header = Translate(original, language);
+                var original = ResolveTranslationKey(column, OriginalHeaderProperty, LastAppliedHeaderProperty, columnHeader);
+                var translated = Translate(original, language);
+                column.Header = translated;
+                column.SetValue(LastAppliedHeaderProperty, translated);
             }
         }
 
@@ -764,6 +785,30 @@ public static class UiPreferencesService
 
         owner.SetValue(property, current);
         return current;
+    }
+
+    /// <summary>
+    /// Returns the translation key for a localized element without destroying runtime text.
+    /// Static literals keep their first-seen text as the key so EN/KO switching works, but when
+    /// the app has rewritten the value since the localizer last touched it (dynamic status text
+    /// such as alarm counts or footer values), the current value becomes the new key so a
+    /// re-apply never stomps live data back to the XAML default.
+    /// </summary>
+    private static string ResolveTranslationKey(
+        DependencyObject owner,
+        DependencyProperty originalProperty,
+        DependencyProperty lastAppliedProperty,
+        string current)
+    {
+        var original = GetOrStore(owner, originalProperty, current);
+        if (owner.GetValue(lastAppliedProperty) is string lastApplied &&
+            !string.Equals(current, lastApplied, StringComparison.Ordinal))
+        {
+            owner.SetValue(originalProperty, current);
+            return current;
+        }
+
+        return original;
     }
 
     private static string Translate(string original, UiLanguage language)

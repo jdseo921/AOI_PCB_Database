@@ -32,13 +32,13 @@
             <TextBlock Text="Log Filters" Style="{StaticResource HmiSectionHeaderText}"/>
           </DockPanel>
         </Border>
-        <ScrollViewer Grid.Row="1" Margin="8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="128">
+        <ScrollViewer Grid.Row="1" Margin="8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="200">
           <WrapPanel>
-          <StackPanel Width="180" Margin="0,0,8,8">
+          <StackPanel Width="205" Margin="0,0,8,8">
             <TextBlock Text="From" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <DatePicker x:Name="FromDatePicker" Style="{StaticResource HmiFieldDatePicker}"/>
           </StackPanel>
-          <StackPanel Width="180" Margin="0,0,8,8">
+          <StackPanel Width="205" Margin="0,0,8,8">
             <TextBlock Text="To" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,4"/>
             <DatePicker x:Name="ToDatePicker" Style="{StaticResource HmiFieldDatePicker}"/>
           </StackPanel>
@@ -580,7 +580,7 @@
             <Button x:Name="CancelWorkButton" Style="{StaticResource MiniBtn}" Content="Cancel" IsEnabled="False" Click="OnCancelWorkClick"/>
           </StackPanel>
         </StackPanel>
-        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="250">
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="340">
         <StackPanel>
           <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
             <StackPanel>

@@ -29,6 +29,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
     private ICameraSource _cameraSource = CameraSourceFactory.ActiveSource;
     private bool _isRunning;
     private bool _currentResultSaved;
+    private bool _loadNextBoardInProgress;
     private bool _updatingCalibrationProfiles;
     private CancellationTokenSource? _robotCycleCancellation;
     private CancellationTokenSource? _refreshCancellation;
@@ -386,7 +387,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
                 return;
 
             var analysis = await _robotCycleService.RunInspectionStepAsync(
-                _ => Task.FromResult(RunInspection(_currentImagePath)),
+                _ => RunInspectionAsync(_currentImagePath),
                 token);
             if (analysis is not null)
                 LogEvent("ROBOT INSPECT", $"Inspection step completed through cycle service: {analysis.Verdict}.");
@@ -601,6 +602,13 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
 
     private async Task LoadNextBoardAsync(bool runInspection = true, CancellationToken cancellationToken = default)
     {
+        if (_loadNextBoardInProgress)
+        {
+            LogEvent("NEXT BOARD", "Next-board request ignored: a board load/inspection is already in progress.");
+            return;
+        }
+
+        _loadNextBoardInProgress = true;
         try
         {
             var nextBoard = await GetNextBoardAsync(cancellationToken);
@@ -624,7 +632,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
             RefreshHeader();
             if (runInspection)
             {
-                RunInspection(nextBoard.ImagePath);
+                await RunInspectionAsync(nextBoard.ImagePath);
             }
             else
             {
@@ -649,6 +657,10 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
             SetResultStatus("REVIEW");
             LogEvent("ERROR", $"Next board failed: {ex.Message}");
             MessageBox.Show($"Next board failed:\n{ex.Message}", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _loadNextBoardInProgress = false;
         }
     }
 
@@ -735,7 +747,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         ImageCacheService.ClearOnPageUnload();
     }
 
-    private AnalysisResult? RunInspection(string imagePath)
+    private async Task<AnalysisResult?> RunInspectionAsync(string imagePath)
     {
         var state = WorkflowState.Instance;
         var engine = InspectionEngineFactory.Create();
@@ -743,7 +755,11 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
 
         var frameCapturedAtUtc = DateTime.UtcNow;
         var analysisStartUtc = DateTime.UtcNow;
-        var analysis = engine.Analyze(imagePath, state.GoldenImagePath, state.DetectionPriority);
+        // The pixel/model analysis is CPU-bound and can take seconds on large boards; it must
+        // not freeze the operator UI. Everything before and after stays on the UI thread.
+        var goldenImagePath = state.GoldenImagePath;
+        var detectionPriority = state.DetectionPriority;
+        var analysis = await Task.Run(() => engine.Analyze(imagePath, goldenImagePath, detectionPriority));
         var analysisEndUtc = DateTime.UtcNow;
         analysis.BoardProgram = BoardModelText.Text;
         analysis.BoardId = CurrentBoardId();
@@ -1140,12 +1156,12 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
             var run = await _robotCycleService.RunFullCycleAsync(
                 BuildLoadCommand(),
                 BuildInspectCommand(),
-                _ =>
+                async _ =>
                 {
-                    var analysis = RunInspection(_currentImagePath);
+                    var analysis = await RunInspectionAsync(_currentImagePath);
                     if (analysis is not null && !SaveCurrentResultFromRobotCycle())
-                        return Task.FromResult<AnalysisResult?>(null);
-                    return Task.FromResult(analysis);
+                        return null;
+                    return analysis;
                 },
                 BuildUnloadCommand(),
                 cancellationToken);

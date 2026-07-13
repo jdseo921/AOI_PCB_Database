@@ -9,6 +9,7 @@ namespace AOI_Monitor.Services;
 public static class AlarmEventService
 {
     private const string SimulationBoundaryKey = "SIMULATION_BOUNDARY_ACTIVE";
+    private static readonly TimeSpan ResolvedAlarmRetention = TimeSpan.FromDays(90);
     private static readonly object Sync = new();
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -139,6 +140,67 @@ public static class AlarmEventService
         return true;
     }
 
+    /// <summary>
+    /// Acknowledges every active alarm in one action so the operator can clear alarm-banner
+    /// backlog without clicking each row. Returns the number of alarms acknowledged.
+    /// </summary>
+    public static int AcknowledgeAllActive(string operatorId)
+    {
+        var acknowledged = 0;
+        lock (Sync)
+        {
+            EnsureLoadedForCurrentRoot();
+            foreach (var alarm in Events.Where(item =>
+                item.IsActive && item.AcknowledgementState == AlarmAcknowledgementState.Unacknowledged))
+            {
+                alarm.AcknowledgementState = AlarmAcknowledgementState.Acknowledged;
+                alarm.AcknowledgedAtUtc = DateTime.UtcNow;
+                alarm.AcknowledgedBy = string.IsNullOrWhiteSpace(operatorId) ? "UNKNOWN" : operatorId.Trim();
+                acknowledged++;
+            }
+
+            if (acknowledged > 0)
+                PersistUnsafe();
+        }
+
+        if (acknowledged > 0)
+            AlarmEventsChanged?.Invoke();
+
+        return acknowledged;
+    }
+
+    /// <summary>
+    /// Auto-resolves non-critical active alarms older than <paramref name="maxAge"/> so a healthy
+    /// workstation does not boot with a permanently red banner full of last month's conditions.
+    /// Critical alarms are never auto-expired; they require a human decision. Returns the number
+    /// of alarms expired.
+    /// </summary>
+    public static int ExpireStaleActiveAlarms(TimeSpan maxAge, string operatorId = "SYSTEM auto-expiry")
+    {
+        var cutoff = DateTime.UtcNow - maxAge;
+        var expired = 0;
+        lock (Sync)
+        {
+            EnsureLoadedForCurrentRoot();
+            foreach (var alarm in Events.Where(item =>
+                item.IsActive &&
+                item.Severity != AlarmSeverity.Critical &&
+                item.TimestampUtc < cutoff))
+            {
+                ResolveUnsafe(alarm, operatorId);
+                expired++;
+            }
+
+            if (expired > 0)
+                PersistUnsafe();
+        }
+
+        if (expired > 0)
+            AlarmEventsChanged?.Invoke();
+
+        return expired;
+    }
+
     public static bool Resolve(string alarmId, string operatorId)
     {
         lock (Sync)
@@ -206,6 +268,17 @@ public static class AlarmEventService
         File.WriteAllText(csvPath, BuildCsv(events), Encoding.UTF8);
         ExportVerificationService.RecordVerifiedExport("AlarmEventLog", folder, "OK", WorkflowState.Instance.OperatorWithRole);
         return new AlarmEventExportResult(folder, jsonPath, csvPath);
+    }
+
+    public static void ReloadFromDiskForTests()
+    {
+        lock (Sync)
+        {
+            Events.Clear();
+            _loaded = false;
+        }
+
+        AlarmEventsChanged?.Invoke();
     }
 
     public static void ClearForTests()
@@ -284,7 +357,15 @@ public static class AlarmEventService
         {
             var loaded = JsonSerializer.Deserialize<List<AlarmEvent>>(File.ReadAllText(path), JsonOptions);
             if (loaded is not null)
-                Events.AddRange(loaded.Where(item => !string.IsNullOrWhiteSpace(item.AlarmId)));
+            {
+                // Keep the snapshot bounded: resolved alarms older than the retention window are
+                // history that already lives in exported logs, not live state. Active alarms are
+                // always kept regardless of age.
+                var resolvedCutoff = DateTime.UtcNow - ResolvedAlarmRetention;
+                Events.AddRange(loaded.Where(item =>
+                    !string.IsNullOrWhiteSpace(item.AlarmId) &&
+                    (item.IsActive || item.TimestampUtc >= resolvedCutoff)));
+            }
         }
         catch (Exception ex)
         {

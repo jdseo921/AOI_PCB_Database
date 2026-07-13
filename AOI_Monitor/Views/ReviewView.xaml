@@ -40,7 +40,7 @@
   <ScrollViewer Style="{StaticResource FactoryScrollablePage}">
   <Grid Margin="8" MinHeight="665">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="340"/>
+      <ColumnDefinition Width="372"/>
       <ColumnDefinition Width="8"/>
       <ColumnDefinition Width="*"/>
       <ColumnDefinition Width="8"/>
@@ -80,7 +80,7 @@
                 <DataGridTextColumn Header="Sample" Binding="{Binding Sample}"      Width="104" MinWidth="104"/>
                 <DataGridTextColumn Header="AI"     Binding="{Binding AiResult}"    Width="54" MinWidth="54" HeaderTemplate="{StaticResource HmiHeaderInspectionResultTemplate}"/>
                 <DataGridTextColumn Header="GT"     Binding="{Binding GroundTruth}" Width="54" MinWidth="54" HeaderTemplate="{StaticResource HmiHeaderGroundTruthTemplate}"/>
-                <DataGridTemplateColumn Header="Risk" Width="*" MinWidth="86">
+                <DataGridTemplateColumn Header="Risk" Width="*" MinWidth="118">
                   <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
                       <Border Style="{StaticResource RiskChipBorder}" HorizontalAlignment="Left" Margin="0,1,0,1">

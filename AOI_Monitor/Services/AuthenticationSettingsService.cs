@@ -290,7 +290,9 @@ public static class AuthenticationSettingsService
     private static (string Hash, string Salt, int Iterations) CreatePasswordHash(string password)
     {
         var salt = RandomNumberGenerator.GetBytes(16);
-        var iterations = 120_000;
+        // OWASP 2023+ guidance for PBKDF2-SHA256. Existing records keep their stored iteration
+        // count for verification and upgrade the next time the password is set.
+        var iterations = 600_000;
         var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, 32);
         return (Convert.ToBase64String(hash), Convert.ToBase64String(salt), iterations);
     }

@@ -40,6 +40,7 @@ public static class AoiDatabaseMigrations
         new(27, "Add image-only PCB sample learning persistence.", ApplyImageLearningPersistence),
         new(28, "Add image-only anomaly region scoring evidence.", ApplyImageLearningAnomalyEvidence),
         new(29, "Add recoverable payload to log archive for archive-then-purge retention.", ApplyLogArchivePayload),
+        new(30, "Add held-out false-call estimate to image-learning calibration results.", ApplyCalibrationHeldOutEstimate),
     };
 
     public static int LatestVersion => OrderedMigrations[^1].Version;
@@ -216,6 +217,16 @@ public static class AoiDatabaseMigrations
         // Recoverable log retention: LogArchive stores the full source row payload so archived rows
         // remain queryable/recoverable after the live row is purged.
         AoiDatabase.AddColumnIfMissing(connection, transaction, "LogArchive", "PayloadJson", "TEXT NOT NULL DEFAULT ''");
+    }
+
+    private static void ApplyCalibrationHeldOutEstimate(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // Held-out calibration split: the threshold is selected on a calibration half of the
+        // OK Validation set and the headline false-call rate is measured on the untouched half,
+        // removing threshold-selection bias. NULL HeldOutFalseCallRate = set too small to split.
+        AoiDatabase.AddColumnIfMissing(connection, transaction, "ImageLearningCalibrationResults", "HeldOutOkCount", "INTEGER NOT NULL DEFAULT 0");
+        AoiDatabase.AddColumnIfMissing(connection, transaction, "ImageLearningCalibrationResults", "HeldOutFalseCalls", "INTEGER NOT NULL DEFAULT 0");
+        AoiDatabase.AddColumnIfMissing(connection, transaction, "ImageLearningCalibrationResults", "HeldOutFalseCallRate", "REAL NULL");
     }
 
     private static void ApplyExportVerification(SqliteConnection connection, SqliteTransaction transaction)

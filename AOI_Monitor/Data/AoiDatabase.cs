@@ -2855,10 +2855,12 @@ public static class AoiDatabase
             """
             INSERT INTO ImageLearningCalibrationResults
                 (CalibrationId, ProjectId, ModelId, CreatedAtUtc, OkValidationCount, NgValidationCount,
-                 LearnedThreshold, FalseCallTarget, FalseCallRate, PossibleEscapeRate, Status, Summary)
+                 LearnedThreshold, FalseCallTarget, FalseCallRate, PossibleEscapeRate, Status, Summary,
+                 HeldOutOkCount, HeldOutFalseCalls, HeldOutFalseCallRate)
             VALUES
                 ($calibrationId, $projectId, $modelId, $createdAtUtc, $okValidationCount, $ngValidationCount,
-                 $learnedThreshold, $falseCallTarget, $falseCallRate, $possibleEscapeRate, $status, $summary);
+                 $learnedThreshold, $falseCallTarget, $falseCallRate, $possibleEscapeRate, $status, $summary,
+                 $heldOutOkCount, $heldOutFalseCalls, $heldOutFalseCallRate);
             SELECT last_insert_rowid();
             """;
         BindImageLearningCalibrationResult(command, result);
@@ -2875,7 +2877,8 @@ public static class AoiDatabase
         command.CommandText =
             """
             SELECT Id, CalibrationId, ProjectId, ModelId, CreatedAtUtc, OkValidationCount, NgValidationCount,
-                   LearnedThreshold, FalseCallTarget, FalseCallRate, PossibleEscapeRate, Status, Summary
+                   LearnedThreshold, FalseCallTarget, FalseCallRate, PossibleEscapeRate, Status, Summary,
+                   HeldOutOkCount, HeldOutFalseCalls, HeldOutFalseCallRate
             FROM ImageLearningCalibrationResults
             WHERE CalibrationId = $calibrationId
             LIMIT 1;
@@ -2899,7 +2902,8 @@ public static class AoiDatabase
         command.CommandText =
             """
             SELECT Id, CalibrationId, ProjectId, ModelId, CreatedAtUtc, OkValidationCount, NgValidationCount,
-                   LearnedThreshold, FalseCallTarget, FalseCallRate, PossibleEscapeRate, Status, Summary
+                   LearnedThreshold, FalseCallTarget, FalseCallRate, PossibleEscapeRate, Status, Summary,
+                   HeldOutOkCount, HeldOutFalseCalls, HeldOutFalseCallRate
             FROM ImageLearningCalibrationResults
             WHERE ($projectId = '' OR ProjectId = $projectId)
               AND ($modelId = '' OR ModelId = $modelId)
@@ -4724,6 +4728,9 @@ public static class AoiDatabase
             PossibleEscapeRate = reader.GetDouble(10),
             Status = reader.GetString(11),
             Summary = reader.IsDBNull(12) ? string.Empty : reader.GetString(12),
+            HeldOutOkCount = reader.GetInt32(13),
+            HeldOutFalseCalls = reader.GetInt32(14),
+            HeldOutFalseCallRate = reader.IsDBNull(15) ? null : reader.GetDouble(15),
         };
     }
 
@@ -5975,6 +5982,9 @@ public static class AoiDatabase
         command.Parameters.AddWithValue("$possibleEscapeRate", result.PossibleEscapeRate);
         command.Parameters.AddWithValue("$status", result.Status ?? "REVIEW");
         command.Parameters.AddWithValue("$summary", result.Summary ?? string.Empty);
+        command.Parameters.AddWithValue("$heldOutOkCount", result.HeldOutOkCount);
+        command.Parameters.AddWithValue("$heldOutFalseCalls", result.HeldOutFalseCalls);
+        command.Parameters.AddWithValue("$heldOutFalseCallRate", result.HeldOutFalseCallRate is { } rate ? rate : DBNull.Value);
     }
 
     private static void BindImageLearningComparisonResult(SqliteCommand command, ImageLearningComparisonResult result)
@@ -7554,6 +7564,9 @@ public static class AoiDatabase
                 PossibleEscapeRate REAL NOT NULL DEFAULT 0,
                 Status TEXT NOT NULL DEFAULT 'REVIEW',
                 Summary TEXT NOT NULL DEFAULT '',
+                HeldOutOkCount INTEGER NOT NULL DEFAULT 0,
+                HeldOutFalseCalls INTEGER NOT NULL DEFAULT 0,
+                HeldOutFalseCallRate REAL NULL,
                 FOREIGN KEY (ProjectId) REFERENCES ImageLearningProjects(ProjectId),
                 FOREIGN KEY (ModelId) REFERENCES LearnedPcbVisualModels(ModelId)
             );

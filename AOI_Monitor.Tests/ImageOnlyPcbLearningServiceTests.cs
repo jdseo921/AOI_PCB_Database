@@ -354,6 +354,144 @@ public sealed class ImageOnlyPcbLearningServiceTests : IDisposable
         Assert.Equal(first.AlignmentOffsetY, second.AlignmentOffsetY);
     }
 
+    [Fact]
+    public void ImageOnlyPcbLearningHeldOutSplitReportsUnbiasedFalseCallRate()
+    {
+        // #2 held-out split: with >= 10 OK Validation images, the threshold must be selected on
+        // the calibration half and the headline false-call rate measured on the untouched
+        // held-out half (threshold-selection bias removal).
+        var project = CreateLearningProject("Held-out split");
+        ImportStandardTrainingSet(project);
+        for (var i = 0; i < 12; i++)
+            ImportImages(project, ImageLearningImageRole.OkValidation, WriteBoardPng($"ok-validation-{i}.png", brightnessShift: (i % 3) - 1, variant: 20 + i));
+
+        var result = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options);
+
+        Assert.Equal(12, result.Calibration.OkValidationCount);
+        Assert.Equal(6, result.Calibration.HeldOutOkCount);
+        Assert.NotNull(result.Calibration.HeldOutFalseCallRate);
+        // The headline rate IS the held-out rate when the split is active.
+        Assert.Equal(result.Calibration.HeldOutFalseCallRate!.Value, result.Calibration.FalseCallRate, precision: 6);
+        Assert.Contains("held-out", result.Calibration.Summary, StringComparison.OrdinalIgnoreCase);
+        // The sweep was built from the calibration half only.
+        Assert.All(result.ThresholdSweep, row => Assert.Equal(6, row.OkValidationCount));
+    }
+
+    [Fact]
+    public void ImageOnlyPcbLearningSmallValidationSetReportsInSampleRateWithoutHoldOut()
+    {
+        var project = CreateLearningProject("Small set no hold-out");
+        ImportStandardTrainingSet(project);
+        for (var i = 0; i < 3; i++)
+            ImportImages(project, ImageLearningImageRole.OkValidation, WriteBoardPng($"ok-validation-small-{i}.png", variant: 40 + i));
+
+        var result = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, _options);
+
+        Assert.Equal(3, result.Calibration.OkValidationCount);
+        Assert.Equal(0, result.Calibration.HeldOutOkCount);
+        Assert.Null(result.Calibration.HeldOutFalseCallRate);
+        Assert.Contains("in-sample", result.Calibration.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ImageOnlyPcbLearningRotationSearchRecoversSmallBoardRotation()
+    {
+        // #3 rotation alignment: a 1.5-degree board rotation displaces edge pixels by several
+        // pixels at 192px, which translation-only alignment cannot absorb. The rigid search must
+        // recover the angle so the rotated-but-good board passes. A smooth sinusoidal texture is
+        // used so bilinear resampling residuals stay far below the tolerance floor.
+        var options = new ImageOnlyPcbLearningOptions
+        {
+            InputWidth = 192,
+            InputHeight = 192,
+            AlignmentSearchRadiusPixels = 6,
+            MinimumAnomalyAreaPixels = 6,
+            DefaultLearnedThreshold = 4.0,
+            FalseCallTarget = 0.05,
+            MaxAllowedPossibleEscapeRate = 0.0,
+            RotationSearchDegrees = 2.0,
+        };
+        var project = CreateLearningProject("Rotation recovery");
+        var goldenPath = WriteSmoothBoardPng("smooth-golden.png", 192, rotationDegrees: 0, variant: 0);
+        ImportImages(project, ImageLearningImageRole.GoldenReference, goldenPath);
+        for (var i = 0; i < 5; i++)
+            ImportImages(project, ImageLearningImageRole.OkLearning, WriteSmoothBoardPng($"smooth-ok-{i}.png", 192, rotationDegrees: 0, variant: i + 1));
+
+        var learning = ImageOnlyPcbLearningService.TrainProject(project.ProjectId, options);
+        var rotatedOk = WriteSmoothBoardPng("smooth-rotated-ok.png", 192, rotationDegrees: 1.5, variant: 2);
+        var rawDifference = ImageOnlyPcbLearningService.CalculateRawDifferencePercentForTest(goldenPath, rotatedOk, options);
+
+        var first = ImageOnlyPcbLearningService.InspectImagePath(
+            learning.Model.ModelId, rotatedOk, options, "Operator01 [Operator]");
+        var second = ImageOnlyPcbLearningService.InspectImagePath(
+            learning.Model.ModelId, rotatedOk, options, "Operator01 [Operator]");
+
+        // Unaligned, the rotation moves the high-gradient texture measurably.
+        Assert.True(rawDifference > 1.5, $"Expected a measurable unaligned rotation difference, got {rawDifference:F2}%.");
+        // The rigid search recovered a rotation close to the injected 1.5 degrees
+        // (sign depends on the mapping convention).
+        Assert.InRange(Math.Abs(first.AlignmentRotationDegrees), 1.2, 1.8);
+        Assert.Equal("OK", first.InspectionResult.Verdict);
+        // Determinism: identical inspections yield bit-identical results.
+        Assert.Equal(first.InspectionResult.AnomalyScore, second.InspectionResult.AnomalyScore);
+        Assert.Equal(first.AlignmentRotationDegrees, second.AlignmentRotationDegrees);
+    }
+
+    /// <summary>
+    /// Smooth low-frequency board texture (sinusoidal weave plus two soft bumps that break the
+    /// pattern's symmetry) generated at an optional rotation about the image center. Smoothness
+    /// keeps bilinear-resampling residuals small so rotation-recovery tests measure alignment,
+    /// not interpolation noise.
+    /// </summary>
+    private string WriteSmoothBoardPng(string fileName, int size, double rotationDegrees, int variant)
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, fileName);
+        var pixels = new byte[size * size * 4];
+        var radians = rotationDegrees * Math.PI / 180.0;
+        var cos = Math.Cos(radians);
+        var sin = Math.Sin(radians);
+        var center = (size - 1) / 2.0;
+
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                // Sample the pattern at the inverse-rotated position so the written image is the
+                // pattern rotated by +rotationDegrees about the image center.
+                var relX = x - center;
+                var relY = y - center;
+                var patternX = (cos * relX) + (sin * relY) + center;
+                var patternY = (-sin * relX) + (cos * relY) + center;
+                var value = SmoothBoardPattern(patternX, patternY, variant);
+                var index = (y * size + x) * 4;
+                pixels[index] = value;
+                pixels[index + 1] = value;
+                pixels[index + 2] = value;
+                pixels[index + 3] = 255;
+            }
+        }
+
+        var bitmap = BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(path);
+        encoder.Save(stream);
+        return path;
+    }
+
+    private static byte SmoothBoardPattern(double x, double y, int variant)
+    {
+        var value = 128.0
+            + (52.0 * Math.Sin(2 * Math.PI * x / 24.0) * Math.Sin(2 * Math.PI * y / 24.0))
+            + (18.0 * Math.Sin(2 * Math.PI * (x + (2 * y)) / 57.0));
+        // Two soft bumps break the sinusoid's translational symmetry so the search optimum is unique.
+        value += 40.0 * Math.Exp(-(((x - 60) * (x - 60)) + ((y - 40) * (y - 40))) / 180.0);
+        value -= 35.0 * Math.Exp(-(((x - 132) * (x - 132)) + ((y - 150) * (y - 150))) / 220.0);
+        value += variant % 3;
+        return (byte)Math.Clamp(value, 0, 255);
+    }
+
     private ImageLearningProject CreateLearningProject(string name)
         => ImageLearningProjectService.CreateProject(name, "BOARD-IMAGE-ONLY", ImageLearningEvidenceMode.SyntheticDemo, "Engineer01 [Engineer]");
 

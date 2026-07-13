@@ -81,7 +81,7 @@ public sealed class LearnedPcbVisualInspectionEngine : IInspectionEngine
             if (model is not null)
                 evidence.AddRange(LearnedVisualModelRegistryService.BuildEvidenceLines(model));
             evidence.Add($"Anomaly score: {inspection.InspectionResult.AnomalyScore:F2}; learned threshold: {result.ReviewThreshold:F2}.");
-            evidence.Add($"Alignment offset: x={inspection.AlignmentOffsetX}, y={inspection.AlignmentOffsetY}.");
+            evidence.Add($"Alignment offset: x={inspection.AlignmentOffsetX}, y={inspection.AlignmentOffsetY}, rotation={inspection.AlignmentRotationDegrees:F2} deg.");
             evidence.Add("Image-only inspection does not require manual defect labels or training bounding boxes.");
             result.Evidence = evidence;
             result.Defects = inspection.Regions

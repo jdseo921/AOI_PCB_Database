@@ -58,8 +58,8 @@ public static class ImageOnlyPcbLearningService
         {
             var alignment = ReferenceEquals(image, referenceSeed)
                 ? new AlignmentOffset(0, 0, 0)
-                : FindAlignment(referenceSeed.Matrix, image.Matrix, normalizedOptions.AlignmentSearchRadiusPixels);
-            var aligned = ApplyTranslation(image.Matrix, referenceSeed.Matrix, alignment.OffsetX, alignment.OffsetY);
+                : FindAlignment(referenceSeed.Matrix, image.Matrix, normalizedOptions.AlignmentSearchRadiusPixels, normalizedOptions.RotationSearchDegrees);
+            var aligned = ApplyRigidTransform(image.Matrix, referenceSeed.Matrix, alignment.OffsetX, alignment.OffsetY, alignment.AngleDegrees);
             alignedTraining.Add(aligned);
             alignmentRecords.Add(new ImageLearningAlignmentRecord(
                 image.Source.Id,
@@ -69,7 +69,8 @@ public static class ImageOnlyPcbLearningService
                 alignment.OffsetY,
                 alignment.Error,
                 "OK",
-                "Aligned to the image-only learning reference."));
+                "Aligned to the image-only learning reference.",
+                alignment.AngleDegrees));
         }
 
         var reference = BuildMeanImage(alignedTraining);
@@ -85,7 +86,9 @@ public static class ImageOnlyPcbLearningService
                 OkLearningCount = trainingImages.Count(image => image.Source.Role == ImageLearningImageRole.OkLearning),
                 InputWidth = normalizedOptions.InputWidth,
                 InputHeight = normalizedOptions.InputHeight,
-                AlignmentMode = $"DownscaledTranslationSearch(+/-{normalizedOptions.AlignmentSearchRadiusPixels}px)",
+                AlignmentMode = normalizedOptions.RotationSearchDegrees > 0
+                    ? $"DownscaledRigidSearch(+/-{normalizedOptions.AlignmentSearchRadiusPixels}px, +/-{normalizedOptions.RotationSearchDegrees:F1}deg)"
+                    : $"DownscaledTranslationSearch(+/-{normalizedOptions.AlignmentSearchRadiusPixels}px)",
                 BrightnessNormalizationMode = $"MeanBrightnessTo{normalizedOptions.TargetMeanBrightness:F0}",
                 FalseCallTarget = normalizedOptions.FalseCallTarget,
                 EvidenceMode = project.EvidenceMode,
@@ -201,7 +204,8 @@ public static class ImageOnlyPcbLearningService
             comparison,
             inspectionResult.AnomalyRegions,
             evaluation.Alignment.OffsetX,
-            evaluation.Alignment.OffsetY);
+            evaluation.Alignment.OffsetY,
+            evaluation.Alignment.AngleDegrees);
     }
 
     public static double CalculateRawDifferencePercentForTest(string firstImagePath, string secondImagePath, ImageOnlyPcbLearningOptions? options = null)
@@ -211,6 +215,13 @@ public static class ImageOnlyPcbLearningService
         var second = LoadImage(secondImagePath, normalizedOptions);
         return CalculateRawDifferencePercent(first.Matrix, second.Matrix);
     }
+
+    /// <summary>
+    /// Minimum OK Validation images before the calibration/held-out split activates. Below this,
+    /// both halves would be too small to be meaningful, so the pre-split behavior is retained and
+    /// the reported rate is explicitly labeled in-sample.
+    /// </summary>
+    public const int MinimumOkValidationForHoldOut = 10;
 
     private static CalibrationComputation Calibrate(
         string projectId,
@@ -225,7 +236,16 @@ public static class ImageOnlyPcbLearningService
         var ngScores = ngValidationImages
             .Select(image => Evaluate(package, image.Matrix, options).Score)
             .ToArray();
-        var sweep = BuildThresholdSweep(okScores, ngScores, options);
+
+        // Held-out split: selecting the threshold on the same images the false-call rate is
+        // reported on biases the headline number optimistic. With enough OK Validation images,
+        // calibrate on the even-index half (deterministic; image order is the stable DB order)
+        // and measure the reported rate on the untouched odd-index half. NG images stay whole:
+        // they drive the possible-escape guardrail, not an unbiased rate estimate.
+        var useHoldOut = okScores.Length >= MinimumOkValidationForHoldOut;
+        var calibrationScores = useHoldOut ? okScores.Where((_, index) => index % 2 == 0).ToArray() : okScores;
+        var heldOutScores = useHoldOut ? okScores.Where((_, index) => index % 2 == 1).ToArray() : Array.Empty<double>();
+        var sweep = BuildThresholdSweep(calibrationScores, ngScores, options);
 
         if (okScores.Length == 0)
         {
@@ -253,8 +273,15 @@ public static class ImageOnlyPcbLearningService
         }
 
         var selected = SelectThreshold(sweep, options);
-        var status = selected.MeetsFalseCallTarget && selected.MeetsPossibleEscapeLimit ? "OK" : "REVIEW";
-        var summary = $"Selected threshold {selected.Threshold:F2}; false-call rate {selected.FalseCallRate:P1}; possible escape rate {selected.PossibleEscapeRate:P1}.";
+        var heldOutFalseCalls = heldOutScores.Count(score => score >= selected.Threshold);
+        double? heldOutRate = useHoldOut ? heldOutFalseCalls / (double)heldOutScores.Length : null;
+        var heldOutMeetsTarget = heldOutRate is not { } rate || rate <= options.FalseCallTarget;
+        var status = selected.MeetsFalseCallTarget && selected.MeetsPossibleEscapeLimit && heldOutMeetsTarget
+            ? "OK"
+            : "REVIEW";
+        var summary = useHoldOut
+            ? $"Selected threshold {selected.Threshold:F2} on {calibrationScores.Length} calibration image(s); held-out false-call rate {heldOutRate:P1} ({heldOutFalseCalls} of {heldOutScores.Length} held-out image(s)); possible escape rate {selected.PossibleEscapeRate:P1}."
+            : $"Selected threshold {selected.Threshold:F2}; false-call rate {selected.FalseCallRate:P1} (in-sample; add OK Validation images to reach {MinimumOkValidationForHoldOut} for a held-out estimate); possible escape rate {selected.PossibleEscapeRate:P1}.";
 
         return new CalibrationComputation(
             new ImageLearningCalibrationResult
@@ -266,10 +293,15 @@ public static class ImageOnlyPcbLearningService
                 NgValidationCount = ngScores.Length,
                 LearnedThreshold = selected.Threshold,
                 FalseCallTarget = options.FalseCallTarget,
-                FalseCallRate = selected.FalseCallRate,
+                // The headline rate is the held-out estimate when available: it is the number
+                // free of threshold-selection bias. Small sets fall back to the in-sample rate.
+                FalseCallRate = heldOutRate ?? selected.FalseCallRate,
                 PossibleEscapeRate = selected.PossibleEscapeRate,
                 Status = status,
                 Summary = summary,
+                HeldOutOkCount = heldOutScores.Length,
+                HeldOutFalseCalls = heldOutFalseCalls,
+                HeldOutFalseCallRate = heldOutRate,
             },
             sweep);
     }
@@ -339,8 +371,8 @@ public static class ImageOnlyPcbLearningService
         ImageMatrix testImage,
         ImageOnlyPcbLearningOptions options)
     {
-        var alignment = FindAlignment(package.Reference, testImage, options.AlignmentSearchRadiusPixels);
-        var aligned = ApplyTranslation(testImage, package.Reference, alignment.OffsetX, alignment.OffsetY);
+        var alignment = FindAlignment(package.Reference, testImage, options.AlignmentSearchRadiusPixels, options.RotationSearchDegrees);
+        var aligned = ApplyRigidTransform(testImage, package.Reference, alignment.OffsetX, alignment.OffsetY, alignment.AngleDegrees);
         var scoreMap = new double[aligned.Pixels.Length];
         var rawDifference = 0.0;
 
@@ -698,7 +730,11 @@ public static class ImageOnlyPcbLearningService
         return dilated;
     }
 
-    private static AlignmentOffset FindAlignment(ImageMatrix reference, ImageMatrix candidate, int searchRadiusPixels)
+    private static AlignmentOffset FindAlignment(
+        ImageMatrix reference,
+        ImageMatrix candidate,
+        int searchRadiusPixels,
+        double rotationSearchDegrees = 0)
     {
         var radius = Math.Min(searchRadiusPixels, Math.Min(reference.Width, reference.Height) / 4);
         var sampleStep = Math.Max(1, Math.Max(reference.Width, reference.Height) / 96);
@@ -718,29 +754,67 @@ public static class ImageOnlyPcbLearningService
             }
         }
 
-        // Coarse-to-fine refinement: the exhaustive pass above scores each offset on a sparse
-        // sampleStep pixel grid, which can lock onto a slightly wrong offset when the sampled
-        // pixels land on locally dominant texture. Re-score the +/-2 neighborhood of the coarse
-        // winner at full resolution (sampleStep 1) and return that refined offset with its
-        // full-resolution error. Small images already ran the coarse pass at sampleStep 1
-        // (full resolution), so refinement is skipped there and their behavior is unchanged.
+        // Small-angle rotation search: fixtures and hand placement rotate boards slightly, and
+        // translation-only alignment leaves that rotation as edge false-calls. Rotation and
+        // translation are near-orthogonal for small angles (rotation is about the image center),
+        // so each candidate angle only needs a narrow translation window around the 0-degree
+        // winner rather than the full radius. Skipped for tiny images (rotation displacement is
+        // sub-pixel there) so existing small-image behavior and tests stay bit-identical.
+        var rotationEnabled = rotationSearchDegrees > 0 && Math.Min(reference.Width, reference.Height) >= 96;
+        if (rotationEnabled)
+        {
+            for (var magnitude = 0.5; magnitude <= rotationSearchDegrees + 0.000001; magnitude += 0.5)
+            {
+                foreach (var angle in new[] { magnitude, -magnitude })
+                {
+                    var minYOffset = Math.Max(-radius, best.OffsetY - 4);
+                    var maxYOffset = Math.Min(radius, best.OffsetY + 4);
+                    var minXOffset = Math.Max(-radius, best.OffsetX - 4);
+                    var maxXOffset = Math.Min(radius, best.OffsetX + 4);
+                    for (var yOffset = minYOffset; yOffset <= maxYOffset; yOffset++)
+                    {
+                        for (var xOffset = minXOffset; xOffset <= maxXOffset; xOffset++)
+                        {
+                            var error = RigidAlignmentError(reference, candidate, xOffset, yOffset, angle, sampleStep);
+                            // Strictly-better comparison: on ties the earlier (smaller-angle,
+                            // ultimately 0-degree) candidate wins, keeping rotation honest.
+                            if (error < best.Error - 0.000001)
+                                best = new AlignmentOffset(xOffset, yOffset, error, angle);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Coarse-to-fine refinement: the passes above score offsets on a sparse sampleStep pixel
+        // grid, which can lock onto a slightly wrong offset when the sampled pixels land on
+        // locally dominant texture. Re-score the +/-2 offset neighborhood (and, when rotation is
+        // active, the +/-0.25-degree half-steps) of the winner at full resolution and return the
+        // refined transform with its full-resolution error. Small images already ran at full
+        // resolution, so refinement is skipped there and their behavior is unchanged.
         if (sampleStep > 1)
         {
             var refined = new AlignmentOffset(0, 0, double.PositiveInfinity);
-            var minYOffset = Math.Max(-radius, best.OffsetY - 2);
-            var maxYOffset = Math.Min(radius, best.OffsetY + 2);
-            var minXOffset = Math.Max(-radius, best.OffsetX - 2);
-            var maxXOffset = Math.Min(radius, best.OffsetX + 2);
-            for (var yOffset = minYOffset; yOffset <= maxYOffset; yOffset++)
+            var angleCandidates = rotationEnabled && best.AngleDegrees != 0
+                ? new[] { best.AngleDegrees, best.AngleDegrees - 0.25, best.AngleDegrees + 0.25 }
+                : new[] { best.AngleDegrees };
+            var minRefineY = Math.Max(-radius, best.OffsetY - 2);
+            var maxRefineY = Math.Min(radius, best.OffsetY + 2);
+            var minRefineX = Math.Max(-radius, best.OffsetX - 2);
+            var maxRefineX = Math.Min(radius, best.OffsetX + 2);
+            foreach (var angle in angleCandidates)
             {
-                for (var xOffset = minXOffset; xOffset <= maxXOffset; xOffset++)
+                for (var yOffset = minRefineY; yOffset <= maxRefineY; yOffset++)
                 {
-                    var error = AlignmentError(reference, candidate, xOffset, yOffset, sampleStep: 1);
-                    if (error < refined.Error - 0.000001 ||
-                        (Math.Abs(error - refined.Error) <= 0.000001 &&
-                         Math.Abs(xOffset) + Math.Abs(yOffset) < Math.Abs(refined.OffsetX) + Math.Abs(refined.OffsetY)))
+                    for (var xOffset = minRefineX; xOffset <= maxRefineX; xOffset++)
                     {
-                        refined = new AlignmentOffset(xOffset, yOffset, error);
+                        var error = RigidAlignmentError(reference, candidate, xOffset, yOffset, angle, sampleStep: 1);
+                        if (error < refined.Error - 0.000001 ||
+                            (Math.Abs(error - refined.Error) <= 0.000001 &&
+                             Math.Abs(xOffset) + Math.Abs(yOffset) < Math.Abs(refined.OffsetX) + Math.Abs(refined.OffsetY)))
+                        {
+                            refined = new AlignmentOffset(xOffset, yOffset, error, angle);
+                        }
                     }
                 }
             }
@@ -749,6 +823,74 @@ public static class ImageOnlyPcbLearningService
         }
 
         return best;
+    }
+
+    /// <summary>
+    /// Rigid (rotation + translation) alignment error. Zero rotation delegates to the exact
+    /// integer-translation path so translation-only behavior stays bit-identical; non-zero
+    /// rotation inverse-maps each sampled reference pixel through a rotation about the image
+    /// center with bilinear sampling, matching <see cref="ApplyRigidTransform"/>.
+    /// </summary>
+    private static double RigidAlignmentError(
+        ImageMatrix reference,
+        ImageMatrix candidate,
+        int offsetX,
+        int offsetY,
+        double angleDegrees,
+        int sampleStep)
+    {
+        if (angleDegrees == 0)
+            return AlignmentError(reference, candidate, offsetX, offsetY, sampleStep);
+
+        var radians = angleDegrees * Math.PI / 180.0;
+        var cos = Math.Cos(radians);
+        var sin = Math.Sin(radians);
+        var centerX = (reference.Width - 1) / 2.0;
+        var centerY = (reference.Height - 1) / 2.0;
+        var sum = 0.0;
+        var count = 0;
+
+        for (var y = 0; y < reference.Height; y += sampleStep)
+        {
+            var relY = y - centerY;
+            for (var x = 0; x < reference.Width; x += sampleStep)
+            {
+                var relX = x - centerX;
+                var sourceX = (cos * relX) + (sin * relY) + centerX - offsetX;
+                var sourceY = (-sin * relX) + (cos * relY) + centerY - offsetY;
+                if (!TryBilinearSample(candidate, sourceX, sourceY, out var value))
+                    continue;
+
+                var delta = reference.Pixels[(y * reference.Width) + x] - value;
+                sum += delta * delta;
+                count++;
+            }
+        }
+
+        return count == 0 ? double.PositiveInfinity : sum / count;
+    }
+
+    private static bool TryBilinearSample(ImageMatrix image, double x, double y, out double value)
+    {
+        value = 0;
+        if (x < 0 || y < 0 || x > image.Width - 1 || y > image.Height - 1)
+            return false;
+
+        var x0 = (int)Math.Floor(x);
+        var y0 = (int)Math.Floor(y);
+        var x1 = Math.Min(x0 + 1, image.Width - 1);
+        var y1 = Math.Min(y0 + 1, image.Height - 1);
+        var fx = x - x0;
+        var fy = y - y0;
+
+        var topLeft = image.Pixels[(y0 * image.Width) + x0];
+        var topRight = image.Pixels[(y0 * image.Width) + x1];
+        var bottomLeft = image.Pixels[(y1 * image.Width) + x0];
+        var bottomRight = image.Pixels[(y1 * image.Width) + x1];
+        var top = topLeft + ((topRight - topLeft) * fx);
+        var bottom = bottomLeft + ((bottomRight - bottomLeft) * fx);
+        value = top + ((bottom - top) * fy);
+        return true;
     }
 
     private static double AlignmentError(ImageMatrix reference, ImageMatrix candidate, int offsetX, int offsetY, int sampleStep)
@@ -774,6 +916,41 @@ public static class ImageOnlyPcbLearningService
         }
 
         return count == 0 ? double.PositiveInfinity : sum / count;
+    }
+
+    /// <summary>
+    /// Applies the recovered rigid transform (rotation about the image center + integer
+    /// translation). Zero rotation delegates to the exact integer-translation path so
+    /// translation-only alignment stays bit-identical with earlier models; non-zero rotation
+    /// inverse-maps with bilinear sampling and falls back to reference pixels outside the frame.
+    /// </summary>
+    private static ImageMatrix ApplyRigidTransform(ImageMatrix source, ImageMatrix fallback, int offsetX, int offsetY, double angleDegrees)
+    {
+        if (angleDegrees == 0)
+            return ApplyTranslation(source, fallback, offsetX, offsetY);
+
+        var radians = angleDegrees * Math.PI / 180.0;
+        var cos = Math.Cos(radians);
+        var sin = Math.Sin(radians);
+        var centerX = (fallback.Width - 1) / 2.0;
+        var centerY = (fallback.Height - 1) / 2.0;
+        var output = new double[fallback.Pixels.Length];
+
+        for (var y = 0; y < fallback.Height; y++)
+        {
+            var relY = y - centerY;
+            for (var x = 0; x < fallback.Width; x++)
+            {
+                var relX = x - centerX;
+                var sourceX = (cos * relX) + (sin * relY) + centerX - offsetX;
+                var sourceY = (-sin * relX) + (cos * relY) + centerY - offsetY;
+                output[(y * fallback.Width) + x] = TryBilinearSample(source, sourceX, sourceY, out var value)
+                    ? value
+                    : fallback.Pixels[(y * fallback.Width) + x];
+            }
+        }
+
+        return new ImageMatrix(fallback.Width, fallback.Height, output);
     }
 
     private static ImageMatrix ApplyTranslation(ImageMatrix source, ImageMatrix fallback, int offsetX, int offsetY)
@@ -854,6 +1031,9 @@ public static class ImageOnlyPcbLearningService
             calibration.Result.FalseCallTarget,
             calibration.Result.FalseCallRate,
             calibration.Result.PossibleEscapeRate,
+            calibration.Result.HeldOutOkCount,
+            calibration.Result.HeldOutFalseCalls,
+            calibration.Result.HeldOutFalseCallRate,
             calibration.Result.Status,
             toleranceArtifactScale = ToleranceArtifactScaleGray16,
             toleranceArtifactBitDepth = 16,
@@ -865,7 +1045,7 @@ public static class ImageOnlyPcbLearningService
     private static string BuildAlignmentCsv(IReadOnlyList<ImageLearningAlignmentRecord> alignments)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("projectImageId,fileName,role,offsetX,offsetY,alignmentError,status,message");
+        builder.AppendLine("projectImageId,fileName,role,offsetX,offsetY,rotationDegrees,alignmentError,status,message");
         foreach (var row in alignments)
         {
             builder.Append(row.ProjectImageId.ToString(CultureInfo.InvariantCulture)).Append(',')
@@ -873,6 +1053,7 @@ public static class ImageOnlyPcbLearningService
                 .Append(row.Role).Append(',')
                 .Append(row.OffsetX.ToString(CultureInfo.InvariantCulture)).Append(',')
                 .Append(row.OffsetY.ToString(CultureInfo.InvariantCulture)).Append(',')
+                .Append(row.RotationDegrees.ToString("F2", CultureInfo.InvariantCulture)).Append(',')
                 .Append(row.AlignmentError.ToString("G17", CultureInfo.InvariantCulture)).Append(',')
                 .Append(EscapeCsv(row.Status)).Append(',')
                 .Append(EscapeCsv(row.Message)).AppendLine();
@@ -1052,6 +1233,7 @@ public static class ImageOnlyPcbLearningService
             FalseCallTarget = Math.Clamp(source.FalseCallTarget, 0.0, 1.0),
             MaxAllowedPossibleEscapeRate = Math.Clamp(source.MaxAllowedPossibleEscapeRate, 0.0, 1.0),
             MinimumAnomalyAreaPixels = Math.Max(1, source.MinimumAnomalyAreaPixels),
+            RotationSearchDegrees = Math.Clamp(source.RotationSearchDegrees, 0.0, 5.0),
         };
     }
 
@@ -1156,7 +1338,7 @@ public static class ImageOnlyPcbLearningService
         List<ImageLearningAnomalyRegion> Regions,
         AlignmentOffset Alignment);
 
-    private sealed record AlignmentOffset(int OffsetX, int OffsetY, double Error);
+    private sealed record AlignmentOffset(int OffsetX, int OffsetY, double Error, double AngleDegrees = 0);
 
     private sealed record ImageMatrix(int Width, int Height, double[] Pixels);
 }

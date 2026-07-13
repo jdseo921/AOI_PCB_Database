@@ -174,6 +174,13 @@ public sealed class ImageLearningCalibrationResult
     public double PossibleEscapeRate { get; set; }
     public string Status { get; set; } = "REVIEW";
     public string Summary { get; set; } = string.Empty;
+
+    // Held-out estimate: when enough OK Validation images exist, the threshold is selected on a
+    // calibration half and the false-call rate is measured on the untouched held-out half, so the
+    // headline number is free of threshold-selection bias. Null when the set was too small to split.
+    public int HeldOutOkCount { get; set; }
+    public int HeldOutFalseCalls { get; set; }
+    public double? HeldOutFalseCallRate { get; set; }
 }
 
 public sealed class ImageLearningComparisonResult
@@ -230,6 +237,13 @@ public sealed class ImageOnlyPcbLearningOptions
     public int SafeFallbackWidth { get; set; } = 512;
     public int SafeFallbackHeight { get; set; } = 512;
     public int AlignmentSearchRadiusPixels { get; set; } = 20;
+
+    /// <summary>
+    /// Small-angle rotation search range in degrees (searched in 0.5-degree steps both ways,
+    /// refined to 0.25 degrees at the winner). 0 disables rotation search. Ignored for images
+    /// smaller than 96px where rotation displacement is sub-pixel.
+    /// </summary>
+    public double RotationSearchDegrees { get; set; } = 2.0;
     public double TargetMeanBrightness { get; set; } = 128.0;
     public double MinimumTolerance { get; set; } = 4.0;
     public double DefaultLearnedThreshold { get; set; } = 6.0;
@@ -252,7 +266,8 @@ public sealed record ImageOnlyPcbInspectionResult(
     ImageLearningComparisonResult ComparisonResult,
     IReadOnlyList<ImageLearningAnomalyRegion> Regions,
     int AlignmentOffsetX,
-    int AlignmentOffsetY);
+    int AlignmentOffsetY,
+    double AlignmentRotationDegrees = 0);
 
 public sealed record ImageLearningAlignmentRecord(
     long ProjectImageId,
@@ -262,7 +277,8 @@ public sealed record ImageLearningAlignmentRecord(
     int OffsetY,
     double AlignmentError,
     string Status,
-    string Message);
+    string Message,
+    double RotationDegrees = 0);
 
 public sealed record ImageLearningSkippedImage(
     long ProjectImageId,

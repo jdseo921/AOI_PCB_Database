@@ -98,19 +98,21 @@ public static class ModelConfigurationValidator
                     fingerprint);
             }
 
+            var isHeatmap = AnomalyHeatmapOutputParser.LooksLikeHeatmap(dimensions);
             var lastDimension = dimensions[^1];
-            if (lastDimension > 0 && lastDimension < 6)
+            if (!isHeatmap && lastDimension > 0 && lastDimension < 6)
             {
                 return Result(
                     ModelConfigurationTestStatus.UnsupportedOutputFormat,
-                    $"Output tensor '{configuration.OutputTensorName}' shape [{string.Join(",", dimensions)}] is not compatible with class/confidence/box rows.",
+                    $"Output tensor '{configuration.OutputTensorName}' shape [{string.Join(",", dimensions)}] is not compatible with class/confidence/box rows or an anomaly heat map.",
                     timestamp,
                     fingerprint);
             }
 
+            var parseMode = isHeatmap ? "anomaly heat map" : "detection rows";
             return Result(
                 ModelConfigurationTestStatus.Ready,
-                $"Ready. ONNX Runtime opened the model, found input '{configuration.InputTensorName}', output '{configuration.OutputTensorName}', and output shape [{string.Join(",", dimensions)}].",
+                $"Ready. ONNX Runtime opened the model, found input '{configuration.InputTensorName}', output '{configuration.OutputTensorName}', and output shape [{string.Join(",", dimensions)}] (parsed as {parseMode}).",
                 timestamp,
                 fingerprint);
         }

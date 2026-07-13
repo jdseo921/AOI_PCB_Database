@@ -17,7 +17,7 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
     private readonly IModelOutputParser _outputParser;
 
     public OnnxInspectionEngine(InspectionModelConfiguration configuration)
-        : this(configuration, new GenericDetectionOutputParser())
+        : this(configuration, new AutoDetectOutputParser())
     {
     }
 

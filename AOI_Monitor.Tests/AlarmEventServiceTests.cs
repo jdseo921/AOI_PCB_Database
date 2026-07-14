@@ -237,4 +237,87 @@ public sealed class AlarmEventServiceTests : IDisposable
         var acknowledged = ClientDemoReadinessGateService.Evaluate(DeploymentProfile.Stage1ImageValidation);
         Assert.Contains(acknowledged.Checks, check => check.Name == "Unacknowledged alarm-level events" && check.Status == ClientDemoGateStatus.Pass);
     }
+
+    [Fact]
+    public void RecurringKeyedAlarmReentersUnacknowledgedSetAfterAcknowledgement()
+    {
+        const string key = "MACHINE_INTERFACE_EXPORT_FAILED";
+        var first = AlarmEventService.Raise(
+            AlarmSeverity.Alarm,
+            "MachineInterface",
+            "Machine-interface export failed for board A.",
+            "Check the export target and retry.",
+            idempotencyKey: key);
+        Assert.True(AlarmEventService.Acknowledge(first.AlarmId, "AlarmAdmin [Admin]"));
+
+        // The same fault recurs with a materially different message: it must re-surface as
+        // unacknowledged rather than stay silently acknowledged.
+        var second = AlarmEventService.Raise(
+            AlarmSeverity.Alarm,
+            "MachineInterface",
+            "Machine-interface export failed for board B.",
+            "Check the export target and retry.",
+            idempotencyKey: key);
+
+        Assert.Equal(first.AlarmId, second.AlarmId);
+        Assert.Equal(AlarmAcknowledgementState.Unacknowledged, second.AcknowledgementState);
+        Assert.Null(second.AcknowledgedAtUtc);
+        Assert.Contains(
+            AlarmEventService.GetUnacknowledgedAlarmLevelEvents(),
+            item => item.AlarmId == first.AlarmId);
+    }
+
+    [Fact]
+    public void IdenticalKeyedReraiseDoesNotResurrectAcknowledgement()
+    {
+        const string key = "SIMULATION_BOUNDARY_ACTIVE";
+        var first = AlarmEventService.Raise(
+            AlarmSeverity.Warning,
+            "SimulationBoundary",
+            "Simulated source active.",
+            "Keep evidence labeled simulated.",
+            idempotencyKey: key);
+        AlarmEventService.Acknowledge(first.AlarmId, "AlarmAdmin [Admin]");
+
+        // A byte-identical re-raise is not a new occurrence; it must not nag the operator again.
+        var second = AlarmEventService.Raise(
+            AlarmSeverity.Warning,
+            "SimulationBoundary",
+            "Simulated source active.",
+            "Keep evidence labeled simulated.",
+            idempotencyKey: key);
+
+        Assert.Equal(AlarmAcknowledgementState.Acknowledged, second.AcknowledgementState);
+    }
+
+    [Fact]
+    public void CorruptSnapshotIsQuarantinedAndRaisesCriticalSelfAlarm()
+    {
+        var snapshotPath = Path.Combine(_root, "exports", "alarm_events", "alarm_events_state.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(snapshotPath)!);
+        File.WriteAllText(snapshotPath, "{ this is not valid alarm json ]]");
+
+        AlarmEventService.ReloadFromDiskForTests();
+        var active = AlarmEventService.GetEvents(new AlarmEventQuery { ActiveOnly = true, OperatorVisibleOnly = false });
+
+        // A corrupt snapshot must not silently vanish: a Critical self-alarm surfaces the loss so
+        // readiness gates block instead of reporting Go.
+        Assert.Contains(active, item => item.Severity == AlarmSeverity.Critical && item.Source.Contains("AlarmPersistence", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(AlarmEventService.GetActiveCriticalAlarms(), item => item.Source.Contains("AlarmPersistence", StringComparison.OrdinalIgnoreCase));
+
+        // The unreadable file is moved aside (not left to be overwritten by the next write).
+        var quarantined = Directory.GetFiles(Path.GetDirectoryName(snapshotPath)!, "*.corrupt-*");
+        Assert.NotEmpty(quarantined);
+    }
+
+    [Fact]
+    public void PersistRewritesSnapshotAtomicallyWithoutLeavingTempFiles()
+    {
+        AlarmEventService.Raise(AlarmSeverity.Alarm, "Camera", "Camera link lost.", "Check the cable.");
+        var dir = Path.Combine(_root, "exports", "alarm_events");
+
+        Assert.True(File.Exists(Path.Combine(dir, "alarm_events_state.json")));
+        // The atomic write swaps a temp file into place and must not leave temp residue behind.
+        Assert.Empty(Directory.GetFiles(dir, "*.tmp-*"));
+    }
 }

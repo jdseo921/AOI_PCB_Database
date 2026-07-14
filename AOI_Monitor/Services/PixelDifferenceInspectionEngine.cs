@@ -13,6 +13,12 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
     public string Name => "Pixel Difference Prototype Engine";
     public string Version => "PIXEL_DIFF_0.1";
 
+    // Reject implausibly large images before decode. A valid-but-enormous PNG/JPEG (a
+    // "decompression bomb", or an accidental gigapixel scan) would otherwise force a multi-GB
+    // BGRA allocation on the inspection thread and abort the batch run. 100 MPix covers any real
+    // PCB image with wide margin; oversized images take the graceful SAMPLE_IMAGE_LOAD_FAILED path.
+    internal const long MaxDecodePixels = 100_000_000;
+
     public AnalysisResult Analyze(string samplePath, string? goldenPath, DetectionPriority priority)
     {
         var timing = new InspectionTiming();
@@ -449,6 +455,9 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
     {
         if (!File.Exists(path)) return null;
 
+        if (ExceedsMaxDecodePixels(path))
+            return null;
+
         var bmp = new BitmapImage();
         bmp.BeginInit();
         bmp.CacheOption = BitmapCacheOption.OnLoad;
@@ -462,6 +471,27 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         var converted = new FormatConvertedBitmap(bmp, PixelFormats.Bgra32, null, 0);
         converted.Freeze();
         return converted;
+    }
+
+    // Reads only the frame header (no full decode) to reject oversized images cheaply.
+    private static bool ExceedsMaxDecodePixels(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+            if (decoder.Frames.Count == 0)
+                return false;
+
+            var frame = decoder.Frames[0];
+            return (long)frame.PixelWidth * frame.PixelHeight > MaxDecodePixels;
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or FileFormatException or ArgumentException or OverflowException)
+        {
+            // A header we cannot even read is not treatable as "oversized"; let the normal decode
+            // path attempt it and surface a proper load failure.
+            return false;
+        }
     }
 
     private static BitmapSource Resize(BitmapSource source, int maxW, int maxH)
@@ -484,9 +514,15 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
     private static double CalculateBrightness(BitmapSource src)
     {
         var stride = src.PixelWidth * 4;
-        var count = stride * src.PixelHeight;
+        // 64-bit product so a large full-resolution sample cannot overflow int32 into a negative
+        // count (the sample is measured before the 384x384 downscale). LoadBgra32 already caps
+        // dimensions, so this branch is a defence-in-depth backstop, not the primary guard.
+        var count = (long)stride * src.PixelHeight;
+        if (count > int.MaxValue)
+            return 0;
+
         var pool = ArrayPool<byte>.Shared;
-        var pixels = pool.Rent(count);
+        var pixels = pool.Rent((int)count);
 
         try
         {

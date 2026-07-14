@@ -1339,6 +1339,35 @@ public static class ImageOnlyPcbLearningService
         var mode = model.BrightnessNormalizationMode ?? string.Empty;
         options.UseBoxAverageResampling = mode.Contains("BoxAverage", StringComparison.Ordinal);
         options.FlattenIllumination = mode.Contains("FlattenLocal", StringComparison.Ordinal);
+
+        // Restore the brightness target the model was built with, exactly as the two flags above
+        // are restored. Without this, an inspection that supplied a non-default target would
+        // normalize the test image to a different mean than the persisted reference and bias every
+        // score. Legacy models with no MeanBrightnessTo token keep the current option value.
+        var brightnessToken = ExtractMeanBrightnessTarget(mode);
+        if (brightnessToken is { } target)
+            options.TargetMeanBrightness = target;
+    }
+
+    private static double? ExtractMeanBrightnessTarget(string mode)
+    {
+        const string marker = "MeanBrightnessTo";
+        var start = mode.IndexOf(marker, StringComparison.Ordinal);
+        if (start < 0)
+            return null;
+
+        var valueStart = start + marker.Length;
+        var valueEnd = valueStart;
+        while (valueEnd < mode.Length && (char.IsDigit(mode[valueEnd]) || mode[valueEnd] == '.'))
+            valueEnd++;
+
+        return double.TryParse(
+            mode.AsSpan(valueStart, valueEnd - valueStart),
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var parsed)
+            ? Math.Clamp(parsed, 16.0, 240.0)
+            : null;
     }
 
     private static LearnedVisualModelPackage LoadModelPackage(string modelId, ImageOnlyPcbLearningOptions? options)

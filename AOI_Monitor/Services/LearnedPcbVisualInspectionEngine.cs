@@ -64,9 +64,16 @@ public sealed class LearnedPcbVisualInspectionEngine : IInspectionEngine
                 : result.Verdict == "OK" ? 0.82 : 0.58;
             result.ConfidenceThreshold = result.ReviewThreshold;
             result.DecisionReason = inspection.InspectionResult.DecisionReason;
-            result.SuggestedDefect = inspection.Regions.Count == 0
-                ? "No Image-only Visual Anomaly"
-                : "Image-only Visual Anomaly";
+            // The calibrated verdict comes from the anomaly score (a connectivity-agnostic order
+            // statistic), while regions require a connected blob of at least the localization size.
+            // A non-OK board can therefore trip the score with anomalous area too scattered to form
+            // a single region — label that honestly instead of "No anomaly", which would contradict
+            // the NG/REVIEW verdict.
+            result.SuggestedDefect = inspection.Regions.Count > 0
+                ? "Image-only Visual Anomaly"
+                : result.Verdict == "OK"
+                    ? "No Image-only Visual Anomaly"
+                    : "Diffuse Image-only Anomaly (below localization size)";
             result.Hotspot = inspection.Regions.Count == 0
                 ? new Rect(0, 0, 0, 0)
                 : new Rect(

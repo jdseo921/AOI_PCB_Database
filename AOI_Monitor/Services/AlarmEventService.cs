@@ -72,6 +72,17 @@ public static class AlarmEventService
             alarm.IsSimulatedOrMock = isSimulatedOrMock;
             alarm.IsOperatorVisible = true;
 
+            // A keyed fault that materially recurs after the operator acknowledged the first
+            // occurrence must re-enter the unacknowledged set (and show a current time), otherwise
+            // a still-failing condition silently reads as "handled" on the readiness gates.
+            if (!isNew && changed && alarm.AcknowledgementState == AlarmAcknowledgementState.Acknowledged)
+            {
+                alarm.AcknowledgementState = AlarmAcknowledgementState.Unacknowledged;
+                alarm.AcknowledgedAtUtc = null;
+                alarm.AcknowledgedBy = string.Empty;
+                alarm.TimestampUtc = DateTime.UtcNow;
+            }
+
             if (changed)
                 PersistUnsafe();
         }
@@ -369,8 +380,44 @@ public static class AlarmEventService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Trace.WriteLine($"Alarm event state load failed; clearing in-memory alarm cache: {ex.Message}");
+            // A corrupt/truncated snapshot must NOT silently disappear: losing an active Critical
+            // here would let readiness gates report Go/Pass. Quarantine the bad file so the next
+            // write cannot overwrite it, and raise a Critical self-alarm so the loss is visible on
+            // the readiness gate instead of vanishing.
+            System.Diagnostics.Trace.WriteLine($"Alarm event state load failed; quarantining snapshot: {ex.Message}");
             Events.Clear();
+            var quarantinePath = QuarantineCorruptSnapshot(path);
+            Events.Add(new AlarmEvent
+            {
+                AlarmId = $"ALM-{DateTime.UtcNow:yyyyMMddHHmmssfff}-SNAPSHOT",
+                TimestampUtc = DateTime.UtcNow,
+                Severity = AlarmSeverity.Critical,
+                Source = NormalizeSource("AlarmPersistence"),
+                Message = "The saved alarm state file was unreadable and could not be restored. Any previously active alarms may be lost; review station status before relying on readiness evidence.",
+                RecommendedAction = quarantinePath is null
+                    ? "Investigate the alarm state file under exports/alarm_events, then acknowledge this alarm once station status is confirmed."
+                    : $"The unreadable file was moved to {Path.GetFileName(quarantinePath)}. Confirm station status, then acknowledge this alarm.",
+                IsOperatorVisible = true,
+            });
+            PersistUnsafe();
+        }
+    }
+
+    private static string? QuarantineCorruptSnapshot(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+                return null;
+
+            var quarantinePath = $"{path}.corrupt-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
+            File.Move(path, quarantinePath);
+            return quarantinePath;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Alarm snapshot quarantine failed: {ex.Message}");
+            return null;
         }
     }
 
@@ -380,7 +427,15 @@ public static class AlarmEventService
         {
             var path = SnapshotPath();
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, JsonSerializer.Serialize(Events, JsonOptions), Encoding.UTF8);
+            // Atomic write: serialize to a sibling temp file, then swap it into place. A crash or
+            // power loss mid-write can only truncate the temp file, never the live snapshot, so an
+            // ill-timed interruption can no longer wipe active alarms.
+            var tempPath = $"{path}.tmp-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
+            File.WriteAllText(tempPath, JsonSerializer.Serialize(Events, JsonOptions), Encoding.UTF8);
+            if (File.Exists(path))
+                File.Replace(tempPath, path, null);
+            else
+                File.Move(tempPath, path);
         }
         catch (Exception ex)
         {

@@ -142,6 +142,28 @@ public static class AoiDatabase
 
         try
         {
+            using var headerStream = File.Open(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var headerDecoder = BitmapDecoder.Create(
+                headerStream,
+                BitmapCreateOptions.DelayCreation,
+                BitmapCacheOption.None);
+
+            if (headerDecoder.Frames.Count == 0)
+                return new ImageImportResult(null, false, "Invalid", "Image decoder found no frames.");
+
+            // Reject an oversized image from its header before the full OnLoad decode below, so a
+            // decompression bomb cannot exhaust memory during import validation.
+            var headerFrame = headerDecoder.Frames[0];
+            if ((long)headerFrame.PixelWidth * headerFrame.PixelHeight > PixelDifferenceInspectionEngine.MaxDecodePixels)
+                return new ImageImportResult(null, false, "Invalid", "Image dimensions exceed the supported maximum.");
+        }
+        catch (Exception ex)
+        {
+            return new ImageImportResult(null, false, "Invalid", ex.Message);
+        }
+
+        try
+        {
             using var stream = File.Open(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             var decoder = BitmapDecoder.Create(
                 stream,

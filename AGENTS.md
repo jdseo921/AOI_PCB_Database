@@ -6,10 +6,13 @@ AOI Monitor is a production-oriented WPF PCBA AOI review console, not a cosmetic
 
 This project is standards-aligned, not formally ISO, IEC, ISA, safety, cybersecurity, or regulatory certified. Do not create wording, UI states, exports, reports, or release notes that imply certification or production readiness without the required real evidence and formal process.
 
+The canonical engineering constitution is the **AOI Software Architecture, Secure Development, and Change-Control Standard** in `Docs/standard/` (start at `Docs/standard/00_Index.md`). It must be consulted before every change of any kind; its Change Execution Contract (VOL01 §3), Definition of Done (VOL17 §51), auto-reject list (VOL17 §49), and AI-assisted-development controls (VOL17 §48) bind all work in this repository — including work by AI agents. Where this file and the standard conflict, the standard wins and the conflict is a defect to fix. The requirement catalogue is machine-validated by `Scripts/standard_catalogue.py` (fitness function FF-STD-01, wired into CI).
+
 ## Required Orientation Before Editing
 
 Before changing production code or UI, read the relevant current contracts and surfaces:
 
+- `Docs/standard/00_Index.md` (and the volume covering your subsystem)
 - `README.md`
 - `DESIGN.md`
 - `Docs/Frontend_Design_Review_and_Rework_Plan.md`

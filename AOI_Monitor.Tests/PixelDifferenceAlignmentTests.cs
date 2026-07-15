@@ -1,5 +1,6 @@
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AOI_Monitor.Data;
 using AOI_Monitor.Models;
 using AOI_Monitor.Services;
 using Xunit;
@@ -19,10 +20,19 @@ public sealed class PixelDifferenceAlignmentTests : IDisposable
     {
         _root = Path.Combine(Path.GetTempPath(), "AOI_Monitor_PixelDiffAlignment_Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
+
+        // Isolate shared static state so these tests exercise the whole-board compare path
+        // deterministically. The engine calls RecipeService.LoadLatestRecipe (which reads the
+        // static AoiDatabase storage root and a static recipe cache); without this isolation a
+        // recipe with enabled ROIs left by an earlier test would divert the engine to the ROI
+        // path and flip the whole-board verdict, making these tests order-dependent.
+        AoiDatabase.ConfigureStorageRoot(_root);
+        RecipeService.Invalidate();
     }
 
     public void Dispose()
     {
+        RecipeService.Invalidate();
         try
         {
             if (Directory.Exists(_root))

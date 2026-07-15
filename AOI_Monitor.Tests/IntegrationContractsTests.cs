@@ -393,7 +393,10 @@ public sealed class IntegrationContractsTests
             IntegrationBoundaryRegistry.RobotController = robot;
             IntegrationBoundaryRegistry.EmergencyStopMonitor = new SimulatedEmergencyStopMonitor(robot);
             IntegrationBoundaryRegistry.PlcSafetyController = new NullPlcSafetyController();
-            var service = new RobotCycleService((_, _) => { });
+            // Pure-simulation harness (no PLC, simulated robot): opt into the audited safety bypass,
+            // which is off by default per the safety boundary (Docs/standard, §34). This exercises the
+            // cycle state machine without hardware; production paths keep the fail-safe default.
+            var service = new RobotCycleService((_, _) => { }, new RobotCycleOptions { PermitSafetyBypassForSimulation = true });
             await action(service);
         }
         finally

@@ -4,25 +4,43 @@ on:
   push:
   pull_request:
 
+# Least-privilege token: this workflow only reads the repository and uploads
+# build artifacts, so it needs no write scopes (supply-chain hardening,
+# Docs/standard §42).
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref so a push train does not pile up.
+concurrency:
+  group: dotnet-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test-package:
     name: Build, Test, Package
     runs-on: windows-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.0.x
 
+      - name: Validate engineering standard catalogue (FF-STD-01)
+        shell: pwsh
+        run: python Scripts/standard_catalogue.py --repo-root .
+
       - name: Restore
         shell: pwsh
-        run: dotnet restore AOI_PCB_Database.slnx
+        # --locked-mode fails the build if any packages.lock.json is out of date,
+        # so dependency drift cannot enter CI silently (Docs/standard §42, SUP).
+        run: dotnet restore AOI_PCB_Database.slnx --locked-mode
 
       - name: Build milestone evidence CLI
         shell: pwsh
@@ -166,7 +184,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-results
           path: TestResults/**/*.trx
@@ -174,7 +192,7 @@ jobs:
 
       - name: Upload HMI layout audit
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: hmi-layout-audit
           path: |
@@ -184,28 +202,28 @@ jobs:
 
       - name: Upload UI navigation performance report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ui-navigation-performance
           path: TestResults/ui_navigation_performance.json
           if-no-files-found: ignore
 
       - name: Upload Stage 1 simulation dry-run evidence package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: stage1-simulation-dry-run-evidence-package
           path: TestResults/simulation-dry-run/stage1-evidence-package
           if-no-files-found: error
 
       - name: Upload Stage 2 camera pilot simulation dry-run evidence package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: stage2-camera-pilot-simulation-dry-run-evidence-package
           path: TestResults/simulation-dry-run/stage2-camera-pilot-package
           if-no-files-found: error
 
       - name: Upload image-learning report synthetic evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: image-learning-demo-report-synthetic-not-customer-acceptance
           path: |
@@ -223,7 +241,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload image-learning overlays synthetic evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: image-learning-demo-overlays-synthetic-not-customer-acceptance
           path: |
@@ -235,7 +253,7 @@ jobs:
 
       - name: Upload industrial quality gate report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: industrial-quality-gate-report
           path: |
@@ -249,7 +267,7 @@ jobs:
 
       - name: Upload main branch package
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: AOI_Monitor_PoC
           path: TestResults/package_validation/AOI_Monitor_PoC_*

@@ -80,10 +80,14 @@ public static class MesIntegrationSettingsService
 
         if (settings.Mode == MesIntegrationMode.Rest)
         {
+            // MES carries customer credentials, lot/serial traceability data, and inspection
+            // results, so the transport SHALL be TLS. Plaintext http is rejected per the AOI
+            // Software Architecture, Secure Development, and Change-Control Standard
+            // (Docs/standard, §30 transport security: https-only for MES/traceability).
             if (!Uri.TryCreate(settings.BaseUrl, UriKind.Absolute, out var uri) ||
-                uri.Scheme is not ("http" or "https"))
+                uri.Scheme != Uri.UriSchemeHttps)
             {
-                errors.Add("MES REST base URL must be an absolute http/https URL.");
+                errors.Add("MES REST base URL must be an absolute https:// URL; plaintext http is not permitted for MES credentials and traceability data.");
             }
 
             if (string.IsNullOrWhiteSpace(settings.UploadResultPath))

@@ -75,7 +75,7 @@ public sealed class MesRestIntegrationTests : IDisposable
         Assert.True(result.Accepted);
         Assert.Equal(IntegrationConnectionStatus.Ready, result.Status);
         Assert.Equal(HttpMethod.Post, handler.LastRequest?.Method);
-        Assert.Equal("http://mes.test/api/aoi/results", handler.LastRequest?.RequestUri?.ToString());
+        Assert.Equal("https://mes.test/api/aoi/results", handler.LastRequest?.RequestUri?.ToString());
         Assert.NotNull(handler.LastRequest);
         Assert.True(handler.LastRequest.Headers.TryGetValues("X-Test-Key", out var values));
         Assert.Equal("secret-api-key", Assert.Single(values));
@@ -205,7 +205,7 @@ public sealed class MesRestIntegrationTests : IDisposable
         var settings = RestSettings(maxRetryCount: 0);
         settings.AuthMode = MesRestAuthMode.Bearer;
         settings.BearerToken = "bearer-secret-for-test";
-        settings.BaseUrl = "http://mes.test?token=bearer-secret-for-test";
+        settings.BaseUrl = "https://mes.test?token=bearer-secret-for-test";
         MesIntegrationSettingsService.Save(settings);
 
         var report = await TraceabilityAcceptanceTestService.RunAsync(operatorId: "Engineer01 [Engineer]");
@@ -377,7 +377,7 @@ public sealed class MesRestIntegrationTests : IDisposable
         => new()
         {
             Mode = MesIntegrationMode.Rest,
-            BaseUrl = "http://mes.test",
+            BaseUrl = "https://mes.test",
             UploadResultPath = "/api/aoi/results",
             UploadImagePath = "/api/aoi/images",
             AuthMode = MesRestAuthMode.None,
@@ -403,7 +403,7 @@ public sealed class MesRestIntegrationTests : IDisposable
             nameof(TraceabilityPayload),
             json,
             @"C:\payloads\traceability.json",
-            "http://mes.test/api/aoi/results",
+            "https://mes.test/api/aoi/results",
             maxRetryCount,
             "Initial failure",
             payload.OperatorId,

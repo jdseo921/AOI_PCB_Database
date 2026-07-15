@@ -133,6 +133,8 @@ public static class ModelRegistryService
         if (model.LifecycleState == ModelLifecycleState.AcceptanceFailed)
             throw new InvalidOperationException("Models with failed acceptance cannot be set active. Re-run acceptance or register a corrected model.");
 
+        VerifyStoredModelIntegrity(model);
+
         AoiDatabase.SetActiveModelRegistryRecord(model.ModelId);
         model.IsActive = true;
         WriteMetadata(model);
@@ -217,6 +219,37 @@ public static class ModelRegistryService
     }
 
     public static string ComputeSha256(string path) => HashUtil.ComputeSha256(path);
+
+    /// <summary>
+    /// Recomputes the SHA-256 of the stored ONNX file and refuses activation if it does not match
+    /// the hash captured at registration. The registered hash was recorded once at import; this
+    /// re-verification closes the window in which the on-disk artifact could be swapped or corrupted
+    /// between registration and activation. On mismatch the discrepancy is audited and activation is
+    /// refused so a tampered model never becomes the inference source. Required by the AOI Software
+    /// Architecture, Secure Development, and Change-Control Standard (Docs/standard, §29 model-artifact
+    /// integrity and §31 AI/ML model provenance).
+    /// </summary>
+    /// <param name="model">The registry entry whose stored artifact is being activated.</param>
+    /// <exception cref="FileNotFoundException">The stored model file is missing.</exception>
+    /// <exception cref="InvalidOperationException">The recomputed hash does not match the registered hash.</exception>
+    private static void VerifyStoredModelIntegrity(ModelRegistryEntry model)
+    {
+        if (!File.Exists(model.StoredModelPath))
+            throw new FileNotFoundException("Stored ONNX model file is missing; activation refused.", model.StoredModelPath);
+
+        var actualSha256 = ComputeSha256(model.StoredModelPath);
+        if (string.Equals(actualSha256, model.Sha256, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        AoiDatabase.RecordAuditEvent(
+            "MODEL_INTEGRITY",
+            $"Refused to activate {model.ModelId}: stored ONNX hash {actualSha256} does not match registered SHA-256 {model.Sha256}. The artifact was altered after registration; activation blocked.",
+            relatedEntityType: "ModelRegistry",
+            relatedEntityId: model.ModelId,
+            relatedPath: model.StoredModelPath);
+        throw new InvalidOperationException(
+            $"Model integrity verification failed for '{model.ModelId}': the stored ONNX file no longer matches its registered SHA-256. Activation refused; re-register the model from a trusted source.");
+    }
 
     internal static ModelRegistryRecord ToRecord(ModelRegistryEntry entry)
         => new(

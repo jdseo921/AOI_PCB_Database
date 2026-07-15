@@ -58,4 +58,45 @@ public sealed class RoleAuthorizationTests
         Assert.True(RoleAuthorization.CanRunModelTests(UserRole.Engineer));
         Assert.True(RoleAuthorization.CanRunModelTests(UserRole.Admin));
     }
+
+    [Theory]
+    [InlineData("home")]
+    [InlineData("library")]
+    [InlineData("monitor")]
+    [InlineData("compare")]
+    [InlineData("review")]
+    [InlineData("recipe")]
+    [InlineData("modeltest")]
+    [InlineData("spc")]
+    [InlineData("reports")]
+    [InlineData("calibration")]
+    [InlineData("profile")]
+    [InlineData("pilot")]
+    [InlineData("settings")]
+    [InlineData("install")]
+    [InlineData("guide")]
+    public void EveryRegisteredNavigationKeyIsAccessibleToAdmin(string pageKey)
+    {
+        // Admin holds every capability, so each real route must resolve to an explicit allow.
+        // A key that fails here has been removed from the CanAccessPage switch and would be
+        // caught by default-deny — the failure signals a routing/authorization drift, not a
+        // legitimately forbidden Admin page.
+        Assert.True(RoleAuthorization.CanAccessPage(UserRole.Admin, pageKey));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("unknown")]
+    [InlineData("Home")]        // case-sensitive: capitalized variant is not a registered key
+    [InlineData("admin-backdoor")]
+    [InlineData("../settings")]
+    public void UnregisteredPageKeysAreDeniedToEveryRole(string pageKey)
+    {
+        // Default-deny authorization (§28): an unregistered or spoofed page key must never be
+        // accessible, so a newly added route cannot ship silently operator-accessible and a
+        // crafted key cannot bypass the switch.
+        Assert.False(RoleAuthorization.CanAccessPage(UserRole.Operator, pageKey));
+        Assert.False(RoleAuthorization.CanAccessPage(UserRole.Engineer, pageKey));
+        Assert.False(RoleAuthorization.CanAccessPage(UserRole.Admin, pageKey));
+    }
 }

@@ -34,7 +34,16 @@ public sealed record RobotCycleRunResult(
 
 public sealed class RobotCycleOptions
 {
-    public bool PermitSafetyBypassForSimulation { get; set; } = true;
+    /// <summary>
+    /// When <c>true</c>, a robot motion command is permitted even though the PLC safety status is
+    /// not OK, but only in the fully-simulated case (no PLC configured and no ready robot). This is
+    /// an opt-in demonstration aid and defaults to <c>false</c> (fail-safe) per the AOI Software
+    /// Architecture, Secure Development, and Change-Control Standard (Docs/standard, §34 robot and
+    /// safety boundary: safety bypass is never the default, so an adapter that mis-reports its
+    /// connection state cannot silently obtain motion). Simulation/acceptance flows that intend to
+    /// exercise the cycle without hardware must set this explicitly.
+    /// </summary>
+    public bool PermitSafetyBypassForSimulation { get; set; }
 }
 
 public sealed class RobotCycleService

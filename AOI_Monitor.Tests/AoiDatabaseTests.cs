@@ -985,7 +985,7 @@ public sealed class AoiDatabaseTests : IDisposable
             Mode = "REST",
             ResultStatus = "PASS",
             ImageStatus = "NOT SENT",
-            EndpointUrl = "http://mes.test/api/aoi/results",
+            EndpointUrl = "https://mes.test/api/aoi/results",
             OperatorId = "Engineer42 [Engineer]",
             ReportJsonPath = @"C:\customer\evidence\traceability.json",
         });

@@ -25,20 +25,39 @@ public static class RoleAuthorization
     public static bool CanManageSettings(UserRole role) => role >= UserRole.Admin;
     public static bool CanUseMaintenanceActions(UserRole role) => role >= UserRole.Admin;
 
+    /// <summary>
+    /// Resolves whether <paramref name="role"/> may open the navigation page identified by
+    /// <paramref name="pageKey"/>. Authorization is default-deny: an unknown or unregistered
+    /// page key returns <c>false</c> so a newly added route cannot ship silently
+    /// operator-accessible. Every real navigation key is enumerated explicitly; the operator-view
+    /// pages (home, library, monitor, compare, review, profile, guide) are readable by any
+    /// authenticated role, and privileged pages gate to Engineer/Admin via the capability
+    /// predicates above. Governed by the AOI Software Architecture, Secure Development, and
+    /// Change-Control Standard (Docs/standard, §28 default-deny authorization).
+    /// </summary>
     public static bool CanAccessPage(UserRole role, string pageKey)
     {
         return pageKey switch
         {
-            "home" => true,
+            // Operator-viewable pages (readable by any authenticated role).
+            "home" => role >= UserRole.Operator,
+            "library" => role >= UserRole.Operator,
+            "monitor" => role >= UserRole.Operator,
+            "compare" => role >= UserRole.Operator,
+            "review" => role >= UserRole.Operator,
+            "profile" => role >= UserRole.Operator,
+            "guide" => role >= UserRole.Operator,
+            "modeltest" => role >= UserRole.Operator,
+            "reports" => role >= UserRole.Operator,
+            // Privileged pages.
             "recipe" => CanEditRecipes(role),
             "calibration" => CanEditCalibration(role),
-            "modeltest" => true,
             "spc" => CanRunModelTests(role),
             "pilot" => role >= UserRole.Engineer,
-            "reports" => role >= UserRole.Operator,
             "settings" => role >= UserRole.Engineer,
             "install" => CanManageSettings(role),
-            _ => true,
+            // Default-deny: an unregistered page key is never accessible.
+            _ => false,
         };
     }
 

@@ -16,6 +16,15 @@ public static class RobotAcceptanceTestService
         WriteIndented = true,
     };
 
+    // This service generates SIMULATED robot-acceptance evidence and explicitly labels every run
+    // "Simulation evidence only". It therefore opts into the safety bypass, which — per the safety
+    // boundary in the AOI Software Architecture, Secure Development, and Change-Control Standard
+    // (Docs/standard, §34) — is off by default. The bypass activates ONLY when no PLC is configured
+    // and no robot reports Ready (pure simulation); with real hardware present it is inert, so this
+    // opt-in cannot grant motion on a production cell. Every bypass is audited as ROBOT_SAFETY_BYPASS.
+    private static RobotCycleOptions SimulationCycleOptions()
+        => new() { PermitSafetyBypassForSimulation = true };
+
     public static async Task<RobotAcceptanceRun> RunAsync(
         RobotAcceptanceCriteria? criteria = null,
         IProgress<string>? progress = null,
@@ -41,7 +50,7 @@ public static class RobotAcceptanceTestService
         if (run.SafetySourceKind == "Simulated")
             run.Warnings.Add("PLC/safety interlock evidence is simulated only and is not safety-certified validation.");
 
-        var service = new RobotCycleService((category, message) => auditEvents.Add($"{category}: {message}"));
+        var service = new RobotCycleService((category, message) => auditEvents.Add($"{category}: {message}"), SimulationCycleOptions());
         var fullCycleWatch = Stopwatch.StartNew();
 
         progress?.Report("Running robot load step...");
@@ -109,7 +118,7 @@ public static class RobotAcceptanceTestService
         if (criteria.RequireEmergencyStopTest)
             await RunEmergencyStopCheckAsync(run, cancellationToken).ConfigureAwait(false);
 
-        var resetService = new RobotCycleService((category, message) => auditEvents.Add($"{category}: {message}"));
+        var resetService = new RobotCycleService((category, message) => auditEvents.Add($"{category}: {message}"), SimulationCycleOptions());
         var reset = await resetService.ResetAsync(cancellationToken).ConfigureAwait(false);
         run.ResetReturnedIdle = reset.Accepted && resetService.CurrentState == RobotCycleState.Idle;
         AddStep(
@@ -230,7 +239,7 @@ public static class RobotAcceptanceTestService
 
     private static async Task RunInvalidTransitionCheckAsync(RobotAcceptanceRun run, CancellationToken cancellationToken)
     {
-        var service = new RobotCycleService((_, _) => { });
+        var service = new RobotCycleService((_, _) => { }, SimulationCycleOptions());
         var watch = Stopwatch.StartNew();
         var result = await service.UnloadAsync(UnloadCommand(), cancellationToken).ConfigureAwait(false);
         watch.Stop();
@@ -245,7 +254,7 @@ public static class RobotAcceptanceTestService
         if (IntegrationBoundaryRegistry.PlcSafetyController is SimulatedPlcSafetyController simulatedPlc)
         {
             simulatedPlc.SetEmergencyStopActive(true);
-            var plcService = new RobotCycleService((_, _) => { });
+            var plcService = new RobotCycleService((_, _) => { }, SimulationCycleOptions());
             var plcWatch = Stopwatch.StartNew();
             var plcResult = await plcService.LoadAsync(LoadCommand("E-STOP-TEST"), cancellationToken).ConfigureAwait(false);
             plcWatch.Stop();
@@ -264,7 +273,7 @@ public static class RobotAcceptanceTestService
         }
 
         simulated.TriggerEmergencyStop();
-        var service = new RobotCycleService((_, _) => { });
+        var service = new RobotCycleService((_, _) => { }, SimulationCycleOptions());
         var watch = Stopwatch.StartNew();
         var result = await service.LoadAsync(LoadCommand("E-STOP-TEST"), cancellationToken).ConfigureAwait(false);
         watch.Stop();

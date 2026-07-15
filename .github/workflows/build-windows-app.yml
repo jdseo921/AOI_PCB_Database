@@ -12,16 +12,26 @@ on:
     tags:
       - 'v*'
 
+# Least-privilege token: publish + upload only, no write scopes needed
+# (supply-chain hardening, Docs/standard §42).
+permissions:
+  contents: read
+
+concurrency:
+  group: build-windows-app-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   publish:
     name: Publish self-contained Windows build
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 10.0.x
 
@@ -45,7 +55,7 @@ jobs:
           ) | Set-Content -Path publish/AOI_Monitor/HOW_TO_RUN.txt -Encoding UTF8
 
       - name: Upload Windows build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: AOI_Monitor-windows-x64
           path: publish/AOI_Monitor/**

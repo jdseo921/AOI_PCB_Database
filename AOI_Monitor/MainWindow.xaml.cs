@@ -1422,18 +1422,6 @@ public partial class MainWindow : Window, IDisposable
         _ => profile.ToString(),
     };
 
-    private static string FormatHeaderEngineStatus(string statusText)
-        => statusText switch
-        {
-            "Pixel Difference Prototype Engine" => "Pixel Diff Prototype",
-            "Learned PCB Visual Model Active" => "Learned Visual Active",
-            "Learned Visual Model Missing" => "Learned Visual Missing",
-            "ML Model Ready" => "ML Ready",
-            "ML Model Missing" => "ML Missing",
-            "ML Model Not Tested" => "ML Not Tested",
-            _ => statusText,
-        };
-
     private void OnLightingSettingsChanged()
     {
         UiDispatcher.InvokeIfAvailable(Dispatcher, () =>
@@ -1587,7 +1575,7 @@ public partial class MainWindow : Window, IDisposable
         var status = InspectionModelConfigurationService.GetStatus();
         var statusText = InspectionModelConfigurationService.GetStatusText();
         InspectionEngineStatusText.Text = statusText;
-        HeaderEngineText.Text = FormatHeaderEngineStatus(statusText);
+        HeaderEngineText.Text = InspectionModelConfigurationService.ShortStatusLabel(statusText);
         HeaderEngineText.ToolTip = statusText;
         InspectionEngineStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
         {

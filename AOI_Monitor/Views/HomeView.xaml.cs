@@ -62,7 +62,7 @@ public partial class HomeView : UserControl
         SetStatus(
             HomeEngineStatusBorder,
             HomeEngineStatusText,
-            ShortEngineDisplay(engineStatusText),
+            InspectionModelConfigurationService.ShortStatusLabel(engineStatusText),
             engineStatus switch
             {
                 InspectionEngineStatus.MlModelReady => StatusKind.Ok,
@@ -149,20 +149,6 @@ public partial class HomeView : UserControl
             : $"Critical status: {critical} critical / {alarmLevel} alarm / {warnings} warning";
         HomeAlarmSummaryText.Foreground = Brush(critical > 0 || alarmLevel > 0 ? "#FFBFC1" : warnings > 0 ? "#FFE0A7" : "#DCE5EB");
     }
-
-    // Same short display names the shell header uses so the eight status chips fit one row;
-    // the full engine name stays available on the chip tooltip.
-    private static string ShortEngineDisplay(string statusText)
-        => statusText switch
-        {
-            "Pixel Difference Prototype Engine" => "Pixel Diff Prototype",
-            "Learned PCB Visual Model Active" => "Learned Visual Active",
-            "Learned Visual Model Missing" => "Learned Visual Missing",
-            "ML Model Ready" => "ML Ready",
-            "ML Model Missing" => "ML Missing",
-            "ML Model Not Tested" => "ML Not Tested",
-            _ => statusText,
-        };
 
     private static void SetIntegrationStatus(Border border, TextBlock textBlock, IIntegrationEndpoint endpoint)
     {

@@ -308,7 +308,7 @@ public static class SupportBundleService
                 RelativePath = Path.GetRelativePath(staging, path).Replace('\\', '/'),
                 FileType = Classify(path),
                 Bytes = new FileInfo(path).Length,
-                Sha256 = Sha256(path),
+                Sha256 = HashUtil.ComputeSha256(path),
             })
             .ToList();
 
@@ -421,12 +421,6 @@ public static class SupportBundleService
         if (fileName.Contains("model", StringComparison.OrdinalIgnoreCase))
             return "Model metadata";
         return "Support evidence";
-    }
-
-    private static string Sha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
 
     private static string EnsureUniqueFolder(string folder)

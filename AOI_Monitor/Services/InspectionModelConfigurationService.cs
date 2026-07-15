@@ -95,6 +95,19 @@ public static class InspectionModelConfigurationService
         _ => "Pixel Difference Prototype Engine",
     };
 
+    // Short one-line engine label for the shell header chip and the Home status chip, so both
+    // render the same abbreviation and the full name stays on the tooltip. Single source of truth.
+    public static string ShortStatusLabel(string statusText) => statusText switch
+    {
+        "Pixel Difference Prototype Engine" => "Pixel Diff Prototype",
+        "Learned PCB Visual Model Active" => "Learned Visual Active",
+        "Learned Visual Model Missing" => "Learned Visual Missing",
+        "ML Model Ready" => "ML Ready",
+        "ML Model Missing" => "ML Missing",
+        "ML Model Not Tested" => "ML Not Tested",
+        _ => statusText,
+    };
+
     public static ModelConfigurationTestResult TestAndSave(InspectionModelConfiguration configuration)
     {
         var result = ModelConfigurationValidator.Test(configuration);

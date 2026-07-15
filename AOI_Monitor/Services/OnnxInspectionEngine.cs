@@ -27,8 +27,6 @@ public sealed class OnnxInspectionEngine : IInspectionEngine
         _outputParser = outputParser;
     }
 
-    public static bool RuntimeAvailable => true;
-
     public string Name => "ONNX ML Model";
     public string Version => _configuration.EffectiveModelVersion;
 

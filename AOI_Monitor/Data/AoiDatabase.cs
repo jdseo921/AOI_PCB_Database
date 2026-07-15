@@ -660,25 +660,6 @@ public static class AoiDatabase
         return records;
     }
 
-    public static ExportHistoryRecord? GetExportHistoryRecord(long id)
-    {
-        EnsureInitialized();
-
-        using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            SELECT Id, CreatedAtUtc, ExportType, FilePath, Status, OperatorId, AuditEventId
-            FROM ExportHistory
-            WHERE Id = $id
-            LIMIT 1;
-            """;
-        command.Parameters.AddWithValue("$id", id);
-
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? ReadExportHistory(reader) : null;
-    }
-
     public static ExportVerificationRecord? GetLatestExportVerification(long exportHistoryId)
     {
         EnsureInitialized();

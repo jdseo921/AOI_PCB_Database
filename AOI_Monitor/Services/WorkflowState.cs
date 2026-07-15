@@ -60,16 +60,6 @@ public sealed class WorkflowState
         Notify();
     }
 
-    public void SetRole(UserRole role)
-    {
-        var previousRole = CurrentUser.Role;
-        CurrentUser.Role = role;
-        AddEvent("ROLE", $"Local role changed from {previousRole} to {role}.");
-        Notify();
-    }
-
-    public bool HasPermission(Func<UserRole, bool> permission) => permission(CurrentRole);
-
     public bool TryAuthorize(Func<UserRole, bool> permission, string action, out string message)
     {
         if (permission(CurrentRole))
@@ -211,11 +201,6 @@ public sealed class WorkflowState
         AddEvent("POLICY", message);
         Notify();
         return true;
-    }
-
-    public void SetDetectionPriority(DetectionPriority priority)
-    {
-        TrySetDetectionPriority(priority, out _);
     }
 
     public void QueueTrainingSample(string fileName)

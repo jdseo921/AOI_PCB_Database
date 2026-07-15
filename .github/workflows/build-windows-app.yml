@@ -9,7 +9,6 @@ on:
   push:
     branches:
       - main
-      - claude/aoi-pcb-gui-review-qpqo05
     tags:
       - 'v*'
 

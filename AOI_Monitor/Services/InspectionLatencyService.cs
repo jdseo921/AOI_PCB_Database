@@ -84,9 +84,6 @@ public static class InspectionLatencyService
     public static void StartSpan(InspectionLatencyTraceBuilder builder, string name, DateTime? timestampUtc = null)
         => builder.StartSpan(name, timestampUtc);
 
-    public static void EndSpan(InspectionLatencyTraceBuilder builder, string name, DateTime? timestampUtc = null)
-        => builder.StopSpan(name, timestampUtc);
-
     public static InspectionLatencyTrace CompleteTrace(InspectionLatencyTraceBuilder builder, bool saved)
         => builder.Complete(saved);
 

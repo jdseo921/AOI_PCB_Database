@@ -62,15 +62,6 @@ public sealed record CentralSyncQueueRecord(
     string Status,
     string LastError);
 
-public sealed record CentralSyncAttemptRecord(
-    long Id,
-    long QueueId,
-    DateTime AttemptedAtUtc,
-    string Mode,
-    string EndpointOrFolder,
-    string Status,
-    string Message);
-
 public sealed record CentralSyncRetrySummary(
     int Attempted,
     int Sent,

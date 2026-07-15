@@ -13,13 +13,6 @@ public interface ICameraSource
     CameraFrame? GetNextFrame();
 }
 
-public interface ITriggerSynchronizer
-{
-    bool IsArmed { get; }
-    void Arm();
-    void Disarm();
-}
-
 public interface ICameraStatusDiagnostics
 {
     CameraSourceStatus GetStatus();

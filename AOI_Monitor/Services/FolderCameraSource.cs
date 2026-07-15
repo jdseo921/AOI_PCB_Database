@@ -44,8 +44,6 @@ public sealed class FolderCameraSource : ICameraSource
     public string BoardModel { get; }
     public string LotId { get; }
 
-    public IReadOnlyDictionary<CameraViewType, string> Folders => _folders;
-
     public void SetFolder(CameraViewType viewType, string folderPath)
     {
         if (string.IsNullOrWhiteSpace(folderPath))

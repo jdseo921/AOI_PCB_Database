@@ -77,13 +77,6 @@ public static class MemoryDiagnosticsService
         }
     }
 
-    public static bool IsMemoryPressureHigh()
-    {
-        var snapshot = Capture();
-        return snapshot.WorkingSetBytes >= DefaultWorkingSetWarningBytes ||
-            snapshot.ManagedBytes >= DefaultManagedWarningBytes ||
-            snapshot.ImageCacheBytes >= ImageCacheService.DefaultMaxBytes;
-    }
 
     public static void RecordExportCheckpoint(string operation, int processedCount)
     {

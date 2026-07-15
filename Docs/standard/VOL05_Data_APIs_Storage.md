@@ -112,6 +112,8 @@ erDiagram
 
 Every persisted inspection result SHALL be resolvable — by recorded identifiers alone, with no reliance on file-system state, in-memory state, or operator memory — to all 16 elements below (bound by DAT-005). "Anchor" cites where the element lives today; "Delta" names the migration obligation where it does not.
 
+**Table 21-3 — 16-element traceability guarantee**
+
 | # | Element | Anchor today (repo) | Delta |
 |---|---|---|---|
 | 1 | Exact software version (build + commit) | engine name/version on result; `BuildTestEvidence` unlinked | M-21-1 |
@@ -137,6 +139,8 @@ Stage reality: elements 6, 7, and 13 cannot carry real values in the Stage 1 off
 
 The following migrations extend the existing 30-migration chain (`AoiDatabaseMigrations.OrderedMigrations`). All are additive per the existing policy in `Docs/Database_Schema.md`; none rewrites existing rows. Target stage = the stage gate the migration must precede.
 
+**Table 21-4 — Schema-delta migration obligations**
+
 | ID | Content | Target |
 |---|---|---|
 | M-21-1 | `Stations`, `CustomerSites` tables; `StationId`, `SoftwareBuildId`, `DisplayTimezone` columns on `InspectionResults` | S1 exit |
@@ -160,7 +164,7 @@ flowchart LR
     end
     subgraph OUT["Outbound evidence"]
         C --> S[MES spool row<br/>same transaction, DAT-039/API-026]
-        C --> E[Export set + manifest<br/>per-file SHA-256, DAT-048]
+        C --> E[Export set + manifest<br/>per-file SHA-256, API-021/DAT-048]
     end
     subgraph VERIFY["Verification path (auditor / startup)"]
         Q[Pick any InspectionId] --> R[Resolve 16 elements via FKs<br/>Table 21-3]
@@ -172,7 +176,7 @@ flowchart LR
     E -.-> V
 ```
 
-**Reading this diagram:** on the write path, every state-changing domain operation commits its parent row, child rows, and its audit event inside one SQLite transaction (DAT-014); the audit row carries a chain hash linking it to the previous audit row (DAT-012), which converts the audit table from plain rows into a tamper-evident sequence. Outbound, the same commit atomically enqueues any MES spool row (API-026) and any export is packaged with a per-file SHA-256 manifest (DAT-048). On the verification path, an auditor (or the startup self-check) picks any inspection, resolves all 16 traceability elements through recorded foreign keys, re-verifies the audit chain and the original-image hash against the vault, and either confirms traceability or raises a Critical alarm and quarantines the record — never silently repairing it (DAT-027).
+**Reading this diagram:** on the write path, every state-changing domain operation commits its parent row, child rows, and its audit event inside one SQLite transaction (DAT-014); the audit row carries a chain hash linking it to the previous audit row (DAT-012), which converts the audit table from plain rows into a tamper-evident sequence. Outbound, the same commit atomically enqueues any MES spool row (API-026) and any export is packaged with a per-file SHA-256 manifest (API-021, persisted per DAT-048). On the verification path, an auditor (or the startup self-check) picks any inspection, resolves all 16 traceability elements through recorded foreign keys, re-verifies the audit chain and the original-image hash against the vault, and either confirms traceability or raises a Critical alarm and quarantines the record — never silently repairing it (DAT-027).
 
 ### R: §21 requirements (DAT-001–DAT-016)
 
@@ -206,7 +210,7 @@ Each migration obligation in Table 21-4 SHALL be implemented as an additive sche
 
 **[DAT-005]** (P0 | ALL | Persistence, Audit)
 Every persisted inspection result SHALL be resolvable, by recorded identifiers alone, to all 16 traceability elements enumerated in Table 21-3, using the defined sentinels where a stage has no real value.
-- Why: an unreconstructable verdict is worthless as quality evidence and indefensible in a customer escape investigation. Maps: 62443-3-3 SR 2.8; SSDF-PS.3; IPC-2591.
+- Why: an unreconstructable verdict is worthless as quality evidence and indefensible in a customer escape investigation. Maps: 62443-3-3 SR 2.8; SSDF-PS.3; CFX.
 - Verify: xUnit suite TraceabilityResolutionTests (new) resolving all 16 elements on every fixture result. Evidence: test run report per release. Owner: Software Architect. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -406,7 +410,7 @@ Error payloads crossing any boundary SHALL NOT contain stack traces, internal fi
 
 **[API-009]** (P2 | ALL | All)
 Every dimensioned numeric field in a contract schema SHALL declare an explicit unit in the schema file and carry a unit-bearing field name.
-- Why: unit ambiguity across camera exposure, board geometry, and latency fields produces wrong-by-1000x defects that pass type checks. Maps: Internal; CWE-1339.
+- Why: unit ambiguity across camera exposure, board geometry, and latency fields produces wrong-by-1000x defects that pass type checks. Maps: Internal; CWE-682.
 - Verify: fitness function FF-API-03 (schema lint: dimensioned fields require unit annotation). Evidence: CI gate log. Owner: Software Architect. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
@@ -444,7 +448,7 @@ Every operation in a contract schema SHALL declare its idempotency class (idempo
 
 **[API-015]** (P1 | S4 | MES, REST)
 Every MES result upload SHALL carry a client-generated idempotency key derived from the inspection PublicId so that retries cannot create duplicate MES records.
-- Why: the spool retries transmissions (`MesSpoolService.cs`); without an idempotency key every retry risks duplicate quality records in the customer MES. Maps: Internal; IPC-2591.
+- Why: the spool retries transmissions (`MesSpoolService.cs`); without an idempotency key every retry risks duplicate quality records in the customer MES. Maps: Internal; CFX.
 - Verify: MesRestIntegrationTests duplicate-retry cases (extend existing 16-fact suite). Evidence: test run report. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -512,16 +516,16 @@ Every boundary retry policy SHALL be bounded, use jittered exponential backoff, 
 - Verify: code review checklist item + MesRestIntegrationTests attempt-count cases. Evidence: test run report, review record. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
-**[API-026]** (P1 | S4 | MES, Persistence)
-Every MES-bound payload SHALL be durably spooled in the same database transaction as the domain event that produced it, before any transmission attempt.
-- Why: the current send-then-spool-on-failure design loses payloads on crash, and failed image uploads are never spooled at all (`TraceabilityUploadService.cs:53-57`, `TraceabilitySignoffService.cs:84`); a true outbox makes loss structurally impossible. Maps: Internal; IPC-2591; 62443-3-3 SR 7.1.
+**[API-026]** (P1 | ALL | Persistence, MES)
+Every outbound integration payload — MES upload, central-sync drop, or future REST call — SHALL be durably spooled in the same database transaction as the domain event that produced it, before any transmission attempt.
+- Why: the current send-then-spool-on-failure design loses payloads on crash, and failed image uploads are never spooled at all (`TraceabilityUploadService.cs:53-57`, `TraceabilitySignoffService.cs:84`); a transactional outbox spanning every integration makes loss structurally impossible. Maps: Internal; CFX; 62443-3-3 SR 7.1.
 - Verify: xUnit suite OutboxTransactionTests (new) incl. crash-window simulation. Evidence: test run report. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
-**[API-027]** (P2 | S1–S4 | ImageStore, Acquisition)
-Folder-based image ingestion SHALL execute the §22.6 pipeline stages (allowlist validation, decode checks, quarantine on failure, hash, dedupe, catalog, finalize) in the stated order.
-- Why: reordering (e.g., the current vault-copy before catalog insert, `Images.cs:29-51`) creates orphan files and unaudited rejections. Maps: ASVS-V5; CWE-434; CWE-409.
-- Verify: xUnit suite ImageImportPipelineTests (new) asserting stage order and quarantine behavior. Evidence: test run report. Owner: Software Lead. Auto: Fully automated.
+**[API-027]** (P1 | S1–S4 | ImageStore, Acquisition)
+Folder-based image ingestion SHALL execute the §22.6 validation stages — extension allowlist, size cap, header and full decode, decompression-bomb guard, quarantine-on-failure, SHA-256 hashing, and dedupe — before any catalog write.
+- Why: letting unvalidated bytes reach the catalog or vault admits malformed, oversized, or decompression-bomb images and produces unaudited rejections; the write-ordering that follows validation is owned by DAT-041. Maps: ASVS-V5; CWE-434; CWE-409.
+- Verify: xUnit suite ImageImportPipelineTests (new) asserting validation-stage ordering and quarantine behavior. Evidence: test run report. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
 **[API-028]** (P2 | ALL | CI, All)
@@ -538,7 +542,7 @@ A superseded contract major version SHALL remain supported for at least 12 month
 
 **[API-030]** (P2 | ALL | All)
 Every timestamp field crossing a boundary SHALL be serialized as ISO-8601 UTC with the `Z` designator.
-- Why: offset-free or local timestamps at boundaries reintroduce the ambiguity D-16 eliminates in storage. Maps: Internal; IPC-2591.
+- Why: offset-free or local timestamps at boundaries reintroduce the ambiguity D-16 eliminates in storage. Maps: Internal; CFX.
 - Verify: contract tests timestamp-format cases + schema lint FF-API-03. Evidence: test run report. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
@@ -589,12 +593,14 @@ The repo's parameterization discipline is genuinely good — data values are con
 
 SD-02 (hardcoded "auto-archive logs older than 30 days" in the source spec) is resolved: retention is configurable per data class, with legal hold. The current single-policy retention covers only 4 log tables (`RunLogRetention`, `Infrastructure.cs:3288-3332`); everything else grows unbounded. Target data classes:
 
+**Table 37-5 — Retention data classes**
+
 | Class | Contents | Default retention | Purge precondition |
 |---|---|---|---|
 | Quality evidence | InspectionResults, Defects, ReviewEvents, ExportHistory/Verification, AuditEvents | 730 days | DAT-039 gate; archive-then-purge |
 | Original images | vault files + Images rows | 365 days | linked evidence exported or purged |
 | Derived artifacts | annotated exports, report folders | 180 days | none beyond age |
-| Operational logs | InspectionLatencyTraces, app log files | 90 days | none |
+| Operational logs | Rolling application log files (latency traces/spans → §38/VOL13) | 90 days | none |
 | Training data | TrainingSamples, ImageLearning* | explicit project deletion only | Engineer action, audited |
 | Queues | MesSpoolQueue/CentralSyncQueue rows in terminal states | 90 days after terminal state | Sent/Abandoned/Skipped only |
 | Backups | daily DB backups | last 7 daily + 4 weekly | never while sole copy |
@@ -666,8 +672,8 @@ Startup validation SHALL fail closed when the configured storage root or databas
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
 **[DAT-022]** (P1 | ALL | Persistence)
-Database backups SHALL be produced at least every 24 h of operation, exclusively via the SQLite Online Backup API or `VACUUM INTO`, retaining at minimum the last 7 daily and 4 weekly copies.
-- Why: file-copying a live WAL database captures a torn state; the Online Backup API and VACUUM INTO are the only consistent-snapshot mechanisms. Maps: 62443-3-3 SR 7.3; CSF2.
+Database backups SHALL be produced at least every 24 h of operation, exclusively via the SQLite Online Backup API or `VACUUM INTO`.
+- Why: file-copying a live WAL database captures a torn state; the Online Backup API and VACUUM INTO are the only consistent-snapshot mechanisms. Backup retention counts are governed by DAT-058. Maps: 62443-3-3 SR 7.3; CSF2.
 - Verify: xUnit suite BackupServiceTests (new) + scheduled-task configuration review. Evidence: test run report, backup audit events. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Quarterly.
 
@@ -678,9 +684,9 @@ Every release SHALL include an automated test that restores a backup produced by
 - Exception: Allowed — approver: QA Lead. Review: Per release.
 
 **[DAT-024]** (P2 | ALL | Persistence, Diagnostics)
-The application SHALL run `PRAGMA quick_check` at every startup and a full `PRAGMA integrity_check` at least weekly, recording each result as an audit event.
-- Why: `RunIntegrityCheck()` exists (`Integration.cs:734-742`) but nothing schedules it; unscheduled checks find corruption only after it has propagated into backups. Maps: 62443-3-3 SR 3.4; Internal.
-- Verify: xUnit suite IntegrityCheckSchedulingTests (new) + audit-event inspection. Evidence: test run report, audit events. Owner: Software Lead. Auto: Fully automated.
+The application SHALL run `PRAGMA quick_check` at every startup, recording the result as an audit event.
+- Why: a fast startup consistency probe bounds the window in which page-level corruption goes unnoticed to one session; the deeper periodic scan is DAT-056. Maps: 62443-3-3 SR 3.4; Internal.
+- Verify: xUnit suite IntegrityCheckSchedulingTests (new) startup-quick_check cases + audit-event inspection. Evidence: test run report, audit events. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Quarterly.
 
 **[DAT-025]** (P1 | ALL | Persistence, HMI)
@@ -773,7 +779,7 @@ The application SHALL support a legal-hold flag, per data class and per lot, tha
 
 **[DAT-039]** (P1 | ALL | Persistence, MES)
 The retention job SHALL NOT purge a quality record until its containing lot or export set has a confirmed MES upload acknowledgment, or — where no MES is connected (Stages 1–3) — a verified export plus recorded Admin sign-off.
-- Why: purging quality evidence that never reached the system of record destroys the customer's traceability chain; the Stage 1–3 fallback is A-VOL05-4 (risk: Admin sign-off is weaker than a machine acknowledgment and must be audited). Maps: IPC-2591; 62443-3-3 SR 2.9; Internal.
+- Why: purging quality evidence that never reached the system of record destroys the customer's traceability chain; the Stage 1–3 fallback is A-VOL05-4 (risk: Admin sign-off is weaker than a machine acknowledgment and must be audited). Maps: CFX; 62443-3-3 SR 2.9; Internal.
 - Verify: xUnit suite RetentionGateTests (new) covering ack-present, ack-absent, and fallback paths. Evidence: test run report. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Product Owner. Review: Per release.
 
@@ -818,8 +824,8 @@ The application SHALL enforce a configurable vault quota, halting new imports wi
 #### Exports
 
 **[DAT-046]** (P1 | ALL | Export)
-Every CSV cell whose first character is `=`, `+`, `-`, `@`, tab (0x09), or carriage return (0x0D) SHALL be prefixed with a single-quote character before writing, in addition to RFC 4180 quoting.
-- Why: defect-report CSVs are opened in Excel by production engineers; unescaped cells execute as formulas (CSV/formula injection), turning an export into code execution on a customer PC. Maps: CWE-1236; CSC; ASVS-V1.
+Every CSV cell whose first character is `=`, `+`, `-`, `@`, tab (0x09), carriage return (0x0D), or a full-width Unicode variant of these SHALL be prefixed with a single-quote character before writing, in addition to RFC 4180 quoting, consistent with the §29 (VOL08) formula-neutralization rule.
+- Why: defect-report CSVs are opened in Excel by production engineers; unescaped cells (including full-width homoglyphs) execute as formulas (CSV/formula injection), turning an export into code execution on a customer PC. Maps: CWE-1236; CSC; ASVS-V1.
 - Verify: xUnit suite ExportInjectionTests (new) with hostile-content fixtures. Evidence: test run report. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -830,9 +836,9 @@ Every CSV export SHALL conform to the §37.7.1 profile: RFC 4180 quoting, UTF-8 
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
 **[DAT-048]** (P2 | ALL | Export)
-Every export set SHALL include a manifest listing every contained file with its SHA-256 hash and the export schema version.
-- Why: extends the existing `ExportVerification` mechanism to all export types so recipients can prove completeness and integrity of quality evidence. Maps: 62443-4-2 CR 3.4; SSDF-PS.2.
-- Verify: xUnit suite ExportProfileTests manifest cases + ExportVerificationService records. Evidence: test run report, ExportVerification rows. Owner: Software Lead. Auto: Fully automated.
+Every export set SHALL persist its API-021 exchange-package manifest as `ExportVerification` rows that link each contained file's SHA-256 hash to the export's `ExportId`.
+- Why: API-021 owns the on-disk manifest contents; this records those hashes as queryable in-database evidence so completeness and integrity are provable without re-reading the shipped package. Maps: 62443-4-2 CR 3.4; SSDF-PS.2.
+- Verify: xUnit suite ExportProfileTests manifest-persistence cases + ExportVerificationService records. Evidence: test run report, ExportVerification rows. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
 **[DAT-049]** (P2 | ALL | Export)
@@ -842,9 +848,9 @@ Export file and folder names SHALL be generated exclusively from the allowlist `
 - Exception: Not allowed. Review: Annual.
 
 **[DAT-050]** (P2 | ALL | Export, ImageStore)
-Annotated image exports SHALL carry the marker `ANNOTATED` in both the filename and a burned-in overlay, while original-mode exports remain byte-identical to the vault file.
-- Why: an annotated rendering mistaken for the original falsifies evidence; byte-identity of originals is what the manifest hash (DAT-048) attests. Maps: Internal; SSDF-PS.3.
-- Verify: xUnit suite ImageLearningOverlayExportServiceTests extension (marker + byte-identity cases). Evidence: test run report. Owner: QA Lead. Auto: Fully automated.
+Annotated image exports SHALL carry the marker `ANNOTATED` in both the filename and a burned-in text overlay.
+- Why: an annotated rendering mistaken for the original falsifies evidence; a dual filename-plus-overlay marker makes the annotation unmissable however the file is later viewed. Maps: Internal; SSDF-PS.3.
+- Verify: xUnit suite ImageLearningOverlayExportServiceTests marker cases. Evidence: test run report. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
 **[DAT-051]** (P3 | ALL | Export)
@@ -876,6 +882,28 @@ Archive extraction SHALL enforce the §37.7.4 safety profile — canonical-path 
 - Why: config-backup restore and validation-kit import extract archives that may transit untrusted media; zip-slip, symlink escape, and decompression bombs are the classic vectors (CWE-22, CWE-409). Maps: CWE-22; CWE-409; ASVS-V5.
 - Verify: xUnit suite ArchiveSafetyTests (new) with zip-slip, symlink, bomb, and tampered-manifest fixtures. Evidence: test run report. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
+
+#### Split-out atomic obligations
+
+These records carry obligations split from earlier requirements so that each binds exactly one atomic action; they are appended here to preserve frozen IDs (no renumbering).
+
+**[DAT-056]** (P2 | ALL | Persistence, Diagnostics)
+The application SHALL run a full `PRAGMA integrity_check` at least once every 7 days, recording the result as an audit event.
+- Why: `RunIntegrityCheck()` exists (`Integration.cs:734-742`) but nothing schedules it; the deep periodic scan catches corruption that the startup quick_check (DAT-024) can miss, before it propagates into backups. Maps: 62443-3-3 SR 3.4; Internal.
+- Verify: xUnit suite IntegrityCheckSchedulingTests (new) weekly-schedule cases + audit-event inspection. Evidence: test run report, audit events. Owner: Software Lead. Auto: Fully automated.
+- Exception: Allowed — approver: Software Architect. Review: Quarterly.
+
+**[DAT-057]** (P2 | ALL | Export, ImageStore)
+Every original-mode image export SHALL be byte-identical to its source vault file, verified against the export manifest hash (API-021/DAT-048).
+- Why: an original-mode export is evidence only if it reproduces the vaulted bytes exactly; a re-encoded or re-compressed "original" silently diverges from the hash the manifest attests. Maps: Internal; SSDF-PS.3; 62443-4-2 CR 3.4.
+- Verify: xUnit suite ImageLearningOverlayExportServiceTests byte-identity cases. Evidence: test run report. Owner: QA Lead. Auto: Fully automated.
+- Exception: Not allowed. Review: Annual.
+
+**[DAT-058]** (P1 | ALL | Persistence)
+The backup store SHALL retain at minimum the last 7 daily and 4 weekly backup copies, pruning only copies older than that horizon.
+- Why: retention is a distinct obligation from producing a consistent backup (DAT-022); pruning a newer copy or dropping below the horizon destroys the recovery points a restore depends on. Maps: 62443-3-3 SR 7.3; Internal.
+- Verify: xUnit suite BackupServiceTests retention-count cases. Evidence: test run report. Owner: Software Lead. Auto: Fully automated.
+- Exception: Allowed — approver: Software Architect. Review: Quarterly.
 
 ### 37.9 VOL05 Open Decisions and Assumptions
 

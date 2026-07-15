@@ -191,7 +191,7 @@ At startup the application SHALL verify that adapter plugin and vendor SDK direc
 - Exception: Allowed — approver: Security Lead. Review: Per release.
 
 **[CAM-013]** (P2 | S2+ | CameraAdapter, Acquisition)
-The adapter layer SHALL cap device-supplied GenICam XML at 10 MB, parse it with DTD processing and entity expansion disabled, and treat any parse failure as a connection failure rather than proceeding with partial features.
+The adapter layer SHALL parse device-supplied GenICam XML with DTD processing and entity expansion disabled under a 10 MB input ceiling, treating any parse failure or ceiling breach as a connection failure rather than proceeding with partial features.
 - Why: the camera feature XML is fetched from the device — a spoofed or hostile camera can deliver crafted XML to the in-process parser (research: vision-hw §3). Maps: GENICAM; CWE-20; CWE-776.
 - Verify: adapter conformance test with oversized/malformed XML fixtures (extends `Scripts/validate-camera-adapter-package.ps1`). Evidence: adapter acceptance report. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
@@ -217,8 +217,8 @@ GigE Vision camera links SHALL terminate in a dedicated, non-routed camera netwo
 - Exception: Not allowed. Review: Per release.
 
 **[CAM-017]** (P3 | S2+ | Acquisition, Diagnostics)
-The acquisition layer SHOULD maintain per-stream counters of GVSP block-ID sequence gaps, packet resend requests, and unexpected-geometry frames, exposed through `GetDiagnostics()` and the structured log.
-- Why: GVSP frame injection is demonstrated practice (research: vision-hw §9, arXiv:2410.05417) and sequence/geometry anomalies are its observable side effects; segmentation (CAM-016) is necessary but not sufficient. Maps: GIGEV; ATTACK-ICS; Internal.
+The acquisition layer SHOULD maintain per-stream counters of GVSP block-ID sequence gaps and packet-resend requests, exposed through `GetDiagnostics()` and the structured log.
+- Why: GVSP frame injection is demonstrated practice (research: vision-hw §9, arXiv:2410.05417) and GVSP block-ID gaps and resend storms are its transport-layer side effects that CAM-031's frame-level counters do not cover; segmentation (CAM-016) is necessary but not sufficient. Maps: GIGEV; ATTACK-ICS; Internal.
 - Verify: adapter conformance test with induced packet loss. Evidence: diagnostics log samples in the HIL package. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: Quarterly.
 
@@ -335,8 +335,8 @@ Frames SHALL flow from acquisition to the inspection engine through a bounded qu
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
 **[CAM-035]** (P1 | S2+ | CameraAdapter, Acquisition)
-Every native frame buffer SHALL have exactly one documented owner at each lifecycle step (SDK allocates → adapter reads → adapter returns/requeues), with pixel data copied into managed memory or a rent/return-disciplined managed pool before `TryGetFrame` returns; touching a native buffer after it is returned to the SDK is prohibited.
-- Why: use-after-release of vendor-SDK buffers is native memory corruption — silently wrong pixel data at best, an exploitable crash at worst (CWE-416); the copy-out boundary keeps everything downstream of the adapter memory-safe. Maps: CWE-416; CWE-401; MS-SDL.
+Each adapter SHALL copy pixel data out of the vendor-SDK native buffer into managed memory (or a rent/return-disciplined managed pool) before `TryGetFrame` returns; reading or writing a native buffer after it is returned to the SDK is prohibited.
+- Why: every native frame buffer must have exactly one documented owner at each lifecycle step (SDK allocates → adapter reads → adapter returns/requeues), and use-after-release of vendor-SDK buffers is native memory corruption — silently wrong pixel data at best, an exploitable crash at worst (CWE-416); the copy-out boundary keeps everything downstream of the adapter memory-safe. Maps: CWE-416; CWE-401; MS-SDL.
 - Verify: adapter review checklist requiring a buffer-lifecycle table in the adapter README, plus a 10,000-frame stress test with reset injection in the conformance suite. Evidence: review record + HIL stress log. Owner: Software Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -355,8 +355,8 @@ Frame decode and pixel-format conversion SHALL enforce configured ceilings — d
 ### R: Calibration linkage, threading, and health (CAM-038–CAM-041)
 
 **[CAM-038]** (P1 | S2+ | Acquisition, Persistence)
-The acquisition layer SHALL stamp every inspection-bound frame with the active camera-and-lens calibration profile ID and last-verification UTC date from the §20 device-and-calibration lifecycle (VOL04), blocking inspection starts while the referenced calibration is expired or unverified.
-- Why: a measurement traced to no calibration, or a lapsed one, is unusable in a customer dispute and hides optical drift; the calibration states already exist in §20 (VOL04) — this requirement binds frames and results to them. Maps: Internal; 62443-4-2 CR 2.8; 25010.
+The acquisition layer SHALL stamp every inspection-bound frame with the active camera-and-lens calibration profile ID and last-verification UTC date from the §20 device-and-calibration lifecycle (VOL04), blocking metric (mm/µm) inspection starts while the referenced calibration is expired or unverified and permitting labeled pixel-only runs consistent with the §17 Table 17-5 degraded-capability matrix and §20 (VOL04).
+- Why: a metric measurement traced to no calibration, or a lapsed one, is unusable in a customer dispute and hides optical drift; the calibration states already exist in §20 (VOL04) and the §17 degraded-capability matrix blocks only metric judgments while permitting labeled pixel-only runs — this requirement binds frames and results to those states without contradicting the FSM degraded-mode rule. Maps: Internal; 62443-4-2 CR 2.8; 25010.
 - Verify: fitness function FF-CAM-04 (calibration fields non-null on result tables) plus an expiry-block unit test. Evidence: CI gate log. Owner: QA Lead. Auto: Fully automated.
 - Exception: Allowed — approver: QA Lead. Review: Quarterly.
 

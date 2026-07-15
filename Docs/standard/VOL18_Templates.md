@@ -25,7 +25,7 @@ This section is the single source for every record the standard requires an engi
 
 ```mermaid
 flowchart LR
-    P["PLAN<br/>ADR · CIA · THR · NDR<br/>DBM · RBK"] --> G["MERGE GATE<br/>PRD · CRC · AID"]
+    P["PLAN<br/>ADR · CIA · THR · NDR<br/>DBM · RBK"] --> G["MERGE GATE<br/>PR · CRC · AID"]
     G --> R["RELEASE<br/>MIR · MRR · DSR · RAP<br/>PTR · STR · RRR · EXC"]
     C["COMMISSIONING (Stage 2+)<br/>HAR · RSQ · SBR · MOI"] --> R
     R --> O["OPERATE<br/>INC · PM · SBM · REG"]

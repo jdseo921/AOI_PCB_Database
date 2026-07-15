@@ -48,7 +48,7 @@ Input validation SHALL use allowlists (accepted formats, character sets, numeric
 - Exception: Allowed — approver: Security Lead. Review: On change.
 
 **[INP-003]** (P2 | ALL | Logging, Audit)
-The application SHALL reject input that fails validation and record the rejection with a stable event ID through the logging service (D-09) without echoing the raw rejected bytes into the log record.
+The application SHALL reject input that fails validation, recording the rejection through the logging service (D-09) with a stable event ID and without echoing the raw rejected bytes into the log record.
 - Why: fail-closed rejection with evidence supports forensics while preventing log injection via the rejected payload itself (CWE-117). Maps: ASVS-V16; CWE-117; 62443-4-2 CR 2.8.
 - Verify: test class `ValidationRejectionLoggingTests` asserting event ID presence and raw-byte absence. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
@@ -145,7 +145,7 @@ Header-declared dimensions SHALL be validated against IL-2 and IL-3 using metada
 - Exception: Not allowed. Review: Annual.
 
 **[INP-012]** (P2 | ALL | ImageStore, Inference)
-Truncated or partially decodable image files SHALL be rejected in full, and no partially decoded frame SHALL enter the vault, an inference input, or an evidence record.
+Truncated or partially decodable image files SHALL be rejected in full so that no partially decoded frame enters the vault, an inference input, or an evidence record.
 - Why: partial frames silently corrupt inspection evidence and can carry decoder state into undefined behavior; truncation is a standard fuzzing find (CWE-20). Maps: CWE-20; ASVS-V5.
 - Verify: `ImageIngestionLimitTests` truncated-fixture corpus (see INP-065). Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
@@ -163,14 +163,14 @@ The image pipeline SHALL reject files containing data after the format's end-of-
 - Exception: Allowed — approver: Security Lead. Review: On change.
 
 **[INP-015]** (P1 | ALL | ImageStore, Diagnostics)
-The application SHALL treat EXIF, XMP, and all other embedded image metadata as inert data and SHALL NOT dereference any path, URL, or external reference contained in it.
+The application SHALL treat EXIF, XMP, and all other embedded image metadata as inert data that is never used to construct or dereference any path, URL, or external reference contained in it.
 - Why: metadata-driven fetches create SSRF/path-traversal pivots from a file that "is just an image" (CWE-918, CWE-610); metadata is display/logging data only. Maps: CWE-918; CWE-610; ASVS-V5.
 - Verify: fitness function FF-INP-05 (grep/analyzer: no URI or path construction from metadata reader outputs) plus review checklist. Evidence: CI gate log. Owner: Security Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
 
 **[INP-016]** (P2 | ALL | ImageStore, Persistence)
-Vault admission SHALL require a successful full decode of the candidate file and record the SHA-256 hash of the original bytes in the `Images.FileHash` column.
-- Why: preserves the existing full-decode + dedupe discipline (`AoiDatabase.Images.cs:104-137`) as a norm; the hash anchors traceability and duplicate detection. Maps: ASVS-V5; 62443-4-2 CR 3.4; Internal.
+Vault admission SHALL require a successful full decode of the candidate file before the INP-030 content hash is recorded in the `Images.FileHash` column.
+- Why: preserves the existing full-decode + dedupe discipline (`AoiDatabase.Images.cs:104-137`) as a norm and orders a successful decode ahead of the INP-030 content hash, which alone anchors traceability and duplicate detection. Maps: ASVS-V5; 62443-4-2 CR 3.4; Internal.
 - Verify: existing `AoiDatabaseTests` import cases extended with hash assertions. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
@@ -247,8 +247,8 @@ Ingestion into any managed storage subtree SHALL be refused, with a Warning alar
 - Exception: Allowed — approver: IT Admin (customer). Review: Quarterly.
 
 **[INP-028]** (P1 | ALL | Config, Persistence)
-Startup validation SHALL reject a configured storage root located under a cloud-synchronized or roaming-profile directory (OneDrive, Dropbox, Google Drive, roaming AppData), raising a Critical configuration alarm.
-- Why: sync engines rewrite and lock files underneath SQLite WAL and the vault, producing corruption and silent divergence; the development repo itself currently sits under OneDrive (repo-reality gap, `context/repo` finding 10). Maps: Internal; 62443-4-2 CR 3.4.
+Startup validation SHALL raise a Critical configuration alarm and fail closed when the configured storage root fails the cloud-synchronized, roaming-profile, and network-share location check owned by the data-and-storage standard (§21 / §37 / VOL05).
+- Why: sync engines rewrite and lock files underneath SQLite WAL and the vault, producing corruption and silent divergence, and the development repo itself currently sits under OneDrive (repo-reality gap 10); the data-and-storage standard owns the prohibited-location set (including network shares) while this record supplies the Critical-alarm, fail-closed startup behavior. Maps: Internal; 62443-4-2 CR 3.4.
 - Verify: test class `StorageRootValidationTests` (known sync-root patterns rejected). Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Quarterly.
 
@@ -265,7 +265,7 @@ The application SHALL record a SHA-256 content hash for every ingested artifact 
 - Exception: Not allowed. Review: Annual.
 
 **[INP-031]** (P2 | ALL | ImageStore, Diagnostics)
-Artifacts that fail any validation gate SHALL be moved to the dedicated quarantine subtree together with a metadata record (source, failure reason, timestamp, SHA-256), and quarantined artifacts SHALL NOT be eligible for any load, decode, or execution path.
+Artifacts that fail any validation gate SHALL be moved, with a metadata record (source, failure reason, timestamp, SHA-256), into the dedicated quarantine subtree, from which no load, decode, or execution path is reachable.
 - Why: quarantine preserves forensic evidence of attempted or accidental bad input while making "rejected" a terminal, inspectable state instead of silent deletion. Maps: ASVS-V5; 62443-4-2 CR 2.8; Internal.
 - Verify: `QuarantineTests` (rejected fixture lands in quarantine with metadata; loader refuses quarantine paths). Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
@@ -443,7 +443,7 @@ ASSUMPTION A-VOL08-7: the generic text lighting protocol has no vendor-defined c
 ### R: Protocol rules (INP-056–INP-062)
 
 **[INP-056]** (P2 | S3+ | RobotAdapter, MES)
-Command messages received over any network or IPC channel SHALL carry a timestamp or sequence number and be rejected when older than the configured freshness window (default 30 s) or out of sequence.
+Command messages received over any network or IPC channel SHALL be rejected when they lack a timestamp or sequence number, are older than the configured freshness window (default 30 s), or arrive out of sequence.
 - Why: without freshness checks, a captured "start cycle" or "apply threshold" message replays indefinitely (CWE-294); mandatory once the D-06 worker IPC or Stage 3–4 command channels exist. Maps: CWE-294; 62443-4-2 CR 3.1; 800-82.
 - Verify: `ProtocolFramingTests` replay cases against the IPC/command dispatcher. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
@@ -618,14 +618,14 @@ Stations SHALL load inference models only as single-file ONNX artifacts accompan
 
 **[SER-012]** (P1 | ALL | ModelMgmt)
 Model import SHALL reject any ONNX file whose tensors reference external data files, accepting single-file models only.
-- Why: the ONNX external-data mechanism is a recurring path-traversal CVE lineage (CVE-2024-27318 plus incomplete-fix follow-ups, e.g. CVE-2026-27489 — UNVERIFIED), and D-03 prohibits it outright rather than trying to sandbox the resolution. Maps: CWE-22; ONNX-SEC; Internal.
+- Why: the ONNX external-data mechanism is a recurring path-traversal CVE lineage (CVE-2024-27318 plus incomplete-fix follow-ups — CVE-2026-27489 and the related DoS CVE-2026-44512, both UNVERIFIED against NVD), and D-03 prohibits it outright rather than trying to sandbox the resolution. Maps: CWE-22; ONNX-SEC; Internal.
 - Verify: `ModelArtifactVerificationTests` external-data fixture rejected at import. Evidence: CI test results. Owner: ML Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[SER-013]** (P2 | ALL | Training, ModelMgmt)
 Conversion of trained models to ONNX SHALL be performed only inside the controlled training environment (§31 / VOL09), never on a station and never from an artifact that failed the pipeline's provenance checks.
 - Why: conversion tooling must open the unsafe source formats, so it belongs where pickle handling is contained (SER-007/SER-008) and where the D-03 manifest is produced and signed. Maps: CWE-502; SSDF-AI; AISVS.
-- Verify: FF-SER-01 confirms no conversion code ships in station binaries; training-pipeline review checklist. Evidence: CI gate log; review record. Owner: ML Lead. Auto: Partially automated.
+- Verify: FF-SER-01 confirms no conversion code ships in station binaries; training-CI gate FF-SER-08 blocks conversion of any artifact lacking a passing provenance record. Evidence: CI gate log. Owner: ML Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Annual.
 
 **[SER-014]** (P1 | ALL | ModelMgmt)
@@ -653,8 +653,8 @@ The inference engine SHALL load models only by explicit registry identity resolv
 - Exception: Not allowed. Review: Annual.
 
 **[SER-018]** (P1 | ALL | ModelMgmt, IAM)
-`ModelRegistryService.SetActiveModel` (`ModelRegistryService.cs:126-149`) SHALL enforce, at the service layer, both an authorized-role check and the acceptance-gate status check before switching the active model.
-- Why: the role gate exists today only in UI code-behind and view-model bindings, so any code path or file edit reaching the service activates an unaccepted model — the acceptance gate is bypassable (repo-reality gap 5); service-layer default-deny is the §28 / VOL07 pattern. Maps: CWE-862; 62443-4-2 CR 2.1; ASVS-V8.
+`ModelRegistryService.SetActiveModel` (`ModelRegistryService.cs:126-149`) SHALL enforce, at the service layer, the model-activation gate — an authorized-role check and the acceptance/lifecycle-state check defined by the AI model-lifecycle standard (§19 / VOL04, §31 / VOL09) — before switching the active model.
+- Why: the role gate exists today only in UI code-behind and view-model bindings, so any code path or file edit reaching the service activates an unaccepted model — the acceptance gate is bypassable (repo-reality gap 5); the AI model-lifecycle standard owns the exact admissible states while this record fixes the service-layer default-deny enforcement point (§28 / VOL07 pattern). Maps: CWE-862; 62443-4-2 CR 2.1; ASVS-V8.
 - Verify: extended `RoleAuthorizationTests` service-layer cases (unauthorized role and non-PASS acceptance both refused). Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -671,7 +671,7 @@ The application SHALL re-verify the model file's SHA-256, manifest signature, by
 - Exception: Not allowed. Review: Per release.
 
 **[SER-021]** (P2 | ALL | ModelMgmt)
-The previously accepted model version SHALL be retained on the station and be re-activatable only through the same verified activation path as any other model.
+The previously accepted model version SHALL be retained on the station, re-activatable only through the same verified activation path as any other model.
 - Why: rollback after a bad activation must not require re-import (stations can be air-gapped, D-08), and an unverified "fast rollback" side door would defeat SER-018 and SER-020. Maps: 62443-4-2 CR 7.4; Internal.
 - Verify: `ModelActivationTests` rollback case (previous version activates with full verification). Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
@@ -688,8 +688,8 @@ Model artifacts entering the training environment SHOULD be scanned with at leas
 - Verify: training CI job runs pinned scanner versions; any finding blocks artifact promotion. Evidence: training CI log. Owner: ML Lead. Auto: Fully automated.
 - Exception: Allowed — approver: ML Lead. Review: Quarterly.
 
-**[SER-024]** (P3 | ALL | Training)
-Weight artifacts exchanged between training-pipeline steps SHOULD use the safetensors format instead of pickle-based checkpoints.
+**[SER-024]** (P2 | ALL | Training)
+Weight artifacts exchanged between training-pipeline steps SHALL use the safetensors format, or ONNX for deployable models, rather than pickle-based checkpoints, per the AI training standard (§31 / VOL09) which confines pickle to the hash-verified internal store.
 - Why: safetensors is designed for no-code-execution loading and bans buffer holes to prevent polyglot files (SAFETENSORS; independently audited by Trail of Bits, 2023), shrinking the pipeline's residual pickle surface to SER-008's quarantined store. Maps: SAFETENSORS; PT-SEC; CWE-502.
 - Verify: FF-SER-05 lint reports pickle-format interchange between pipeline steps. Evidence: CI gate log. Owner: ML Lead. Auto: Fully automated.
 - Exception: Allowed — approver: ML Lead. Review: Annual.
@@ -769,7 +769,7 @@ flowchart TD
     E -- no prefix --> H{"Operating mode?"}
     H -- Demo --> I["Migrate-on-read to v2<br/>+ audit event"]
     H -- Pilot / Production --> R["Reject value: Critical config<br/>alarm, dependent feature disabled"]
-    F --> U["Secret held in memory only;<br/>never logged (CRY-002/038)"]
+    F --> U["Secret held in memory only;<br/>never logged (CRY-002/CRY-038/CRY-039)"]
     G --> U
     I --> U
 ```
@@ -877,7 +877,7 @@ The application SHALL NOT install any TLS certificate-validation callback, trust
 - Exception: Not allowed. Review: Per release.
 
 **[CRY-020]** (P2 | S2+ | MES, REST)
-Every outbound TLS connection SHALL negotiate TLS 1.2 or higher and SHALL NOT offer or accept SSL 3.0, TLS 1.0, or TLS 1.1.
+Every outbound TLS connection SHALL negotiate TLS 1.2 or higher, offering and accepting no SSL 3.0, TLS 1.0, or TLS 1.1.
 - Why: the deprecated protocol versions carry exploitable cipher and downgrade weaknesses (CWE-326); pinning the floor at TLS 1.2, preferring 1.3, keeps a misconfigured OS or a downgrade-forcing peer from weakening the channel. Maps: CWE-326; CWE-757; CSC.
 - Verify: `MesRestIntegrationTests` negotiated-protocol assertion against a TLS-1.1-only test listener (connection refused); FF-CRY-01 flags explicit `SslProtocols` set below TLS 1.2. Evidence: CI test results; CI gate log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Security Lead. Review: On change.
@@ -889,7 +889,7 @@ Outbound TLS clients SHALL validate the server certificate chain, validity perio
 - Exception: Not allowed. Review: Per release.
 
 **[CRY-022]** (P2 | S2+ | MES, OPCUA, Config)
-Peer-certificate validation SHALL resolve trust against an explicitly configured trust store (the Windows machine store or an application-managed trust list), and the application SHALL NOT add certificates to any system trust store at runtime.
+Peer-certificate validation SHALL resolve trust only against an explicitly configured trust store (the Windows machine store or an application-managed trust list), never adding certificates to any system trust store at runtime.
 - Why: a runtime-added trust anchor is a permanent backdoor for every future connection; an explicit, reviewed trust list bounds what the station will trust and localizes OPC UA application-instance trust-list management to §35 / VOL11. Maps: CWE-295; OPCUA-P2; 62443-4-2 CR 3.1.
 - Verify: review checklist CR-CRY-03 on trust-configuration code; `MesRestIntegrationTests` untrusted-issuer rejection. Evidence: PR review record; CI test results. Owner: Security Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: Quarterly.
@@ -908,7 +908,7 @@ Every private key or key container the application holds outside a hardware keys
 
 ### 30.5 Cryptographic primitives and key management
 
-This subsection fixes the algorithm floor, the password-hash parameters, the source of security-relevant randomness, and the key-lifecycle mechanics the rest of the volume assumes. The repo's cryptographic posture is already partly compliant — password hashing is PBKDF2-HMAC-SHA-256 at 600,000 iterations with a 16-byte `RandomNumberGenerator` salt and constant-time comparison (`AOI_Monitor/Services/AuthenticationSettingsService.cs:290-298`), the Roslyn analyzers CA5350/CA5351 (broken and weak crypto) are already promoted to build errors, and no `BinaryFormatter` or weak-random construction was found — so most rules here codify an existing good state and make it non-regressable rather than demanding new work. Account, session, and lockout policy that consumes the password hash is §28 / VOL07; the release-time signing ceremony that consumes the signing key is §42–43 / VOL15; this subsection fixes only the primitive floors both must meet. Table 30-2 is the normative algorithm floor.
+This subsection fixes the algorithm floor, the password-hash parameters, the source of security-relevant randomness, and the key-lifecycle mechanics the rest of the volume assumes. The repo's cryptographic posture is already partly conformant to the Table 30-2 floor — password hashing is PBKDF2-HMAC-SHA-256 at 600,000 iterations with a 16-byte `RandomNumberGenerator` salt and constant-time comparison (`AOI_Monitor/Services/AuthenticationSettingsService.cs:290-298`), the Roslyn analyzers CA5350/CA5351 (broken and weak crypto) are already promoted to build errors, and no `BinaryFormatter` or weak-random construction was found — so most rules here codify an existing good state and make it non-regressable rather than demanding new work. Account, session, and lockout policy that consumes the password hash is §28 / VOL07; the release-time signing ceremony that consumes the signing key is §42–43 / VOL15; this subsection fixes only the primitive floors both must meet. Table 30-2 is the normative algorithm floor.
 
 Table 30-2 — Cryptographic algorithm floor (normative minimums; stronger is always permitted)
 
@@ -943,7 +943,7 @@ The password-hashing key-derivation function SHALL be PBKDF2-HMAC-SHA-256 with a
 - Exception: Not allowed. Review: Per release.
 
 **[CRY-028]** (P2 | ALL | All)
-All randomness used for a security purpose — salts, tokens, entropy values, temp-file names, nonces — SHALL be generated with `System.Security.Cryptography.RandomNumberGenerator`, and `System.Random`, `Guid.NewGuid` as a secret, or any non-cryptographic PRNG SHALL NOT be used for such values.
+All randomness used for a security purpose — salts, tokens, entropy values, temp-file names, nonces — SHALL be generated with `System.Security.Cryptography.RandomNumberGenerator` rather than `System.Random`, `Guid.NewGuid` as a secret, or any non-cryptographic PRNG.
 - Why: `System.Random` is predictable from a few observed outputs, so a token or salt drawn from it is guessable (CWE-330, CWE-338); the repo already uses `RandomNumberGenerator` for password salts and this generalizes the rule to every security-relevant draw. Maps: CWE-330; CWE-338; CSC.
 - Verify: fitness function FF-CRY-03 (CA5394 "do not use insecure randomness" as a build error plus review of security-relevant random call sites). Evidence: CI gate log. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: On change.
@@ -961,19 +961,19 @@ The certificate and credential renewal procedure SHALL be exercised end-to-end a
 - Exception: Allowed — approver: Security Lead. Review: Annual.
 
 **[CRY-031]** (P2 | S2+ | Diagnostics, Config)
-Certificate and credential expiry evaluation SHALL derive the current time from the NTP-monitored system clock (D-16), and the application SHALL raise a diagnostic and withhold expiry-dependent trust decisions when clock synchronization has been lost beyond a configured threshold (default 24 h).
+Certificate and credential expiry evaluation SHALL derive the current time only from the NTP-monitored system clock (D-16), withholding every expiry-dependent trust decision and raising a diagnostic whenever clock synchronization has been lost beyond the configured threshold (default 24 h).
 - Why: certificate validation is only as trustworthy as the clock it reads — a drifted or attacker-set clock either accepts an expired certificate or rejects a valid one (CWE-295, CWE-324); making the clock dependency explicit and monitored stops a silent-time failure from silently changing trust. Maps: CWE-295; CWE-324; Internal.
 - Verify: `SecureClockTests` (expired-cert-with-skewed-clock and unsynced-clock cases; NTP-drift diagnostic asserted). Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
 **[CRY-032]** (P1 | ALL | Build, CI, Installer)
-Code-signing and artifact-signing private keys SHALL reside only in an HSM or hardware token meeting FIPS 140-2 Level 2 or Common Criteria EAL 4+, never on developer machines, ordinary CI runners, or in repository or pipeline secrets (D-12).
+Code-signing and artifact-signing private keys SHALL reside only in an HSM or hardware token meeting FIPS 140-3 Level 2 (or a still-valid FIPS 140-2 Level 2 validation) or Common Criteria EAL 4+, never on developer machines, ordinary CI runners, or in repository or pipeline secrets (D-12).
 - Why: the CA/Browser Forum baseline has mandated hardware key custody for publicly trusted code-signing certificates since 2023-06-01, and a signing key stolen from a laptop or CI variable lets an attacker sign malware as the vendor (CWE-321, CWE-798); Azure Artifact Signing public trust is unavailable to Korean organizations, so an OV certificate on a commercial-CA token is the procurement path. Maps: CWE-321; SLSA; SSDF-PS.1; 62443-4-2 CR 3.4.
 - Verify: release-process review confirms key custody and that the signing step runs off developer and CI hosts (§42–43 / VOL15); release evidence records the signing certificate chain. Evidence: release evidence; review record. Owner: Release Manager. Auto: Manual review.
 - Exception: Not allowed. Review: Per release.
 
 **[CRY-033]** (P3 | ALL | All)
-A documented key- and credential-compromise runbook SHALL exist covering revocation, re-issue, artifact re-signing, and fleet notification, and SHALL be referenced by the incident-response process in §54 / VOL16.
+A documented key- and credential-compromise runbook covering revocation, re-issue, artifact re-signing, and fleet notification SHALL exist and be referenced by the incident-response process in §54 / VOL16.
 - Why: compromise of a signing key, MES credential, or DPAPI entropy is a when-not-if event whose response spans rotation (CRY-012), revocation (CRY-013), and re-signing (CRY-032); a runbook written before the incident is the difference between hours and weeks of exposure. Maps: CSF2; 62443-4-2 CR 1.5; Internal.
 - Verify: runbook review plus an annual tabletop drill exercising one key-compromise scenario. Evidence: drill record. Owner: Security Lead. Auto: Manual review.
 - Exception: Allowed — approver: Security Lead. Review: Annual.
@@ -982,7 +982,7 @@ A documented key- and credential-compromise runbook SHALL exist covering revocat
 
 The controls above keep secrets encrypted at rest and in transit; this subsection keeps them out of the three places secrets most often leak from — source control, diagnostics artifacts, and process memory. Two repo weaknesses set the agenda. The pre-commit and CI secret scan is a homemade regex with a broad allowlist (`Scripts/check-code-quality.ps1:204-213`, repo-reality gap 8), which is exactly the bypassable denylist pattern INP-002 warns against. And diagnostics redaction is literal blocklist string-matching (`AOI_Monitor/Services/SecretProtectionService.cs:41-54`, `context/repo/security.md` §7), so a secret that appears URL-encoded, Base64-wrapped, or split across fields passes straight through. The rules below replace both with structural controls and pin the tests that prove them, completing the CRY-001 and CRY-002 verification chains.
 
-### R: Secret-detection and handling rules (CRY-034–CRY-038)
+### R: Secret-detection and handling rules (CRY-034–CRY-040)
 
 **[CRY-034]** (P1 | ALL | CI, Build)
 Commits and pull requests SHALL be scanned by a maintained secret-scanning tool (gitleaks-class per D-14) run both as a pre-commit hook and as a CI gate, replacing the homemade regex allowlist at `Scripts/check-code-quality.ps1:204-213`.
@@ -1003,20 +1003,32 @@ Redaction of secrets from diagnostics artifacts SHOULD operate by clearing the s
 - Exception: Allowed — approver: Security Lead. Review: On change.
 
 **[CRY-037]** (P3 | ALL | Diagnostics, Logging)
-Every crash report and support-bundle artifact SHALL be produced through the central redaction facade (`AOI_Monitor/Services/CrashReportService.cs`, `AOI_Monitor/Services/SupportBundleService.cs`), and no other code path SHALL write a diagnostics artifact that bypasses it.
+Every crash report and support-bundle artifact SHALL be produced only through the central redaction facade (`AOI_Monitor/Services/CrashReportService.cs`, `AOI_Monitor/Services/SupportBundleService.cs`), with no other code path writing a diagnostics artifact that bypasses it.
 - Why: a single redaction chokepoint is the only way to guarantee CRY-002 holds for artifact types added later; a second, ad-hoc export path is how the next secret leak ships — the log-write facade in FF-INP-08 uses the same containment shape. Maps: CWE-532; ASVS-V16; Internal.
 - Verify: fitness function FF-CRY-05 (architecture test: diagnostics-artifact writers reachable only through the redaction facade). Evidence: CI gate log. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: On change.
 
 **[CRY-038]** (P3 | ALL | All)
-Unprotected secret values SHALL exist in process memory only for the minimal duration required to use them, SHALL NOT be written by the application to disk or a swap-backed file, and SHOULD be held in clearable buffers (`char[]`/`Span<char>`) zeroed after use for every secret whose consuming API accepts a mutable buffer.
-- Why: a secret left resident in a long-lived immutable `string` lingers on the managed heap until garbage collection and can surface in a memory dump or crash report (CWE-316, CWE-226); minimizing lifetime and clearing buffers shrinks that exposure window and reinforces CRY-002. Maps: CWE-316; CWE-226; Internal.
+Unprotected secret values SHALL be released from process memory no later than completion of the operation that consumes them.
+- Why: a secret left resident in a long-lived immutable `string` lingers on the managed heap until garbage collection and can surface in a memory dump or crash report (CWE-316, CWE-226); bounding the lifetime to the consuming operation shrinks that exposure window and reinforces CRY-002. Maps: CWE-316; CWE-226; Internal.
+- Verify: review checklist CR-CRY-06 on secret-handling code paths; `SecretProtectionServiceTests` secret-lifetime case. Evidence: PR review record; CI test results. Owner: Software Lead. Auto: Partially automated.
+- Exception: Allowed — approver: Security Lead. Review: Annual.
+
+**[CRY-039]** (P2 | ALL | All)
+The application SHALL NOT write an unprotected secret value to disk or any swap-backed file.
+- Why: an unprotected secret persisted to disk or paged out to a swap-backed file outlives the process and becomes recoverable from the volume or the page file (CWE-316, CWE-591); keeping unprotected secrets memory-resident is what confines their exposure to a running process. Maps: CWE-316; CWE-591; Internal.
+- Verify: review checklist CR-CRY-06 on secret-handling code paths; `SecretProtectionServiceTests` no-plaintext-persistence case. Evidence: PR review record; CI test results. Owner: Software Lead. Auto: Partially automated.
+- Exception: Not allowed. Review: Per release.
+
+**[CRY-040]** (P3 | ALL | All)
+The application SHOULD hold every secret whose consuming API accepts a mutable buffer in a `char[]`/`Span<char>` zeroed immediately after use.
+- Why: a secret held in a long-lived immutable `string` cannot be cleared and lingers on the managed heap until garbage collection, where it can surface in a memory dump (CWE-316, CWE-226); a clearable buffer zeroed after use bounds the window a dump can capture. Maps: CWE-316; CWE-226; Internal.
 - Verify: review checklist CR-CRY-06 on secret-handling code paths; `SecretProtectionServiceTests` buffer-clearing case where the API supports it. Evidence: PR review record; CI test results. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: Annual.
 
 ### 30.7 Volume assumptions and open decisions
 
-This subsection consolidates the conservative assumptions this volume made where information was missing and the decisions it deliberately defers. Per the §6 / VOL01 process, both feed the merged specification-defects and open-decisions register. Each assumption is stated in full at its point of use (cross-referenced below) and carries its residual risk; each open decision carries an owner and a resolution trigger. Nothing here is a placeholder — every item is a bounded, tracked decision with a defined forcing event, and none blocks the requirements above from being enforced today.
+This subsection consolidates the conservative assumptions this volume made where information was missing and the decisions it deliberately defers. Per the §6 / VOL01 process, both feed the merged specification-defects and open-decisions register. Each assumption is stated in full at its point of use (cross-referenced below) and carries its residual risk; the A-VOL08-n numbers are assigned by topic rather than by document position, so the "Stated at" column of Table 30-3 gives each assumption's location. Each open decision carries an owner and a resolution trigger. Nothing here is a placeholder — every item is a bounded, tracked decision with a defined forcing event, and none blocks the requirements above from being enforced today.
 
 Table 30-3 — Volume assumptions (A-VOL08-n)
 
@@ -1043,4 +1055,4 @@ Table 30-4 — Open decisions (OD-VOL08-n)
 | OD-VOL08-7 | Legacy-transport exception via a TLS-terminating reverse proxy for a non-upgradable MES gateway | Security Lead | on the first customer MES gateway that fails CRY-018 / CRY-020 |
 | OD-VOL08-8 | Model-manifest detached-signature format (CMS / PKCS#7, OpenPGP, or COSE) | Software Architect | before the first signed model release |
 
-— End of VOL08. §29 INP-001–INP-065 (65) and SER-001–SER-025 (25); §30 CRY-001–CRY-038 (38). No requirement IDs are owned by another volume. —
+— End of VOL08. §29 INP-001–INP-065 (65) and SER-001–SER-025 (25); §30 CRY-001–CRY-040 (40). No requirement IDs are owned by another volume. —

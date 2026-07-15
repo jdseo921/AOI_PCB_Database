@@ -17,7 +17,7 @@ prohibited (they are overwritten on every run).
 
 - **Index (human-readable):** [`catalogue_index.generated.md`](catalogue_index.generated.md)
   — counts by category, priority, and automation, plus the full ID → statement
-  table for all 1,417 requirements.
+  table for all 1,451 requirements.
 - **Catalogue (machine-readable):** [`requirement-catalogue.json`](requirement-catalogue.json)
   — one object per requirement (`id`, `category`, `priority`, `stages`,
   `components`, `statement`, `why`, `maps`, `verify`, `evidence`, `owner`,
@@ -42,41 +42,41 @@ violation.
 
 | Category | Count | Owning volume |
 |---|---|---|
-| GOV | 25 | VOL01 |
+| GOV | 26 | VOL01 |
 | ARC | 55 | VOL02 (001–015), VOL03 (016–055) |
-| MOD | 40 | VOL03 |
-| ORC | 40 | VOL04 |
-| DAT | 55 | VOL05 |
+| MOD | 41 | VOL03 |
+| ORC | 43 | VOL04 |
+| DAT | 58 | VOL05 |
 | API | 30 | VOL05 |
-| COD | 65 | VOL06 |
+| COD | 66 | VOL06 |
 | DOC | 25 | VOL06 |
-| SEC | 65 | VOL07 |
+| SEC | 68 | VOL07 |
 | IAM | 62 | VOL07 |
 | INP | 65 | VOL08 |
 | SER | 25 | VOL08 |
-| CRY | 38 | VOL08 |
+| CRY | 40 | VOL08 |
 | AIM | 120 | VOL09 |
 | CAM | 45 | VOL10 |
 | THD | 22 | VOL10 |
-| ROB | 40 | VOL11 |
+| ROB | 41 | VOL11 |
 | SAF | 22 | VOL11 |
 | MES | 30 | VOL11 |
 | OPU | 30 | VOL11 |
-| HMI | 50 | VOL12 |
-| LOC | 22 | VOL12 |
+| HMI | 59 | VOL12 |
+| LOC | 23 | VOL12 |
 | OBS | 40 | VOL13 |
 | PER | 35 | VOL13 |
-| REL | 40 | VOL13 |
+| REL | 46 | VOL13 |
 | TST | 60 | VOL14 |
 | SUP | 45 | VOL15 |
 | BLD | 25 | VOL15 |
 | RELS | 25 | VOL15 |
-| DEP | 22 | VOL15 |
+| DEP | 25 | VOL15 |
 | OPS | 22 | VOL15 |
 | PRI | 25 | VOL16 |
 | IR | 22 | VOL16 |
 | COM | 18 | VOL16 |
-| LIC | 8 | VOL16 |
+| LIC | 9 | VOL16 |
 | CHG | 58 | VOL17 |
 
 ## 61. Final Self-Audit
@@ -91,40 +91,40 @@ from memory.
 
 | Metric | Value |
 |---|---|
-| Total atomic requirements | **1,417** |
+| Total atomic requirements | **1,451** |
 | Distinct categories | 36 |
 | Volume files (requirement-bearing) | 19 (VOL01–VOL19) |
-| Floor required by mandate | 800 (exceeded by 617) |
+| Floor required by mandate | 800 (exceeded by 651) |
 | Target band | 1,000–1,500 (within band) |
 
-**By priority:** P0 = 94 · P1 = 392 · P2 = 746 · P3 = 185.
-The P0 share (6.6%) sits inside the 5–8% guidance; P0s are concentrated on
+**By priority:** P0 = 94 · P1 = 400 · P2 = 766 · P3 = 191.
+The P0 share (6.5%) sits inside the 5–8% guidance; P0s are concentrated on
 safety-boundary, authorization, artifact-integrity, and critical-defect paths.
 
-**By automation status:** Fully automated = 854 · Partially automated = 346 ·
-Manual review = 203 · External assessment = 14.
-Automated or partially-automated verification therefore covers 1,200 of 1,417
+**By automation status:** Fully automated = 876 · Partially automated = 354 ·
+Manual review = 207 · External assessment = 14.
+Automated or partially-automated verification therefore covers 1,230 of 1,451
 requirements (85%). The 14 external-assessment requirements are exactly the ones
 that require a certified safety engineer or legal counsel (safety-boundary,
 CE/CRA/AI-Act/PIPA applicability) and are marked as such rather than falsely
 claimed as satisfiable in-house.
 
 **By stage applicability** (a requirement may apply to several stages):
-S1 = 1,099 · S2 = 1,230 · S3 = 1,155 · S4 = 1,185.
+S1 = 1,126 · S2 = 1,263 · S3 = 1,348 · S4 = 1,445.
 
 **By category (against per-category quotas):** every one of the mandate's nine
-requirement-domain minima is met (architecture/modularity/code/doc = 250 across
-ARC+MOD+COD+DOC = 185… see note); security = SEC+IAM+INP+SER+CRY+PRI = 280;
-AI/ML = AIM = 120; OT/cyber-physical = CAM+THD+ROB+SAF+MES+OPU = 189; testing/
-reliability/perf/observability = TST+PER+REL+OBS = 175; supply-chain/build/deploy/
-ops = SUP+BLD+RELS+DEP+OPS = 139; change-governance = CHG+GOV = 83; HMI/local =
-HMI+LOC = 72; data/retention/traceability/privacy = DAT+API+PRI = 110.
+requirement-domain minima is met (architecture/modularity/code/doc:
+ARC+MOD+COD+DOC = 187 — see note; security = SEC+IAM+INP+SER+CRY+PRI = 285;
+AI/ML = AIM = 120; OT/cyber-physical = CAM+THD+ROB+SAF+MES+OPU = 190; testing/
+reliability/perf/observability = TST+PER+REL+OBS = 181; supply-chain/build/deploy/
+ops = SUP+BLD+RELS+DEP+OPS = 142; change-governance = CHG+GOV = 84; HMI/local =
+HMI+LOC = 82; data/retention/traceability/privacy = DAT+API+PRI = 113.
 
 > Note on the architecture-domain minimum: the mandate's "150 architecture,
 > modularity, code-quality, and documentation" minimum is met by ARC (55) + MOD
-> (40) + COD (65) + DOC (25) = **185**. The "250 application/platform/identity/
-> input/cryptography/data-security" minimum is met by SEC (65) + IAM (62) + INP
-> (65) + SER (25) + CRY (38) + DAT (55) + API (30) = **340**.
+> (41) + COD (66) + DOC (25) = **187**. The "250 application/platform/identity/
+> input/cryptography/data-security" minimum is met by SEC (68) + IAM (62) + INP
+> (65) + SER (25) + CRY (40) + DAT (58) + API (30) = **348**.
 
 ### 61.2 Source and standards coverage
 
@@ -132,8 +132,8 @@ HMI+LOC = 72; data/retention/traceability/privacy = DAT+API+PRI = 110.
 |---|---|
 | Source documents traced (§5/VOL01) | 3 of 3 (roadmap, GUI spec, defect table) |
 | Specification defects registered (SD-xx, §6/VOL01) | 23 |
-| Open decisions registered (OD-xx, all volumes) | 165 (9 program-level OD-01..09 in VOL01 + per-volume OD-VOLxx-n) |
-| Labeled assumptions (A-VOLxx-n) | 99 |
+| Open decisions registered (OD-xx, all volumes) | 169 (9 program-level OD-01..09 in VOL01 + per-volume OD-VOLxx-n) |
+| Labeled assumptions (A-VOLxx-n) | 100 |
 | Binding technology decisions (D-01..D-18) | 18 (VOL02 §11) |
 | External standards/regulations in the applicability matrix (§55/VOL16) | ~40 rows across the research clusters |
 | Bibliography citation clusters (§60/VOL19) | 14 research clusters, ~90 sources |
@@ -175,11 +175,12 @@ mandate coverage) was run against the full draft. It produced **190 findings**:
 |---|---|
 | Blockers (3) | **Resolved.** (1) VOL12 — 12 requirement records carried authoring deliberation scratch in the machine-parsed `Maps:` field; all 12 cleaned to resolved keys. (2) VOL17 — `FF-PR-01` was referenced 10× with no catalogue row; a row was added to §52.6. (3) VOL20 — the self-audit volume did not exist; it is this file. |
 | Major factual-errors | Credibility-critical items corrected inline: the unit-suite size (≈524, not 488), the EU AI Act Annex III point-4 date (now marked UNVERIFIED pending the Digital Omnibus OJ text), the PIPA surcharge figure (3% baseline with the 10% aggravated-case claim marked UNVERIFIED), and the ONNX external-data CVE lineage (successor CVE marked UNVERIFIED). One reported major (VOL14 Table 39-2/39-3) was verified to be a **false positive** and correctly not applied. |
-| Remaining majors and all minors | Tracked. The bulk of the remaining major and minor findings (grammar/prose tightening, cross-volume duplicate consolidation, non-blocking untestable-wording sharpening, bibliography date reconciliation, and OD/assumption renumbering) are catalogued in `scratchpad/review_findings.json` and are being applied by the fixer pass. None affects catalogue validity: the document is parser-clean (FF-STD-01 exit 0) with all quotas met. |
+| Remaining majors and all minors | **Applied.** A per-volume fixer pass resolved ~107 of the findings across the 19 volumes: compound requirements were split into atomic records (growing the catalogue from 1,417 to 1,451 — e.g. MOD-041, ORC-041..043, DAT-056..058, REL and HMI expansions), cross-volume duplicates were consolidated by cross-reference (no ID deleted or renumbered), untestable wording was given named verification methods, missing table captions and open-decision references were added, and bibliography dates/CVE IDs were reconciled or marked UNVERIFIED. Findings that were already satisfied (some by the inline blocker/factual fixes above) were verified and skipped; a small number that suggested prohibited foreign-ID cross-references were satisfied with section references instead. The full finding set is retained in `scratchpad/review_findings.json`. |
 
-The review's own output is retained as evidence; the fixer pass that applies the
-non-blocker findings is a documented follow-up under the standard's own
-continuous-improvement obligation (GOV, VOL01) rather than a gate on adopting v1.0.
+After the fixer pass the catalogue is parser-clean (FF-STD-01 exit 0), all
+per-category quotas remain met, and ID numbering is contiguous with no gaps.
+Any residual prose polish is governed as ordinary continuous improvement (GOV,
+VOL01), not a gate on adopting v1.0.
 
 ### 61.5 Hostile-reviewer checklist (self-applied)
 

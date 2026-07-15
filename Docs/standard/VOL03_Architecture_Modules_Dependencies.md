@@ -225,7 +225,7 @@ The Domain module SHALL reference only the .NET base class library — no WPF as
 **[ARC-023]** (P2 | S2+ | Orchestrator)
 The Inspection Orchestrator SHALL be the only module that sequences acquisition, inference, post-processing, and decision steps of a live inspection cycle.
 - Why: today views orchestrate business flows directly (21 views call `AoiDatabase`; `MonitorView.xaml.cs` is 1,441 LOC), so cycle logic cannot be reused for robot-fed Stage 3 operation. Maps: 42010; Internal.
-- Verify: FF-DEP-01 layer rules plus review checklist item CR-ARC-3. Evidence: CI test log; PR review record. Owner: Software Architect. Auto: Partially automated.
+- Verify: fitness function FF-ARC-05 (scan: Acquisition→Inference→PostProc→Decision step-sequencing calls occur only within Orchestrator namespaces) plus review checklist item CR-ARC-3. Evidence: CI gate log; PR review record. Owner: Software Architect. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 #### Cross-cutting service usage
@@ -269,7 +269,7 @@ Navigation page keys SHALL be defined in exactly one registry consumed by routin
 - Exception: Allowed — approver: Software Architect. Review: Quarterly.
 
 **[ARC-030]** (P3 | ALL | All)
-Restructuring toward the §12 target SHALL proceed by incremental extract-and-redirect steps on the live codebase; starting a parallel replacement implementation of any §14 module requires a recorded exception.
+Restructuring toward the §12 target SHALL proceed by incremental extract-and-redirect steps on the live codebase, not by parallel replacement implementations of a §14 module.
 - Why: the working 66 kLOC application with ~524 passing tests is the asset; a rewrite discards the tested navigation, error-boundary, and lifecycle engineering already in the shell. Maps: Internal; 42010.
 - Verify: review checklist item CR-ARC-6 (ADR present for each extraction step). Evidence: ADR register. Owner: Software Architect. Auto: Manual review.
 - Exception: Allowed — approver: Product Owner. Review: Annual.
@@ -482,7 +482,7 @@ Zone boundaries around the AOI station SHALL enforce deny-by-default, permitting
 - Exception: Allowed — approver: Security Lead. Review: On change.
 
 **[ARC-035]** (P1 | S4 | MES,OPCUA,REST)
-MES/ERP communication SHALL use only the single MES conduit of §13.5 with transport security of HTTPS over TLS 1.2 or newer, or OPC UA with security policy Basic256Sha256 or stronger.
+MES/ERP transport SHALL use HTTPS over TLS 1.2 or newer, or OPC UA with security policy Basic256Sha256 or stronger.
 - Why: MES settings currently accept `http://` (`MesIntegrationSettingsService.cs:83-87`), exposing API keys and Basic credentials on the factory network; Basic128Rsa15/Basic256 are deprecated SHA-1-era policies. Maps: OPCUA-P2; CWE-319; 62443-4-2 CR 3.1.
 - Verify: test class `MesEndpointPolicyTests` (rejects non-TLS endpoints and deprecated OPC UA policies). Evidence: CI test log. Owner: Security Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Security Lead. Review: Per release.
@@ -1031,12 +1031,12 @@ This section is the authoritative inventory of the 29 modules that compose AOI M
 - Capabilities: command hardware — no (never issues real commands, by construction); customer data — yes (replays customer image sets); executable/model artifacts — no.
 - Repo mapping: `AOI_Monitor/Services/FolderCameraSource.cs`, `MockMesClient.cs`, `SimulatedRobotController`/`SimulatedPlcSafetyController`/`SimulatedEmergencyStopMonitor` and the `Null*` implementations in `Services/IntegrationContracts.cs`, and `Templates/*` fakes; composition via `IntegrationBoundaryRegistry` (frozen, ARC-050).
 
-### R: Module-catalogue requirements (MOD-001…MOD-039; process-boundary records MOD-034/036/037/040 are stated in §16)
+### R: Module-catalogue requirements (MOD-001…MOD-039 and MOD-041; process-boundary records MOD-034/036/037/040 are stated in §16)
 
 #### Catalogue integrity and capability control
 
 **[MOD-001]** (P1 | ALL | All)
-Each module SHALL be defined by exactly one §14.3 record, and a module SHALL NOT exercise a dependency or capability that its record does not grant.
+Each module SHALL be defined by exactly one §14.3 record.
 - Why: an unbounded module defeats dependency enforcement and threat-model scoping; the record is the contract the §15 architecture tests check against. Maps: 42010; 62443-4-1 SD-1; Internal.
 - Verify: fitness function FF-ARC-01 (record/module-map parity) plus `ArchitectureRulesTests`. Evidence: CI test log. Owner: Software Architect. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
@@ -1092,13 +1092,13 @@ Page and capability authorization SHALL default to deny for any key not explicit
 - Exception: Not allowed. Review: Per release.
 
 **[MOD-010]** (P2 | ALL | Decision)
-Final verdict assignment (OK/NG/REVIEW) SHALL be produced by the single Decision Engine component from candidate findings plus a versioned threshold profile; engines and validation services SHALL NOT assign final verdicts.
+Final verdict assignment (OK/NG/REVIEW) SHALL be produced only by the Decision Engine component from candidate findings plus a versioned threshold profile.
 - Why: verdict logic scattered across the three engines and `BatchValidationService` cannot be reproduced or reasoned about; one authority makes decisions auditable and testable. Maps: 42010; 25010; Internal.
 - Verify: `DecisionEngineTests` plus fitness function FF-DEP-04 (no verdict assignment outside the Decision namespace). Evidence: CI test log. Owner: Software Architect. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[MOD-011]** (P2 | ALL | Recipe)
-Recipe activation SHALL be atomic and versioned: on activation failure the previously active recipe SHALL remain active and the failure SHALL be audited.
+Recipe activation SHALL be atomic and versioned, such that a failed activation leaves the previously active recipe active and writes a failure entry to the audit log.
 - Why: a half-applied recipe change would inspect boards against an undefined configuration; fail-closed activation preserves a known-good state. Maps: 62443-4-2 CR 2.1; 25010; Internal.
 - Verify: `RecipeVersioningTests` (activation failure retains the prior active recipe). Evidence: CI test log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
@@ -1130,13 +1130,13 @@ A camera adapter that fails to load or validate SHALL be substituted by the diag
 - Exception: Not allowed. Review: Per release.
 
 **[MOD-016]** (P2 | S2+ | LightingAdapter)
-A lighting command SHALL change the controller's reported status to reflect delivery success or failure; a failed command SHALL NOT be silently retried without a status change.
+A lighting command SHALL update the controller's reported status to reflect delivery success or failure before any retry or the next command is issued.
 - Why: fire-and-forget lighting with no acknowledgement can leave illumination in an unknown state while inspection proceeds, corrupting results. Maps: 62443-4-2 CR 2.1; CWE-392; Internal.
 - Verify: transport fault-injection unit tests on `TcpTextLightingController`/`SerialTextLightingController`. Evidence: CI test log. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Software Lead. Review: Annual.
 
 **[MOD-017]** (P0 | ALL | Inference)
-The Inference Runtime SHALL load only single-file ONNX artifacts and SHALL reject external-data ONNX tensors and any pickle-bearing or code-executing artifact (`.pt`, `.pth`, `.pkl`, `.h5`).
+The Inference Runtime SHALL load only single-file ONNX artifacts, rejecting external-data ONNX tensors and any pickle-bearing or code-executing artifact (`.pt`, `.pth`, `.pkl`, `.h5`).
 - Why: external-data ONNX is a recurring path-traversal CVE class and pickle-bearing formats execute code on load; D-03 confines conversion to the training environment. Maps: ONNX-SEC; CWE-502; PT-SEC.
 - Verify: `InferenceArtifactPolicyTests` (reject external-data tensors and non-ONNX formats). Evidence: CI test log. Owner: ML Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
@@ -1174,14 +1174,14 @@ The REST transport client SHALL make exactly one delivery attempt per dispatch a
 - Exception: Allowed — approver: Software Lead. Review: Annual.
 
 **[MOD-023]** (P2 | S4 | OPCUA)
-The OPC UA integration SHALL reject the deprecated Basic128Rsa15 and Basic256 security policies and require Basic256Sha256 or stronger.
-- Why: Basic128Rsa15 and Basic256 are SHA-1-era policies deprecated by the OPC Foundation; accepting them exposes the plant conduit to known-weak cryptography. Maps: OPCUA-P2; CWE-327; 62443-4-2 CR 3.1.
+The OPC UA integration SHALL apply the security-policy allowlist governed by §27/VOL07 (Basic256Sha256 floor; SecurityPolicy None, Basic128Rsa15, and Basic256 disabled).
+- Why: the authoritative OPC UA security-policy floor is owned by §27/VOL07; this record binds the OPC UA integration module to apply it so the plant conduit never negotiates SHA-1-era or unencrypted policies. Maps: OPCUA-P2; CWE-327; 62443-4-2 CR 3.1.
 - Verify: policy-allowlist tests on the OPC UA client configuration. Evidence: CI test log. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[MOD-024]** (P1 | S3–S4 | RobotAdapter,SafetyStatus)
-Robot and PLC controllers SHALL be registered only through a reviewed commissioning/bootstrap step; the product SHALL NOT load robot or safety controllers through a drop-folder plugin loader.
-- Why: motion and safety hardware must never be bound from an unattended folder scan; the repo deliberately ships no robot plugin loader, and this makes that a rule. Maps: 62443-4-1 SD-4; CWE-494; 800-82.
+No production module SHALL load a robot or PLC/safety controller through a drop-folder or `Assembly.LoadFrom` plugin path; binding occurs only through the reviewed commissioning/bootstrap registration governed by §34/VOL11.
+- Why: motion and safety hardware must never be bound from an unattended folder scan; this module-boundary rule keeps that seam closed while §34/VOL11 owns the commissioning-registration obligation. Maps: CWE-494; 62443-4-1 SD-4; 800-82.
 - Verify: fitness function FF-DEP-05 (no robot/PLC assembly-load call sites) plus commissioning checklist item COM-ROB-1. Evidence: CI test log; commissioning record. Owner: Controls & Safety Engineer. Auto: Partially automated.
 - Exception: Not allowed. Review: On change.
 
@@ -1230,25 +1230,25 @@ Every audited action SHALL record a resolved actor identity and station; an audi
 - Exception: Not allowed. Review: Per release.
 
 **[MOD-032]** (P2 | ALL | Logging)
-Runtime log messages SHALL be emitted through the Logging module with a stable event ID per message type and written to size-capped rolling files (D-09).
-- Why: ad-hoc string logging without stable IDs defeats plant-SOC detection analytics and the §38/VOL13 observability model. Maps: 62443-4-2 CR 2.8; ATTACK-ICS; 800-82.
-- Verify: fitness function FF-LOG-01 (emission-outside-Logging scan) plus `LoggingEventIdTests`. Evidence: CI gate log. Owner: Software Lead. Auto: Fully automated.
+The Logging module SHALL write runtime log messages to size-capped rolling files that rotate before a configured size cap is exceeded, with bounded total retention (D-09).
+- Why: unbounded log files exhaust station disk and slow forensic retrieval; size-capped rotation with bounded retention keeps logs available without filling the volume. Maps: CWE-400; 62443-4-2 CR 2.8; Internal.
+- Verify: test class `LogRollingFileTests` (rotation at the configured size cap and enforcement of the retention bound). Evidence: CI test log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Quarterly.
 
 **[MOD-033]** (P3 | ALL | SafetyStatus)
-A boundary type SHOULD NOT be named to imply real hardware I/O it does not perform; `TcpTextPlcSafetyController`, which performs no TCP I/O, SHOULD be renamed to reflect its stub behavior.
-- Why: the misnamed safety stub invites a reader to assume real PLC I/O exists, contradicting the repo's truthful-evidence contract (AGENTS.md). Maps: 62443-4-1 SD-3; CWE-1059; Internal.
+A boundary type SHOULD NOT be named to imply real hardware I/O it does not perform.
+- Why: `TcpTextPlcSafetyController`, which performs no TCP I/O, is renamed to reflect its stub behavior; a misnamed safety stub invites a reader to assume real PLC I/O exists, contradicting the repo's truthful-evidence contract (AGENTS.md). Maps: 62443-4-1 SD-3; CWE-1059; Internal.
 - Verify: review checklist item CR-ARC-9 (name-versus-behavior audit for boundary stubs). Evidence: PR review record. Owner: Software Architect. Auto: Manual review.
 - Exception: Allowed — approver: Software Architect. Review: Annual.
 
 **[MOD-035]** (P2 | S4 | Licensing)
-The product SHALL NOT present or enforce licensing entitlements until the Licensing module ships with signature-verified entitlement artifacts, and no license gate SHALL sit on the inspection or safety path.
-- Why: an entitlement check on the inspection path is a production-availability hazard, and claiming enforcement that does not exist violates the truthfulness contract. Maps: 62443-4-1 SD-2; SBD; Internal.
-- Verify: review checklist item CR-ARC-10 (no licensing gate on inspection or safety paths). Evidence: PR review record. Owner: Product Owner. Auto: Manual review.
+The product SHALL NOT present or enforce licensing entitlements until the Licensing module ships with signature-verified entitlement artifacts.
+- Why: claiming enforcement that does not exist violates the truthfulness contract, and an entitlement surface without signature-verified artifacts is meaningless. Maps: 62443-4-1 SD-2; SBD; Internal.
+- Verify: review checklist item CR-ARC-15 (no licensing enforcement claimed or active before signature-verified entitlement artifacts ship). Evidence: PR review record. Owner: Product Owner. Auto: Manual review.
 - Exception: Allowed — approver: Product Owner. Review: Annual.
 
 **[MOD-038]** (P1 | S2+ | Update)
-Application, model, and recipe update payloads SHALL be signature- and hash-verified before they are staged or applied, and a failing payload SHALL be refused with the running version retained (D-08/D-12).
+Application, model, and recipe update payloads SHALL be refused, with the running version retained, unless signature- and hash-verification succeeds before staging or application (D-08/D-12).
 - Why: unverified update intake is the primary OT compromise path; fail-closed verification keeps a rejected package from ever executing. Maps: SLSA; 62443-4-1 SUM-4; CWE-494.
 - Verify: §43/VOL15 update-verification tests (reject unsigned, downgrade, and tampered packages). Evidence: CI test log; update audit log. Owner: Release Manager. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
@@ -1258,6 +1258,12 @@ Simulated or mock output SHALL be marked `IsSimulated`/`Simulated` end to end an
 - Why: relabeling simulated results as real would produce fraudulent acceptance evidence; the repo already enforces this structurally and it must stay binding. Maps: 62443-4-1 SD-4; CWE-345; Internal.
 - Verify: `SimulationProvenanceTests` plus the PR claim-language gate (PR-CLAIM/STAGE2/PROD). Evidence: CI test log; CI gate log. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
+
+**[MOD-041]** (P2 | S4 | Licensing)
+No licensing entitlement gate SHALL sit on the inspection or safety execution path; entitlement checks are confined to non-inspection, non-safety features.
+- Why: an entitlement check on the inspection or safety path is a production-availability hazard that could halt inspection or interfere with the observe-only safety boundary (D-18). Maps: 62443-4-1 SD-2; CWE-693; Internal.
+- Verify: review checklist item CR-ARC-10 (no licensing gate on inspection or safety paths). Evidence: PR review record. Owner: Product Owner. Auto: Manual review.
+- Exception: Allowed — approver: Product Owner. Review: Annual.
 
 ---
 
@@ -1484,9 +1490,9 @@ No mutable state SHALL be shared by reference across the inference pipeline boun
 - Exception: Not allowed. Review: Per release.
 
 **[MOD-040]** (P2 | ALL | Simulation)
-Simulation and emulation implementations SHALL NOT be auto-registered into a production composition root; their activation SHALL be explicit, audited, and surfaced as purple-labeled simulated status in the HMI.
-- Why: a simulated adapter silently bound in production would run inspection with fake hardware while appearing operational; explicit, labeled activation prevents that. Maps: 62443-4-1 SD-4; CWE-665; Internal.
-- Verify: test class `SimulationIsolationTests` (no simulated type in the production composition set) plus the HMI purple-label audit. Evidence: CI test log; HMI layout audit. Owner: QA Lead. Auto: Partially automated.
+Simulation and emulation implementations SHALL NOT be auto-registered into a production composition root; their activation is explicit and audited.
+- Why: a simulated adapter silently bound in production would run inspection with fake hardware while appearing operational; explicit, audited activation prevents that. HMI purple-label surfacing of simulated status is governed by §36/VOL12. Maps: 62443-4-2 CR 2.8; CWE-1188; Internal.
+- Verify: test class `SimulationIsolationTests` (no simulated type auto-registered in the production composition set; activation emits an audit event). Evidence: CI test log. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 ---
@@ -1502,4 +1508,4 @@ These entries are merged into the standard's §6 register. Assumptions are conse
 - **OD-VOL03-1** (open decision) — Whether the Stage 4 OPC UA integration (§14.3.18) ships as an OPC UA client consuming an MES server, or as an OPC UA server exposing an AOI node model to the MES. This choice sets the module's public interface style and its inbound-versus-outbound conduit direction. Owner: Software Architect. Decision deadline: Stage 4 architecture freeze; default if unresolved is client-only (no inbound listener), the more restrictive posture.
 - **OD-VOL03-2** (open decision) — Whether 3D Processing (§14.3.11) shares the inference worker process on the D-01 split or runs in its own worker. Owner: Software Architect. Decision deadline: first native 3D SDK adoption; default if unresolved is co-location with inference in a single worker to minimize process count.
 
-*End of VOL03 — Architecture, Modules, and Dependencies (§12–§16). This volume defines module records §14.3.1–§14.3.29, dependency rules §15, process boundaries §16, and requirement records ARC-016…ARC-055 and MOD-001…MOD-040.*
+*End of VOL03 — Architecture, Modules, and Dependencies (§12–§16). This volume defines module records §14.3.1–§14.3.29, dependency rules §15, process boundaries §16, and requirement records ARC-016…ARC-055 and MOD-001…MOD-041.*

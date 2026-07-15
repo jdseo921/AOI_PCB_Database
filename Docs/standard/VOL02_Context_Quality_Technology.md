@@ -240,7 +240,7 @@ Each scenario is marked **Automated** (measured by CI/soak tooling — the repo 
 
 Three rules govern how the scenario measures are produced, so that numbers in release evidence are comparable release-to-release:
 
-1. **One instrument per measure.** Each Automated measure names its data source: QAS-01/02 read the `InspectionLatencyTraces` table and the batch-run timing columns already persisted by the data layer; QAS-03/11 read the soak harness (`SoakTestService`) and alarm log; QAS-08 reads analyzer/gate output; QAS-13 reads the startup timeline event (ARC-015 gives it a stable event ID). Substituting a different instrument is a measurement-method change and requires a recorded rationale in the release evidence.
+1. **One instrument per measure.** Each Automated measure names its data source: QAS-01/02 read the `InspectionLatencyTraces` table and the batch-run timing columns already persisted by the data layer; QAS-03/11 read the soak harness (`SoakTestService`) and alarm log; QAS-06 reads the service-layer authorization architecture-test/analyzer output together with the maintained privileged-operation inventory; QAS-07's Automated gate-time measure reads the CI gate-execution timing (its lead-time measure is Assessed — see the summary map — and reads the change-tracking system); QAS-08 reads analyzer/gate output; QAS-12 reads the safety-status observation command-gate test harness; QAS-13 reads the startup timeline event (ARC-015 gives it a stable event ID). Substituting a different instrument is a measurement-method change and requires a recorded rationale in the release evidence.
 2. **Percentiles, not means.** Every latency-class measure is stated as P95 plus max. Means are recorded for information only — the source spec's undefined "within 1 second" (SD-07) is precisely the failure mode this rule prevents.
 3. **Environment binding.** Every measurement records the hardware profile, OS build, and application version it ran on (the ARC-015 startup inventory makes this free). A number without its environment is not release evidence.
 
@@ -254,7 +254,7 @@ Summary map of scenarios to ISO/IEC 25010:2023 characteristics [25010]:
 | 04 | Reliability — recoverability | Assessed | §41/VOL13 |
 | 05 | Security — resistance (patch response) | Assessed | §54/VOL16 |
 | 06 | Security — accountability, authenticity | Automated | §28/VOL07 |
-| 07 | Maintainability — modifiability | Automated | §49–51/VOL17 |
+| 07 | Maintainability — modifiability | Automated (gate) / Assessed (lead time) | §49–51/VOL17 |
 | 08 | Maintainability — modularity, testability | Automated | §23/VOL06 |
 | 09 | Flexibility — installability | Assessed | §44/VOL15 |
 | 10 | Interaction capability — operability, user-error protection | Assessed | §36/VOL12 |
@@ -272,7 +272,7 @@ The safety row uses the characteristic newly added at the top level in the 2023 
 | Environment | Production station, reference hardware profile (A-VOL02-6), steady state |
 | Artifact | Inference pipeline: load → preprocess → inference → overlay |
 | Response | Verdict and overlay rendered; latency trace row persisted |
-| Response measure | P95 ≤ 1,000 ms and max ≤ 2,000 ms over the acceptance dataset (supersedes SD-07's undefined "1 second") |
+| Response measure | Live S2+ path: P95 ≤ 1,000 ms, P99 ≤ 1,500 ms, hard watchdog ceiling 3,000 ms; S1 batch (WL-BATCH) workload: P95 ≤ 2,000 ms. The §40/VOL13 latency budget is authoritative for these figures (supersedes SD-07's undefined "1 second") |
 
 ### QAS-02 Sustained board throughput (performance efficiency — capacity) — Automated
 
@@ -324,7 +324,7 @@ The safety row uses the characteristic newly added at the top level in the 2023 
 | Response | Operation permitted only with an authenticated session holding the required role; default-deny for unknown operations and page keys |
 | Response measure | 100 % of the privileged-operation inventory enforced at service layer; 0 default-allow arms. Current nonconformities: `RoleAuthorization.cs:41` (`_ => true`) and unguarded `ModelRegistryService.SetActiveModel` — corrective requirements are owned by §28/VOL07 |
 
-### QAS-07 Change lead time (maintainability — modifiability) — Automated
+### QAS-07 Change lead time (maintainability — modifiability) — Automated (gate time) / Assessed (lead time)
 
 | Field | Specification |
 |---|---|
@@ -332,7 +332,7 @@ The safety row uses the characteristic newly added at the top level in the 2023 
 | Environment | Normal development, full quality gate (`Scripts/run-quality-gates.ps1`) |
 | Artifact | Build/test/gate pipeline |
 | Response | Release-candidate package with all gates green |
-| Response measure | ≤ 5 working days P50, ≤ 10 working days P95; single gate execution ≤ 30 min on CI |
+| Response measure | Automated: single gate execution ≤ 30 min on CI. Assessed (source: change-tracking system): change lead time from approved-fix start-of-implementation to green release candidate ≤ 5 working days P50, ≤ 10 working days P95 |
 
 ### QAS-08 Code-limit conformance (maintainability — modularity, testability) — Automated
 
@@ -397,7 +397,7 @@ The safety row uses the characteristic newly added at the top level in the 2023 
 ### R: Quality-scenario requirements
 
 **[ARC-006]** (P2 | ALL | CI, Diagnostics)
-The release pipeline SHALL measure and record the response measures of every §10 scenario marked "Automated" for each release candidate.
+The release pipeline SHALL measure and record the response measures of every §10 scenario marked "Automated" whose stage precondition is met by the release candidate's target stage, for each release candidate.
 - Why: quality scenarios decay without per-release measurement; the repo already emits latency and navigation-performance JSON that no gate consumes (`Scripts/run-quality-gates.ps1` artifacts). Maps: 25010; SSDF-PW.8; Internal.
 - Verify: fitness function FF-ARC-QAS-01 (aggregates QAS measurements into one release report). Evidence: `TestResults/` QAS report per release. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
@@ -544,7 +544,7 @@ All dates verified in the research pack on 2026-07-15 unless marked otherwise. "
 | OS (primary) | Windows 11 IoT Enterprise LTSC 2024 | Extended support to **2034-10-10** | None until 2034 planning | [WIN-LC] |
 | OS (accepted) | Windows 11 Pro/Enterprise 24H2 or later | Modern lifecycle, per-build servicing | Verify build support at each install (ARC-013) | [WIN-LC] |
 | OS (prohibited) | Windows 10, all editions | EOL **2025-10-14** (consumer ESU to 2026-10-13) | No new deployments; existing must migrate (SD-09) | [WIN-LC] |
-| Runtime | .NET 10 LTS (10.0.x, SDK pinned via `global.json`) | EOL **2028-11-14** | Begin .NET 12 LTS migration ≥ 2028-05-14 | [NET-LC] |
+| Runtime | .NET 10 LTS (10.0.x, SDK pinned via `global.json`) | EOL **2028-11-14** | Begin .NET 12 LTS migration by 2028-05-18 (180 days before 2028-11-14) | [NET-LC] |
 | Runtime servicing | Self-contained publish carries its own runtime copy | Monthly Patch Tuesday releases | Rebuild + redeploy on security patches; self-contained apps do NOT auto-update | [NET-LC] |
 | Inference | ONNX Runtime **1.27.0** exact pin | **No vendor LTS exists** | Product-defined window: quarterly review; adopt security patch releases ≤ 30 days (D-03) | [ONNX-SEC] |
 | Database | Microsoft.Data.Sqlite 10.0.1 + SQLitePCLRaw.bundle_e_sqlite3 3.0.3 | Assumed to track the .NET 10 lifecycle (A-VOL02-1) | Review with the quarterly matrix review | [NET-LC], A-VOL02-1 |
@@ -554,11 +554,11 @@ All dates verified in the research pack on 2026-07-15 unless marked otherwise. "
 
 ### 11.5 End-of-life policy
 
-1. **180-day rule.** For every row of §11.4, a migration plan SHALL exist and be in execution no later than 6 months (180 days) before the component's end-of-support date (enforced by ARC-009).
+1. **180-day rule.** For every row of §11.4, a migration plan SHALL exist and be in execution no later than 180 days before the component's end-of-support date (enforced by ARC-009).
 2. **No EOL in production.** No production station runs the product on any component past its end-of-support date (enforced by ARC-008, P0). Customer refusal to upgrade an OS is handled as a §53/VOL17 risk-acceptance case owned by the customer, documented in writing, and excludes the station from Stage 2+ (network-connected) operation.
 3. **Product-defined windows.** Components without a vendor lifecycle (ONNX Runtime, SQLitePCLRaw bundle) get a product-defined window: exact pin + quarterly review + 30-day security-patch adoption (D-03). The quarterly review is the ARC-009 record.
 4. **Fleet visibility.** Per-station platform inventory is logged at startup (ARC-015) so Field Service can produce an EOL exposure report for the whole fleet on demand.
-5. **Known horizon events** as of 2026-07-15: .NET 8/9 wall 2026-11-10 (no repo exposure); CPython 3.11 training-env migration during 2027 (UNVERIFIED date); .NET 10 → .NET 12 LTS migration start ≥ 2028-05-14; Windows 11 IoT LTSC 2024 horizon 2034-10-10.
+5. **Known horizon events** as of 2026-07-15: .NET 8/9 wall 2026-11-10 (no repo exposure); CPython 3.11 training-env migration during 2027 (UNVERIFIED date); .NET 10 → .NET 12 LTS migration start ≥ 2028-05-18 (180 days before 2028-11-14); Windows 11 IoT LTSC 2024 horizon 2034-10-10.
 
 ### 11.6 Assumptions and open decisions (VOL02)
 
@@ -600,7 +600,7 @@ Adopting, replacing, or removing a runtime, GUI framework, database engine, infe
 **[ARC-011]** (P2 | S1–S4 | Inference, Diagnostics)
 Release evidence SHALL record an evaluation of the three D-01 worker-split triggers (T1 GPU EP adoption, T2 crash-prone native SDK, T3 HMI latency-budget breach) with a measured or observed result for each.
 - Why: D-01 defers process isolation behind explicit tripwires; unmeasured triggers rot the deferral into an unbounded in-process risk. Maps: Internal; 25010.
-- Verify: release-evidence template field populated from QAS-01 measurements and the crash-report log. Evidence: release evidence package. Owner: Software Architect. Auto: Partially automated.
+- Verify: release-evidence template field populated from the build's ONNX Runtime execution-provider configuration (T1), the crash-report log (T2), and QAS-01/§40 latency measurements (T3). Evidence: release evidence package. Owner: Software Architect. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
 
 **[ARC-012]** (P1 | ALL | Installer, Build)
@@ -616,9 +616,9 @@ The installer SHALL refuse installation when the target OS build or .NET runtime
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[ARC-014]** (P2 | ALL | CI, Build)
-CI restore SHALL run in locked mode (`RestoreLockedMode=true`) against the committed `packages.lock.json` files of every project.
-- Why: lock files exist (`Directory.Build.props:5`) but CI restore is not locked (`dotnet-ci.yml:25`), so silent dependency drift or substitution remains possible despite the pins. Maps: CWE-494; SSDF-PW.4; SLSA.
-- Verify: fitness function FF-ARC-LOCK-01 (workflow scan asserts the flag on every restore step). Evidence: CI configuration plus gate log. Owner: Software Lead. Auto: Fully automated.
+Dependency restore for every project's committed `packages.lock.json` SHALL run in locked mode (`RestoreLockedMode=true`) as required by the authoritative supply-chain restore-integrity rule in the SUP catalogue (§42/VOL15), which governs both CI and release restore and defines the failure behaviour on lock drift.
+- Why: lock files exist (`Directory.Build.props:5`) but restore is not locked today (`dotnet-ci.yml:25`); this entry is the D-07 technology-decision hook and defers to §42/VOL15 for the restore-integrity mechanism rather than maintaining a parallel specification. Maps: CWE-494; SSDF-PW.4; SLSA.
+- Verify: the locked-mode restore fitness function owned by §42/VOL15 covers this product's CI and release restore steps; no separate VOL02 gate. Evidence: CI configuration plus gate log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: On change.
 
 **[ARC-015]** (P3 | ALL | Diagnostics, Logging)

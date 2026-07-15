@@ -133,6 +133,7 @@ Fault injection uses **named mechanisms**, not ad-hoc hacks. Table 39-4 is the b
 | GPU failure | inference-worker double returning EP initialization failure (applicable once the D-01 worker split occurs) | Contract (S2+) |
 | DB failure | read-only DB file; corrupted-page fixture failing `PRAGMA integrity_check`; locked-DB concurrent writer | Recovery |
 | Permission failure | ACL-denied directory as storage root; `UnauthorizedAccessException`-throwing seam | Recovery |
+| Safety-status channel loss | `SimulatedPlcSafetyController` double returning Unreachable/Faulted/stale status; e-stop-monitor stub timing out | Recovery/safety |
 
 ### 39.6 CI tiers and required checks
 
@@ -152,9 +153,9 @@ flowchart LR
 | Tier | Composition (by Tier trait) | Budget | Blocking effect |
 |---|---|---|---|
 | Per-PR | Unit, Component, Contract, Security (matrix + tamper), hygiene/format/analyzer gates | ≤15 min | Required status check (TST-057) |
-| Nightly | full suite + Integration, UI, API, Fuzz (1 CPU-h/target), Property, Perf, Recovery, migration fwd/rollback | ≤8 h | Red blocks the next release train |
-| Weekly | Soak ladder, full Stryker run (Table 39-3), long fuzz (8 CPU-h/target), stress | ≤72 h | Red blocks the next release train |
-| Per-release | installer lifecycle, upgrade/rollback pair, backup/restore drill, model regression, `/stage1-gate` loop | per release | Release gate — no ship while red |
+| Nightly | full suite + Integration, UI, API, Fuzz (1 CPU-h/target), Property, Perf, Recovery, Migration (fwd/rollback) | ≤8 h | Red blocks the next release train |
+| Weekly | Soak ladder, full Stryker run (Table 39-3), long fuzz (8 CPU-h/target), Stress | ≤72 h | Red blocks the next release train |
+| Per-release | Installer lifecycle, upgrade/rollback pair, backup/restore drill, model regression (Golden), `/stage1-gate` loop | per release | Release gate — no ship while red |
 | Cadence | penetration test, dependency tabletop, IR exercise (TST-058/059/060) | calendar | Findings enter §54/§56 tracking |
 
 Evidence artifacts produced by the tiers keep the existing repo conventions: trx logs and `industrial_quality_gate_report.json` under `TestResults/`, coverage and Stryker reports as uploaded CI artifacts, fuzz and soak reports in their run folders, HIL/commissioning evidence in the readiness package. Artifact retention follows §38 (VOL13); release-gating artifacts are archived with the release per §43 (VOL15).
@@ -194,7 +195,7 @@ Every pull request that changes production code under `AOI_Monitor/Services`, `A
 - Exception: Allowed — approver: QA Lead (mechanical refactors covered by existing characterization tests). Review: Per release.
 
 **[TST-003]** (P2 | ALL | CI)
-Every automated test SHALL carry exactly one `[Trait("Tier", …)]` value from {Unit, Component, Contract, Integration, API, UI, Security, Fuzz, Property, Perf, Recovery, Soak, HIL} so that CI tiers filter deterministically.
+Every automated test SHALL carry exactly one `[Trait("Tier", …)]` value from {Unit, Component, Contract, Integration, API, UI, Security, Fuzz, Property, Perf, Recovery, Migration, Golden, Soak, Stress, Installer, HIL, Cadence} so that CI tiers filter deterministically.
 - Why: tiering (TST-056) is impossible without a machine-readable taxonomy; today's filters rely on class-name conventions (`run-quality-gates.ps1:141-169`). Maps: Internal.
 - Verify: fitness function FF-TST-04 (trait completeness scan over test assemblies). Evidence: CI gate log. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
@@ -242,7 +243,7 @@ Every inbound REST API endpoint introduced under §22 SHALL have endpoint tests 
 - Exception: Not allowed. Review: Per release.
 
 **[TST-011]** (P2 | ALL | Domain, CI)
-Every public service API SHALL have negative tests asserting that invalid, boundary, and out-of-range inputs are rejected with a typed error or documented refusal result rather than accepted or silently coerced.
+Every public service API introduced or changed in a pull request SHALL have negative tests asserting that invalid, boundary, and out-of-range inputs are rejected with a typed error or documented refusal result rather than accepted or silently coerced.
 - Why: silent-fallback readers already mask corruption in the data layer (`ParseDateTime` → `MinValue`); negative tests are the countermeasure to that class. Maps: ASVS-V2; CWE-20.
 - Verify: review checklist item + FF-TST-03 assertion-quality gate sampling. Evidence: PR review record. Owner: QA Lead. Auto: Partially automated.
 - Exception: Allowed — approver: QA Lead. Review: Annual.
@@ -324,8 +325,8 @@ Tamper-rejection tests SHALL verify that modification of any signed or integrity
 - Exception: Not allowed. Review: Per release.
 
 **[TST-024]** (P2 | ALL | CI)
-Every remediation of a nonconformity recorded in the §6 register (VOL01) SHALL ship with a regression test pinning the corrected behavior in the same pull request.
-- Why: the known-gap list (default-allow page gate, unsigned plugin loading, hash never re-verified, bypassable acceptance gate, safety-bypass default) is only permanently fixed if each fix is pinned. Maps: SSDF-RV.3; Internal.
+Every §6-register (VOL01) nonconformity closure SHALL link its remediation pull request to the pinning regression test required by TST-053, recorded in the register entry.
+- Why: the known-gap list (default-allow page gate, unsigned plugin loading, hash never re-verified, bypassable acceptance gate, safety-bypass default) is only permanently closed if each remediation links to its TST-053 regression test in the register. Maps: SSDF-RV.3; Internal.
 - Verify: PR review checklist item; §6 register links each closed item to its test. Evidence: register entry + trx artifact. Owner: QA Lead. Auto: Manual review.
 - Exception: Not allowed. Review: Per release.
 
@@ -420,7 +421,7 @@ The robot cycle FSM SHALL have transition-matrix tests covering every state × c
 **[TST-039]** (P0 | S3–S4 | SafetyStatus)
 A test SHALL verify that loss of the safety-status observation channel (PLC or e-stop monitor unreachable, faulted, or stale) causes the application to refuse all motion commands and enter the §34 fail-safe behavior.
 - Why: D-18 makes the application an observer of safety status; the one obligation an observer has is to fail safe when it goes blind — this is the test that proves it. Maps: 13849-1; 60204-1; Internal.
-- Verify: named tests in `RobotCycleTransitionMatrixTests` using the disconnect/fault injection rows of Table 39-4. Evidence: trx artifact. Owner: Controls & Safety Engineer. Auto: Fully automated.
+- Verify: named tests in `RobotCycleTransitionMatrixTests` using the safety-status-channel-loss row of Table 39-4. Evidence: trx artifact. Owner: Controls & Safety Engineer. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[TST-040]** (P0 | ALL | RobotAdapter, SafetyStatus)
@@ -521,8 +522,8 @@ A test observed to fail intermittently SHALL be quarantined in a tracked repo li
 
 **[TST-055]** (P0 | ALL | Training, CI)
 Customer production images SHALL NOT be stored in the repository, CI artifacts, or checked-in test corpora; automated-test imagery is limited to synthetic or licensed corpora, and customer data is used only in the segregated evaluation environment per §31 (VOL09) and §46 (VOL16).
-- Why: customer imagery is customer intellectual property (PIPA/GDPR exposure when boards carry identifying context); `check-repo-hygiene.ps1` already bans customer datasets and the CI already generates synthetic PNGs — this binds the boundary permanently. Maps: PIPA; GDPR; SSDF-PS.1.
-- Verify: fitness function FF-TST-09 (extends `Scripts/check-repo-hygiene.ps1` forbidden-pattern scan to CI artifact uploads). Evidence: hygiene gate log. Owner: Data Protection Officer (advisory) with QA Lead executing. Auto: Fully automated.
+- Why: customer imagery is customer intellectual property (PIPA/GDPR exposure when boards carry identifying context); `check-repo-hygiene.ps1` already bans customer datasets and the CI already generates synthetic PNGs — this binds the boundary permanently; the Data Protection Officer advises on customer-IP scope. Maps: PIPA; GDPR; SSDF-PS.1.
+- Verify: fitness function FF-TST-09 (extends `Scripts/check-repo-hygiene.ps1` forbidden-pattern scan to CI artifact uploads). Evidence: hygiene gate log. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
 **[TST-056]** (P1 | ALL | CI)

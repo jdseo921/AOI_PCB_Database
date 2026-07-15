@@ -4,7 +4,7 @@ Scope: this volume governs everything between "the code is correct" and "a custo
 
 Supersedes/Related existing docs: §43–§44 are the normative layer above `Docs/Deployment_Package_Guide.md` and `Docs/Installation_Guide.md` (those remain as operator instructions; where they conflict with this volume, this volume prevails — both still name Windows 10, see DEP-002). `Docs/Branch_Protection_and_Quality_Gates.md` and `Docs/Developer_CI.md` remain as CI operating instructions; branch-protection *governance* is owned by the CHG catalogue (§48–53/VOL17), while this volume owns the pipeline's supply-chain hardening. `Docs/ONNX_Model_Training.md` remains the training-environment how-to; its dependency handling is bound by SUP-005/SUP-006.
 
-Requirement IDs owned by this volume: **SUP-001..045, BLD-001..025, RELS-001..025, DEP-001..022, OPS-001..022** (139 records). Assumptions: **A-VOL15-1..5**. Open decisions: **OD-VOL15-1..3** (§45.6; merged into §6/VOL01).
+Requirement IDs owned by this volume: **SUP-001..045, BLD-001..025, RELS-001..025, DEP-001..025, OPS-001..022** (142 records). Assumptions: **A-VOL15-1..5**. Open decisions: **OD-VOL15-1..6** (§45.6; merged into §6/VOL01).
 
 ---
 
@@ -26,7 +26,7 @@ Table 42-1 — Supply-chain inventory classes
 | 4 | CI actions | `actions/checkout@v4`, `actions/setup-dotnet@v4`, `actions/upload-artifact@v4` — tag-pinned, not SHA-pinned |
 | 5 | CI build machines | GitHub-hosted `windows-latest` runners (image version currently unrecorded) |
 | 6 | Installer tools | WiX toolset (to be adopted per D-08); `signtool` (to be adopted per D-12) |
-| 7 | Signing tools + certificates | none yet — OV certificate + HSM token pending (OD-03, D-12) |
+| 7 | Signing tools + certificates | none yet — OV certificate + HSM token pending (OD-VOL15-5, D-12) |
 | 8 | Native DLLs | `e_sqlite3` (via SQLitePCLRaw), `onnxruntime.dll` (via the NuGet package) |
 | 9 | DB engine | SQLite (embedded via #8; D-04) |
 | 10 | Image codecs / PDF / compression | WPF/WIC in-box codecs, in-house `PdfExportService` (no third-party PDF lib), `System.IO.Compression` |
@@ -34,11 +34,11 @@ Table 42-1 — Supply-chain inventory classes
 | 12 | Robot SDKs / PLC libraries | none yet (Stage 3) |
 | 13 | OPC UA stacks | none yet (Stage 4); UA-.NETStandard (MIT-licensed since Dec 2025) is the assessed candidate [OPCUA-P2] |
 | 14 | Python interpreter + wheels (training env) | Python 3.11 + anomalib toolchain via uv (`Scripts/ml`, `Docs/ONNX_Model_Training.md`) |
-| 15 | CUDA / cuDNN / GPU drivers | not adopted (CPU EP baseline, D-01; adoption tracked as OD-02) |
+| 15 | CUDA / cuDNN / GPU drivers | not adopted (CPU EP baseline, D-01; adoption tracked as OD-VOL15-4) |
 | 16 | Model runtimes | ONNX Runtime 1.27.0 — no vendor LTS exists; the product defines its own support window (D-03) |
 | 17 | AI models incl. base/pretrained lineage | anomalib pretrained backbones consumed in training; shipped artifact = single-file ONNX + signed manifest (D-03) |
 | 18 | Device firmware (cameras, lighting, robot, safety PLC) | Stage 2+; tracked per station in the fleet inventory (OPS-009) |
-| 19 | License/keys material | signing keys (D-12), license-file signing keys (OD-04) — custody per the CRY catalogue (§30/VOL08) |
+| 19 | License/keys material | signing keys (D-12), license-file signing keys (OD-VOL15-6) — custody per the CRY catalogue (§30/VOL08) |
 
 ### 42.2 Threat model TM-42-A — build and release environment (STRIDE-lite)
 
@@ -70,12 +70,12 @@ Table 42-1 — Supply-chain inventory classes
 
 ### 42.4 Threat model TM-42-C — licensing (STRIDE-lite)
 
-Licensing requirements themselves are owned by the LIC catalogue (§55/VOL16) and the mechanism decision by OD-04 (per-station, offline-verifiable license file). This threat model binds that design.
+Licensing requirements themselves are owned by the LIC catalogue (§55/VOL16) and the mechanism decision by OD-VOL15-6 (per-station, offline-verifiable license file). This threat model binds that design.
 
 | STRIDE | Scenario | Treatment |
 |---|---|---|
 | Spoofing | Forged license file enables unpaid features/stations | signed license files, offline signature verification (LIC catalogue, §55/VOL16) |
-| Tampering | License state file edited on disk | signature + ACLs (DEP-017 class of protections) |
+| Tampering | License state file edited on disk | signature (per the license mechanism, OD-VOL15-6) + ACLs (DEP-017) |
 | Tampering | Clock rollback extends a time-limited license | UTC + monotonic anchoring, last-seen-time persistence (D-16; DEP-021) |
 | Repudiation | License moved between stations without trace | station-identity binding recorded in fleet inventory (OPS-009) |
 | DoS | License-check failure halts a running production line | enforcement degrades only at the next Idle state, never mid-inspection (LIC catalogue, §55/VOL16) |
@@ -208,8 +208,8 @@ New open-source dependencies SHOULD have an OpenSSF Scorecard score of at least 
 - Exception: Allowed — approver: Security Lead. Review: Annual.
 
 **[SUP-016]** (P1 | ALL | Build, Training)
-Every dependency license SHALL be on the recorded license allowlist (MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, MS-PL, ISC) or approved through External Legal Counsel review before it ships in a release.
-- Why: copyleft or unknown licenses in a proprietary industrial product create distribution-blocking legal exposure discovered cheapest at intake; full obligations live in the LIC catalogue (§55/VOL16). Maps: SBOM-MIN; Internal.
+Every dependency license SHALL be on the approved license allowlist defined by the LIC catalogue (§55/VOL16), or approved through External Legal Counsel review, before it ships in a release.
+- Why: copyleft or unknown licenses in a proprietary industrial product create distribution-blocking legal exposure discovered cheapest at intake; the single authoritative allowlist and its CI gate live in the LIC catalogue (§55/VOL16), so this record binds intake to that one list rather than re-enumerating it (which would drift and contradict the gate). Maps: SBOM-MIN; Internal.
 - Verify: license field required in the intake template; SBOM license audit at release (FF-SUP-05). Evidence: intake record + SBOM. Owner: Release Manager. Auto: Partially automated.
 - Exception: Allowed — approver: External Legal Counsel. Review: Per release.
 
@@ -445,7 +445,7 @@ Each release build SHALL begin from a fresh clone at the release tag with no bui
 **[BLD-004]** (P1 | ALL | Build)
 Every release SHALL be versioned per SemVer 2.0.0 with the git commit SHA embedded in `AssemblyInformationalVersion` and surfaced in the HMI About panel and the startup log line.
 - Why: field triage dies without an exact source pin — "version 1.2" is not a commit; the SHA closes the loop between a station's report and the repository. Maps: SSDF-PS.3; SLSA; Internal.
-- Verify: fitness function FF-BLD-02 (publish output inspected for informational version pattern `X.Y.Z+g<sha>`); UiTests assert About-panel display. Evidence: CI gate log + test run. Owner: Software Lead. Auto: Fully automated.
+- Verify: fitness function FF-BLD-02 (publish output inspected for informational version pattern `X.Y.Z+g<sha>`); UiTests assert About-panel display; a startup-log assertion confirms the informational version line is emitted at boot. Evidence: CI gate log + test run. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
 **[BLD-005]** (P2 | ALL | CI)
@@ -505,9 +505,9 @@ The package-validation gate (`Scripts/publish.ps1 -ValidationOnly`, gate PKG-001
 - Exception: Not allowed. Review: Annual.
 
 **[BLD-014]** (P2 | ALL | Installer)
-Install, upgrade-in-place, repair, and uninstall SHALL each be executed on a clean reference OS image for every release, with per-scenario results recorded.
-- Why: MSI servicing bugs (component-rule violations, orphaned files, broken upgrades) surface only in these four paths and brick field updates when missed. Maps: Internal; MS-SDL.
-- Verify: install-test checklist (§57/VOL18 template) executed on the reference image. Evidence: install test record in release evidence. Owner: QA Lead. Auto: Partially automated.
+The installer-lifecycle results required by the testing strategy (the TST catalogue, §39/VOL14) SHALL be captured in the per-release evidence package with per-scenario pass/fail recorded.
+- Why: the four installer-lifecycle scenarios (install, upgrade-in-place, repair, uninstall) are defined and executed under the testing strategy (§39/VOL14); this record's distinct duty is to land their results in the per-release evidence package so the release gate (RELS-007) and customer audits can rely on them without re-specifying the scenarios. Maps: Internal; MS-SDL.
+- Verify: the installer-lifecycle results are present in the release evidence package with per-scenario pass/fail, cross-checked at release review. Evidence: install test record in release evidence. Owner: QA Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Release Manager. Review: Per release.
 
 **[BLD-015]** (P2 | ALL | Build, Installer)
@@ -727,9 +727,9 @@ The field-update mechanism SHALL deliver updates only as the signed WiX MSI and 
 - Exception: Not allowed. Review: Annual.
 
 **[RELS-022]** (P2 | ALL | Update, CI)
-The unsigned self-contained single-file build produced by `build-windows-app.yml` SHALL NOT function as an update or release channel and is retained only as a labeled non-release test build.
-- Why: that workflow publishes an unsigned exe on every push to `main`, outside the gate (its lines 3–5); if a station or customer ever treated it as an update it would bypass signing, the manifest, anti-rollback, and every §42.5 check. Maps: CWE-494; SSDF-PS.2; Internal.
-- Verify: station-side verification (RELS-011) rejects the unsigned single-file output, and the workflow artifact name carries the test-build marker (BLD-017). Evidence: verification test + workflow file. Owner: Software Lead. Auto: Partially automated.
+The unsigned self-contained single-file build produced by `build-windows-app.yml` SHALL carry a `test-build` artifact-name marker that distinguishes it from signed release artifacts.
+- Why: an unmarked test artifact is indistinguishable from a signed release artifact and can slip into a customer channel; the marker is what makes the delivery ban (BLD-017) and the station-side rejection of unsigned output (RELS-011) enforceable by name. Maps: CWE-494; SSDF-PS.2; Internal.
+- Verify: workflow lint confirms the publish job's uploaded artifact name carries the `test-build` marker. Evidence: CI gate log + workflow file. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[RELS-023]** (P3 | ALL | Update, Diagnostics)
@@ -770,8 +770,8 @@ Egress is denied by default and opened only to the customer-approved MES/OPC UA 
 ### R: Supported platform and baseline
 
 **[DEP-001]** (P1 | ALL | Installer, Config)
-New AOI stations SHALL run Windows 11 IoT Enterprise LTSC 2024 as the baseline edition, with Windows 11 Pro 24H2+ or a non-IoT Windows 11 LTSC 2024 edition accepted only under a recorded end-of-support-date plan and Windows 10 prohibited for new deployments.
-- Why: Windows 10 support ended 2025-10-14, and only the IoT Enterprise LTSC 2024 edition carries a ten-year lifecycle to 2034-10-10 (the non-IoT LTSC ends 2029-10-09), matching an industrial asset's service life (D-02). Maps: WIN-LC; 62443-3-3 SR 7.6; CWE-1104.
+New AOI stations SHALL run Windows 11 IoT Enterprise LTSC 2024 as the baseline edition.
+- Why: only the IoT Enterprise LTSC 2024 edition carries a ten-year lifecycle to 2034-10-10 (the non-IoT LTSC ends 2029-10-09), matching an industrial asset's service life (D-02); accepted-alternative editions are governed by DEP-023 and the Windows 10 prohibition by DEP-024. Maps: WIN-LC; 62443-3-3 SR 7.6; CWE-1104.
 - Verify: OS edition and build captured in the station provisioning record and the fleet inventory (OPS-009). Evidence: provisioning record. Owner: IT Admin (customer). Auto: Manual review.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
@@ -846,9 +846,9 @@ Secure Boot SHALL be enabled in station firmware.
 - Exception: Allowed — approver: Security Lead. Review: Annual.
 
 **[DEP-013]** (P2 | ALL | Config, ImageStore)
-Volumes holding the customer image, the SQLite database, models, and recipes SHALL be encrypted with BitLocker, with recovery keys held under a documented escrow procedure.
-- Why: an inspection station accumulates confidential customer product images and tuned recipes, BitLocker protects them against drive theft or RMA-return disclosure, and key escrow prevents encryption from becoming a self-inflicted data loss (dotnet-windows research §12). Maps: CWE-311; 62443-4-2 CR 4.1; CSF2.
-- Verify: encryption-status audit of the data volumes with the escrow procedure recorded. Evidence: BitLocker status + escrow record. Owner: IT Admin (customer). Auto: Partially automated.
+Volumes holding the customer image, the SQLite database, models, and recipes SHALL be encrypted with BitLocker.
+- Why: an inspection station accumulates confidential customer product images and tuned recipes, and BitLocker protects them against drive theft or RMA-return disclosure (dotnet-windows research §12); the recovery-key escrow that keeps this encryption survivable is DEP-025. Maps: CWE-311; 62443-4-2 CR 4.1; CSF2.
+- Verify: encryption-status audit confirms the data volumes are BitLocker-encrypted. Evidence: BitLocker status report. Owner: IT Admin (customer). Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: Annual.
 
 **[DEP-014]** (P3 | ALL | Config, IAM)
@@ -872,9 +872,9 @@ The directories holding models, recipes, and trust stores SHALL be writable only
 - Exception: Not allowed. Review: Annual.
 
 **[DEP-017]** (P2 | ALL | Config, Licensing)
-Configuration files, secret stores, and the license-state file SHALL be admin-writable only and free of plaintext secrets, with secrets protected via Windows DPAPI (D-10) and the license state signature-protected.
-- Why: world-writable config and plaintext registry or file secrets let any local process tamper with trust decisions and read credentials, and DPAPI plus ACLs plus license-state signing (TM-42-C) close the local-tamper path. Maps: CWE-732; CWE-312; 62443-4-2 CR 4.1; Internal.
-- Verify: ACL and content audit of the config, secret, and license directories, plus a grep for plaintext secret patterns in config. Evidence: config audit report. Owner: Security Lead. Auto: Partially automated.
+Configuration files, secret stores, and the license-state file SHALL be writable only by Administrators and the product's privileged maintenance identity, never by the interactive operator account.
+- Why: a user-writable config, secret store, or license-state file lets any local process tamper with trust decisions and read credentials, so admin-only ACLs close the local-tamper path; plaintext-secret protection via Windows DPAPI (D-10) is owned by the CRY catalogue (§30/VOL08) and license-state signature protection by the licensing mechanism (TM-42-C, OD-VOL15-6). Maps: CWE-732; CWE-312; 62443-4-2 CR 4.1; Internal.
+- Verify: ACL audit of the config, secret-store, and license-state directories confirms write access is limited to Administrators and the maintenance identity. Evidence: config ACL audit report. Owner: Security Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Annual.
 
 **[DEP-018]** (P2 | ALL | Audit, Logging)
@@ -896,8 +896,8 @@ Crash dumps SHALL be written only to an Administrators-only directory, never to 
 - Exception: Not allowed. Review: Annual.
 
 **[DEP-021]** (P2 | ALL | Config, Diagnostics)
-The station SHALL synchronize its clock via `w32tm` against a customer-approved time source and monitor synchronization health, with UTC persisted and monotonic clocks used for durations (D-16).
-- Why: audit ordering, license time-limits, certificate and timestamp validation, and anti-rollback all depend on trustworthy time, so an unmonitored clock drift or rollback undermines TM-42-C license enforcement and signature validity. Maps: 62443-3-3 SR 2.11; CWE-367; Internal.
+The station SHALL synchronize its clock via `w32tm` against a customer-approved time source and raise a monitored alarm when synchronization is lost or measured drift exceeds the configured threshold (D-16).
+- Why: audit ordering, license time-limits, certificate and timestamp validation, and anti-rollback all depend on trustworthy time, so an unmonitored clock drift or rollback undermines TM-42-C license enforcement and signature validity; UTC persistence and monotonic-clock use for durations (D-16) are owned by the data-architecture and logging sections (§21/VOL05, §38/VOL13). Maps: 62443-3-3 SR 2.11; CWE-367; Internal.
 - Verify: time-sync configuration and health check in the fleet inventory; the drift alarm is tested. Evidence: time-sync monitoring record. Owner: IT Admin (customer). Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: Annual.
 
@@ -905,6 +905,24 @@ The station SHALL synchronize its clock via `w32tm` against a customer-approved 
 Removable-media use on production stations SHALL be governed by a documented USB policy that disables autorun and treats update media as untrusted until it passes the RELS-011 verification.
 - Why: USB is the delivery channel for air-gapped updates and therefore the prime vector for the fake-vendor-update attack (TM-42-B), and an unmanaged USB policy lets arbitrary media execute or substitute a bundle before verification. Maps: 62443-3-3 SR 3.2; CWE-494; 800-82.
 - Verify: USB/removable-media policy applied and audited on the reference station, with autorun disabled. Evidence: media-policy audit. Owner: IT Admin (customer). Auto: Partially automated.
+- Exception: Allowed — approver: Security Lead. Review: Annual.
+
+**[DEP-023]** (P2 | ALL | Installer, Config)
+Windows 11 Pro 24H2+ or a non-IoT Windows 11 LTSC 2024 edition MAY be deployed in place of the DEP-001 baseline only under a recorded end-of-support-date plan.
+- Why: these editions carry shorter lifecycles than IoT Enterprise LTSC 2024 (the non-IoT LTSC ends 2029-10-09 and Pro follows the 24H2 servicing cadence), so their use is acceptable only when the shorter support horizon is planned for explicitly (D-02). Maps: WIN-LC; CWE-1104; Internal.
+- Verify: the provisioning record for any non-baseline edition carries the recorded end-of-support-date plan, and the fleet inventory (OPS-009) flags non-baseline editions. Evidence: provisioning record. Owner: IT Admin (customer). Auto: Partially automated.
+- Exception: Allowed — approver: Software Architect. Review: On change.
+
+**[DEP-024]** (P1 | ALL | Installer, Config)
+New AOI-station deployments SHALL NOT use any Windows 10 edition.
+- Why: Windows 10 reached end of support on 2025-10-14 and receives no security updates, so a new deployment onto it accumulates unpatchable CVEs across a multi-year industrial service life (D-02, SD-09). Maps: WIN-LC; CWE-1104; 62443-3-3 SR 7.6.
+- Verify: the station provisioning record's OS-edition field is asserted not to be a Windows 10 build, and the fleet inventory (OPS-009) flags any Windows 10 station. Evidence: provisioning record + fleet inventory. Owner: IT Admin (customer). Auto: Partially automated.
+- Exception: Not allowed. Review: On change.
+
+**[DEP-025]** (P2 | ALL | Config, ImageStore)
+BitLocker recovery keys for the encrypted data volumes (DEP-013) SHALL be held under a documented escrow procedure that permits authorized key recovery.
+- Why: encryption without recoverable keys turns a TPM reset or a forgotten passphrase into permanent loss of months of tuned recipes and traceability records, so escrow is what makes DEP-013 encryption survivable and is the precondition the OPS-014 restore drill validates. Maps: CWE-311; CSF2; Internal.
+- Verify: escrow procedure recorded and a key-recovery drill executed against a test volume. Evidence: escrow record + key-recovery drill record. Owner: IT Admin (customer). Auto: Manual review.
 - Exception: Allowed — approver: Security Lead. Review: Annual.
 
 ---
@@ -1029,7 +1047,7 @@ Each site SHALL take scheduled backups of the database, recipes, configuration, 
 
 **[OPS-014]** (P1 | ALL | Persistence)
 Backup restorability SHALL be verified by an actual restore drill at least quarterly at each site.
-- Why: an untested backup is an assumption rather than a recovery capability, and restore drills are the only proof the backups (OPS-013) are usable and the encrypted-DB key escrow (DEP-013) works. Maps: CSF2; 62443-3-3 SR 7.4; CWE-1188.
+- Why: an untested backup is an assumption rather than a recovery capability, and restore drills are the only proof the backups (OPS-013) are usable and the encrypted-DB key escrow (DEP-025) works. Maps: CSF2; 62443-3-3 SR 7.4; CWE-1188.
 - Verify: quarterly restore-drill record showing a successful restore to a test target. Evidence: restore-drill record. Owner: Field Service. Auto: Manual review.
 - Exception: Not allowed. Review: Quarterly.
 
@@ -1102,6 +1120,9 @@ These entries are declared here and merged into the global specification-defects
 - **OD-VOL15-1** — Offline revocation distribution mechanism: how a revoked signing certificate or a revoked release (RELS-020) reaches air-gapped stations that cannot query an online CRL/OCSP responder (candidate: a signed revocation list carried in each update bundle and in a standalone revocation bundle). Owner: Security Lead. Target: before the first commercial release.
 - **OD-VOL15-2** — Anti-rollback floor governance for a solo/small team: who authors the security floor per release (RELS-014) and how the safe-recovery override's two-person expectation is satisfied under the §7 self-review-plus-cooling-period compensating control. Owner: Security Lead. Target: before the first field update.
 - **OD-VOL15-3** — Fleet telemetry, dashboard transport, and remote-support tooling selection: which concrete transport and remote-support product (OPS-002, OPS-010, OPS-019) satisfy the per-session, MFA, logged, no-permanent-tunnel constraints for connected sites, pending customer contracts and Korea-first data-residency terms. Owner: Product Owner. Target: before the first Stage-4 connected deployment.
+- **OD-VOL15-4** — GPU/CUDA execution-provider adoption criteria: whether and when the ONNX Runtime CUDA (or other GPU) execution provider is adopted over the CPU-EP baseline (D-01), the CUDA/cuDNN/driver versions that would then enter the supply-chain inventory (Table 42-1 class 15), and the isolated-inference-worker split D-01 mandates on adoption. Owner: ML Lead. Target: before any GPU-accelerated station ships.
+- **OD-VOL15-5** — OV signing-certificate and HSM/hardware-token procurement: which commercial CA issues the product's OV code-signing certificate and which HSM or hardware token holds the private key under CA/B Forum hardware-custody rules (D-12), given that Azure Trusted Signing public trust is not available to Korean organizations. Owner: Security Lead. Target: before the first signed release.
+- **OD-VOL15-6** — Per-station offline-verifiable license-file mechanism: the concrete file format, signing scheme, and station-binding for the offline license file whose threat model is TM-42-C (§42.4) and whose requirements are owned by the LIC catalogue (§55/VOL16), including the license-state signature protection referenced by DEP-017. Owner: Product Owner. Target: before the first licensed commercial deployment.
 
-<!-- END VOL15 — SUP-001..045, BLD-001..025, RELS-001..025, DEP-001..022, OPS-001..022 = 139 records; §42–§45 complete; A-VOL15-1..5; OD-VOL15-1..3. -->
+<!-- END VOL15 — SUP-001..045, BLD-001..025, RELS-001..025, DEP-001..025, OPS-001..022 = 142 records; §42–§45 complete; A-VOL15-1..5; OD-VOL15-1..6. -->
 

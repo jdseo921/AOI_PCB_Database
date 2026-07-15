@@ -27,7 +27,7 @@ Every artifact class the product persists is classified below. The classes bind 
 | 8 | Production results (verdicts, metrics, rates) | `InspectionResults`, acceptance/validation tables | Confidential |
 | 9 | Operator performance statistics (if ever built) | not implemented | Personal data + regulatory tripwire |
 
-Notes on the table. Row 3: a serial or barcode alone is not personal information under PIPA Art. 2(1), but it is contractual traceability evidence and stays Confidential. Row 6: `SupportBundleService` already excludes raw customer images and the image vault and records the exclusion in its manifest (`AOI_Monitor/Services/SupportBundleService.cs:324-331`) — PRI-024 freezes that behavior. Row 7: model weights, tolerance maps (`tolerance_map.png`), and learned references (`learned_reference.png`) can memorize and partially reconstruct board appearance; they are treated exactly like the images they were trained on. Row 9 is deliberately listed although unimplemented: operator-performance analytics would trigger PIPA Art. 37-2 (automated decisions), GDPR Art. 35 (DPIA for systematic employee monitoring), and — if used for employment decisions — EU AI Act Annex III point 4 high-risk classification (application date governed by the Digital Omnibus amendment, expected 2027-12-02 — UNVERIFIED pending OJ publication) [AIA]. PRI-025 fences this.
+Notes on the table. Row 3: a serial or barcode alone is not personal information under PIPA Art. 2(1), but it is contractual traceability evidence and stays Confidential. Row 6: `SupportBundleService` already excludes raw customer images and the image vault and records the exclusion in its manifest (`AOI_Monitor/Services/SupportBundleService.cs:324-331`) — PRI-024 freezes that behavior. Row 7: model weights, tolerance maps (`tolerance_map.png`), and learned references (`learned_reference.png`) can memorize and partially reconstruct board appearance; they are treated exactly like the images they were trained on. Row 9 is deliberately listed although unimplemented: operator-performance analytics would trigger PIPA Art. 37-2 (automated decisions), GDPR Art. 35 (DPIA for systematic employee monitoring), and — if used for employment decisions — EU AI Act Annex III point 4 high-risk classification (application date governed by the Digital Omnibus amendment — UNVERIFIED pending OJ publication; see §55.7 and COM-014) [AIA]. PRI-025 fences this.
 
 ### 46.2 Handling rules and current-state honesty
 
@@ -80,7 +80,7 @@ The table is deliberately scoped to the seven LINDDUN categories with one domina
 **[PRI-001]** (P1 | ALL | Persistence, ImageStore, Config)
 Every persisted artifact type SHALL be assigned exactly one Table 46-1 data class in the machine-readable inventory `Docs/standard/data_classification.json` before the change introducing that artifact type merges.
 - Why: unclassified stores silently escape retention, export-audit, and encryption controls; the schema already grew to 60 tables plus a filesystem vault without any classification record. Maps: GDPR (Art 30); PIPA; CSF2 (ID.AM).
-- Verify: fitness function FF-PRI-01 (CI script compares SQLite table list and storage-root folders against the inventory file; unknown entries fail). Evidence: CI gate log. Owner: Software Architect. Auto: Fully automated.
+- Verify: fitness function FF-PRI-01 (CI script compares SQLite table and column schemas and storage-root folders against the inventory file; unknown tables, columns, or folders fail). Evidence: CI gate log. Owner: Software Architect. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[PRI-002]** (P2 | ALL | Domain, Export)
@@ -92,7 +92,7 @@ Customer-IP and personal data SHALL be processed only for the purposes enumerate
 **[PRI-003]** (P2 | ALL | Persistence, Logging)
 The application SHALL NOT collect personal data beyond user-account records, session and audit identity fields, and operator-entered review notes.
 - Why: data minimization; every additional personal field expands PIPA/GDPR exposure with no inspection value, and CRA Annex I 2(g) makes minimization a product property. Maps: GDPR (Art 5(1)(c)); PIPA; CRA.
-- Verify: FF-PRI-01 inventory diff flags any new personal-data field for review. Evidence: CI gate log + review record. Owner: Data Protection Officer (advisory). Auto: Partially automated.
+- Verify: FF-PRI-01 (extended to diff SQLite column schemas, not only table names, against the personal-data field inventory) flags any new personal-data column for review. Evidence: CI gate log + review record. Owner: Data Protection Officer (advisory). Auto: Partially automated.
 - Exception: Allowed — approver: Data Protection Officer (advisory). Review: On change.
 
 **[PRI-004]** (P1 | S2+ | Acquisition, CameraAdapter)
@@ -200,7 +200,7 @@ The product SHALL ship a records-of-processing (RoPA-style) document enumerating
 - Exception: Not allowed. Review: Per release.
 
 **[PRI-020]** (P2 | ALL | Diagnostics, Config)
-Any feature that transmits usage or telemetry data off the station SHALL pass a recorded privacy review before release and default to off, activating only on explicit customer opt-in or contract clause (D-09 baseline: no third-party telemetry).
+Any feature that transmits usage or telemetry data off the station SHALL default to off, activating only on explicit customer opt-in or a contract clause (D-09 baseline: no third-party telemetry).
 - Why: silent telemetry from a factory floor is both a PIPA violation waiting to happen and a trust-destroying discovery during customer network monitoring. Maps: GDPR (Art 25); PIPA; CRA (Annex I 2(g)); Internal (D-09).
 - Verify: privacy-review record attached to the feature PR; FF-PRI-03 network-endpoint inventory diff. Evidence: review record + CI gate log. Owner: Data Protection Officer (advisory). Auto: Partially automated.
 - Exception: Not allowed. Review: On change.
@@ -218,7 +218,7 @@ Backup retention SHALL be configured so that no backup copy of a deleted record 
 - Exception: Allowed — approver: Data Protection Officer (advisory). Review: Annual.
 
 **[PRI-023]** (P1 | ALL | Audit, Diagnostics)
-Upon a confirmed breach involving personal data, the incident process SHALL produce a notification decision within 24 hours of confirmation that applies the PIPA rule (report to PIPC/KISA and notify subjects within 72 hours when thresholds are met: ≥1,000 subjects, sensitive data, or hacking-caused) and the GDPR Art 33 rule (supervisory authority within 72 hours) using §54 timeline evidence.
+Upon a confirmed breach involving personal data, the incident process SHALL produce a notification decision within 24 hours of confirmation that applies the PIPA rule (report to PIPC/KISA within 72 hours and notify affected data subjects without undue delay when thresholds are met: ≥1,000 subjects, sensitive data, or hacking-caused) and the GDPR Art 33 rule (supervisory authority within 72 hours) using §54 timeline evidence.
 - Why: 72-hour clocks are unmeetable without a pre-built decision step; the vendor/customer controller-processor split (OD-VOL16-1) determines who files, and that must be decided per contract before the first incident. Maps: PIPA; GDPR (Arts 33/34); CRA (Art 14 alignment).
 - Verify: annual incident tabletop exercise executing the breach-notification template (§57/VOL18). Evidence: tabletop record. Owner: Security Lead. Auto: Manual review.
 - Exception: Not allowed. Review: Annual.
@@ -372,8 +372,8 @@ Before 2026-09-11, the incident process SHALL be exercised end-to-end against th
 - Exception: Allowed — approver: Product Owner. Review: Annual.
 
 **[IR-013]** (P1 | ALL | All)
-Upon a personal-data breach meeting PIPA thresholds (≥1,000 affected subjects, sensitive information, or hacking-caused), the responsible party under the support contract SHALL report to PIPC/KISA and notify affected data subjects within 72 hours.
-- Why: PIPA's 72-hour clock and the ~Aug 2026 penalty escalation (administrative surcharge up to 3% of total revenue; a rise toward 10% for aggravated large-scale cases is UNVERIFIED — confirm with External Legal Counsel) make missed notification an existential business risk; the vendor/customer filing split is OD-VOL16-1. Maps: PIPA; GDPR (alignment).
+For a personal-data breach, the party designated in the support contract (OD-VOL16-1) SHALL execute the PIPA and GDPR breach-notification obligations defined in PRI-023.
+- Why: the PIPA and GDPR breach clocks in PRI-023 are unmeetable unless one named party is contractually accountable for filing; the vendor/customer split is OD-VOL16-1, and an unassigned duty means neither party files under a 72-hour clock. Maps: PIPA; GDPR (alignment).
 - Verify: breach-notification template (§57/VOL18) exercised in the annual tabletop (PRI-023). Evidence: tabletop record. Owner: Security Lead. Auto: Manual review.
 - Exception: Not allowed. Review: Annual.
 
@@ -530,6 +530,18 @@ Per D-18, the application only observes safety status; these standards bind the 
 
 The AI Act row is the only "aligned" verdict in the matrix, and it is narrow: alignment means the minimal-risk classification rationale is documented and both tripwires (ML in the safety chain; operator-performance scoring for employment decisions) are fenced by D-18 and PRI-025 — it is not a conformity claim, and it is re-checked against the final Omnibus OJ text (COM-008, COM-014).
 
+**§55.7a — PIPC Safety-Standards control map (Table 55-3).** COM-010 requires each control of the PIPC Safety-Standards Notification to map to its implementing requirement category with a status; FF-COM-01 parses the rows below.
+
+| PIPC Safety-Standards control | Implementing requirement category | Stages | Status |
+|---|---|---|---|
+| Unique per-user identifiers | IAM (per-user local accounts, D-11) | ALL | gap |
+| Least privilege / access control | IAM (RBAC default-deny at service boundary; default-allow page gate to be inverted) | ALL | gap |
+| One-way password hashing | IAM (PBKDF2-600k SHA-256, D-11) | ALL | aligned |
+| Access-log retention ≥ 1 year | Audit / Persistence (§38/VOL13; retention config PRI-006) | ALL | gap |
+| Encryption in transit and at rest | REST/MES + ImageStore (TLS 1.2+ PRI-015; BitLocker PRI-016) | ALL | gap |
+| Malware protection | Installer / host hardening (§44/VOL15) | ALL | assessment-needed |
+| Physical safeguards | Installer / site controls (IT Admin customer) | ALL | assessment-needed |
+
 ### 55.8 Vision interfaces and platform lifecycles
 
 | Standard/policy | Class | Stages | Owner | Status | Where |
@@ -660,7 +672,7 @@ An annual compliance self-audit SHOULD re-verify every matrix row's status again
 - Verify: dated gap report on file. Evidence: gap report. Owner: Product Owner. Auto: Manual review.
 - Exception: Allowed — approver: Product Owner. Review: Annual.
 
-### 55.9 Licensing (LIC-001–LIC-008)
+### 55.9 Licensing (LIC-001–LIC-009)
 
 This subsection governs both directions of licensing: how the product enforces its own commercial license against customers, and how the product complies with the licenses of the third-party components it ships. No licensing subsystem exists in the codebase today (no licensing service under `AOI_Monitor/Services/`; ASSUMPTION A-VOL16-2) — these requirements are the design constitution for the subsystem the commercialization milestone (first release 1Q 2027 per `Docs/Roadmap_and_Stages.md`) must build.
 
@@ -687,9 +699,9 @@ License enforcement SHALL NOT interrupt an inspection cycle or lot in progress; 
 - Exception: Not allowed. Review: Per release.
 
 **[LIC-004]** (P2 | ALL | Licensing, Config)
-License validation SHALL operate fully offline with offline activation supported, and any network-based license check must be disclosed in product documentation, disabled by default, and logged as an audit event when enabled.
-- Why: hidden phone-home is both an air-gap violation (D-08 targets offline-capable deployment) and a trust breach discoverable by any customer network monitor; disclosure plus default-off makes the behavior contractual instead of covert. Maps: Internal (D-08); CRA (Annex I 2(g)).
-- Verify: FF-PRI-03 network-endpoint inventory (no undisclosed license endpoints) + offline-activation test on an air-gapped station image. Evidence: CI gate log + test record. Owner: Software Lead. Auto: Partially automated.
+License validation SHALL operate fully offline, supporting offline activation with no network call.
+- Why: offline operation preserves air-gap capability (D-08 targets offline-capable deployment); a license mechanism that requires a network call would strand air-gapped stations. Maps: Internal (D-08); CRA (Annex I 2(g)).
+- Verify: offline-activation test on an air-gapped station image confirming validation completes with no outbound network call. Evidence: test record. Owner: Software Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
 
 **[LIC-005]** (P2 | ALL | Build, Installer)
@@ -715,6 +727,12 @@ A documented transfer procedure SHALL rebind a license to a replacement machine 
 - Why: stations fail and get replaced mid-production; without a bounded offline transfer path, machine binding (LIC-007) becomes a denial-of-service against the paying customer's line. Maps: Internal.
 - Verify: transfer-procedure walkthrough in the Field Service runbook, exercised once per year. Evidence: runbook + exercise record. Owner: Field Service. Auto: Manual review.
 - Exception: Allowed — approver: Product Owner. Review: Annual.
+
+**[LIC-009]** (P2 | ALL | Licensing, Config)
+Any network-based license check SHALL be disclosed in product documentation, disabled by default, and logged as an audit event when enabled.
+- Why: hidden phone-home is a trust breach discoverable by any customer network monitor; disclosure plus default-off makes the behavior contractual instead of covert. Maps: Internal (D-08); CRA (Annex I 2(g)).
+- Verify: FF-PRI-03 network-endpoint inventory (no undisclosed license endpoints) plus an audit-event assertion when a network check is enabled. Evidence: CI gate log + test record. Owner: Software Lead. Auto: Partially automated.
+- Exception: Not allowed. Review: Per release.
 
 ---
 

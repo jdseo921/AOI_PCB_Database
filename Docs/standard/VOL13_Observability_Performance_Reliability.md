@@ -129,7 +129,7 @@ Table 38-4 — telemetry retention classes (all configurable archive-then-purge,
 | Class | Default retention | Notes |
 |---|---|---|
 | AuditEvents + chain anchors | 730 days on-station | never shorter than customer quality-record policy |
-| InspectionResults/Defects | 365 days | existing archive-then-purge path |
+| InspectionResults/Defects | 730 days | quality-evidence class; §37.5 (VOL05) is authoritative for database-record retention |
 | Rolling application logs | 90 days, size caps per file 64 MB | rotation tested (OBS-029) |
 | Metrics aggregates | 180 days | raw spans 30 days |
 | Crash reports | 90 days | dumps 30 days (Customer-IP class) |
@@ -295,8 +295,8 @@ Log export and diagnostic-bundle creation SHALL require the Admin role enforced 
 - Exception: Not allowed. Review: Per release.
 
 **[OBS-025]** (P1 | ALL | Audit, Persistence)
-Each `AuditEvents` row SHALL store a chain hash computed as SHA-256 over the previous row's chain hash concatenated with the canonical serialization of the current row's payload.
-- Why: audit rows currently sit unprotected in user-writable SQLite — the single biggest forensic gap; hash chaining makes deletion, reordering, and edits detectable. Maps: 62443-4-2 CR 2.8, CR 3.4; CWE-778.
+Each `AuditEvents` row SHALL store a per-row chain hash constructed per the §21 (VOL05) audit-row chain-hash rule, so that deletion, reordering, and edits become detectable in the observability trail.
+- Why: audit rows currently sit unprotected in user-writable SQLite — the single biggest forensic gap; the hash construction is defined once by §21 (VOL05, the data/storage owner) to prevent formula drift, and this record binds the observability layer to persist and rely on it. Maps: 62443-4-2 CR 2.8, CR 3.4; CWE-778.
 - Verify: test class `AuditChainTests` (new): append, verify, tamper-detect cases. Evidence: test run. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -391,9 +391,9 @@ Each application start SHALL persist a startup self-test report (check outcomes,
 - Exception: Not allowed. Review: Per release.
 
 **[OBS-040]** (P3 | ALL | CI, Diagnostics)
-A CI check SHOULD compare the emitted metric set against the Table 38-3 catalogue file and fail on undeclared or missing metrics.
-- Why: keeps catalogue and code from drifting the way `Docs/Industrial_Quality_Checklist.md` and the gate JSON already have. Maps: Internal.
-- Verify: FF-OBS-04 in `Scripts/run-quality-gates.ps1`. Evidence: CI gate log. Owner: QA Lead. Auto: Fully automated.
+The machine-readable metrics catalogue `Docs/observability/metrics_catalogue.json` SHOULD be maintained as the authoritative form of Table 38-3, with a CI drift check failing the build on any divergence between the JSON catalogue and the table.
+- Why: OBS-014 already gates emitted code against the catalogue, so this record's distinct obligation is keeping the JSON catalogue and Table 38-3 themselves in lockstep — the way `Docs/Industrial_Quality_Checklist.md` and the gate JSON already drifted. Maps: Internal.
+- Verify: FF-OBS-06 (catalogue-vs-table drift check) in `Scripts/run-quality-gates.ps1`. Evidence: CI gate log. Owner: QA Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Lead. Review: Annual.
 
 ---
@@ -700,7 +700,7 @@ Every MES result SHALL be persisted to the durable outbox before the first send 
 - Exception: Not allowed. Review: Per release.
 
 **[PER-026]** (P2 | ALL | Persistence, Diagnostics)
-Every accumulating store on a station — logs, metrics, spool/outbox, caches, archives, vault — SHALL have a declared upper bound in size, row count, or retention age, and a fitness function SHALL fail the build on any inspection-path collection or log writer lacking one.
+Every accumulating store on a station — logs, metrics, spool/outbox, caches, archives, vault — SHALL have a declared upper bound in size, row count, or retention age.
 - Why: "no unbounded anything" is the disk-full self-DoS invariant (F-18); the repo today bounds only four retained tables and lets the vault, `ImageLearning*`, exports, and the outbox grow without limit (data-layer gap 5). Maps: CWE-400; 62443-3-3 SR 7.2; Internal.
 - Verify: FF-PER-05 (unbounded-growth scan) + retention-coverage test extending `LogRetentionTests`. Evidence: CI gate log + trx. Owner: Software Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
@@ -756,9 +756,9 @@ At the Table 40-3 worst case (4 views at 26 MP plus a 20,000,000-point 3D scan),
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[PER-035]** (P3 | S2+ | Orchestrator, Diagnostics)
-Sustained inspection throughput (`insp.throughput`) SHALL meet the configured line takt over any production shift without the acquisition queue holding permanent backpressure.
-- Why: meeting per-cycle latency does not guarantee sustained rate if queues saturate; a throughput floor across a shift is the number a line owner actually experiences. Maps: 25010; Internal.
-- Verify: soak-rung throughput evidence (R2–R4) + `insp.throughput` metric. Evidence: soak report + metric aggregates. Owner: Software Lead. Auto: Partially automated.
+Sustained inspection throughput (`insp.throughput`) SHALL meet the configured line takt over any production shift with `insp.queue.acquisition_depth` staying below its 6-of-8 high-water mark for at least 95% of the shift and never sustaining full for more than 60 s (Table 38-3, Table 40-5).
+- Why: meeting per-cycle latency does not guarantee sustained rate if queues saturate; a throughput floor plus a measurable non-saturation bound on the acquisition queue is the condition a line owner actually experiences, replacing the unquantifiable "permanent backpressure". Maps: 25010; Internal.
+- Verify: soak-rung throughput evidence (R2–R4) + `insp.throughput` and `insp.queue.acquisition_depth` metric aggregates. Evidence: soak report + metric aggregates. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Annual.
 
 ---
@@ -931,9 +931,9 @@ Every failure mode of Table 41-1 SHALL be detected and driven to exactly one of 
 - Exception: Not allowed. Review: Per release.
 
 **[REL-002]** (P2 | ALL | Diagnostics, Orchestrator)
-Each fault of Table 41-1 SHALL be detected through its named §38 signal (alarm, metric threshold, or health check) within the detection latency asserted by that fault's fault-injection test.
-- Why: containment cannot start before detection, so binding each fault to a concrete §38 signal removes vaguely-noticed detection and makes latency measurable (per-fault latency budgets are OD-VOL13-1). Maps: 62443-4-2 CR 6.2; 25010; Internal.
-- Verify: fault-injection suite FI-01..FI-34 measuring detection latency per fault. Evidence: FI test records. Owner: Software Lead. Auto: Partially automated.
+Each fault of Table 41-1 SHALL be detected through its named §38 signal (alarm, metric threshold, or health check) within 2 s of fault onset, or within the tighter per-fault budget where OD-VOL13-1 defines one.
+- Why: containment cannot start before detection, so binding each fault to a concrete §38 signal plus a fixed 2 s default upper bound removes the self-referential "whatever the test asserts" bar and makes latency objectively checkable; tighter per-fault budgets are calibrated under OD-VOL13-1 but never exceed the 2 s ceiling. Maps: 62443-4-2 CR 6.2; 25010; Internal.
+- Verify: fault-injection suite FI-01..FI-34 asserting detection latency at most the 2 s default (or the tighter OD-VOL13-1 budget) per fault. Evidence: FI test records. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[REL-003]** (P1 | ALL | Orchestrator)
@@ -949,8 +949,8 @@ Every safe-state entry SHALL present the operator a stable error code drawn from
 - Exception: Not allowed. Review: Per release.
 
 **[REL-005]** (P2 | ALL | HMI)
-The operator error code of REL-004 SHALL be accompanied by a plain-language recommended action, and a raw stack trace or exception text SHALL NOT be shown to the operator role (referenced as REL-005 by the fault-flow diagram).
-- Why: an operator needs the next action, not internals; leaking a stack trace violates the DESIGN.md factory-safe dialog rule and exposes implementation detail (CWE-209). Maps: CWE-209; 25010 (usability); Internal.
+On every safe-state entry the operator error code of REL-004 SHALL be accompanied by a plain-language recommended action (referenced as REL-005 by the fault-flow diagram).
+- Why: an operator needs the next action, not internals; the complementary rule that no raw stack trace or exception text is shown to the operator role is OBS-036, so this record keeps to the single positive obligation and defers stack-trace suppression there. Maps: CWE-209; 25010 (usability); Internal.
 - Verify: existing CQ-MSG-001 gate (`Scripts/check-code-quality.ps1`) + `SafeStateOperatorMessageTests` action-text case. Evidence: CI gate log + trx. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
@@ -971,9 +971,9 @@ On loss of the safety-observation channel the station SHALL enter EmergencyStopp
 - Exception: Not allowed. Review: Per release.
 
 **[REL-008]** (P1 | S3+ | RobotAdapter, SafetyStatus)
-The robot safety-bypass flag `PermitSafetyBypassForSimulation` SHALL default to FALSE and SHALL be honored only inside an explicitly selected simulation profile that cannot be active on a production station.
-- Why: the flag defaults TRUE in the repo (gap 6), so a mis-provisioned station could run with safety observation bypassed; a false default with profile gating removes that latent unsafe state. Maps: 13849-1; 62443-4-2 CR 2.1; D-18.
-- Verify: `RobotSafetyConfigTests` (new) default-and-gating case with startup rejecting the flag outside a simulation profile. Evidence: trx. Owner: Controls & Safety Engineer. Auto: Fully automated.
+The robot safety-bypass flag `PermitSafetyBypassForSimulation` SHALL default to FALSE.
+- Why: the flag defaults TRUE in the repo (gap 6), so a mis-provisioned station could run with safety observation bypassed; a FALSE default removes that latent unsafe default, and the complementary simulation-profile gating is REL-041. Maps: 13849-1; 62443-4-2 CR 2.1; D-18.
+- Verify: `RobotSafetyConfigTests` (new) default-value case asserting FALSE when unset. Evidence: trx. Owner: Controls & Safety Engineer. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[REL-009]** (P2 | S3 | RobotAdapter, SafetyStatus)
@@ -1083,14 +1083,14 @@ Failed MES image or attachment uploads SHALL be spooled to the durable outbox an
 - Exception: Not allowed. Review: Per release.
 
 **[REL-025]** (P2 | S4 | MES, Persistence)
-The MES outbox and central-sync queue SHALL be disk-bounded per Table 40-5 with duplicate suppression keyed by MesMessageId, and a pending quality record SHALL NOT be silently dropped.
-- Why: an unbounded outbox is a disk-full self-DoS during a long outage while silent drop-on-overflow loses evidence, so a bound plus a Critical alarm forces operator action instead of quiet data loss. Maps: CWE-400; IPC-2591 (traceability); 62443-3-3 SR 7.2.
+The MES outbox and central-sync queue SHALL be disk-bounded per Table 40-5 with duplicate suppression keyed by MesMessageId.
+- Why: an unbounded outbox is a disk-full self-DoS during a long outage, so the Table 40-5 bound with MesMessageId dedup caps growth without double-reporting; the complementary no-silent-drop guard on overflow is REL-042. Maps: CWE-400; IPC-2591 (traceability); 62443-3-3 SR 7.2.
 - Verify: `BoundedQueueTests` outbox-bound case + `MesOutboxDurabilityTests` dedup case. Evidence: trx. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[REL-026]** (P2 | S3+ | MES, RobotAdapter)
-A network partition SHALL drive Degraded operation with automatic reconnect and outbox drain, and SHALL NOT block local inspection and result persistence.
-- Why: connectivity loss must not stop a station from producing and storing verdicts, so decoupling local inspection from the network keeps the line running through a partition (F-12). Maps: 62443-4-2 CR 7.4; 25010 (reliability); Internal.
+A network-link partition (F-12) SHALL NOT block local inspection or result persistence, draining the durable outbox on reconnect through the store-and-forward spine of REL-023.
+- Why: connectivity loss must not stop a station from producing and storing verdicts, so decoupling local inspection from the network keeps the line running through a partition; the store-and-forward Degraded spine is REL-023, so this record narrows to the link-partition trigger and the local-decoupling delta rather than restating it. Maps: 62443-4-2 CR 7.4; 25010 (reliability); Internal.
 - Verify: FI-12 fault-injection case. Evidence: FI record. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
@@ -1115,9 +1115,9 @@ A GPU out-of-memory or device-reset (TDR) fault SHALL fall back to the CPU execu
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[REL-030]** (P1 | ALL | ModelMgmt, Inference)
-A model-load failure SHALL keep the prior active model serving and SHALL refuse the new artifact until its manifest and SHA-256 re-verify at load time.
-- Why: a station must never be left with no model by a bad deployment, and loading an artifact whose hash is never re-checked (repo gap 5) risks a tampered model; keep-prior plus load-time verify closes both (F-22, D-03). Maps: ONNX-SEC; 62443-4-2 CR 3.4; D-03.
-- Verify: FI-22 fault-injection case + `ModelLoadIntegrityTests` (new) hash-reverify case. Evidence: FI record + trx. Owner: ML Lead. Auto: Fully automated.
+A model-load failure SHALL keep the prior active model serving so a bad deployment never leaves the station with no model.
+- Why: a station must never be left without a model by a failed deployment (F-22), so keep-prior is the availability control; the complementary load-time manifest and SHA-256 re-verification of the new artifact is REL-043. Maps: ONNX-SEC; 62443-4-2 CR 3.4; D-03.
+- Verify: FI-22 fault-injection case (keep-prior on load failure). Evidence: FI record. Owner: ML Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
 
 **[REL-031]** (P2 | ALL | Persistence)
@@ -1135,8 +1135,8 @@ Database corruption detected by `RunIntegrityCheck` (`PRAGMA integrity_check`) S
 ### R: Disk, backup, and restore
 
 **[REL-033]** (P1 | ALL | Persistence, ImageStore)
-On disk-full the station SHALL enter Degraded with inspection-result persistence holding write priority over telemetry (OBS-030), and records pending confirmed MES upload SHALL be exempt from retention purge.
-- Why: a full disk must not drop quality records to make room for logs, and purging un-uploaded results to free space would silently break traceability, so the priority rule plus purge-guard protects the evidence path (F-18). Maps: CWE-400; IPC-2591 (traceability); 62443-3-3 SR 7.2.
+On disk-full the station SHALL exempt records pending confirmed MES upload from retention purge while in Degraded, so freeing space never discards un-uploaded quality evidence (telemetry-versus-result write priority is governed by OBS-030).
+- Why: purging un-uploaded results to free space would silently break traceability, so exempting pending-upload records from purge protects the evidence path on a full disk (F-18); the complementary rule that inspection-result persistence keeps write priority over telemetry is OBS-030. Maps: CWE-400; IPC-2591 (traceability); 62443-3-3 SR 7.2.
 - Verify: FI-18 fault-injection case + `LogRetentionTests` purge-guard case. Evidence: FI record + trx. Owner: Software Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -1147,23 +1147,23 @@ A filesystem permission change that denies access to the storage root or image v
 - Exception: Not allowed. Review: Per release.
 
 **[REL-035]** (P3 | ALL | Persistence, Diagnostics)
-The station SHALL run a scheduled backup of the database and audit-chain anchors with a `backup.age` alarm at 26 h Warning and 72 h Critical, and a backup failure SHALL drive Degraded.
-- Why: an unbacked-up station has an unbounded restore-loss window, so age alarms make a stalled backup visible before a corruption event turns it into permanent loss (F-32, thresholds per A-VOL13-4). Maps: 62443-4-2 CR 7.3; CSF2; Internal.
-- Verify: FI-32 fault-injection case + `MetricAlertThresholdTests` backup-age case. Evidence: FI record + trx. Owner: IT Admin (customer). Auto: Partially automated.
+The station SHALL run a scheduled backup of the database and audit-chain anchors with a `backup.age` alarm at 26 h Warning and 72 h Critical.
+- Why: an unbacked-up station has an unbounded restore-loss window, so age alarms make a stalled backup visible before a corruption event turns it into permanent loss (F-32, thresholds per A-VOL13-4); the backup-failure Degraded transition is REL-044. Maps: 62443-4-2 CR 7.3; CSF2; Internal.
+- Verify: `MetricAlertThresholdTests` backup-age case. Evidence: trx. Owner: IT Admin (customer). Auto: Partially automated.
 - Exception: Allowed — approver: Product Owner. Review: Annual.
 
 **[REL-036]** (P3 | ALL | Persistence)
-A restore drill SHALL be performed and verified at least quarterly against a runbook, and a restore failure SHALL drive Faulted with the drill result recorded.
-- Why: a backup never test-restored is not a recovery capability, so a periodic verified drill converts an assumed restore into a proven one and catches unusable backups before an incident needs them (F-33, cadence per A-VOL13-4). Maps: 62443-4-2 CR 7.4; CSF2; Internal.
-- Verify: FI-33 fault-injection case + quarterly restore-drill record. Evidence: FI record + drill report. Owner: IT Admin (customer). Auto: Partially automated.
+A restore drill SHALL be performed and verified at least quarterly against a runbook, with the drill result recorded.
+- Why: a backup never test-restored is not a recovery capability, so a periodic verified drill converts an assumed restore into a proven one and catches unusable backups before an incident needs them (F-33, cadence per A-VOL13-4); the restore-failure Faulted transition is REL-045. Maps: 62443-4-2 CR 7.4; CSF2; Internal.
+- Verify: quarterly restore-drill record against the runbook. Evidence: drill report. Owner: IT Admin (customer). Auto: Manual review.
 - Exception: Allowed — approver: Product Owner. Review: Quarterly.
 
 ### R: Platform faults and the fault-injection program
 
 **[REL-037]** (P3 | ALL | Diagnostics, Config)
-A Windows-update interruption SHALL recover through the power-loss spine (unclean-marker boot, WAL replay, recovery scan, SelfTesting), and antivirus interference SHALL be contained by bounded retry with documented storage-path exclusions.
-- Why: the OS maintenance environment routinely kills or stalls the process (F-26) or locks vault files (F-27), so handling both with existing recovery machinery and published exclusions keeps platform behavior from being mistaken for application faults. Maps: 62443-4-2 CR 7.4; WIN-LC; Internal.
-- Verify: FI-26 and FI-27 fault-injection cases. Evidence: FI records. Owner: IT Admin (customer). Auto: Partially automated.
+A Windows-update interruption SHALL recover through the power-loss spine — unclean-marker boot, WAL replay, recovery scan, and SelfTesting.
+- Why: the OS maintenance environment routinely kills or stalls the process (F-26), so reusing the power-loss recovery machinery keeps an interrupted update from being mistaken for an application fault; the complementary antivirus-interference containment is REL-046. Maps: 62443-4-2 CR 7.4; WIN-LC; Internal.
+- Verify: FI-26 fault-injection case. Evidence: FI record. Owner: IT Admin (customer). Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Annual.
 
 **[REL-038]** (P3 | ALL | Update, Config)
@@ -1173,9 +1173,9 @@ A partial or signature-invalid software update SHALL fail closed to Configuratio
 - Exception: Not allowed. Review: Per release.
 
 **[REL-039]** (P3 | ALL | Diagnostics)
-Elapsed-time measurement SHALL use the monotonic `Stopwatch` clock (D-16) so a clock jump cannot corrupt duration evidence, and the station SHALL drop to Degraded above a 60 s NTP offset.
-- Why: wall-clock subtraction breaks under NTP steps and manual time changes, silently corrupting every latency percentile and ordering derived from it, whereas monotonic timing is immune and the offset alarm flags the environment fault (F-25). Maps: 62443-4-2 CR 2.11; D-16; Internal.
-- Verify: FI-25 fault-injection case + FF-PER-02 (monotonic-clock analyzer). Evidence: FI record + CI gate log. Owner: Software Lead. Auto: Fully automated.
+On a clock jump the station SHALL drop to Degraded above a 60 s NTP offset (F-25), duration evidence remaining valid because elapsed time is measured on the monotonic `Stopwatch` per PER-005 (D-16).
+- Why: a silently stepped or manually changed clock would corrupt cross-system ordering, so dropping to Degraded above the 60 s offset flags the environment fault; the monotonic-clock measurement rule that keeps latency percentiles immune is owned by PER-005 and is not restated here. Maps: 62443-4-2 CR 2.11; D-16; Internal.
+- Verify: FI-25 fault-injection case (clock-jump). Evidence: FI record. Owner: Software Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Annual.
 
 ### R: Fault-injection test program
@@ -1186,6 +1186,46 @@ A fault-injection test program SHALL provide one test FI-01..FI-34 for the match
 - Verify: fitness function FF-REL-01 mapping each F-nn to an existing FI-nn test and failing on any gap. Evidence: CI gate log + trx. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
+### R: Complementary atomic obligations
+
+These records carry the second obligation of an earlier compound requirement so that each requirement binds exactly one obligation (5-line grammar); each names the sibling record it complements.
+
+**[REL-041]** (P1 | S3+ | RobotAdapter, SafetyStatus)
+The robot safety-bypass flag `PermitSafetyBypassForSimulation` SHALL be honored only inside an explicitly selected simulation profile that cannot be active on a production station, with startup rejecting the flag when it is set outside such a profile.
+- Why: gating the bypass to a simulation-only profile prevents a mis-provisioned production station from running with safety observation bypassed (repo gap 6), the complement to the REL-008 FALSE default. Maps: 13849-1; 62443-4-2 CR 2.1; D-18.
+- Verify: `RobotSafetyConfigTests` (new) profile-gating case asserting startup rejection outside a simulation profile. Evidence: trx. Owner: Controls & Safety Engineer. Auto: Fully automated.
+- Exception: Not allowed. Review: Per release.
+
+**[REL-042]** (P2 | S4 | MES, Persistence)
+A pending quality record in the MES outbox or central-sync queue SHALL NOT be silently dropped on overflow, the Table 40-5 disk bound instead raising a Critical alarm for operator action.
+- Why: silent drop-on-overflow during a long outage loses traceability evidence, so forcing a Critical alarm makes overflow an operator decision rather than quiet data loss, complementing the REL-025 bound. Maps: CWE-400; IPC-2591 (traceability); 62443-3-3 SR 7.2.
+- Verify: `MesOutboxDurabilityTests` overflow-alarm case asserting no silent drop. Evidence: trx. Owner: Software Lead. Auto: Fully automated.
+- Exception: Not allowed. Review: Per release.
+
+**[REL-043]** (P1 | ALL | ModelMgmt, Inference)
+A new model artifact SHALL be refused at load time until its signed manifest and SHA-256 re-verify, so a tampered or corrupt artifact never becomes the active model.
+- Why: the repo computes the model hash at registration but never re-checks it at load (gap 5), so load-time re-verification is the control that blocks a tampered artifact (F-22, D-03), complementing the REL-030 keep-prior rule. Maps: ONNX-SEC; 62443-4-2 CR 3.4; D-03.
+- Verify: `ModelLoadIntegrityTests` (new) hash-reverify case with a tampered artifact. Evidence: trx. Owner: ML Lead. Auto: Fully automated.
+- Exception: Not allowed. Review: Per release.
+
+**[REL-044]** (P3 | ALL | Persistence, Diagnostics)
+A backup failure SHALL drive the station to Degraded with the failure alarmed until a successful backup completes.
+- Why: a stalled backup grows the restore-loss window silently, so degrading and alarming on failure makes the recovery risk visible before a corruption event turns it into permanent loss (F-32), complementing the REL-035 scheduled-backup and age alarms. Maps: 62443-4-2 CR 7.3; CSF2; Internal.
+- Verify: FI-32 fault-injection case. Evidence: FI record. Owner: IT Admin (customer). Auto: Partially automated.
+- Exception: Allowed — approver: Product Owner. Review: Annual.
+
+**[REL-045]** (P3 | ALL | Persistence)
+A restore failure SHALL drive the station to Faulted with the failed-restore result recorded.
+- Why: a restore that fails verification means the backup is unusable, so faulting and recording the failure stops production on an unrecoverable evidence store rather than continuing blind (F-33), complementing the REL-036 quarterly drill. Maps: 62443-4-2 CR 7.4; CSF2; Internal.
+- Verify: FI-33 fault-injection case. Evidence: FI record. Owner: IT Admin (customer). Auto: Partially automated.
+- Exception: Allowed — approver: Product Owner. Review: Quarterly.
+
+**[REL-046]** (P3 | ALL | Diagnostics, Config)
+Antivirus interference SHALL be contained by bounded retry with documented storage-path exclusions so a scanner file lock or IO-latency spike does not fault the station.
+- Why: on-access scanners routinely lock vault files or spike IO latency (F-27), so bounded retry plus published exclusions keeps the scanner from being mistaken for an application fault, complementing the REL-037 Windows-update recovery spine. Maps: 62443-4-2 CR 7.4; WIN-LC; Internal.
+- Verify: FI-27 fault-injection case. Evidence: FI record. Owner: IT Admin (customer). Auto: Partially automated.
+- Exception: Allowed — approver: Software Architect. Review: Annual.
+
 ---
 
 ### 41.3 Volume open decisions and assumptions (merge into §6 / VOL01)
@@ -1194,16 +1234,16 @@ Per the author brief, the assumptions and open decisions used across VOL13 (§38
 
 Assumptions:
 
-- **A-VOL13-1** — The Table 38-4 telemetry retention defaults (audit 730 d, results 365 d, logs 90 d, metrics 180 d) are conservative pre-deployment values pending each customer's quality-record and compliance policy. Risk: retention set shorter than a legal hold or longer than privacy allows. Mitigation: per-class configurability (OBS-023) plus a commissioning review; revisit On change of customer policy.
+- **A-VOL13-1** — The Table 38-4 telemetry retention defaults (audit 730 d, results 730 d matching the §37.5/VOL05 quality-evidence class, logs 90 d, metrics 180 d) are conservative pre-deployment values pending each customer's quality-record and compliance policy. Risk: retention set shorter than a legal hold or longer than privacy allows. Mitigation: per-class configurability (OBS-023) plus a commissioning review; revisit On change of customer policy.
 - **A-VOL13-2** — WL-REF (Table 40-1) and REF-HW are conservative pre-Stage-2 engineering estimates (origin §40.1). Risk: mis-sized latency and capacity budgets. Mitigation: PER-033 re-baseline at the R2 pilot; revisit Per release until pilot.
 - **A-VOL13-3** — The PER-019 resource-leak slope thresholds and the at-least-7-day MTBF target (PER-031) are engineering targets pending field data. Risk: thresholds too strict (false alarms) or too loose (missed leaks). Mitigation: recalibrate against R2/R4 soak evidence; revisit Per release.
 - **A-VOL13-4** — The REL-036 quarterly restore-drill cadence and the 26 h / 72 h `backup.age` thresholds (REL-035) are default operational intervals pending the customer maintenance-window agreement. Risk: drills too infrequent to catch an unusable backup before it is needed. Mitigation: bind to the customer maintenance contract at commissioning; revisit On change.
 
 Open decisions:
 
-- **OD-VOL13-1** — The per-fault detection-latency budgets (REL-002) and the database-lock bounded-retry budget (REL-031) are calibrated inside the fault-injection suite at its first run rather than fixed in this volume; until that run each FI test's asserted latency and retry count are provisional. Owner: QA Lead. Target: first FI-program execution (§39, VOL14).
+- **OD-VOL13-1** — REL-002 fixes a 2 s default detection-latency upper bound; the tighter per-fault budgets and the database-lock bounded-retry budget (REL-031) are calibrated inside the fault-injection suite at its first run rather than fixed in this volume. Until that run the 2 s default is the interim bound each FI test asserts against, and the retry count is provisional. Owner: QA Lead. Target: first FI-program execution (§39, VOL14).
 - **OD-VOL13-2** — The ThreeD per-stage latency budget is deferred until sensor selection (§33, VOL10); the worst-case 3D point count is bounded now (Table 40-3, 20,000,000 points) so 3D-adapter input validation ships before the hardware. Owner: Software Architect. Target: 3D sensor selection.
 
 ---
 
-*End of VOL13 — Observability, Performance, and Reliability (§38, §40, §41). Requirement counts: OBS 40 · PER 35 · REL 40 = 115 atomic requirements.*
+*End of VOL13 — Observability, Performance, and Reliability (§38, §40, §41). Requirement counts: OBS 40 · PER 35 · REL 46 = 121 atomic requirements.*

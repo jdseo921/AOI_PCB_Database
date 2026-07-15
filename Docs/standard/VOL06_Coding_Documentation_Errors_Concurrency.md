@@ -136,7 +136,7 @@ A pull request exceeding 800 changed logical lines SHALL either be split or unde
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[COD-013]** (P2 | ALL | CI)
-A pull request SHALL address exactly one deployable architectural concern (one §14 module/component, or one named cross-cutting rule change), and SHALL NOT mix behavioral change with mechanical refactoring.
+A pull request SHALL be scoped to exactly one deployable architectural concern — one §14 module/component or one named cross-cutting rule change — excluding any mixing of behavioral change with mechanical refactoring.
 - Why: mixed-concern PRs defeat bisection, rollback, and the claim-language gates; the repo's own history shows refactor-only PRs are practical. Maps: SSDF-PW.7; Internal.
 - Verify: review checklist item in `.github/pull_request_template.md`; FF-COD-03 heuristic (paths spanning >1 module group flagged). Evidence: PR record. Owner: Software Architect. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
@@ -190,9 +190,9 @@ Authorization and input-validation decisions SHALL each be implemented in exactl
 ### R: Prohibited constructs
 
 **[COD-021]** (P2 | ALL | All)
-Required program behavior SHALL be reachable through the explicit call graph, and SHALL NOT depend on hidden control flow such as static-constructor ordering, event-subscription order, or reflection-based dispatch.
-- Why: the repo already carries a fragile instance — `WorkflowState`'s private constructor must run before any audited DB write to install `AoiDatabase.AuditOperatorProvider` (`Services/WorkflowState.cs:36-41`); such ordering dependencies break silently. Maps: CWE-696; Internal.
-- Verify: review checklist item; FF-COD-05 flags reflection-based dispatch of domain logic. Evidence: review record. Owner: Software Architect. Auto: Manual review.
+Domain and state-machine behavior SHALL NOT be dispatched through reflection or made to depend on static-constructor execution order.
+- Why: the repo already carries a fragile instance — `WorkflowState`'s private constructor must run before any audited DB write to install `AoiDatabase.AuditOperatorProvider` (`Services/WorkflowState.cs:36-41`); such ordering dependencies break silently, and reflection dispatch hides domain flow from the explicit call graph. Maps: CWE-696; Internal.
+- Verify: FF-COD-05 flags reflection-based dispatch of domain logic and static-constructor side effects that gate later behavior; review checklist for the `WorkflowState` ctor-ordering instance. Evidence: CI gate log + review record. Owner: Software Architect. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Annual.
 
 **[COD-022]** (P1 | ALL | All)
@@ -201,7 +201,7 @@ Runtime replacement or interception of existing members (detour/patching librari
 - Verify: FF-COD-05 (package and API blocklist) + dependency review. Evidence: CI gate log. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
-**[COD-023]** (P1 | ALL | All, Build)
+**[COD-023]** (P1 | ALL | All)
 Runtime code generation (`Reflection.Emit`, `DynamicMethod`, runtime Roslyn compilation, expression-tree compilation of externally influenced expressions) SHALL NOT be introduced without a recorded Security Lead review naming the input sources and their trust level.
 - Why: runtime codegen converts data-plane inputs into executable code paths; unreviewed, it is an arbitrary-code-execution primitive inside a station that holds DPAPI secrets. Maps: CWE-94; SSDF-PW.5; 62443-4-1.
 - Verify: FF-COD-05 API blocklist; exception path requires linked review record. Evidence: CI gate log + review record. Owner: Security Lead. Auto: Partially automated.
@@ -276,9 +276,15 @@ Identifiers (recipe, model, lot, image, station) and physical quantities (durati
 - Exception: Allowed — approver: Software Architect. Review: Quarterly.
 
 **[COD-035]** (P2 | ALL | All)
-Nullable reference diagnostics (CS8600/8602/8603/8604/8618/8625/8765) SHALL be errors in Debug as well as Release builds, and every null-forgiving `!` operator SHALL carry a same-line justification comment.
-- Why: the repo enables `Nullable=enable` everywhere but promotes the diagnostics to errors only in Release (`Directory.Build.props:12`), so local Debug work accumulates null bugs CI catches late; unaudited `!` re-opens the hole. Maps: CWE-476; Internal.
-- Verify: FF-COD-07. Evidence: build log + CI gate log. Owner: Software Lead. Auto: Fully automated.
+Nullable reference diagnostics (CS8600/8602/8603/8604/8618/8625/8765) SHALL be compiler errors in Debug as well as Release builds.
+- Why: the repo enables `Nullable=enable` everywhere but promotes the diagnostics to errors only in Release (`Directory.Build.props:12`), so local Debug work accumulates null bugs CI catches late. Maps: CWE-476; Internal.
+- Verify: FF-COD-07 nullable-as-error configuration check. Evidence: build log + CI gate log. Owner: Software Lead. Auto: Fully automated.
+- Exception: Allowed — approver: Software Lead. Review: Annual.
+
+**[COD-066]** (P2 | ALL | All)
+Every null-forgiving `!` operator SHALL carry a same-line justification comment naming the invariant that guarantees non-null.
+- Why: companion to COD-035 — an unaudited `!` silently re-opens the null-safety hole the nullable diagnostics close, asserting non-null without recorded evidence. Maps: CWE-476; Internal.
+- Verify: FF-COD-07 unaudited `!`-operator check. Evidence: build log + CI gate log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Lead. Review: Annual.
 
 **[COD-036]** (P2 | ALL | Domain)
@@ -365,7 +371,7 @@ A documentation comment SHALL convey information beyond a restatement of the ide
 - Exception: Not allowed. Review: Annual.
 
 **[DOC-004]** (P2 | ALL | All)
-A comment or doc comment made inaccurate by a code change SHALL be corrected in the same change; stale documentation is a defect, not a backlog item.
+An in-code comment or `///` doc comment made inaccurate by a code change SHALL be corrected in the same change; stale documentation is a defect, not a backlog item.
 - Why: a wrong comment actively misleads the next maintainer; same-change repair is the only policy that keeps the FF-DOC gates meaningful. Maps: Internal; SSDF-PW.7.
 - Verify: review checklist item in PR template. Evidence: PR record. Owner: Software Lead. Auto: Manual review.
 - Exception: Not allowed. Review: Annual.
@@ -407,7 +413,7 @@ Each §14 (VOL03) subsystem SHALL have a module README covering: purpose, public
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[DOC-011]** (P1 | ALL | All)
-Every architecturally significant decision (new dependency, boundary change, technology choice, D-xx revisit) SHALL be recorded as a numbered ADR using the §57 (VOL18) template, and an accepted ADR SHALL NOT be edited — it is superseded by a new ADR.
+Every architecturally significant decision (new dependency, boundary change, technology choice, D-xx revisit) SHALL be recorded as a numbered, immutable ADR using the §57 (VOL18) template, superseded only by a new ADR rather than edited in place once accepted.
 - Why: the D-01..D-18 register exists because undocumented decisions get re-litigated; immutable ADRs preserve the reasoning that reviews and audits depend on. Maps: 42010; SSDF-PO.
 - Verify: review checklist (PRs meeting the significance trigger must link an ADR); FF-DOC-04 numbering check. Evidence: `Docs/standard/adr/` history. Owner: Software Architect. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
@@ -467,13 +473,13 @@ Every normative document SHALL carry a header with version, date, owning role, a
 - Exception: Allowed — approver: Software Architect. Review: Annual.
 
 **[DOC-021]** (P2 | ALL | All)
-Documentation describing changed behavior SHALL be updated in the same PR as the behavior change.
+A standalone `Docs/` document describing changed behavior SHALL be updated in the same PR as the behavior change.
 - Why: measured drift already exists ("~40 tables" vs 60; schema baseline 28 vs 30) in a project whose brand is truthful evidence; same-PR repair is the only drift control that scales to a small team. Maps: SSDF-PW.7; Internal.
 - Verify: review checklist item + FF-DOC-04 dead-link/claim gates. Evidence: PR record. Owner: Software Lead. Auto: Manual review.
 - Exception: Not allowed. Review: Annual.
 
 **[DOC-022]** (P3 | ALL | All)
-`<inheritdoc/>` SHALL be used only where the inherited contract applies unchanged; an override that narrows, widens, or otherwise alters behavior SHALL restate its contract explicitly.
+`<inheritdoc/>` SHALL be used only where the inherited contract applies unchanged, with any override that narrows, widens, or otherwise alters behavior restating its contract explicitly instead.
 - Why: inherited docs on behavior-changing overrides are stale-by-construction documentation. Maps: Internal; 25010.
 - Verify: review checklist; FF-DOC-02 flags `<inheritdoc/>` on overrides with added throws/side effects. Evidence: review record. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Software Lead. Review: Annual.
@@ -491,7 +497,7 @@ Every architecture diagram SHALL be committed with editable source (Mermaid pref
 - Exception: Allowed — approver: Software Architect. Review: Annual.
 
 **[DOC-025]** (P2 | ALL | All)
-Every public static service class SHALL document, in its type doc comment, its thread-safety model, the state it owns, and its test reset seam.
+Every public static service class SHALL document in its type doc comment, or link to the COD-025 registry entry for, its thread-safety model, owned state, and test reset seam.
 - Why: 97 static service classes are the de facto composition model; their concurrency contracts are currently folklore, which §26 (single-writer, ownership) cannot be enforced against. Retrofit deadline is Open Decision OD-VOL06-4. Maps: Internal; CWE-820.
 - Verify: FF-DOC-02 rule for `static class` types with mutable state. Evidence: CI gate log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Quarterly.
@@ -646,7 +652,7 @@ A method SHALL NOT return success/failure ambiguously: no bool returns carrying 
 - Verify: FF-COD-08 fallback-reader rule + unit tests for corrupt-input paths (suite `CorruptDataSurfacingTests`). Evidence: CI gate log + test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Quarterly.
 
-**[COD-050]** (P1 | ALL | MES, Network, Persistence)
+**[COD-050]** (P1 | ALL | MES, REST, Persistence)
 Retries SHALL occur only through a named, declared retry policy (attempt count, backoff, eligibility per Table 25-1) attached at one layer, and inline ad-hoc retry loops are prohibited.
 - Why: hidden retries multiply — the MES outbox already exhibits nested retry multiplication (retry inside retry), which turns one outage into a duplicate-submission storm; single-layer declared policies make retry behavior auditable. Maps: CWE-799; Internal.
 - Verify: FF-COD-08 (loop-with-catch-and-delay heuristic outside policy types) + review checklist. Evidence: CI gate log. Owner: Software Lead. Auto: Partially automated.
@@ -658,7 +664,7 @@ Non-idempotent commands (robot motion, MES result submission, database mutations
 - Verify: review checklist per integration + suite `IdempotencyContractTests` for MES spool and robot command paths. Evidence: test results + review record. Owner: Software Architect. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
 
-**[COD-052]** (P1 | ALL | MES, Network)
+**[COD-052]** (P1 | ALL | MES, REST)
 Every automatic retry policy SHALL bound attempts (≤5), apply exponential backoff with jitter (base ≥1 s, factor ≥2, jitter ≥±20%), and open a per-dependency circuit breaker after policy exhaustion.
 - Why: unbounded or synchronized retries produce retry storms that finish off a struggling dependency and saturate the factory network segment; numeric floors make the policy testable. Maps: CWE-400; CWE-799; Internal.
 - Verify: suite `RetryPolicyTests` asserting bounds/backoff/jitter/breaker per policy. Evidence: test results. Owner: Software Lead. Auto: Fully automated.
@@ -759,7 +765,7 @@ Code SHALL NOT synchronously block on asynchronous work via `.Wait()`, `.Result`
 - Exception: Allowed — approver: Software Architect. Review: Annual.
 
 **[COD-057]** (P2 | ALL | HMI)
-`async void` SHALL appear only in WPF event-handler signatures, and each such handler's body SHALL delegate to a `Task`-returning method executed through `UiErrorBoundaryService` (or the App global-handler path for shell-level handlers).
+`async void` SHALL appear only in WPF event-handler signatures whose body delegates to a `Task`-returning method executed through `UiErrorBoundaryService` (or the App global-handler path for shell-level handlers).
 - Why: `async void` exceptions bypass normal awaiting and crash or vanish; the repo's 56 occurrences are acceptable only because boundaries backstop them — this makes that pattern mandatory rather than incidental. Maps: CWE-248; Internal.
 - Verify: FF-COD-09 (extends CQ-ASYNC-001) + boundary-delegation heuristic. Evidence: CI gate log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Lead. Review: Annual.

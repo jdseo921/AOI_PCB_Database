@@ -31,6 +31,8 @@ The `RobotCycleService` FSM is the seed of the target machine: its transition-re
 
 Twenty-two states. **Rest states** (no timeout; the machine may remain indefinitely): Idle, Paused, Maintenance, Degraded, Faulted, EmergencyStopped, ConfigurationInvalid, AwaitingOperatorReview. All others are **transient** and carry a timeout (Table 17-2).
 
+**Table 17-1 — Canonical states**
+
 | State | Meaning |
 |---|---|
 | Starting | Process launched; configuration loading; no subsystem started |
@@ -129,9 +131,9 @@ Timeout defaults below are engineering defaults under ASSUMPTION A-VOL04-1 (conf
 | BoardPresent | board seated | position command issued | 30 s → Faulted | clamp, barcode reader |
 | Positioning | board clamped | pose reached | 30 s → Faulted | robot/stage motion (S3+) |
 | LightingSetup | pose reached | profile applied + settled | 2 s → AcquisitionFailed | lighting channel writes |
-| Acquiring | lighting settled | frame set complete | 5 s → AcquisitionFailed | camera trigger; lighting hold |
+| Acquiring | lighting settled | frame set complete | 250 ms capture / 100 ms transfer Max (§40/VOL13) → AcquisitionFailed | camera trigger; lighting hold |
 | AcquisitionFailed | acquisition fault | retry or escalate decided | 5 s → Degraded/Faulted | camera re-trigger only |
-| Inspecting | frame set complete | analysis returned | 10 s → Faulted | none |
+| Inspecting | frame set complete | analysis returned | 1200 ms inference Max (§40/VOL13) → NoResult; hang > 3000 ms watchdog → Faulted | none |
 | Evaluating | analysis returned | verdict derived | 2 s → Faulted | none |
 | AwaitingOperatorReview | verdict REVIEW | disposition recorded | none (alarm at 10 min; OD-VOL04-1) | none |
 | Persisting | verdict final | transaction committed | 5 s → Faulted | none |
@@ -143,6 +145,8 @@ Timeout defaults below are engineering defaults under ASSUMPTION A-VOL04-1 (conf
 | Faulted | fault recorded | Reset intent + cause cleared | none | none (status polling only) |
 | EmergencyStopped | safety observation (S3+) | safety reset verified + ack | none | none (status polling only) |
 | ShuttingDown | Shutdown intent from rest state | cleanup complete | 30 s → forced exit, no clean marker | stop/park/disconnect only |
+
+**Cycle-stage timeouts defer to §40/VOL13.** The Acquiring and Inspecting timeouts carry the per-stage Max-tolerated bounds of the §40/VOL13 latency budget (Table 40-2), which is authoritative for cycle-stage timing and overrides the generic A-VOL04-1 configurability for these two rows. An inspection cycle that exceeds the §40/VOL13 end-to-end watchdog (3000 ms) is aborted to a **NoResult** outcome — the honest disposition for an over-run, distinct from OK/NG and complementary to the INTERRUPTED outcome of ORC-011 (fault, cancellation, e-stop, shutdown, or process exit); **Faulted** is reserved for a stage that does not return at all beyond the watchdog bound.
 
 **Table 17-3 — Audit, restart, recovery, cancellation per state**
 
@@ -175,7 +179,7 @@ Timeout defaults below are engineering defaults under ASSUMPTION A-VOL04-1 (conf
 
 | Transition | Authorized initiator | Guards / interlocks (S3+) | Retry | Idempotent? |
 |---|---|---|---|---|
-| Idle → BoardLoading | Operator+ intent; MES order (S4); robot handshake (S3) | all six interlocks safe; devices Connected; recipe Deployed; model Active | n/a | yes — duplicate StartCycle rejected (ORC-013) |
+| Idle → BoardLoading | Operator+ intent; MES order (S4); robot handshake (S3) | all six interlocks safe; devices Connected; recipe Deployed; model Active | n/a | yes — duplicate StartCycle SHOULD be rejected (ORC-013) |
 | BoardLoading → BoardPresent | orchestrator (sensor/confirm) | clamp confirmed | per adapter | yes (sensor re-read) |
 | Positioning → LightingSetup | orchestrator | pose-reached confirmation | 1 re-command | yes |
 | Acquiring → AcquisitionFailed | orchestrator (timeout/invalid frame) | — | max 2 retries/cycle (ORC-010) | yes |
@@ -546,7 +550,7 @@ sequenceDiagram
 ### 18.4 Versioning and migration rules
 
 1. **Immutable revisions.** A revision's content never changes after submission. "Editing" an Approved or Deployed recipe means cloning it into a new Draft revision. The existing append-only `RecipeRevisions` behavior already satisfies the storage half; the missing enforcement half is ORC-018.
-2. **Semantic recipe schema version.** Every revision embeds `schemaVersion` (MAJOR.MINOR). MINOR additions are backward-compatible (loaders ignore unknown optional fields); MAJOR changes require a migration. The current un-versioned `RecipeDocument` shape is retroactively schema version 1.0 (ASSUMPTION A-VOL04-3).
+2. **Semantic recipe schema version.** Every revision embeds `schemaVersion` (MAJOR.MINOR) (ORC-041). MINOR additions are backward-compatible (loaders ignore unknown optional fields); MAJOR changes require a migration. The current un-versioned `RecipeDocument` shape is retroactively schema version 1.0 (ASSUMPTION A-VOL04-3).
 3. **Migration rules.** A loader encountering an older MAJOR version applies a registered, tested migration to the current shape *in memory* and records the migration in the load result; it never rewrites the stored revision. A loader encountering a newer MAJOR version than it supports refuses the revision (ORC-020) — forward compatibility is never guessed.
 4. **No token mutation.** The `HealLocalizedTokens` repair (RecipeService.cs:114-122) remains for legacy revisions only; revisions at schema version ≥ 1.1 SHALL store canonical English tokens (enforced by validation), retiring the healing path from the live pipeline. Localization is a display concern (§47/VOL12).
 5. **Lock is a state, not a toggle.** The `WorkflowState.IsRecipeLocked` UI toggle is superseded by the state machine: only Deployed revisions execute (ORC-017), so "locked" is the natural condition and requires no operator discipline.
@@ -574,7 +578,7 @@ The InReview → Approved transition SHALL be recorded by a reviewer whose ident
 ### R: Recipe schema versioning, compatibility, integrity (ORC-020–ORC-024)
 
 **[ORC-020]** (P2 | ALL | Recipe)
-Every recipe revision SHALL embed a semantic recipe schema version (MAJOR.MINOR), and loaders SHALL NOT load a revision whose MAJOR version exceeds the application's supported schema version.
+Loaders SHALL NOT load a recipe revision whose embedded semantic schema version (MAJOR.MINOR) carries a MAJOR component exceeding the application's supported schema version.
 - Why: an old station loading a structurally newer recipe silently drops fields it does not understand — thresholds vanish without error; refusing unknown MAJOR versions converts silent misinspection into a visible block. Maps: Internal; CWE-372.
 - Verify: loader version-gate unit tests (older-minor accepted, newer-major refused, migration recorded). Evidence: test run log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: On change.
@@ -748,7 +752,7 @@ A Staged model SHOULD complete a station-local smoke evaluation (bounded referen
 - Exception: Allowed — approver: ML Lead. Review: Per release.
 
 **[ORC-031]** (P2 | ALL | ModelMgmt, Persistence)
-The previously Active model version SHALL be retained on disk and in the registry as Superseded, and the rollback transition reinstating it SHALL be exercised by an automated test in every release.
+The previously Active model version SHALL be retained on disk and in the registry as Superseded so that rollback is a state transition rather than a re-import.
 - Why: a rollback that requires re-import is not a rollback — it is a new deployment under incident pressure; retention plus a tested transition makes recovery a state change measured in seconds. Maps: Internal; AI-RMF; SSDF.
 - Verify: rollback integration test (activate B, roll back to A, assert A serves inference and B is RolledBack). Evidence: test run log. Owner: ML Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
@@ -830,11 +834,11 @@ stateDiagram-v2
 
 **Reading this diagram:** a calibration profile is trustworthy (Calibrated) only inside its validity window and only while nothing that physically determines the transform has changed. Two independent forces end trust: **time** (Calibrated → Expiring → Expired, with the Expiring window giving operations 7 days of warning to schedule re-verification) and **events** (any optics, camera, lens, or fixture change immediately Invalidates the profile regardless of remaining validity — a bumped camera does not wait for a calendar). Re-verification during Expiring is cheap (measure a reference target, compare against tolerance); recovery from Expired or Invalidated requires full recalibration. The defaults — 30-day validity, 7-day warning, verification at every production-shift start or 24 h, whichever comes first — are engineering defaults under ASSUMPTION A-VOL04-4, site-tunable within 1–90 days. Consequences for inspection are in Table 17-5: Expired/Invalidated calibration blocks metric (mm) judgments; pixel-only inspection may continue with the record explicitly labeled.
 
-**Calibration traceability.** Every inspection record stores the calibration profile ID *and revision* that was active for the measurement (ORC-039). This is a schema migration obligation: `InspectionResults` currently has no such column, so today two inspections a month apart cannot prove they used the same mm-per-pixel transform — an unanswerable question in any metrology dispute (supports IPC-610 disposition evidence).
+**Calibration traceability.** Every inspection record stores the calibration profile ID and its CreatedAtUtc acceptance timestamp that was active for the measurement (ORC-039). This is a schema migration obligation: `InspectionResults` currently has no such column, so today two inspections a month apart cannot prove they used the same mm-per-pixel transform — an unanswerable question in any metrology dispute (supports IPC-610 disposition evidence).
 
 ### 20.5 Lighting profile versioning
 
-Lighting determines what the camera sees; an unversioned lighting change is an invisible dataset shift that degrades model performance with no audit trace. Lighting profiles therefore become first-class versioned artifacts: a profile (channel intensities, strobe/settle timing, color/angle selection) is immutable once referenced by a recipe revision or an inspection record; changes create a new profile version. The recipe's `LightingProfile` field references profile ID + version; the inspection record stores the applied version (via the Persisting transaction of §17.6). Because the current TCP/serial lighting writes are fire-and-forget with no acknowledgment (LightingControllers.cs:68-120), the applied-version claim is qualified: where the controller cannot confirm application, the record marks lighting state `Unverified` — the honesty rule of the existing status vocabulary extended to illumination (§32/VOL10 owns the ACK requirement itself).
+Lighting determines what the camera sees; an unversioned lighting change is an invisible dataset shift that degrades model performance with no audit trace. Lighting profiles therefore become first-class versioned artifacts: a profile (channel intensities, strobe/settle timing, color/angle selection) is immutable once referenced by a recipe revision or an inspection record; changes create a new profile version. The recipe's `LightingProfile` field references profile ID + version; the inspection record stores the applied version (via the Persisting transaction of §17.6). Because the current TCP/serial lighting writes are fire-and-forget with no acknowledgment (LightingControllers.cs:68-120), the applied-version claim is qualified: where the controller cannot confirm application, the record marks lighting state `Unverified` (ORC-043) — the honesty rule of the existing status vocabulary extended to illumination (§32/VOL10 owns the ACK requirement itself).
 
 ### R: Device and calibration lifecycle (ORC-035–ORC-040)
 
@@ -857,21 +861,43 @@ Metric (millimeter-based) judgments SHALL execute only under a calibration profi
 - Exception: Not allowed. Review: Per release.
 
 **[ORC-038]** (P2 | S2+ | Acquisition, Config)
-Calibration profiles SHALL carry a validity window (default 30 days, bounds 1–90 days per A-VOL04-4) and SHALL be transitioned to Invalidated immediately upon a recorded optics, camera, lens, or fixture change event.
-- Why: time-based expiry catches drift; event-based invalidation catches step changes that expiry cannot — a swapped camera with a valid-looking calendar is the classic silent metrology failure. Maps: Internal; 25010.
-- Verify: expiry fake-clock unit tests; invalidation-event tests wired to device re-registration and maintenance events. Evidence: test run log. Owner: Software Lead. Auto: Fully automated.
+Calibration profiles SHALL carry a validity window (default 30 days, bounds 1–90 days per A-VOL04-4) after whose elapse the profile transitions to Expired.
+- Why: time-based expiry catches slow drift a technician would not notice; without a hard validity window a months-old transform keeps producing precise-looking mm values indefinitely (event-based invalidation is ORC-042). Maps: Internal; 25010.
+- Verify: expiry fake-clock unit tests asserting transition to Expired at window elapse across the 1–90 day bounds. Evidence: test run log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
 **[ORC-039]** (P1 | S2+ | Persistence, Audit)
-Every inspection record SHALL store the calibration profile ID and revision active at measurement time, added to `InspectionResults` by a versioned schema migration.
+Every inspection record SHALL store the calibration profile ID and its CreatedAtUtc acceptance timestamp active at measurement time, added to `InspectionResults` by a versioned schema migration.
 - Why: `InspectionResults` currently carries no calibration linkage (AoiDatabase.Infrastructure.cs:3705-3732 defines the profiles, nothing references them), so mm-based evidence cannot be traced to its transform — a traceability break in the product's core value claim (§21/VOL05 data model). Maps: Internal; 62443-4-2 CR 2.8; IPC-610.
-- Verify: migration test + persistence unit test asserting calibration linkage on every new record. Evidence: test run log. Owner: Software Lead. Auto: Fully automated.
+- Verify: migration test + persistence unit test asserting the calibration profile ID and CreatedAtUtc are stored on every new inspection record. Evidence: test run log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
 **[ORC-040]** (P2 | S2+ | LightingAdapter, Recipe)
-Lighting profiles SHALL be immutable versioned artifacts referenced by profile ID and version from recipe revisions and inspection records, with any parameter change producing a new version and unconfirmed application recorded as `Unverified` lighting state.
-- Why: an unversioned lighting tweak shifts the imaging distribution under every model and recipe without a trace; fire-and-forget controllers (LightingControllers.cs:68-120) additionally cannot prove application, and pretending otherwise would forge evidence. Maps: Internal; AI-RMF; 25010.
-- Verify: profile-immutability unit tests; persistence test asserting version + Unverified marking on records. Evidence: test run log. Owner: Software Lead. Auto: Fully automated.
+Lighting profiles SHALL be immutable versioned artifacts referenced by profile ID and version from recipe revisions and inspection records, with any parameter change producing a new version.
+- Why: an unversioned lighting tweak shifts the imaging distribution under every model and recipe without a trace; immutable per-version artifacts make every illumination change an auditable event (application-confirmation state is ORC-043). Maps: Internal; AI-RMF; 25010.
+- Verify: profile-immutability unit tests asserting a parameter change yields a new version and referenced versions are never mutated. Evidence: test run log. Owner: Software Lead. Auto: Fully automated.
+- Exception: Allowed — approver: Software Architect. Review: On change.
+
+### R: Records appended by atomic-obligation split (ORC-041–ORC-043)
+
+These three records isolate single obligations split out of ORC-020 (recipe schema embedding), ORC-038 (calibration event invalidation), and ORC-040 (lighting verification state) so that each record binds exactly one obligation; they are numbered at the end of the ORC range to preserve the stable numbering of the existing records.
+
+**[ORC-041]** (P2 | ALL | Recipe)
+Every recipe revision SHALL embed a semantic recipe schema version (MAJOR.MINOR) in its canonical JSON at creation, enforced by validation that rejects any submitted revision lacking a well-formed version.
+- Why: the loader MAJOR-version gate (ORC-020) can only refuse a structurally newer recipe if every revision declares its own version; an unversioned revision is un-gateable and silently drops fields it does not understand. Maps: Internal; CWE-372.
+- Verify: schema-validation unit tests asserting a created or submitted revision carries a well-formed schemaVersion and that a missing or malformed version is rejected. Evidence: test run log. Owner: Software Lead. Auto: Fully automated.
+- Exception: Not allowed. Review: On change.
+
+**[ORC-042]** (P2 | S2+ | Acquisition, Config)
+A recorded optics, camera, lens, or fixture change event SHALL transition the affected calibration profile to Invalidated regardless of remaining validity window.
+- Why: event-based invalidation catches step changes that time-based expiry (ORC-038) cannot — a swapped or bumped camera with a valid-looking calendar is the classic silent metrology failure. Maps: Internal; 25010.
+- Verify: invalidation-event unit tests wired to device re-registration and maintenance events asserting the profile enters Invalidated. Evidence: test run log. Owner: Software Lead. Auto: Fully automated.
+- Exception: Allowed — approver: Software Architect. Review: On change.
+
+**[ORC-043]** (P2 | S2+ | LightingAdapter, Persistence)
+Where a lighting controller cannot confirm profile application, the inspection record SHALL mark the applied lighting state `Unverified` rather than asserting an unconfirmed profile version.
+- Why: fire-and-forget TCP/serial lighting writes (LightingControllers.cs:68-120) cannot prove application; recording a confirmed version the controller never acknowledged would forge evidence, so Unverified is the honest state. Maps: Internal; 25010.
+- Verify: persistence unit test asserting the Unverified marking is recorded when the controller returns no acknowledgment. Evidence: test run log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
 ### 20.6 VOL04 assumptions and open decisions

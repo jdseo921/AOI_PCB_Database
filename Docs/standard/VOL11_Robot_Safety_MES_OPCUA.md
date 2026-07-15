@@ -194,8 +194,8 @@ Every safety-status reading SHALL carry a source timestamp, and readings older t
 - Exception: Allowed — approver: Controls & Safety Engineer. Review: On change.
 
 **[SAF-010]** (P0 | ALL | Config, SafetyStatus)
-`PermitSafetyBypassForSimulation` SHALL default to false and SHALL be settable to true only while the operating mode is Demo with no real robot adapter registered.
-- Why: inverts repo nonconformity 9b-6 (`RobotCycleService.cs:37` defaults true); production hardening must not depend on configuration discipline. Maps: Internal (D-18); 62443-4-2 CR 7.7; CWE-1188.
+`PermitSafetyBypassForSimulation` SHALL be false except while the operating mode is Demo with no real robot adapter registered.
+- Why: the flag therefore defaults false and can never be true on a production station; inverts repo nonconformity 9b-6 (`RobotCycleService.cs:37` defaults true) so production hardening does not depend on configuration discipline. Maps: Internal (D-18); 62443-4-2 CR 7.7; CWE-1188.
 - Verify: FF-SAF-02 fitness function (unit test asserting the default + config-schema gate) in CI. Evidence: CI gate log. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -236,7 +236,7 @@ The application SHALL record the cell's e-stop stop category (0 or 1 per IEC 602
 - Exception: Allowed — approver: Controls & Safety Engineer. Review: On change.
 
 **[SAF-017]** (P2 | S3+ | SafetyStatus, RobotAdapter)
-Safety status SHALL be represented, logged, and displayed separately from ordinary robot command status, and the two SHALL never be merged into a single aggregate indicator.
+Safety status SHALL be represented, logged, and displayed on a channel separate from ordinary robot command status, never merged into a single aggregate indicator.
 - Why: a merged "OK" light hides which of quality/motion/safety degraded; the repo's four-state `IntegrationConnectionStatus` already keeps them distinct — this preserves that separation. Maps: Internal (D-18); 62443-4-2 CR 2.9.
 - Verify: contract review checklist + `HmiLayoutAuditService` indicator rule. Evidence: review record + layout audit JSON. Owner: Software Architect. Auto: Partially automated.
 - Exception: Not allowed. Review: Annual.
@@ -255,7 +255,7 @@ Operating-mode selection, teach enable, and safety-chain reset SHALL be physical
 
 **[SAF-020]** (P3 | ALL | SafetyStatus)
 The Controls & Safety Engineer SHOULD re-verify the cited safety-standard editions (ISO 12100, ISO 13849-1/-2, ISO 13850, ISO 10218-1/-2, IEC 62061, IEC 60204-1) once per year and record the review outcome.
-- Why: ISO 12100 and ISO 13849-2 revisions are in DIS stage and ISO 13850 is flagged "to be revised" (research pack, 2026-07-15); edition drift silently invalidates citations. Maps: Internal.
+- Why: cited safety-standard editions drift over time — ISO 12100:2010 remains current with no published revision per the research pack (2026-07-15) — and unmonitored edition drift silently invalidates citations. Maps: Internal.
 - Verify: annual standards-watch review record in the risk register. Evidence: dated review entry. Owner: Controls & Safety Engineer. Auto: Manual review.
 - Exception: Allowed — approver: Software Architect. Review: Annual.
 
@@ -271,7 +271,7 @@ The Safety Status Adapter for a real PLC SHALL be validated during commissioning
 - Verify: `Docs/Hardware_In_The_Loop_Checklist.md` PLC interlock section executed per deployment. Evidence: signed HIL record + `RobotAcceptanceRuns` rows. Owner: Controls & Safety Engineer. Auto: Manual review.
 - Exception: Not allowed. Review: On change.
 
-### R: Robot command integration (ROB-001..ROB-040)
+### R: Robot command integration (ROB-001..ROB-041)
 
 **[ROB-001]** (P1 | S3+ | RobotAdapter, Orchestrator)
 Robot commands SHALL be restricted to the active versioned allowlist (v1: `Load`, `MoveToInspectPosition`, `Unload`, `Home`, `ResetFault`, `AbortCycle`, `QueryStatus`), with any other command rejected before transport.
@@ -292,8 +292,8 @@ Command sequence numbers SHALL be strictly monotonic per adapter session, and th
 - Exception: Not allowed. Review: Per release.
 
 **[ROB-004]** (P1 | S3+ | RobotAdapter, Orchestrator)
-Every issued command SHALL require an explicit acknowledgement from the adapter, and a missing acknowledgement within the per-command timeout SHALL transition the cycle to `Faulted` with no automatic re-send.
-- Why: unacknowledged motion is the canonical duplicate-motion hazard; fail to `Faulted`, never retry blind. Maps: Internal; 62443-4-2 CR 3.6.
+A robot command lacking an explicit adapter acknowledgement within its per-command timeout SHALL transition the cycle to `Faulted`.
+- Why: unacknowledged motion is the canonical duplicate-motion hazard; fail to `Faulted`, with the no-automatic-retry rule owned by ROB-016. Maps: Internal; 62443-4-2 CR 3.6.
 - Verify: `RobotCommandContractTests` ack-timeout case with simulated silent adapter. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -311,7 +311,7 @@ The adapter SHALL reject any command whose `IssuedAtUtc` age exceeds the configu
 
 **[ROB-007]** (P2 | S3+ | RobotAdapter)
 Where the robot transport provides session, message authentication, or anti-replay features, the adapter SHALL enable them; where it cannot, the residual replay risk SHALL be recorded in the risk register (§56, VOL19) with the compensating cell-network controls.
-- Why: many vendor motion protocols carry no authentication (ASSUMPTION A-VOL11-6); the control is then segmentation plus point-to-point wiring, and pretending otherwise hides risk. Maps: CWE-294; 62443-3-3 SR 5.1; 800-82.
+- Why: many vendor motion protocols carry no authentication (ASSUMPTION A-VOL11-4); the control is then segmentation plus point-to-point wiring, and pretending otherwise hides risk. Maps: CWE-294; 62443-3-3 SR 5.1; 800-82.
 - Verify: adapter commissioning review checklist + risk-register entry check. Evidence: commissioning record. Owner: Security Lead. Auto: Manual review.
 - Exception: Allowed — approver: Security Lead. Review: On change.
 
@@ -358,9 +358,9 @@ The application SHALL issue `Manual` or `Maintenance` commands only while the co
 - Exception: Not allowed. Review: Per release.
 
 **[ROB-015]** (P1 | S3+ | Orchestrator)
-After a `Faulted` or `EmergencyStopped` state, the Orchestrator SHALL block all motion commands until an explicit `ResetFault` succeeds under an Engineer-or-higher role and the safety chain is observed reset.
-- Why: restart prevention after fault; extends `ResetAsync` (`RobotCycleService.cs:177-212`, refuses reset while e-stop active) with an explicit role gate. Maps: 13850; 60204-1; Internal (D-18).
-- Verify: `IntegrationContractsTests.cs` reset-clears-e-stop tests extended with role assertions. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
+After a `Faulted` state that is not an observed e-stop or protective stop, the Orchestrator SHALL block all motion commands until an explicit `ResetFault` succeeds under an Engineer-or-higher role.
+- Why: restart prevention after a non-safety fault; the e-stop and protective-stop anti-restart path is owned solely by SAF-015. Extends `ResetAsync` (`RobotCycleService.cs:177-212`) with an explicit role gate. Maps: Internal (D-18); CWE-841; 62443-4-2 CR 3.6.
+- Verify: `IntegrationContractsTests.cs` non-safety-fault reset tests asserting the Engineer-or-higher role gate. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[ROB-016]** (P1 | S3+ | Orchestrator, RobotAdapter)
@@ -395,7 +395,7 @@ The Orchestrator SHALL block any robot command whose motion-invariant preconditi
 
 **[ROB-021]** (P2 | S3+ | RobotAdapter, Diagnostics)
 The application and the robot adapter SHALL exchange bidirectional heartbeats with a configured period (default 1 s) and declare observation loss after a configured timeout (default 3 s).
-- Why: watchdog in both directions detects hangs on either side between commands; defaults are ASSUMPTION A-VOL11-4. Maps: 62443-4-2 CR 7.1; Internal (D-18).
+- Why: watchdog in both directions detects hangs on either side between commands; defaults are ASSUMPTION A-VOL11-3. Maps: 62443-4-2 CR 7.1; Internal (D-18).
 - Verify: `RobotRecoveryMatrixTests` heartbeat-loss case. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
@@ -454,13 +454,13 @@ The Orchestrator SHALL detect controller resets (sequence regression, session id
 - Exception: Not allowed. Review: Per release.
 
 **[ROB-031]** (P2 | S3+ | Orchestrator, Persistence)
-The Orchestrator SHALL persist cycle-state transitions durably for display and forensics, and SHALL NOT persist any motion-command queue for automatic replay after restart.
-- Why: recovery matrix row 4 — post-power-loss safety comes from recovering observed physical state, never from replaying stored intent. Maps: Internal; CWE-841.
+The Orchestrator SHALL NOT persist any motion-command queue for automatic replay after restart.
+- Why: recovery matrix row 4 — post-power-loss safety comes from recovering observed physical state, never from replaying stored intent; durable cycle-state persistence for display and forensics is owned by ROB-041. Maps: Internal; CWE-841.
 - Verify: FF-ROB-07 gate (no command-queue persistence API) + `RobotRecoveryMatrixTests` power-loss case. Evidence: CI gate log + test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[ROB-032]** (P2 | ALL | Simulation, RobotAdapter)
-Simulated robot cycles SHALL be labeled `Simulated` end-to-end (status, messages, exports) and SHALL NOT satisfy any Stage 3 acceptance-evidence gate.
+Simulated robot cycles SHALL be labeled `Simulated` end-to-end across status, messages, and exports; every Stage 3 acceptance-evidence gate rejects cycles so labeled.
 - Why: preserves the repo's simulation-honesty invariant ("No real robot command was sent", `IntegrationContracts.cs:424` and siblings; `Docs/Vendor_Adapter_Implementation_Guide.md:34-48`). Maps: Internal; 62443-4-1 SM-12.
 - Verify: existing simulation-provenance tests + FactoryReadiness gate rules. Evidence: readiness export. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
@@ -513,11 +513,17 @@ Each abuse case AC-ROB-01..AC-ROB-08 (§34.8) SHALL have either an automated reg
 - Verify: traceability check — abuse-case table column mapping to test names, reviewed per release. Evidence: test-mapping table in `TestResults`. Owner: QA Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: Per release.
 
+**[ROB-041]** (P2 | S3+ | Orchestrator, Persistence)
+The Orchestrator SHALL persist cycle-state transitions durably for display and forensics.
+- Why: recovery-matrix row 4 and the ROB-028 restart reconciliation both presume a durable non-terminal cycle state; this states that persistence obligation explicitly, separate from the ROB-031 replay prohibition. Maps: Internal; CWE-841.
+- Verify: `RobotRecoveryMatrixTests` state-persistence case asserting transitions survive restart. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
+- Exception: Not allowed. Review: Per release.
+
 ---
 
 ## 35. MES/ERP and OPC UA Architecture
 
-This section governs every exchange between AOI Monitor and manufacturing IT (MES/ERP), over two channels: the REST client that exists today (`AOI_Monitor/Services/MesRestClient.cs`) and the OPC UA server/client capability planned for Stage 4 (currently only `NullOpcUaMesClient`, `IntegrationContracts.cs:590-600`). It exists because MES connectivity is the first place this product touches networks it does not own, and because the source specs left the two most dangerous questions open: what happens when MES is down (SD-03), and who owns which data. The boundary with §21/§22 (VOL05) is that VOL05 owns data schemas and API grammar; this section owns transport security, delivery semantics, and system-of-record authority. The boundary with §28 (VOL07) is that VOL07 owns the identity model; this section binds its application to MES federation and OPC UA sessions. Roadmap note: `Docs/Roadmap_and_Stages.md` targets IPC-CFX [CFX] for Stage 4 — the relationship between CFX/Hermes [HERMES] and OPC UA Machine Vision is an open decision (OD-VOL11-4), and nothing here presumes one replaces the other.
+This section governs every exchange between AOI Monitor and manufacturing IT (MES/ERP), over two channels: the REST client that exists today (`AOI_Monitor/Services/MesRestClient.cs`) and the OPC UA server/client capability planned for Stage 4 (currently only `NullOpcUaMesClient`, `IntegrationContracts.cs:590-600`). It exists because MES connectivity is the first place this product touches networks it does not own, and because the source specs left the two most dangerous questions open: what happens when MES is down (SD-03), and who owns which data. The boundary with §21/§22 (VOL05) is that VOL05 owns data schemas and API grammar; this section owns transport security, delivery semantics, and system-of-record authority. The boundary with §28 (VOL07) is that VOL07 owns the identity model; this section binds its application to MES federation and OPC UA sessions. Roadmap note: `Docs/Roadmap_and_Stages.md` targets IPC-CFX [CFX] for Stage 4 — the relationship between CFX/Hermes [HERMES] and OPC UA Machine Vision is an open decision (OD-VOL11-4), and nothing here presumes one replaces the other. Consistent with VOL01's four-stage model, which places MES/ERP integration at Stage 4, every MES transport and outbox requirement below binds at Stage 4 even where the underlying REST client already exists in the codebase; only MES-022's never-drop guarantee spans all stages, since it protects inspection results whether or not MES is present.
 
 ### 35.1 Current repo reality (grounding)
 
@@ -591,19 +597,19 @@ Stage 4 OPC UA exposure follows the current OPC 10000 security model (Part 2 v1.
 
 ### R: MES/REST transport and outbox (MES-001..MES-030)
 
-**[MES-001]** (P0 | S2+ | MES, Config)
+**[MES-001]** (P0 | S4 | MES, Config)
 The application SHALL reject any configured MES base URL whose scheme is not `https`.
 - Why: the current validator accepts `http://` (`MesIntegrationSettingsService.cs:83-87`), allowing API keys and Basic credentials to transit plaintext (CWE-319). Maps: CWE-319; ASVS-V12; 62443-4-2 CR 4.1.
 - Verify: FF-MES-01 — settings-validation unit test rejecting `http` in `MesRestIntegrationTests.cs`. Evidence: CI test results. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
-**[MES-002]** (P1 | S2+ | MES, REST)
+**[MES-002]** (P1 | S4 | MES, REST)
 The application SHALL NOT disable or weaken TLS server-certificate validation on any MES connection.
 - Why: the repo is currently clean (no `ServerCertificateCustomValidationCallback` bypass exists); this keeps validation-bypass out permanently. Maps: CWE-295; ASVS-V12; 62443-4-2 CR 3.1.
 - Verify: FF-MES-02 grep/analyzer gate over the solution for bypass patterns. Evidence: CI gate log. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
-**[MES-003]** (P1 | S2+ | MES, IAM)
+**[MES-003]** (P1 | S4 | MES, IAM)
 Every MES request SHALL carry an authentication credential (API key, bearer token, or Basic over TLS) stored per the §30 secret-storage rules (VOL08 CRY catalogue).
 - Why: unauthenticated result upload invites forgery of quality records; credentials at rest follow D-10/DPAPI rules owned by VOL08. Maps: CWE-306; 62443-4-2 CR 1.2; ASVS-V13.
 - Verify: `MesRestIntegrationTests.cs` auth-header assertions (existing, lines around 253-268 behavior) kept green. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
@@ -615,25 +621,25 @@ The MES service account used by the station SHALL be provisioned with only the o
 - Verify: integration-onboarding checklist countersigned by the customer. Evidence: onboarding record. Owner: IT Admin (customer). Auto: Manual review.
 - Exception: Allowed — approver: Security Lead. Review: Annual.
 
-**[MES-005]** (P2 | S2+ | MES, REST)
+**[MES-005]** (P2 | S4 | MES, REST)
 The application SHALL validate every MES request and response against its versioned typed schema, treating an empty or non-conforming response body as failure unless the endpoint is explicitly configured as legacy-empty-body.
 - Why: the current client silently treats an empty body as "legacy endpoint" success (`MesRestClient.cs:199-205`) — implicit leniency hides broken integrations. Maps: CWE-20; ASVS-V4; Internal.
 - Verify: `MesRestIntegrationTests.cs` schema-validation cases + explicit legacy-flag case. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
-**[MES-006]** (P2 | S2+ | MES, REST)
+**[MES-006]** (P2 | S4 | MES, REST)
 The application SHALL enforce payload size caps on MES traffic: 1 MB per JSON request, 10 MB per image upload, and 1 MB per read response.
 - Why: bounded I/O protects both ends from malformed or hostile payloads (resource exhaustion, CWE-400). Maps: CWE-400; ASVS-V4; 62443-4-2 CR 7.1.
 - Verify: `MesRestIntegrationTests.cs` oversize-rejection cases. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
-**[MES-007]** (P2 | S2+ | MES, REST)
+**[MES-007]** (P2 | S4 | MES, REST)
 Every MES HTTP call SHALL enforce a configured per-request timeout (default 30 s) and honor cooperative cancellation.
 - Why: hung sockets must not stall the dispatcher or shutdown; cancellation makes outage drills deterministic. Maps: CWE-400; Internal.
 - Verify: `MesRestIntegrationTests.cs` timeout + cancellation cases. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
-**[MES-008]** (P2 | S2+ | MES)
+**[MES-008]** (P2 | S4 | MES)
 Every result and image upload SHALL carry a stable idempotency key (station ID + local record ID + payload schema version) and its original issued-at UTC timestamp.
 - Why: lets MES deduplicate retried deliveries and reject replays; keys survive across process restarts because they derive from durable IDs. Maps: CWE-294; Internal (D-16); ASVS-V13.
 - Verify: `MesOutboxTests` (new xUnit class) key-stability cases across simulated restarts. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
@@ -657,61 +663,61 @@ The MES API contract SHALL carry an explicit version (URL segment or header), an
 - Verify: contract review checklist at integration onboarding + version assertion in `MesRestIntegrationTests.cs`. Evidence: integration contract document. Owner: Software Architect. Auto: Partially automated.
 - Exception: Not allowed. Review: On change.
 
-**[MES-012]** (P2 | S2+ | MES, Logging)
+**[MES-012]** (P2 | S4 | MES, Logging)
 MES error responses SHALL be parsed into a structured error record (code, message, correlation ID) with secrets redacted before any persistence or logging.
 - Why: preserves the existing redaction discipline (`MesRestClient.cs:166-187`; `AoiDatabase.Integration.cs:211`) and makes failures machine-analyzable. Maps: CWE-532; Internal (D-09).
 - Verify: existing redaction tests in `AuthenticationAndSecretHandlingTests.cs` + `MesRestIntegrationTests.cs` error-shape cases. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
-**[MES-013]** (P2 | S2+ | MES, Audit)
+**[MES-013]** (P2 | S4 | MES, Audit)
 Every MES request SHALL carry a correlation ID that is recorded in the spool row, the `MesUploadAttempts` row, and the transmitted payload.
 - Why: end-to-end correlation is the only way to reconcile "MES says received, station says failed" disputes. Maps: 62443-4-2 CR 2.8; Internal (D-09).
 - Verify: `MesOutboxTests` correlation propagation case. Evidence: CI test results + attempt rows. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
-**[MES-014]** (P2 | S2+ | MES, Persistence)
+**[MES-014]** (P2 | S4 | MES, Persistence)
 Spool retry scheduling SHALL use exponential backoff with full jitter: initial delay 10 s, factor 2, maximum 15 min.
 - Why: replaces the fixed `RetryBackoffMs` interval (`AoiDatabase.Integration.cs:424`) that synchronizes retry storms across stations after a shared outage. Maps: Internal; 62443-4-2 CR 7.1.
 - Verify: `MesOutboxTests` backoff-schedule assertions. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
-**[MES-015]** (P2 | S2+ | MES, REST)
+**[MES-015]** (P2 | S4 | MES, REST)
 Retry loops SHALL exist only in the spool dispatcher; `MesRestClient` SHALL perform exactly one HTTP attempt per dispatch.
 - Why: the current nested retries multiply to (MaxRetryCount+1)² HTTP calls per item (repo hardware survey §4) — one retry authority makes attempt counts truthful. Maps: Internal; CWE-400.
 - Verify: FF-MES-03 gate (no retry loop in `MesRestClient`) + `MesOutboxTests` attempt-count case. Evidence: CI gate log + test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
-**[MES-016]** (P2 | S2+ | MES, REST)
+**[MES-016]** (P2 | S4 | MES, REST)
 The dispatcher SHALL open a circuit after 5 consecutive transport failures, hold it open for a 60 s cool-down, and probe with a single half-open request before resuming.
 - Why: circuit breaking stops futile hammering during outages and gives the outage path a defined shape for testing. Maps: Internal; 62443-4-2 CR 7.1.
 - Verify: `MesOutboxTests` breaker state-machine cases. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
-**[MES-017]** (P1 | S2+ | MES, Persistence)
+**[MES-017]** (P1 | S4 | MES, Persistence)
 Every outbound MES payload SHALL be durably enqueued in `MesSpoolQueue` within the same SQLite transaction as the domain write that produced it, before any network send is attempted.
 - Why: converts the crash-lossy send-then-spool pattern (`TraceabilityUploadService.cs:53-57`; repo gap 9b-7) into a true transactional outbox — a crash between result and enqueue can no longer lose the payload. Maps: Internal (D-04); CWE-390.
 - Verify: `MesOutboxTests` crash-window case (kill between commit and dispatch; payload survives). Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
-**[MES-018]** (P1 | S2+ | MES, ImageStore)
+**[MES-018]** (P1 | S4 | MES, ImageStore)
 Failed image uploads SHALL be spooled as `UploadImageCommand` items with the same delivery guarantees as result payloads.
 - Why: today a failed image upload just returns "FAIL" and the image is never retried (`TraceabilitySignoffService.cs:84-85`) — silent evidence loss for the traceability chain. Maps: Internal; CWE-390.
 - Verify: `MesOutboxTests` image-spool case; production code (not only tests) writes `UploadImageCommand` rows. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
-**[MES-019]** (P2 | S2+ | MES)
+**[MES-019]** (P2 | S4 | MES)
 A background dispatcher SHALL retry eligible spool items automatically at a period of at most 60 s while pending items exist, independent of any UI action.
 - Why: recovery must not depend on an operator pressing the Reports-view button (`ReportsView.Operations.cs:415` is the only trigger today). Maps: Internal; 62443-4-2 CR 7.1.
 - Verify: `MesOutboxTests` background-dispatch case with virtual clock. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
-**[MES-020]** (P1 | S2+ | MES, Orchestrator)
+**[MES-020]** (P1 | S4 | MES, Orchestrator)
 Inspection SHALL continue without interruption during any MES outage.
 - Why: resolves SD-03's line-stoppage ambiguity in favor of availability — the OT priority order (800-82) puts production continuity above delivery immediacy; local durability makes this safe. Maps: 800-82; 62443-3-3 SR 7.1; Internal.
 - Verify: `MesOutboxTests` outage-continuity case (inspections succeed with a dead endpoint). Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
-**[MES-021]** (P1 | S2+ | MES, Diagnostics)
+**[MES-021]** (P1 | S4 | MES, Diagnostics)
 Crossing either queue bound (72 h in-queue age or 50,000 pending results) SHALL put the station into the `Degraded` state and raise an operator alarm.
 - Why: bounded queues need explicit, visible full-behavior; degradation is a state operators act on, not a log line. Maps: Internal; 62443-3-3 SR 7.1; 25010.
 - Verify: `MesOutboxTests` bound-crossing cases for both bounds. Evidence: CI test results + alarm rows. Owner: Software Lead. Auto: Fully automated.
@@ -723,25 +729,25 @@ The application SHALL NOT drop, purge, or overwrite any inspection result that l
 - Verify: `MesOutboxTests` retention-interaction case + `LogRetentionTests.cs` extension asserting undelivered rows survive retention. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
-**[MES-023]** (P2 | S2+ | MES, Persistence)
+**[MES-023]** (P2 | S4 | MES, Persistence)
 Every spool item SHALL expose its delivery status from the closed vocabulary {`Pending`, `Sent`, `Failed`, `Abandoned`} together with its full per-attempt history.
 - Why: codifies the existing status model and `MesUploadAttempts` history as a permanent contract for readiness evaluation and audits. Maps: Internal; 62443-4-2 CR 2.8.
 - Verify: `MesOutboxTests` status-lifecycle assertions. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
-**[MES-024]** (P2 | S2+ | MES, Persistence)
+**[MES-024]** (P2 | S4 | MES, Persistence)
 Spool APIs SHALL NOT expose an operation whose name differs from its persisted effect; specifically, no deletion-named operation may set `Sent`.
 - Why: `DeleteMesSpoolItem` currently aliases `MarkMesSpoolItemSent` (`AoiDatabase.Integration.cs:401-402`), so queue reports can misstate operator intent (repo gap 9b-12). Maps: Internal; CWE-1164.
 - Verify: FF-MES-04 API-naming gate + `MesOutboxTests` terminal-state truth case. Evidence: CI gate log + test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
-**[MES-025]** (P2 | S2+ | MES, Persistence)
+**[MES-025]** (P2 | S4 | MES, Persistence)
 The outbox SHALL reject enqueue of a second `Pending` item carrying the same idempotency key.
 - Why: enqueue-side duplicate detection complements MES-side dedupe (MES-008); the `CentralSyncQueue` dedup guard (`CentralSyncService.cs:287-303`) is the in-repo precedent. Maps: Internal; CWE-694.
 - Verify: `MesOutboxTests` duplicate-enqueue case. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
-**[MES-026]** (P2 | S2+ | MES, Export)
+**[MES-026]** (P2 | S4 | MES, Export)
 Items that exhaust their retry budget SHALL move to the dead-letter state (`Failed`), and an exportable reconciliation report (JSON + HTML) of `Failed`, `Abandoned`, and over-age `Pending` items SHALL feed the factory-readiness evaluation.
 - Why: dead-lettering plus a human-facing reconciliation report is the honest end state for undeliverable data; extends existing queue exports (`MesSpoolService.cs:210-231`) and readiness logic (`EvaluateReadiness`, lines 89-154). Maps: Internal; 62443-4-2 CR 2.8.
 - Verify: `MesOutboxTests` dead-letter + report content cases. Evidence: reconciliation report artifact. Owner: QA Lead. Auto: Fully automated.
@@ -774,8 +780,8 @@ Delayed-result reconciliation after an outage SHALL deliver spooled items in ori
 ### R: OPC UA (OPU-001..OPU-030)
 
 **[OPU-001]** (P1 | S4 | OPCUA, Config)
-OPC UA endpoints SHALL expose only security policies on the configured allowlist {`Basic256Sha256` (minimum), `Aes128_Sha256_RsaOaep`, `Aes256_Sha256_RsaPss` (preferred), `ECC_nistP256`, `ECC_nistP384`}.
-- Why: these are the current, non-deprecated policies per OPC 10000-7 profiles as verified 2026-07-15; the allowlist is configuration, so tightening needs no release. Maps: OPCUA-P2; 62443-3-3 SR 4.1; CWE-327.
+OPC UA endpoints SHALL expose only security policies on the configured allowlist {`Basic256Sha256` (minimum), `Aes128_Sha256_RsaOaep`, `Aes256_Sha256_RsaPss` (preferred), `ECC_nistP256`, `ECC_nistP384`}, except as narrowly permitted by OPU-002 for a contractually required legacy peer.
+- Why: these are the current, non-deprecated policies per OPC 10000-7 profiles as verified 2026-07-15; the allowlist is configuration, so tightening needs no release, and the only permitted departure is the OPU-002 legacy-peer path under a recorded risk acceptance. Maps: OPCUA-P2; 62443-3-3 SR 4.1; CWE-327.
 - Verify: FF-OPU-01 config-schema gate + `OpcUaEndpointConfigTests` (new xUnit class) endpoint enumeration. Evidence: CI gate log + test results. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -798,8 +804,8 @@ Production OPC UA endpoints SHALL use MessageSecurityMode `SignAndEncrypt`.
 - Exception: Allowed — approver: Security Lead. Review: Quarterly.
 
 **[OPU-005]** (P2 | S4 | OPCUA, CRY)
-Each station SHALL have its own X.509 v3 application instance certificate with the ApplicationUri in SubjectAltName and an RSA key of at least 2048 bits (3072 bits SHOULD be used for new issuance).
-- Why: per-application certificates are the OPC UA application-authentication primitive (Part 2); shared certs destroy attribution. Maps: OPCUA-P2; 62443-4-2 CR 1.2; CWE-321.
+Each station SHALL have its own X.509 v3 application instance certificate with the ApplicationUri in SubjectAltName and an RSA key of at least 2048 bits.
+- Why: per-application certificates are the OPC UA application-authentication primitive (Part 2); shared certs destroy attribution; new issuance should prefer 3072-bit RSA keys per the §30 key-strength guidance (VOL08 CRY). Maps: OPCUA-P2; 62443-4-2 CR 1.2; CWE-321.
 - Verify: certificate provisioning procedure + `OpcUaSecurityTests` certificate-property assertions. Evidence: provisioning record. Owner: Security Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Annual.
 
@@ -822,9 +828,9 @@ The application SHALL raise an operator alarm at least 30 days before any OPC UA
 - Exception: Not allowed. Review: Annual.
 
 **[OPU-009]** (P2 | S4 | OPCUA)
-The trust store SHALL include and honor certificate revocation lists, rejecting revoked peer certificates.
-- Why: revocation is the only remedy for a compromised peer key between renewal cycles. Maps: OPCUA-P2; CWE-299.
-- Verify: `OpcUaSecurityTests` revoked-cert rejection case. Evidence: CI test results. Owner: Security Lead. Auto: Fully automated.
+The trust store SHALL refresh certificate revocation lists at a configured interval (default 24 h), treating an unavailable or stale CRL as a validation failure.
+- Why: OPU-007 already rejects an already-revoked peer certificate; this record adds the freshness obligation so revocation data cannot silently go stale between renewal cycles. Maps: OPCUA-P2; CWE-299; CWE-672.
+- Verify: `OpcUaSecurityTests` stale-CRL and refresh-interval cases. Evidence: CI test results. Owner: Security Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Security Lead. Review: Annual.
 
 **[OPU-010]** (P1 | S4 | OPCUA, IAM)
@@ -936,8 +942,8 @@ Before production enable at a site, the OPC UA integration SHALL pass a recorded
 - Exception: Not allowed. Review: On change.
 
 **[OPU-028]** (P3 | S4 | OPCUA)
-ECC security policies (`ECC_nistP256`, `ECC_nistP384`) MAY be enabled where both peers support them, and `ECC_curve25519`/`ECC_curve448` SHALL NOT be offered while the pinned stack line does not support them.
-- Why: ECC policies match Aes256_Sha256_RsaPss strength with smaller keys, but the UA-.NETStandard 1.x line omits the Curve25519/448 variants — offering unsupported policies produces undiagnosable negotiation failures. Maps: OPCUA-P2; Internal.
+ECC security policies (`ECC_nistP256`, `ECC_nistP384`) MAY be enabled where both peers support them.
+- Why: ECC policies match Aes256_Sha256_RsaPss strength with smaller keys; `ECC_curve25519`/`ECC_curve448` are already excluded by the OPU-001 allowlist and by the pinned UA-.NETStandard 1.x line, which omits those variants. Maps: OPCUA-P2; Internal.
 - Verify: `OpcUaEndpointConfigTests` ECC-offer matrix against pinned stack capabilities. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Security Lead. Review: On change.
 
@@ -959,8 +965,8 @@ Assumptions (each carries risk if wrong; all feed §6, VOL01):
 
 - **ASSUMPTION A-VOL11-1** — Default robot command timeouts (ROB-005) and inspect settle time (ROB-019) are set without vendor timing data. Risk: too-short values fault healthy cycles; too-long values delay fault detection. Replace with measured values during Stage 3 commissioning.
 - **ASSUMPTION A-VOL11-2** — Safety-observation freshness (500 ms max age, SAF-009) and in-flight evaluation period (250 ms, SAF-013) assume a PLC/fieldbus gateway that can publish at ≥ 2 Hz. Risk: a slower gateway would force relaxation; relaxation requires Controls & Safety Engineer approval and re-analysis of observation-loss windows.
-- **ASSUMPTION A-VOL11-4** — Heartbeat defaults (1 s period / 3 s loss, ROB-021) assume a dedicated cell network with sub-100 ms round trips. Risk: congested networks cause false observation-loss faults.
-- **ASSUMPTION A-VOL11-6** — The eventual robot vendor transport is assumed to lack native authentication/anti-replay (ROB-007). Risk understated if the vendor offers security features that then go unconfigured — commissioning must positively confirm and enable whatever exists.
+- **ASSUMPTION A-VOL11-3** — Heartbeat defaults (1 s period / 3 s loss, ROB-021) assume a dedicated cell network with sub-100 ms round trips. Risk: congested networks cause false observation-loss faults.
+- **ASSUMPTION A-VOL11-4** — The eventual robot vendor transport is assumed to lack native authentication/anti-replay (ROB-007). Risk understated if the vendor offers security features that then go unconfigured — commissioning must positively confirm and enable whatever exists.
 - **ASSUMPTION A-VOL11-5** — OPC UA session/subscription/transport limits (OPU-019..OPU-021) are pre-Stage-4 sizing guesses. Risk: real MES subscription patterns exceed the quotas and get throttled; revisit with measured Stage 4 traffic.
 
 Open decisions (tracked in §6, VOL01):

@@ -260,7 +260,7 @@ STRIDE, Stage 4 (delta):
 | DS | Info disclosure | DPAPI CurrentUser/null entropy: creds decryptable by same-user process | `SEC-039`; CWE-522 |
 | DF | Info disclosure | Credentials transit plaintext `http://` | `SEC-037`; CWE-319 |
 | DF | Tampering | Forged/altered result record uploaded to MES | `SEC-040`; CWE-345 |
-| P | Spoofing | Unauthenticated/anonymous MES or OPC UA call accepted | `SEC-042`, `IAM-062`; CWE-306/CWE-288 |
+| P | Spoofing | Unauthenticated/anonymous MES or OPC UA call accepted | `SEC-042`; CWE-306/CWE-288 |
 | TB | Elevation | Direct corporate→cell route bypasses DMZ | `SEC-036` |
 | DF | Tampering | Weak OPC UA policy (Basic128Rsa15/Basic256) negotiated | `SEC-038` |
 
@@ -268,7 +268,7 @@ Abuse/misuse cases (S4):
 - **AB-S4-1:** Malware running as the operator account decrypts stored MES API keys via DPAPI and exfiltrates them. Countered by machine-scope DPAPI + secondary entropy or a managed secret store — `SEC-039`.
 - **AB-S4-2:** A MITM on a misconfigured `http://` MES URL captures Basic/API-key credentials. Countered by HTTPS-only + minimum TLS — `SEC-037`.
 - **AB-S4-3:** An attacker forges a "PASS" result record and uploads it to MES to ship a defective lot. Countered by signing result records before upload — `SEC-040`.
-- **AB-S4-4:** An attacker calls the Stage-4 OPC UA/REST surface anonymously to read or command. Countered by authenticating every call and disabling anonymous/`None` — `SEC-042`, `IAM-062`.
+- **AB-S4-4:** An attacker calls the Stage-4 OPC UA/REST surface anonymously to read or command. Countered by authenticating every call and disabling anonymous/`None` — `SEC-042`, `SEC-038`.
 - **AB-S4-5:** The `MesAuthenticationBoundary` stub is left active in production, letting any typed user ID become the audited operator with no credential (`context/repo/security.md` §7.8). Countered by prohibiting the stub in production — `IAM-042`.
 - **AB-S4-6:** A legacy MES forces a deprecated OPC UA policy; the station accepts it. Countered by a policy allowlist with `Basic256Sha256` floor and documented risk acceptance for exceptions — `SEC-038`.
 
@@ -311,21 +311,21 @@ D-18 fixes the boundary: the AOI application is ordinary, non-safety-rated softw
 ### R: Security architecture requirements
 
 **[SEC-001]** (P1 | ALL | IAM, All)
-The system SHALL deny every access decision by default at each trust boundary, allowing only through an explicit rule; the page-authorization default arm SHALL be changed from `_ => true` to deny.
-- Why: default-allow (`RoleAuthorization.cs:41`) exposes any new page to Operators; default-deny is the industrial baseline. Maps: 62443-4-2 CR 2.1; SSDF-PW.9; CWE-862.
+Every trust boundary — page access, service operation, network endpoint, and plugin load — SHALL deny access unless an explicit rule allows it.
+- Why: default-deny is the industrial baseline for every boundary; the concrete `RoleAuthorization` page-arm `_ => true` inversion is owned by IAM-002. Maps: 62443-4-2 CR 2.1; SSDF-PW.9; CWE-862.
 - Verify: fitness function FF-DENY-01 asserts no reachable authorization path returns allow without an explicit rule. Evidence: analyzer + unit test log. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-002]** (P2 | ALL | All)
-Every process and Windows service identity SHALL run with only the privileges required for its function, and the application SHALL NOT require routine local-administrator rights to operate.
-- Why: least privilege limits blast radius of any single compromise. Maps: 62443-4-2 CCSC 3; SSDF-PW.9; 800-82r3.
-- Verify: review checklist SEC-LP-01 against the service-identity matrix (§28.9); runtime check that the app starts as standard user. Evidence: hardening report. Owner: IT Admin (customer). Auto: Partially automated.
+Every process and Windows service identity SHALL run with only the privileges its function requires.
+- Why: least privilege limits blast radius of any single compromise; the no-local-admin-for-interactive-users obligation is owned by IAM-052. Maps: 62443-4-2 CCSC 3; SSDF-PW.9; 800-82r3.
+- Verify: review checklist SEC-LP-01 verifies each process and service identity against the least-privilege service-identity matrix (§28.9). Evidence: hardening report. Owner: IT Admin (customer). Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: Per release.
 
 **[SEC-003]** (P2 | ALL | All)
 The architecture SHALL implement at least four independent security layers — input/ingest validation, service-boundary authorization, artifact/audit integrity, and network segmentation — such that no single layer's failure alone yields a full compromise.
 - Why: defense in depth prevents single-control failure from being catastrophic. Maps: 62443-4-1 SD-2; MS-SDL practice 3; SBD.
-- Verify: threat-model review confirms each critical path is covered by ≥2 layers. Evidence: threat-model document. Owner: Software Architect. Auto: Manual review.
+- Verify: threat-model review confirms all four named layers — ingest validation, service-boundary authorization, artifact/audit integrity, and network segmentation — are present, and that removing any one still leaves each critical path with at least one enforcing control. Evidence: threat-model document. Owner: Software Architect. Auto: Manual review.
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-004]** (P0 | S3–S4 | Decision, RobotAdapter, IAM)
@@ -341,15 +341,15 @@ Every privileged action SHALL produce an audit record containing identity, role,
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-006]** (P1 | ALL | Config, Installer)
-The shipped default configuration SHALL be secure by default: no default password, security logging enabled, unsigned plugin loading disabled, and Demo passwordless mode confined to the Demo operating mode.
-- Why: secure-by-default removes the most common deployment weaknesses. Maps: SBD secure-by-default; SSDF-PW.9; 62443-4-1 SG-1.
-- Verify: gate that inspects the shipped config bundle for insecure defaults. Evidence: config-audit report. Owner: Release Manager. Auto: Fully automated.
+The shipped default configuration SHALL pass secure-default gate FF-CFG-01, which asserts the defaults required by IAM-007, SEC-050, SEC-026, and IAM-014.
+- Why: secure-by-default removes the most common deployment weaknesses; each asserted default is owned by its own requirement and this gate composes them into one verifiable check. Maps: SBD secure-by-default; SSDF-PW.9; 62443-4-1 SG-1.
+- Verify: gate FF-CFG-01 inspects the shipped config bundle and fails if any composed default (no default password, security logging on, unsigned-plugin loading disabled, Demo confined to Demo mode) is violated. Evidence: config-audit report. Owner: Release Manager. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-007]** (P1 | ALL | IAM, UseCases)
-Authorization decisions SHALL be enforced at the service boundary from an authoritative session, and the system SHALL NOT rely on UI-layer permission checks as the only enforcement.
-- Why: the current model enforces most capabilities only in code-behind `EnsurePermission` (`MainWindow.xaml.cs`), which any code path bypasses. Maps: 62443-4-2 CR 2.1; CWE-862; ASVS-V8.
-- Verify: architecture test that each privileged use-case has a service-layer authorization call independent of the view. Evidence: NetArchTest rule log. Owner: Software Lead. Auto: Fully automated.
+Authorization decisions SHALL be computed only in the service or domain layer from an authoritative session, never in the presentation layer.
+- Why: "trust the server" places authorization in the service layer as an architecture principle; the concrete matrix-operation enforcement and the `EnsurePermission`-not-sole rule are owned by IAM-005. Maps: 62443-4-2 CR 2.1; CWE-862; ASVS-V8.
+- Verify: NetArchTest rule that the presentation layer (views and code-behind) contains no authorization-decision logic. Evidence: NetArchTest rule log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-008]** (P3 | ALL | Installer, Diagnostics)
@@ -359,21 +359,21 @@ The workstation image SHALL disable or remove services, ports, and features not 
 - Exception: Allowed — approver: Security Lead. Review: Annual.
 
 **[SEC-009]** (P2 | ALL | All)
-No security control SHALL depend solely on the availability or correctness of the UI process; each SHALL remain effective if the UI is bypassed or automated.
-- Why: 21 views call `AoiDatabase` directly and 14.6k LOC of code-behind hold logic; UI-only controls are not controls. Maps: 62443-4-2 CR 2.1; CWE-602.
+Every security control SHALL remain effective when the UI process is bypassed, automated, or replaced by a headless tool invocation.
+- Why: 21 views call `AoiDatabase` directly and headless tools (`AOI_Monitor.Tools`) exist; a control that runs only in the UI is not a control. Maps: 62443-4-2 CR 2.1; CWE-602.
 - Verify: review that headless/tool invocation paths (`AOI_Monitor.Tools`) enforce the same checks. Evidence: review record. Owner: Software Architect. Auto: Manual review.
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-010]** (P2 | S1–S4 | Inference, CameraAdapter, Update)
-Native-interop components (ONNX Runtime, camera/lighting SDKs, image codecs) SHALL be patched within 30 days of a security release, and managed parsing SHALL be preferred over native parsing for untrusted input where a managed path exists.
+Native-interop components (ONNX Runtime, camera/lighting SDKs, image codecs) SHALL be patched within 30 days of a security release.
 - Why: memory-safety CWEs (416/787/122) dominate the KEV list and live in native code. Maps: KEV; SSDF-PW.4.4; 62443-4-1 SUM-3.
 - Verify: dependency-update SLA gate + `dotnet list package --vulnerable`. Evidence: dependency scan log. Owner: Software Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: Quarterly.
 
 **[SEC-011]** (P3 | ALL | All)
-Each release SHALL include a security architecture description that is a conformant architecture description recording trust boundaries, data flows, and security requirements with rationale.
-- Why: documented security requirements with rationale. Maps: 62443-4-1 SR-3; 42010; SSDF-PW.1.
-- Verify: review that the AD is present, dated, and version-linked. Evidence: architecture document. Owner: Software Architect. Auto: Manual review.
+Each release SHALL include a documented security architecture description recording trust boundaries, data flows, and security requirements with rationale.
+- Why: documented security requirements with rationale; supports the 42010 architecture-description elements without claiming conformance. Maps: 62443-4-1 SR-3; 42010; SSDF-PW.1.
+- Verify: review that the architecture description is present, dated, version-linked, and enumerates the trust boundaries, data flows, and security requirements it claims. Evidence: architecture document. Owner: Software Architect. Auto: Manual review.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[SEC-012]** (P2 | S1–S4 | All)
@@ -413,8 +413,8 @@ Every ingested image, model, and recipe SHALL be treated as untrusted and proces
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-018]** (P1 | S1+ | ModelMgmt, Inference)
-Production stations SHALL reject any inference model artifact that is not a single-file ONNX plus signed manifest, and SHALL NOT load `.pt`, `.pth`, `.pkl`, `.h5`, or any pickle-bearing or code-executing artifact.
-- Why: pickle/`.pt`/`.h5` load executes code; D-03 mandates ONNX-only on stations. Maps: ONNX-SEC; PT-SEC; CWE-502; SSDF-PW.4.
+Production stations SHALL enforce the model-artifact loading allowlist — single-file ONNX plus signed manifest, with pickle-bearing and code-executing formats refused — as specified for artifact loading in §29 / VOL08.
+- Why: the enforcement point is the station (this section); the format and manifest allowlist detail is owned by the SER catalogue, §29 / VOL08, per D-03. Maps: ONNX-SEC; CWE-502; D-03.
 - Verify: test that non-ONNX and external-data artifacts are refused; loader allowlist check. Evidence: loader test log. Owner: ML Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -491,15 +491,15 @@ A motion command SHALL be issued only when the current safety status is affirmat
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-031]** (P1 | S3+ | RobotAdapter, SafetyStatus)
-Production builds SHALL NOT contain any safety-bypass flag that defaults to enabling motion, and `PermitSafetyBypassForSimulation` SHALL default to disabled and be unavailable outside Simulation mode.
-- Why: the flag defaults true today and keys on `Status != Ready`, granting motion to a misbehaving adapter (`RobotCycleService.cs:37`). Maps: 13849-1; 25010-safety; Internal.
+Production builds SHALL NOT contain any safety-bypass flag that defaults to enabling motion.
+- Why: a safety-bypass flag that defaults to enabling motion grants motion to a misbehaving adapter; the specific `PermitSafetyBypassForSimulation` default and scope are owned by SEC-067. Maps: 13849-1; 25010-safety; Internal.
 - Verify: build-config test that the bypass is absent/disabled in production builds. Evidence: config test log. Owner: Controls & Safety Engineer. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-032]** (P0 | S3+ | SafetyStatus)
-When the safety-status observation channel is lost or its reading is stale beyond a defined interval, the application SHALL enter a safe state and block motion.
+When the safety-status observation channel is lost or its reading is stale beyond a configurable staleness interval (documented default 500 ms), the application SHALL enter a safe state and block motion.
 - Why: D-18 requires the app to fail safe when the observation channel is lost. Maps: 13849-1; 13850; 25010-safety.
-- Verify: test that channel loss/staleness triggers safe state within the interval. Evidence: fault-injection test. Owner: Controls & Safety Engineer. Auto: Fully automated.
+- Verify: test that channel loss or staleness beyond the 500 ms default triggers the safe state within the interval. Evidence: fault-injection test. Owner: Controls & Safety Engineer. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-033]** (P1 | S3+ | RobotAdapter, SafetyStatus)
@@ -509,9 +509,9 @@ An e-stop or interlock transition to not-safe SHALL trigger an in-flight abort o
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-034]** (P2 | S3+ | RobotAdapter)
-Robot and PLC controllers SHALL be registered only through a reviewed commissioning step; drop-folder plugin loading of robot/PLC controllers is prohibited.
-- Why: preserves the repo's deliberate no-robot-loader posture as a binding control. Maps: 62443-4-2 CR 3.4; CWE-94; Internal.
-- Verify: review that no robot/PLC drop-folder loader exists; registration is code-reviewed. Evidence: commissioning procedure. Owner: Controls & Safety Engineer. Auto: Manual review.
+Loading a robot or PLC controller from a drop-folder or via `Assembly.LoadFrom` SHALL be prohibited on production stations as an untrusted-code-execution path.
+- Why: frames the no-robot-loader posture as a security control against arbitrary code execution; the commissioning-registration mechanism is owned by the ROB catalogue, §34 / VOL11. Maps: CWE-94; 62443-4-2 CR 3.4; Internal.
+- Verify: review that no robot/PLC drop-folder or `Assembly.LoadFrom` path exists on a production station. Evidence: code and commissioning review. Owner: Controls & Safety Engineer. Auto: Manual review.
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-035]** (P1 | S3+ | RobotAdapter, IAM)
@@ -551,9 +551,9 @@ An inspection result record SHALL be signed or otherwise tamper-evident before u
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-041]** (P2 | S4 | MES, REST, OPCUA)
-Result transmission SHALL be outbound-only from the station, and any inbound MES/OPC UA command SHALL be authenticated and schema-validated before action.
-- Why: limits the Stage 4 inbound attack surface and blocks unvalidated commands. Maps: 62443-4-2 CR 3.5; ASVS-V4; CWE-20.
-- Verify: test that unauthenticated or schema-invalid inbound commands are rejected. Evidence: endpoint test log. Owner: Software Lead. Auto: Fully automated.
+Result transmission SHALL be outbound-only from the station.
+- Why: limits the Stage 4 inbound attack surface; inbound-command schema-validation is owned by SEC-068 and authentication by SEC-042. Maps: 62443-4-2 CR 3.5; ASVS-V4; CWE-20.
+- Verify: test that the station opens no inbound result-transmission listener and only pushes results outbound. Evidence: endpoint test log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Security Lead. Review: Per release.
 
 **[SEC-042]** (P1 | S4 | REST, OPCUA, IAM)
@@ -653,8 +653,8 @@ Training artifacts SHALL enter production only as a single-file ONNX plus signed
 - Exception: Not allowed. Review: Per release.
 
 **[SEC-058]** (P1 | ALL | Build, CI, Installer)
-Code-signing private keys SHALL be held in hardware/HSM custody in a controlled signing environment and SHALL NOT reside on developer machines or ordinary CI runners.
-- Why: D-12 and 62443-4-1 SM-8 require signing-key protection; keys on dev/CI are a supply-chain compromise. Maps: D-12; 62443-4-1 SM-8; SSDF-PS.2.
+Code-signing private keys SHALL be held under the hardware key-custody controls owned by §30 / VOL08, isolated from developer machines and ordinary CI runners.
+- Why: D-12 and 62443-4-1 SM-8 require signing-key protection; the concrete hardware-assurance custody floor is owned by the CRY catalogue, §30 / VOL08. Maps: D-12; 62443-4-1 SM-8; SSDF-PS.2.
 - Verify: review of key-custody procedure; scan that no signing key material is in the repo or runner. Evidence: key-custody attestation. Owner: Release Manager. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -699,6 +699,24 @@ The product documentation SHALL declare a target capability security level per f
 - Why: 62443 integrators need declared SL-C claims per FR to slot the cell into their zone model. Maps: 62443-4-2 SL-C; 62443-3-3; 62443-3-2 ZCR5.
 - Verify: review that the SL-C vector is declared and justified per FR. Evidence: SL-C declaration. Owner: Security Lead. Auto: External assessment.
 - Exception: Allowed — approver: Security Lead. Review: Annual.
+
+**[SEC-066]** (P2 | S1–S4 | Inference, CameraAdapter, ImageStore)
+For each untrusted-input format that has a managed decoder available, the application SHALL use the managed decoder rather than a native codec.
+- Why: managed decoders avoid the memory-safety CWE class native codecs carry on untrusted input; this makes the decoder-choice rule checkable, separate from the SEC-010 patch SLA. Maps: CWE-119; SSDF-PW.4.4; ASVS-V5.
+- Verify: analyzer FF-NATIVE-01 enumerates native-codec call sites on untrusted-input paths and asserts a managed decoder is used wherever one exists. Evidence: analyzer log. Owner: Software Lead. Auto: Fully automated.
+- Exception: Allowed — approver: Security Lead. Review: Quarterly.
+
+**[SEC-067]** (P1 | S3+ | RobotAdapter, SafetyStatus, Simulation)
+`PermitSafetyBypassForSimulation` SHALL default to disabled and remain unavailable outside Simulation mode.
+- Why: the flag defaults true today and keys on `Status != Ready`, granting motion to a misbehaving adapter (`RobotCycleService.cs:37`); the general production prohibition is SEC-031. Maps: 13849-1; 25010-safety; Internal.
+- Verify: build-config test that the bypass is disabled by default and cannot be enabled outside Simulation mode. Evidence: config test log. Owner: Controls & Safety Engineer. Auto: Fully automated.
+- Exception: Not allowed. Review: Per release.
+
+**[SEC-068]** (P2 | S4 | MES, OPCUA, REST)
+Any inbound MES or OPC UA command SHALL be schema-validated before it is acted upon.
+- Why: separates inbound-command validation from the outbound-only rule (SEC-041); authentication of the same commands is owned by SEC-042. Maps: CWE-20; ASVS-V5; 62443-4-2 CR 3.5.
+- Verify: test that a schema-invalid inbound command is rejected before any action. Evidence: endpoint validation test. Owner: Software Lead. Auto: Fully automated.
+- Exception: Not allowed. Review: Per release.
 
 ---
 
@@ -787,9 +805,9 @@ The system SHALL implement the ten-identity model of §28.1, mapping human roles
 - Exception: Not allowed. Review: Per release.
 
 **[IAM-002]** (P0 | ALL | IAM, HMI)
-The `RoleAuthorization` page and operation gate SHALL default to deny for unknown keys; the `_ => true` default arm SHALL be removed.
-- Why: default-allow (`RoleAuthorization.cs:41`) grants unknown pages to Operators. Maps: CWE-862; 62443-4-2 CR 2.1; SSDF-PW.9.
-- Verify: unit test that an unknown page/operation key returns deny. Evidence: authz unit test. Owner: Software Lead. Auto: Fully automated.
+The `RoleAuthorization` page-access gate SHALL default to deny for unknown page keys, replacing the `_ => true` default arm.
+- Why: default-allow (`RoleAuthorization.cs:41`) grants unknown pages to Operators; service-operation keys are owned by IAM-017. Maps: CWE-862; 62443-4-2 CR 2.1; SSDF-PW.9.
+- Verify: unit test that an unknown page key returns deny. Evidence: authz unit test. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[IAM-003]** (P1 | ALL | IAM)
@@ -877,9 +895,9 @@ A change to the active authentication mode SHALL be a privileged, audited operat
 - Exception: Not allowed. Review: Per release.
 
 **[IAM-017]** (P1 | ALL | IAM, UseCases)
-The authorization service SHALL deny any operation key not explicitly present in the permissions matrix.
-- Why: default-deny for unknown operations mirrors the page-gate inversion. Maps: CWE-862; 62443-4-2 CR 2.1; SSDF-PW.9.
-- Verify: test that an unmapped operation key returns deny. Evidence: authz unit test. Owner: Software Lead. Auto: Fully automated.
+The authorization service SHALL deny any service-operation key not explicitly present in the permissions matrix.
+- Why: default-deny for unknown service-operation keys complements the IAM-002 page-gate inversion. Maps: CWE-862; 62443-4-2 CR 2.1; SSDF-PW.9.
+- Verify: test that an unmapped service-operation key returns deny. Evidence: authz unit test. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[IAM-018]** (P2 | ALL | Recipe, IAM, Audit)
@@ -1003,15 +1021,15 @@ Failed authentication attempts SHALL be audited and SHALL be capable of raising 
 - Exception: Not allowed. Review: Per release.
 
 **[IAM-038]** (P2 | ALL | Audit, IAM)
-Every privileged action SHALL be audited with user identity, role, and station identifier.
-- Why: preserves and mandates the repo's existing identity-carrying audit rows. Maps: 62443-4-2 CR 2.8; CR 2.11; ASVS-V16.
-- Verify: test that privileged actions write identity+role+station. Evidence: audit-field test. Owner: Security Lead. Auto: Fully automated.
+Every privileged action's audit record SHALL identify the target resource and record whether the action succeeded or failed.
+- Why: SEC-005 fixes the actor fields (identity, role, station, timestamp, reason); the target object and success/failure outcome are equally required to reconstruct a privileged event. Maps: 62443-4-2 CR 2.8; CR 2.11; ASVS-V16.
+- Verify: test that a privileged action's audit row carries a target-resource identifier and a success/failure outcome. Evidence: audit-field test. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[IAM-039]** (P1 | S1–S4 | Decision, Audit, IAM)
-An override of an AI result SHALL require a reason code, SHALL preserve the original AI result unaltered, and SHALL record both the override and the original.
-- Why: overrides without a preserved original destroy the quality-evidence chain. Maps: 62443-4-2 CR 2.8; 25010-accountability; Internal.
-- Verify: test that an override stores a reason code and the original AI verdict remains retrievable. Evidence: override-audit test. Owner: QA Lead. Auto: Fully automated.
+An override of an AI result SHALL preserve the original AI verdict unaltered and store it alongside the override record.
+- Why: overrides without a preserved original destroy the quality-evidence chain; the reason-code requirement is owned by IAM-041. Maps: 62443-4-2 CR 2.8; 25010-accountability; Internal.
+- Verify: test that an override stores the original AI verdict unaltered and it remains retrievable alongside the override. Evidence: override-audit test. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[IAM-040]** (P2 | S1–S4 | Decision, IAM, Audit)
@@ -1081,8 +1099,8 @@ Creating a break-glass account SHALL require two authorized persons and a future
 - Exception: Not allowed. Review: Per release.
 
 **[IAM-051]** (P1 | ALL | IAM, Installer)
-Windows service identities SHALL run under least-privilege accounts, and the product SHALL NOT run its services as LocalSystem where a scoped account suffices.
-- Why: least-privilege service identities limit compromise blast radius (D-01). Maps: 62443-4-2 CCSC 3; SSDF-PW.9; 800-82r3.
+The product SHALL NOT run any Windows service as LocalSystem where a named, scoped least-privilege account suffices.
+- Why: concrete service-identity mechanism (named scoped accounts, not LocalSystem); the general least-privilege principle is owned by SEC-002. Maps: 62443-4-2 CCSC 3; SSDF-PW.9; 800-82r3.
 - Verify: review of the service-identity matrix against least-privilege; runtime check of account scope. Evidence: service-identity review. Owner: IT Admin (customer). Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: Per release.
 
@@ -1147,9 +1165,9 @@ Disabling an account SHALL immediately terminate its active sessions and block s
 - Exception: Not allowed. Review: Per release.
 
 **[IAM-062]** (P2 | S4 | IAM, OPCUA, MES)
-Identity-provider and MES-endpoint configuration changes SHALL require re-authentication and audit, and anonymous access to any privileged OPC UA operation SHALL be disabled.
-- Why: changing where identity comes from is high-impact; anonymous privileged OPC UA is unauthenticated critical access. Maps: CWE-306; OPCUA-P2; 62443-4-2 CR 1.1.
-- Verify: test that IdP/endpoint changes enforce reauth+audit and anonymous privileged OPC UA is refused. Evidence: idp-config test. Owner: Security Lead. Auto: Fully automated.
+Identity-provider and MES-endpoint configuration changes SHALL require step-up re-authentication and an audit record.
+- Why: changing where identity comes from is high-impact; the anonymous-privileged-OPC-UA prohibition is owned by SEC-042. Maps: 62443-4-2 CR 1.5; CR 2.8; ASVS-V7.
+- Verify: test that an IdP or MES-endpoint change enforces re-authentication and writes an audit row. Evidence: idp-config test. Owner: Security Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 ---
@@ -1165,6 +1183,7 @@ Labeled assumptions carried by this volume (merged into §6 at assembly):
 - **A-VOL07-5:** Target capability security level baseline is `SL-C 2` per FR (`SEC-065`), with Stage 3/4 raising selected FRs; the exact per-FR/per-zone `SL-T` awaits the customer's 62443-3-2 risk assessment.
 - **A-VOL07-6:** Break-glass default maximum lifetime is 8 h with post-use review within one business day (`IAM-047`/`IAM-049`) — values pending operations review.
 - **A-VOL07-7:** Failed-attempt throttling schedule (progressive backoff, e.g., escalating delay after 5 failures, capped) is a starting value pending shop-floor tuning (`IAM-034`/`IAM-036`); Operator read-only viewing is never blocked (`IAM-035`).
+- **A-VOL07-8:** Safety-status staleness interval default is 500 ms (`SEC-032`), chosen as a conservative sub-second bound for a robot-cell observation channel. Risk: too-tight a value could nuisance-trip the safe state; the value is configurable and pending controls tuning.
 
 Open decisions to be resolved (feed §6 / VOL01):
 

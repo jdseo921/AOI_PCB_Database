@@ -43,14 +43,14 @@ Table 31-1 — Separated lifecycles, entry/exit criteria, owners:
 | 10 | Approval | Evaluation + security reports attached | Recorded acceptance decision with criteria snapshot | Product Owner |
 | 11 | Packaging | Approved candidate | Release package with manifest per §31.8 | Release Manager |
 | 12 | Signing | Packaged artifact | Detached signature by release key; verification log | Release Manager |
-| 13 | Deployment | Signed package | Package installed, signature verified, state `Deployed` (inactive) | Release Manager |
-| 14 | Activation | Deployed model; acceptance PASS or unexpired audited waiver | Model active; canary/shadow plan started; audit event | ML Lead |
+| 13 | Deployment | Signed package | Package installed, signature verified, state `Staged` (pre-activation, inactive) | Release Manager |
+| 14 | Activation | `Staged` model; acceptance PASS or unexpired audited waiver | State `Active`; canary/shadow plan started; audit event | ML Lead |
 | 15 | Monitoring | Model active; monitoring plan | Continuous — exits only into rollback or retirement | QA Lead |
 | 16 | Rollback | Trigger from monitoring plan met | Prior signed model active; incident record | Software Lead |
 | 17 | Retirement | Retirement decision recorded | Model inactive, archived, blocked from activation | ML Lead |
 | 18 | Deletion | Retention expiry or customer demand | Deletion certificate (artifact hashes, date, basis, approver) | Product Owner |
 
-The repo already persists a nine-state model lifecycle (`ModelLifecycleState`, `AOI_Monitor/Models/InspectionModelConfiguration.cs:127-137`) with audited transitions in `ModelLifecycleService` — this standard keeps that machinery and extends it (see AIM-003) rather than replacing it. The known bypass — `ModelRegistryService.SetActiveModel` admits `Registered` models with no acceptance run and carries no service-layer role check (`AOI_Monitor/Services/ModelRegistryService.cs:126-149`; repo-reality gap §9b-5) — is closed by AIM-011.
+The repo already persists a nine-state model lifecycle (`ModelLifecycleState`, `AOI_Monitor/Models/InspectionModelConfiguration.cs:127-137`) with audited transitions in `ModelLifecycleService` — this standard keeps that machinery and aligns it to the twelve normative model states of §19/VOL04 (see AIM-003) rather than replacing it wholesale. The known bypass — `ModelRegistryService.SetActiveModel` admits `Registered` models with no acceptance run and carries no service-layer role check (`AOI_Monitor/Services/ModelRegistryService.cs:126-149`; repo-reality gap §9b-5) — is closed by AIM-011.
 
 ```mermaid
 flowchart TD
@@ -87,13 +87,13 @@ Every inspection engine type registered in `InspectionEngineFactory` (`AOI_Monit
 - Exception: Not allowed. Review: Per release.
 
 **[AIM-002]** (P2 | ALL | Training, ModelMgmt)
-Each of the eighteen lifecycles in Table 31-1 SHALL start only after its listed entry criteria are met and complete only when its listed exit-criteria evidence is stored in the model registry or dataset ledger.
+Each of the eighteen lifecycles in Table 31-1 SHALL store its listed exit-criteria evidence in the model registry or dataset ledger before it is treated as complete (entry criteria are enumerated per lifecycle in Table 31-1).
 - Why: lifecycle smearing (labeling during training, tuning on test data) is the root cause of optimistic metrics and untraceable releases. Maps: SSDF-AI PS.3.1; AI-RMF MAP 1; 62443-4-1 SM-1.
 - Verify: release-audit checklist CHK-AIM-02 walks one release end-to-end against Table 31-1. Evidence: lifecycle evidence index in the release package. Owner: QA Lead. Auto: Manual review.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[AIM-003]** (P3 | ALL | ModelMgmt, Persistence)
-The persisted model lifecycle state machine (`ModelLifecycleState`, `AOI_Monitor/Models/InspectionModelConfiguration.cs:127-137`) SHALL be extended with distinct states for Packaged, Signed, ShadowCanary, and RolledBack so every Table 31-1 boundary is observable in the database.
+The persisted model lifecycle state machine (`ModelLifecycleState`, `AOI_Monitor/Models/InspectionModelConfiguration.cs:127-137`) SHALL be migrated to the twelve normative model states defined in §19/VOL04, applying that section's state-migration mapping, so every Table 31-1 boundary is observable in the database.
 - Why: states that exist only in people's heads cannot be audited or gated; today deployment and canary are indistinguishable from full activation. Maps: AISVS C3; Internal.
 - Verify: xUnit suite ModelLifecycleStateTests (state-transition matrix). Evidence: CI test log; schema migration record. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Annual.
@@ -141,15 +141,15 @@ Only the latest acceptance run for a model SHALL be promotable to production can
 - Exception: Not allowed. Review: Annual.
 
 **[AIM-011]** (P0 | ALL | ModelMgmt, IAM)
-`ModelRegistryService.SetActiveModel` (`AOI_Monitor/Services/ModelRegistryService.cs:126-149`) SHALL enforce, inside the service layer, both a role-authorization check and a lifecycle-state check admitting only models in `Deployed` state or under an unexpired audited waiver.
+`ModelRegistryService.SetActiveModel` (`AOI_Monitor/Services/ModelRegistryService.cs:126-149`) SHALL enforce, inside the service layer, both a role-authorization check and a lifecycle-state check admitting only models in `Staged` state (the pre-activation, inactive state of §19/VOL04) or under an unexpired audited waiver.
 - Why: today only `Retired`/`AcceptanceFailed` are blocked and no role check exists, so any code path can bypass the acceptance gate entirely (repo-reality gap §9b-5). Maps: AISVS C5; 62443-4-2 CR 2.1; SSDF-AI PS.1.1.
-- Verify: new xUnit suite ModelActivationAuthorizationTests (Operator denied; Registered/RuntimeValidated states denied; waiver path audited). Evidence: CI test log. Owner: Software Lead. Auto: Fully automated.
+- Verify: new xUnit suite ModelActivationAuthorizationTests (Operator denied; a non-`Staged` state such as `Candidate` denied; waiver path audited). Evidence: CI test log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[AIM-012]** (P2 | ALL | ModelMgmt, Inference)
-An expired deployment waiver SHALL demote the affected model from active service at the next inspection-start check instead of remaining a readiness warning (`AOI_Monitor/Services/FactoryReadinessService.cs:410-416`).
-- Why: an advisory-only expiry means a "temporary" waiver is permanent in practice; enforcement at inspection start avoids mid-cycle disruption while closing the hole. Maps: AISVS C3; AI-RMF MANAGE 2.4; Internal.
-- Verify: xUnit case in ModelActivationAuthorizationTests simulating an expired waiver. Evidence: CI test log; audit demotion event. Owner: Software Lead. Auto: Fully automated.
+An expired deployment waiver SHALL force the affected model to the inspection-blocked `Degraded` state at the next self-test pass, per §19/VOL04, instead of remaining a readiness warning (`AOI_Monitor/Services/FactoryReadinessService.cs:410-416`).
+- Why: an advisory-only expiry means a "temporary" waiver is permanent in practice; forcing the model to the inspection-blocked `Degraded` state at the next self-test pass — the enforcement point and outcome owned by §19/VOL04 — closes the hole without mid-cycle disruption. Maps: AISVS C3; AI-RMF MANAGE 2.4; Internal.
+- Verify: xUnit case in ModelActivationAuthorizationTests simulating an expired waiver. Evidence: CI test log; audit `Degraded`-transition event. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Product Owner. Review: Per release.
 
 **[AIM-013]** (P2 | S2+ | ModelMgmt, Diagnostics)
@@ -189,8 +189,8 @@ Every training, validation, and test image SHALL have a provenance record writte
 - Exception: Allowed — approver: ML Lead. Review: Quarterly.
 
 **[AIM-018]** (P0 | ALL | Training, Licensing)
-Customer-supplied images SHALL be used for model training only under a written contractual authorization whose reference is stored on the dataset revision.
-- Why: training on customer IP without contract basis is a breach exposure that no engineering control can remediate after the fact. Maps: GDPR; PIPA; Internal.
+Customer-supplied images SHALL be used for model training only under the written authorization required by the privacy catalogue (§46/VOL16), whose reference is stored on the dataset revision.
+- Why: training on customer IP without a lawful basis is a breach exposure that no engineering control can remediate after the fact; the privacy catalogue owns the authorization/consent rule and this stores its reference as the AI-side dataset hook. Maps: GDPR; PIPA; Internal.
 - Verify: dataset-release checklist CHK-AIM-AUTH-01 (authorization reference mandatory); FF-AIM-PROV-02 blocks release without it. Evidence: contract reference on the dataset-release record. Owner: Product Owner. Auto: Partially automated.
 - Exception: Not allowed. Review: Annual.
 
@@ -382,9 +382,9 @@ Model artifacts and manifests at rest SHALL be protected by least-privilege ACLs
 - Exception: Allowed — approver: Security Lead. Review: Quarterly.
 
 **[AIM-046]** (P2 | S4 | MES, REST)
-Any Stage 4 network interface exposing inference or model outputs SHALL apply per-client authentication, rate limiting, and query logging before go-live.
-- Why: query access enables model extraction and black-box evasion search (AI 100-2 §2.4.4, §2.2.2); the controls are cheap before exposure and impossible to retrofit after cloning. Maps: AI-100-2 §2.4.4; AISVS 11.3; 62443-3-3 SR 1.1.
-- Verify: interface security review CHK-AIM-API-01; rate-limit integration test. Evidence: review record; test log. Owner: Security Lead. Auto: Partially automated.
+Any Stage 4 network interface exposing inference or model outputs SHALL enforce per-client authentication before go-live; rate limiting and query logging for that interface are governed by the security-architecture and identity catalogues (§27–28/VOL07) and the logging/audit catalogue (§38/VOL13).
+- Why: query access enables model extraction and black-box evasion search (AI 100-2 §2.4.4, §2.2.2); authentication is cheap before exposure and impossible to retrofit after cloning. Maps: AI-100-2 §2.4.4; AISVS 11.3; 62443-3-3 SR 1.1.
+- Verify: interface security review CHK-AIM-API-01 confirming per-client authentication before go-live. Evidence: review record; authentication test log. Owner: Security Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Security Lead. Review: Per release.
 
 **[AIM-047]** (P3 | S4 | MES)
@@ -406,9 +406,9 @@ Training-pipeline code under `Scripts/ml/` SHALL be subject to the same pull-req
 - Exception: Not allowed. Review: Per release.
 
 **[AIM-050]** (P2 | ALL | Training, CI)
-The training environment SHALL install Python dependencies only from a hash-verified lockfile (pip `--require-hashes` or a uv lockfile) per D-07.
-- Why: PyPI supply-chain compromise of an ML dependency executes attacker code exactly where datasets, backbones, and export live. Maps: SSDF-AI PO.3.2; SLSA; 800-161.
-- Verify: FF-AIM-DEP-01 (CI fails on unpinned or hash-less installs in pipeline setup). Evidence: lockfile in repo; CI gate log. Owner: ML Lead. Auto: Fully automated.
+The training environment SHALL install Python dependencies only from a hash-verified lockfile (pip `--require-hashes` or a uv lockfile) that pins PyTorch at version 2.6 or later, per D-07.
+- Why: PyPI supply-chain compromise of an ML dependency executes attacker code exactly where datasets, backbones, and export live; the PyTorch ≥2.6 pin also guarantees the restricted-unpickler `weights_only=True` load default (released 2025-01-29) that AIM-056 lints against being reopened. Maps: SSDF-AI PO.3.2; SLSA; 800-161.
+- Verify: FF-AIM-DEP-01 (CI fails on unpinned or hash-less installs, or a pinned PyTorch below 2.6, in pipeline setup). Evidence: lockfile in repo; CI gate log. Owner: ML Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[AIM-051]** (P3 | ALL | Training, Diagnostics)
@@ -442,14 +442,14 @@ Production stations SHALL NOT load any model artifact other than a manifest-veri
 - Exception: Not allowed. Review: Per release.
 
 **[AIM-055]** (P1 | ALL | ModelMgmt)
-Model ingest SHALL reject ONNX files containing external-data tensor references, admitting single-file models only.
-- Why: the `external_data` path-traversal CVE class (CVE-2024-27318 plus incomplete-fix follow-ups) keeps reopening; refusing the feature removes the class. Maps: CWE-22; ONNX-SEC; SSDF-AI PW.6.1.
+Model ingest SHALL apply, to every model artifact before registration, the single-file-ONNX / external-data-rejection loading rule owned by the serialization catalogue (§29/VOL08).
+- Why: the `external_data` path-traversal CVE class (CVE-2024-27318 plus incomplete-fix follow-ups) keeps reopening; the serialization catalogue owns the format rule and this binds the AI-side ingest path to it rather than duplicating the constraint. Maps: CWE-22; ONNX-SEC; SSDF-AI PW.6.1.
 - Verify: xUnit case in ModelIngestFormatTests with an external-data ONNX fixture. Evidence: CI test log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
 **[AIM-056]** (P2 | ALL | Training, CI)
-CI SHALL fail on any `weights_only=False` occurrence or unreviewed `torch.serialization.add_safe_globals` entry in training code, with PyTorch pinned at version 2.6 or later.
-- Why: `torch.load` defaults to the restricted unpickler only from PyTorch 2.6 (released 2025-01-29); one `weights_only=False` reopens arbitrary code execution on checkpoint load. Maps: PT-SEC; CWE-502; SSDF-AI PW.6.1.
+CI SHALL fail on any `weights_only=False` occurrence or unreviewed `torch.serialization.add_safe_globals` entry in training code.
+- Why: one `weights_only=False` reopens arbitrary code execution on checkpoint load; the PyTorch ≥2.6 floor that makes `weights_only=True` the default is bound by AIM-050. Maps: PT-SEC; CWE-502; SSDF-AI PW.6.1.
 - Verify: FF-AIM-LINT-01 (regex/AST lint gate over `Scripts/ml/`). Evidence: CI gate log. Owner: ML Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Security Lead. Review: Quarterly.
 
@@ -460,9 +460,9 @@ Intermediate and exchanged training weights SHALL use safetensors (or ONNX for d
 - Exception: Allowed — approver: Security Lead. Review: Quarterly.
 
 **[AIM-058]** (P1 | ALL | Inference, Update)
-The product SHALL pin the exact ONNX Runtime version per release and adopt ONNX Runtime patch releases containing security fixes within 30 days of publication.
-- Why: ONNX Runtime publishes no LTS line; malformed-model memory-safety fixes ship in ordinary patch releases (13 in 1.27.0), so lag time is exposure time (D-03). Maps: ONNX-SEC; SSDF-AI RV.1.1; KEV.
-- Verify: FF-AIM-ORT-01 compares pinned version age against the MSRC/GitHub release feed. Evidence: lockfile pin; patch-adoption log. Owner: Software Lead. Auto: Partially automated.
+The product SHALL pin the exact ONNX Runtime version per release, with the security-patch adoption cadence for that runtime governed by the supply-chain catalogue (§42/VOL15).
+- Why: ONNX Runtime publishes no LTS line and malformed-model memory-safety fixes ship in ordinary patch releases (13 in 1.27.0), so an exact per-release pin is the AI-side anchor the supply-chain patch cadence acts on (D-03). Maps: ONNX-SEC; SSDF-AI RV.1.1; KEV.
+- Verify: FF-AIM-ORT-01 asserts an exact ONNX Runtime version pin in the release lockfile. Evidence: lockfile pin per release. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Security Lead. Review: Quarterly.
 
 **[AIM-059]** (P2 | ALL | Inference)
@@ -546,7 +546,7 @@ The monitoring plan SHALL define retraining triggers — drift alarm, false-call
 - Exception: Allowed — approver: QA Lead. Review: Quarterly.
 
 **[AIM-071]** (P1 | S2+ | Decision)
-While any drift alarm is active for a recipe, the system SHALL disable automatic OK verdicts for that recipe, forcing REVIEW disposition until the alarm is cleared.
+While any optical or sensor drift alarm (camera, lighting, or calibration drift per §31.6) is active for a recipe, the system SHALL disable automatic OK verdicts for that recipe, forcing REVIEW disposition until the alarm is cleared.
 - Why: continuing unattended acceptance during a known drift condition converts a maintenance signal into escapes; failing toward review is the only defensible posture. Maps: AI-RMF MANAGE 2.4; Internal.
 - Verify: xUnit suite DriftAlarmDispositionTests. Evidence: CI test log; disposition audit under simulated alarm. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: QA Lead. Review: Per release.
@@ -650,7 +650,7 @@ Every acceptance run SHALL report the abstention (REVIEW) rate and the OOD-flag 
 - Exception: Allowed — approver: QA Lead. Review: Per release.
 
 **[AIM-087]** (P3 | ALL | Inference)
-Re-running the gate dataset twice on the same station SHALL yield identical verdicts for deterministic engines, with any nondeterministic engine documenting its measured verdict-agreement rate and tolerance.
+Re-running the gate dataset twice on the same station SHALL yield identical verdicts for deterministic engines, with any nondeterministic engine documenting a measured verdict-agreement rate of at least 99.5 % on the gate dataset together with its tolerance.
 - Why: run-to-run flicker is a measurement-system failure (the Gage R&R analogue of `RobustnessStudyService`); undocumented nondeterminism makes escapes irreproducible and disputes unresolvable. Maps: AITG-MOD-06; Internal.
 - Verify: repeatability step in the acceptance harness (FF-AIM-MET-13). Evidence: agreement rate in acceptance runs. Owner: QA Lead. Auto: Fully automated.
 - Exception: Allowed — approver: QA Lead. Review: Per release.
@@ -703,9 +703,9 @@ Each shipped model SHALL be accompanied by a machine-readable ML-BOM in CycloneD
 - Verify: FF-AIM-MLBOM-01 (CycloneDX 1.7.1 schema validation of the ML-BOM). Evidence: ML-BOM per release package. Owner: Release Manager. Auto: Fully automated.
 - Exception: Allowed — approver: Security Lead. Review: Per release.
 
-**[AIM-095]** (P3 | ALL | ModelMgmt, Documentation)
+**[AIM-095]** (P3 | ALL | ModelMgmt, Export)
 Each released model SHALL ship a model card stating intended use, the evaluated slices (per AIM-081), known limitations, out-of-scope board types and conditions, and the taxonomy version, extending the release-limitations text already written at `AOI_Monitor/Services/ModelAcceptanceService.cs:297-302`.
-- Why: undocumented scope invites use of a model outside its evidence base; the repo already writes free-text limitations, and this promotes that to a structured transparency record a reviewer can check. Maps: AI-RMF MAP 1.1; AISVS C3; AITG-APP-14.
+- Why: undocumented scope invites use of a model outside its evidence base; the repo already writes free-text limitations, and this promotes that to a structured transparency record a reviewer can check. Maps: AI-RMF MAP 1.1; AISVS C3.
 - Verify: model-card template check CHK-AIM-CARD-01. Evidence: model card in each release package. Owner: ML Lead. Auto: Manual review.
 - Exception: Allowed — approver: Product Owner. Review: Per release.
 
@@ -765,7 +765,7 @@ The false-call rate and confirmed-escape count per active model SHALL be compute
 
 **[AIM-104]** (P3 | S2+ | Decision, Persistence)
 Every operator-confirmed field escape and false call SHALL be recorded against the active model version and dataset revision and made available to the retraining-trigger evaluation of AIM-070.
-- Why: the feedback loop that improves a model is also the loop an attacker skews (model skewing), so attributing each disposition to a model version makes both genuine improvement and abuse auditable. Maps: SSDF-AI RV.1.1; AI-100-2 §2.3; MLSTOP10.
+- Why: the feedback loop that improves a model is also the loop an attacker skews (model skewing), so attributing each disposition to a model version makes both genuine improvement and abuse auditable. Maps: SSDF-AI RV.1.1; AI-100-2 §2.3; AISVS C12.
 - Verify: xUnit suite EscapeFeedbackAttributionTests. Evidence: CI test log; disposition-to-model attribution rows. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: QA Lead. Review: Per release.
 
@@ -776,8 +776,8 @@ Each release SHALL execute a timed rollback drill demonstrating that the previou
 - Exception: Allowed — approver: Release Manager. Review: Per release.
 
 **[AIM-106]** (P1 | S2+ | Decision, ModelMgmt)
-On a sustained production metric breach defined in the monitoring plan, the system SHALL suspend automatic OK verdicts — forcing REVIEW or rollback per the plan — instead of continuing unattended acceptance.
-- Why: continuing to auto-accept through a known degradation converts a monitoring signal into shipped escapes, and failing toward review is the only defensible posture, mirroring the drift rule AIM-071. Maps: AI-RMF MANAGE 2.4; SSDF-AI RV.2.2; Internal.
+On a sustained model-quality metric breach (false-call or escape trend) defined in the monitoring plan and not already covered by the optical/sensor drift rule AIM-071, the system SHALL suspend automatic OK verdicts — forcing REVIEW or rollback per the plan — instead of continuing unattended acceptance.
+- Why: continuing to auto-accept through a known degradation converts a monitoring signal into shipped escapes, and failing toward review is the only defensible posture, complementing the drift rule AIM-071 on a disjoint trigger class. Maps: AI-RMF MANAGE 2.4; SSDF-AI RV.2.2; Internal.
 - Verify: xUnit suite ProductionBreachDispositionTests. Evidence: CI test log; disposition audit under simulated breach. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: QA Lead. Review: Per release.
 

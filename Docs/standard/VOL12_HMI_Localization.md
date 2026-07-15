@@ -31,10 +31,20 @@ Severity finding (carried from the specification-defect register, SD-11): the cu
 
 The operator must never have to ask "what is the machine doing, with which model and recipe, on which board, as whom, and is any of this simulated?" The persistent shell banner (`Docs/HMI_Style_Guide.md`, Banner section; `MainWindow.xaml.cs` footer/status paths) is the single always-visible instrument strip for this information.
 
+The five operator-facing banner state labels are deliberately coarse projections of the canonical inspection state machine owned by §17 (ORC, VOL04); that section's 22-state FSM is the authoritative state vocabulary, and this projection is maintained in lockstep with it so one state vocabulary governs the fleet:
+
+| Banner label | Underlying §17 (VOL04) FSM state(s) |
+|---|---|
+| idle | Idle |
+| inspecting | BoardLoading, BoardPresent, Positioning, Acquiring, Inspecting, Evaluating, Persisting |
+| reviewing | AwaitingOperatorReview |
+| error | Faulted, ConfigurationInvalid, AcquisitionFailed, Degraded |
+| stopped | Paused, Maintenance, ShuttingDown, EmergencyStopped |
+
 #### R: State and identity visibility
 
 **[HMI-001]** (P1 | ALL | HMI)
-The persistent shell banner SHALL display the current machine state and inspection state (idle, inspecting, reviewing, error, stopped) at all times on every page.
+The persistent shell banner SHALL display the current machine state and inspection state (idle, inspecting, reviewing, error, stopped — the §17 FSM projection defined in §36.2) at all times on every page.
 - Why: operators act on state they cannot verify; hidden state causes wrong interventions (CWE-451 UI misrepresentation). Maps: CWE-451; 800-82; 25010.
 - Verify: `HmiLayoutAuditTests` banner assertions plus new suite `ShellBannerContentTests`. Evidence: `hmi_layout_audit.json`. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
@@ -123,7 +133,7 @@ Alarm acknowledgement and fault reset SHALL be implemented as two separate UI co
 - Exception: Not allowed. Review: Per release.
 
 **[HMI-012]** (P2 | ALL | HMI, Audit)
-Every alarm acknowledgement and every fault reset SHALL create an audit event recording user ID, role, timestamp (UTC), alarm ID, and action taken.
+Every alarm acknowledgement and every fault reset SHALL create an audit event carrying the fields defined in HMI-039 plus the alarm ID and the action taken.
 - Why: `AlarmEvent` already carries `AcknowledgedBy`/`ResolvedBy`; without an immutable audit row the who-silenced-what question is unanswerable in an escape investigation. Maps: 62443-4-2 CR 2.8; ASVS-V16; SSDF-PW.1.
 - Verify: `AlarmLifecycleHmiTests` audit assertions against `AuditEvents`. Evidence: audit rows in test DB. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
@@ -185,9 +195,15 @@ Every page SHALL render at 1920x1080 without clipping of text, buttons, inputs, 
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[HMI-020]** (P2 | ALL | HMI)
-Every page SHALL remain fully usable (no clipping, no unreachable controls) at Windows DPI scaling of 100%, 125%, and 150%, and SHOULD remain usable at 200%.
+Every page SHALL remain fully usable (no clipping, no unreachable controls) at Windows DPI scaling of 100%, 125%, and 150%.
 - Why: factory panel PCs commonly run 125/150%; fixed-pixel assumptions clip under scaling (`Docs/HMI_Style_Guide.md` Spacing rules). Maps: Internal; 25010.
 - Verify: `HmiLayoutAuditTests` DPI matrix runs + manual screenshot evidence per AGENTS Definition of Done. Evidence: `hmi_layout_audit.json` + screenshots in stage-exit package. Owner: QA Lead. Auto: Partially automated.
+- Exception: Allowed — approver: Software Architect. Review: Per release.
+
+**[HMI-051]** (P3 | ALL | HMI)
+Every page SHOULD remain fully usable (no clipping, no unreachable controls) at Windows DPI scaling of 200%.
+- Why: some factory panel PCs run 200% on 4K line-side displays; usability at 200% is desirable but, unlike 100/125/150%, a deviation is acceptable with recorded rationale rather than release-blocking. Maps: Internal; 25010.
+- Verify: `HmiLayoutAuditTests` DPI matrix 200% run (advisory) + manual screenshot spot check. Evidence: `hmi_layout_audit.json` DPI section. Owner: QA Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 ### 36.5 Interaction and layout robustness
@@ -247,9 +263,27 @@ Every operation that can exceed the 50 ms UI-thread budget SHALL run asynchronou
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[HMI-029]** (P2 | ALL | HMI)
-Page navigation SHALL remain cancellable, suppress duplicate requests, show the loading overlay only after 150 ms, and keep p95 page-switch time within the budget published in `ui_navigation_performance.json` gates.
+Page navigation SHALL remain cancellable via the shell cancellation token, so that a superseded navigation is abandoned rather than completed.
 - Why: the shell's navigation lifecycle (sequence tokens, cancellation, delayed overlay — `MainWindow.xaml.cs:168-261`) is load-bearing operator experience and must not regress during the MVVM migration. Maps: Internal; 25010.
 - Verify: `UiNavigationPerformanceTests` (existing CI gate PERF-001 lineage). Evidence: `ui_navigation_performance.json`. Owner: Software Lead. Auto: Fully automated.
+- Exception: Allowed — approver: Software Architect. Review: Per release.
+
+**[HMI-052]** (P2 | ALL | HMI)
+Page navigation SHALL suppress duplicate navigation requests to the same page key while a navigation to that page is already in flight.
+- Why: rapid repeated activation of a nav control otherwise queues redundant page loads that stall the UI thread; the shell already suppresses duplicates (`MainWindow.xaml.cs:168-261`) and must not regress. Maps: Internal; CWE-799; 25010.
+- Verify: `UiNavigationPerformanceTests` duplicate-suppression cases. Evidence: `ui_navigation_performance.json`. Owner: Software Lead. Auto: Fully automated.
+- Exception: Allowed — approver: Software Architect. Review: Per release.
+
+**[HMI-053]** (P3 | ALL | HMI)
+The navigation loading overlay SHALL appear only after a navigation has been in progress for at least 150 ms.
+- Why: showing the overlay for sub-150 ms transitions produces a distracting flash on fast page switches; the delayed-overlay behavior exists (`MainWindow.xaml.cs:168-261`) and is load-bearing operator experience. Maps: Internal; 25010.
+- Verify: `UiNavigationPerformanceTests` overlay-delay cases. Evidence: `ui_navigation_performance.json`. Owner: Software Lead. Auto: Fully automated.
+- Exception: Allowed — approver: Software Architect. Review: Per release.
+
+**[HMI-054]** (P2 | ALL | HMI)
+The p95 page-switch time SHALL stay within the budget published in the `ui_navigation_performance.json` gates.
+- Why: navigation latency above budget reads as a hang and drives repeated clicks; the existing CI gate (PERF-001 lineage) must remain green through the MVVM migration. Maps: Internal; 25010.
+- Verify: `UiNavigationPerformanceTests` p95 budget assertion (existing CI gate). Evidence: `ui_navigation_performance.json`. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 ### 36.7 Command safety and approval workflows
@@ -326,9 +360,15 @@ Before a recipe revision can be approved or activated, the HMI SHALL display a f
 - Exception: Not allowed. Review: Per release.
 
 **[HMI-041]** (P1 | ALL | HMI, ModelMgmt)
-Before a model can be activated, the HMI SHALL display the model's manifest contents — SHA-256, taxonomy version, training provenance summary, acceptance state, and manifest signature-verification result per D-03 — and SHALL block activation when signature or hash verification fails.
+Before a model can be activated, the HMI SHALL display the model's manifest contents — SHA-256, taxonomy version, training-provenance summary, acceptance state, and manifest signature-verification result per D-03.
 - Why: repo gap 9b-5: SHA-256 is computed at registration but never re-verified at activation, and the acceptance gate is bypassable via `SetActiveModel`; the activation screen is where verification must become visible and binding. Maps: SSDF-PS.2; SLSA; CWE-494; AISVS.
 - Verify: new suite `ModelActivationManifestTests` (tampered artifact blocks activation; manifest fields rendered). Evidence: test run. Owner: ML Lead. Auto: Fully automated.
+- Exception: Not allowed. Review: Per release.
+
+**[HMI-055]** (P1 | ALL | HMI, ModelMgmt)
+The HMI SHALL block model activation when the model manifest's signature or hash verification fails.
+- Why: repo gap 9b-5: SHA-256 is computed at registration but never re-verified at activation, and the acceptance gate is bypassable via `SetActiveModel`; blocking on verification failure is where artifact integrity becomes binding at the UI. Maps: SSDF-PS.2; SLSA; CWE-494.
+- Verify: `ModelActivationManifestTests` (tampered artifact blocks activation). Evidence: test run. Owner: ML Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 ### 36.8 Error and failure presentation
@@ -336,13 +376,13 @@ Before a model can be activated, the HMI SHALL display the model's manifest cont
 #### R: Errors, sessions, and unsaved work
 
 **[HMI-042]** (P1 | ALL | HMI, Diagnostics)
-Operator-facing error surfaces SHALL show a stable error code from the §25 `AOI-Exxxx` registry plus an operator-safe message and UTC timestamp, and SHALL NOT show stack traces, exception type names, file paths, or connection strings.
+Operator-facing error surfaces SHALL show only a stable `AOI-Exxxx` code from the §25 registry, an operator-safe message, and a UTC timestamp — never stack traces, exception type names, file paths, or connection strings.
 - Why: stack traces leak internals (CWE-209) and are useless to operators; the crash pipeline already writes full detail to `CrashReportService` reports for engineers, and the CQ-MSG-001 gate bans stack traces in MessageBoxes. Maps: CWE-209; ASVS-V16; SSDF-PW.5.
 - Verify: CQ-MSG-001 static gate + `UiErrorBoundaryService` tests asserting code+message shape. Evidence: CI gate log + test run. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[HMI-043]** (P2 | ALL | HMI)
-Every operator-initiated action SHALL produce a visible outcome (success indication, error card, or progress state); failures SHALL NOT be silently discarded.
+Every operator-initiated action SHALL produce a visible outcome — a success indication, an error card, or a progress state — so that no failure is silently discarded.
 - Why: silent failure teaches operators the system is flaky and hides real faults; the error-boundary pattern (`UiErrorBoundaryService.RunAsync`) turns refresh failures into visible cards and is the mandated pattern; the 332 raw `MessageBox.Show` call sites in Views migrate to it under the §23 code standard. Maps: CWE-390; Internal; 25010.
 - Verify: `CommandGuardTests` outcome-visibility cases + empty-catch gates (CQ-CATCH-001, PR-CATCH-001). Evidence: CI gate log + test run. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
@@ -354,9 +394,15 @@ Navigation away from a page holding unsaved edits (recipe, settings, disposition
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[HMI-045]** (P2 | ALL | HMI, IAM)
-On session expiry (per the §28 session policy), the HMI SHALL complete or safely persist any in-flight inspection cycle, lock all state-changing controls to view-only, preserve on-screen results, and require re-authentication to resume — it SHALL NOT abort mid-cycle work or discard unpersisted results (`ASSUMPTION A-VOL12-5`).
+On session expiry (per the §28 session policy), the HMI SHALL lock all state-changing controls to view-only while preserving on-screen results and requiring re-authentication before any control is reactivated (`ASSUMPTION A-VOL12-5`).
 - Why: a hard logout mid-inspection either loses evidence or, worse, leaves hardware mid-sequence; expiry must degrade to observe-only, mirroring D-18's observe-only safety posture. Maps: ASVS-V7; 62443-4-2 CR 2.5; Internal.
-- Verify: new suite `SessionExpiryHmiTests` (expiry injected mid-batch: cycle persists, controls lock, audit row written). Evidence: test run. Owner: Security Lead. Auto: Fully automated.
+- Verify: new suite `SessionExpiryHmiTests` (expiry injected mid-batch: controls lock to view-only, audit row written). Evidence: test run. Owner: Security Lead. Auto: Fully automated.
+- Exception: Allowed — approver: Security Lead. Review: Per release.
+
+**[HMI-056]** (P2 | ALL | HMI, IAM)
+On session expiry, the HMI SHALL complete or durably persist any in-flight inspection cycle before locking controls, and SHALL NOT abort mid-cycle work or discard unpersisted results (`ASSUMPTION A-VOL12-5`).
+- Why: a hard logout mid-inspection either loses evidence or leaves hardware mid-sequence; expiry must preserve the cycle rather than tear it down, mirroring D-18's observe-only safety posture. Maps: ASVS-V7; 62443-4-2 CR 2.5; Internal.
+- Verify: `SessionExpiryHmiTests` (expiry injected mid-batch: cycle persists, no unpersisted results discarded). Evidence: test run. Owner: Security Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Security Lead. Review: Per release.
 
 ### 36.9 AI-result and measurement presentation
@@ -393,9 +439,15 @@ Every result display SHALL render "OK", "not detected", "not inspected", and "in
 - Exception: Not allowed. Review: Per release.
 
 **[HMI-048]** (P2 | ALL | HMI, Export)
-Aggregations, yield statistics, and charts SHALL exclude not-inspected and inspection-failed items from pass/fail denominators and SHALL label their counts separately, never counting missing results as zero defects.
+Aggregations, yield statistics, and charts SHALL exclude not-inspected and inspection-failed items from pass/fail denominators, never counting missing results as zero defects.
 - Why: missing-as-zero silently inflates yield and hides coverage gaps in exactly the reports managers act on; export-side format rules live in §37 (DAT category). Maps: CWE-451; Internal; AI-RMF.
 - Verify: `ResultStateRenderingTests` aggregate cases + export verification suite (`ExportVerification` gate lineage). Evidence: test run + export verification report. Owner: QA Lead. Auto: Fully automated.
+- Exception: Not allowed. Review: Per release.
+
+**[HMI-057]** (P2 | ALL | HMI, Export)
+Not-inspected and inspection-failed counts SHALL be labeled and reported separately from pass/fail results, never presented as zero defects.
+- Why: missing-as-zero silently inflates yield and hides coverage gaps in exactly the reports managers act on; separate labeling makes the coverage gap visible. Maps: CWE-451; Internal; AI-RMF.
+- Verify: `ResultStateRenderingTests` separate-label cases + export verification suite. Evidence: test run + export verification report. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[HMI-049]** (P0 | ALL | HMI, Inference)
@@ -412,12 +464,21 @@ Any inference output flagged as uncertain, abstained, out-of-distribution, or be
 
 ### 36.10 Usability and accessibility verification cadence
 
-Two obligations close the loop between the automated audits above and real humans. They are stated once here and enforced as stage-gate entries (§39/VOL14 owns the gate mechanics; §51/VOL17 owns Definition of Done):
+Two obligations close the loop between the automated audits above and real humans: a structured usability session before each stage exit, and a periodic manual accessibility review. Both are catalogued records (HMI-058, HMI-059) enforced as stage-gate / release-gate entries (§39/VOL14 owns the gate mechanics; §51/VOL17 owns Definition of Done). Usability sessions use customer personnel where available and may be conducted in Korean (`ASSUMPTION A-VOL12-6`); their findings are triaged into the pilot-issue workflow (`AOI_Monitor/Services/PilotIssueService.cs`). The per-release half of the accessibility cadence is the automated layout, contrast, and reinforcement audits (FF-HMI-04/05); the annual half is the manual review bound by HMI-059.
 
-- **Usability testing.** Before each stage exit (Stage 1–4), a structured usability session SHALL be run with at least one production operator and at least one process engineer (customer personnel where available, `ASSUMPTION A-VOL12-6` note: sessions may run in Korean), covering the stage's new workflows end-to-end; findings are triaged into the pilot-issue workflow (`AOI_Monitor/Services/PilotIssueService.cs`). Evidence: session notes + issue list in the stage-exit package. Owner: Product Owner with QA Lead.
-- **Accessibility review.** Per release: the automated layout, contrast, and reinforcement audits (FF-HMI-04/05). Annually: a manual accessibility review — color-vision-deficiency simulation pass over all status screens, keyboard-only walkthrough of engineer screens (HMI-021), and DPI matrix spot check. Evidence: annual review record. Owner: QA Lead.
+#### R: Usability and accessibility cadence
 
-These two cadences are verification obligations attached to HMI-013/015/016/019/020/021 rather than separate requirement records, to keep the record set atomic.
+**[HMI-058]** (P2 | ALL | HMI)
+A structured usability session SHALL be conducted before each stage exit (Stage 1–4) with at least one production operator and at least one process engineer, covering the stage's new workflows end-to-end.
+- Why: automated layout audits cannot detect workflow confusion or operator-safety friction; direct observation before stage exit catches usability defects the gates cannot. Maps: Internal; 25010; SBD.
+- Verify: session-notes and issue-list review as a stage-exit gate entry (§39/VOL14 owns gate mechanics); findings triaged via `PilotIssueService`. Evidence: session notes + issue list in the stage-exit package. Owner: Product Owner. Auto: Manual review.
+- Exception: Allowed — approver: Product Owner. Review: Per release.
+
+**[HMI-059]** (P3 | ALL | HMI)
+A manual accessibility review — color-vision-deficiency simulation over all status screens, a keyboard-only walkthrough of engineer screens, and a DPI-matrix spot check — SHALL be performed at least annually.
+- Why: the per-release automated audits (FF-HMI-04/05) cannot fully model human color-vision deficiency or keyboard-only operation; an annual human pass closes that residual gap. Maps: Internal; 25010.
+- Verify: annual accessibility-review record covering CVD simulation, keyboard-only walkthrough (HMI-021), and DPI spot checks. Evidence: annual review record. Owner: QA Lead. Auto: Manual review.
+- Exception: Allowed — approver: Software Architect. Review: Annual.
 
 ---
 
@@ -504,8 +565,8 @@ Every CSV export SHALL declare its encoding, decimal separator, and timestamp co
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[LOC-009]** (P2 | ALL | HMI, Persistence)
-Timestamps SHALL be persisted in UTC per D-16 and §21, and every displayed local time SHALL be labeled with its timezone or UTC-offset.
-- Why: unlabeled local times across multi-region fleets make cross-site incident timelines unreconstructable; the display label is the LOC-owned half of D-16. Maps: Internal; 62443-4-2 CR 2.8; SSDF-PW.1.
+Every displayed local time SHALL be labeled with its timezone or UTC-offset.
+- Why: unlabeled local times across multi-region fleets make cross-site incident timelines unreconstructable; UTC persistence is governed by §21/D-16, and this record binds only the LOC-owned display label. Maps: Internal; 62443-4-2 CR 2.8; SSDF-PW.1.
 - Verify: `ResultStateRenderingTests` timestamp-label cases + DB ISO-8601 checks in `AoiDatabaseTests`. Evidence: test run. Owner: Software Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
@@ -524,9 +585,9 @@ Every release that adds or changes Korean UI text SHALL obtain recorded sign-off
 - Exception: Allowed — approver: Product Owner. Review: Per release.
 
 **[LOC-012]** (P1 | ALL | HMI, Diagnostics)
-All alarm messages, recommended operator actions, and operator-safe error messages SHALL be 100% translated in every supported language before release; a completeness gate SHALL block release on any untranslated entry.
+All alarm messages, recommended operator actions, and operator-safe error messages SHALL be fully translated in every supported language before release.
 - Why: an untranslated Critical alarm is an unreadable Critical alarm; alarms and error text are the highest-consequence strings in the product. Maps: Internal; 25010; 800-82.
-- Verify: FF-LOC-02: completeness scan over the alarm catalogue and `AOI-Exxxx` operator-message table (registered in the §52 catalogue). Evidence: CI gate log. Owner: QA Lead. Auto: Fully automated.
+- Verify: FF-LOC-02 completeness scan over the alarm catalogue and `AOI-Exxxx` operator-message table blocks release on any untranslated entry (registered in the §52 catalogue). Evidence: CI gate log. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 **[LOC-013]** (P1 | ALL | HMI, Diagnostics)
@@ -537,8 +598,14 @@ Error codes (`AOI-Exxxx`), alarm IDs, and audit event category tokens SHALL rend
 
 **[LOC-014]** (P0 | ALL | Persistence, Taxonomy)
 Machine-readable identifiers — defect taxonomy IDs (D-17), page keys, enum tokens, CSV column keys, verdict tokens (OK/NG/REVIEW), station IDs, recipe and model IDs — SHALL be persisted and exchanged only in their canonical untranslated form, with translation applied at render time only.
-- Why: the repo already persists some Korean display strings and reverse-maps them (`UiPreferencesService.ReverseLocalize`, lines 846-857) — a data-corruption time bomb: any dictionary change orphans stored values; D-17's stable string IDs exist precisely to prevent this. Existing Korean-persisted values SHALL be migrated to canonical tokens by schema migration. Maps: Internal; SSDF-PW.1; CWE-451.
+- Why: the repo already persists some Korean display strings and reverse-maps them (`UiPreferencesService.ReverseLocalize`, lines 846-857) — a data-corruption time bomb: any dictionary change orphans stored values; D-17's stable string IDs exist precisely to prevent this. Remediation of the existing Korean-persisted values is bound separately by LOC-023. Maps: Internal; SSDF-PW.1; CWE-451.
 - Verify: FF-LOC-03: scan for `ReverseLocalize` call sites (target: zero after migration) + `AoiDatabaseTests` canonical-token assertions. Evidence: CI gate log + migration test run. Owner: Software Architect. Auto: Fully automated.
+- Exception: Not allowed. Review: Per release.
+
+**[LOC-023]** (P1 | ALL | Persistence, Taxonomy)
+Existing values persisted as Korean display strings SHALL be migrated to canonical untranslated tokens by a versioned schema migration before the next release.
+- Why: the repo persists some Korean display strings reverse-mapped via `UiPreferencesService.ReverseLocalize` (lines 846-857); until migrated, any dictionary change orphans stored values — a standing data-corruption hazard that LOC-014 prohibits going forward. Maps: Internal; CWE-451; SSDF-PW.1.
+- Verify: `AoiDatabaseTests` migration cases (Korean-persisted rows converted to canonical tokens) + FF-LOC-03 `ReverseLocalize` call-site scan reaching zero. Evidence: migration test run + CI gate log. Owner: Software Architect. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
 ### 47.6 R: Regional deployment profiles
@@ -602,7 +669,7 @@ Assumptions (each carries risk if wrong; all are revisit-on-evidence):
 - **ASSUMPTION A-VOL12-3** — The interim critical-action list in HMI-032 stands until the §28 catalogue (VOL07) is merged; any divergence is reconciled in favor of §28 at document merge. Risk: temporary over- or under-coverage of re-authentication prompts.
 - **ASSUMPTION A-VOL12-4** — +35% layout expansion tolerance is derived from observed EN↔KO string-growth extremes plus buffer. Risk: individual compound Korean technical phrases may exceed it; such cases route through the wrap/trim+tooltip rule (HMI-022).
 - **ASSUMPTION A-VOL12-5** — A session-expiry mechanism will exist per §28; none exists in the repo today (no timeout, no lock — `context` security survey). HMI-045 binds only the HMI behavior at expiry, not the timeout value.
-- **ASSUMPTION A-VOL12-6** — v1.0 supported locales are exactly en-US and ko-KR; each additional locale is a change-controlled addition entering through the LOC-001/002/011/012 gates.
+- **ASSUMPTION A-VOL12-6** — v1.0 supported locales are exactly en-US and ko-KR; each additional locale is a change-controlled addition entering through the LOC-001/002/011/012 gates. Usability sessions (§36.10, HMI-058) may be conducted in Korean, since ko-KR is a supported operator locale.
 - **ASSUMPTION A-VOL12-7** — Canary soak duration is 24 hours or 3 production shifts, whichever is longer. Risk: low-volume lines may need calendar-longer soaks; site overlay may extend but never shorten it.
 
 Open decisions (for the §6 register, VOL01):

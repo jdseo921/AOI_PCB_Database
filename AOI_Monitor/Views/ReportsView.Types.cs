@@ -1,0 +1,830 @@
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using AOI_Monitor.Data;
+using AOI_Monitor.Models;
+using AOI_Monitor.Services;
+using AOI_Monitor.ViewModels;
+using Microsoft.Win32;
+
+namespace AOI_Monitor.Views;
+
+public partial class ReportsView
+{
+    private sealed class BenchmarkOptionsDialog : Window
+    {
+        private readonly ComboBox _sourceCombo = new();
+        private readonly TextBox _imageFolderText = new();
+        private readonly TextBox _runCountText = new() { Text = "25" };
+        private readonly TextBox _durationSecondsText = new();
+        private readonly TextBox _outputFolderText = new();
+
+        public BenchmarkInspectionOptions? Options { get; private set; }
+
+        public BenchmarkOptionsDialog()
+        {
+            Title = "Performance Benchmark";
+            Width = 640;
+            Height = 360;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            ResizeMode = ResizeMode.NoResize;
+            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#11161A"));
+            Foreground = Brushes.White;
+            _outputFolderText.Text = BenchmarkInspectionService.BenchmarkRoot;
+            ConfigureSourceOptions();
+            Content = BuildContent();
+        }
+
+        private Grid BuildContent()
+        {
+            var root = new Grid { Margin = new Thickness(16) };
+            for (var i = 0; i < 8; i++)
+                root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(165) });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
+
+            AddText(root, "Runs the current inspection engine and records latency traces for every benchmarked image/frame.", 0, 0, 3, "#DCE5EB", bold: true);
+            AddLabeledControl(root, "Source", _sourceCombo, 1);
+            AddLabeledFolder(root, "Image folder", _imageFolderText, 2, "Select", OnSelectImageFolder);
+            AddLabeledText(root, "Run count", _runCountText, 3);
+            AddLabeledText(root, "Duration seconds (optional)", _durationSecondsText, 4);
+            AddLabeledFolder(root, "Output folder", _outputFolderText, 5, "Select", OnSelectOutputFolder);
+            AddText(root, "Stage 2 and Full Factory readiness require Active Camera Source with real, non-simulated camera frames. Folder simulation is labeled simulation-only.", 6, 0, 3, "#E1A334");
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 16, 0, 0),
+            };
+            var cancel = new Button { Content = "Cancel", Width = 92, Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
+            var run = new Button { Content = "Run", Width = 92, IsDefault = true };
+            run.Click += OnRunClick;
+            buttons.Children.Add(cancel);
+            buttons.Children.Add(run);
+            Grid.SetRow(buttons, 7);
+            Grid.SetColumnSpan(buttons, 3);
+            root.Children.Add(buttons);
+
+            return root;
+        }
+
+        private void ConfigureSourceOptions()
+        {
+            _sourceCombo.Items.Add(new ComboBoxItem { Content = "Image folder", Tag = BenchmarkInspectionSourceKind.ImageFolder });
+            _sourceCombo.Items.Add(new ComboBoxItem { Content = "Folder camera simulation", Tag = BenchmarkInspectionSourceKind.FolderCameraSimulation });
+            _sourceCombo.Items.Add(new ComboBoxItem { Content = "Active camera source", Tag = BenchmarkInspectionSourceKind.ActiveCameraSource });
+            _sourceCombo.SelectedIndex = 0;
+            _sourceCombo.SelectionChanged += (_, _) =>
+            {
+                var needsFolder = SelectedSource() is BenchmarkInspectionSourceKind.ImageFolder or BenchmarkInspectionSourceKind.FolderCameraSimulation;
+                _imageFolderText.IsEnabled = needsFolder;
+            };
+        }
+
+        private void OnSelectImageFolder(object sender, RoutedEventArgs e)
+        {
+            if (SelectFolder("Select benchmark image folder") is { } folder)
+                _imageFolderText.Text = folder;
+        }
+
+        private void OnSelectOutputFolder(object sender, RoutedEventArgs e)
+        {
+            if (SelectFolder("Select benchmark report output folder") is { } folder)
+                _outputFolderText.Text = folder;
+        }
+
+        private void OnRunClick(object sender, RoutedEventArgs e)
+        {
+            var source = SelectedSource();
+            if (source is BenchmarkInspectionSourceKind.ImageFolder or BenchmarkInspectionSourceKind.FolderCameraSimulation &&
+                !Directory.Exists(_imageFolderText.Text))
+            {
+                MessageBox.Show("Select a valid image folder.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!int.TryParse(_runCountText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var runCount) || runCount <= 0)
+            {
+                MessageBox.Show("Enter a run count greater than 0.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            TimeSpan? duration = null;
+            if (!string.IsNullOrWhiteSpace(_durationSecondsText.Text))
+            {
+                if (!double.TryParse(_durationSecondsText.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) || seconds <= 0)
+                {
+                    MessageBox.Show("Duration must be blank or greater than 0 seconds.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                duration = TimeSpan.FromSeconds(seconds);
+            }
+
+            Options = new BenchmarkInspectionOptions
+            {
+                SourceKind = source,
+                ImageFolder = _imageFolderText.Text.Trim(),
+                RunCount = runCount,
+                Duration = duration,
+                OutputRoot = string.IsNullOrWhiteSpace(_outputFolderText.Text) ? BenchmarkInspectionService.BenchmarkRoot : _outputFolderText.Text.Trim(),
+                AcceptanceThresholdMs = 1000,
+            };
+            DialogResult = true;
+        }
+
+        private BenchmarkInspectionSourceKind SelectedSource()
+            => (_sourceCombo.SelectedItem as ComboBoxItem)?.Tag is BenchmarkInspectionSourceKind source
+                ? source
+                : BenchmarkInspectionSourceKind.ImageFolder;
+
+        private static string? SelectFolder(string title)
+        {
+            var dialog = new OpenFolderDialog
+            {
+                Title = title,
+                Multiselect = false,
+            };
+
+            return dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName)
+                ? dialog.FolderName
+                : null;
+        }
+
+        private static void AddLabeledFolder(Grid root, string label, TextBox box, int row, string buttonText, RoutedEventHandler handler)
+        {
+            AddLabeledText(root, label, box, row);
+            var button = new Button { Content = buttonText, Margin = new Thickness(6, 4, 0, 4), MinHeight = 28 };
+            button.Click += handler;
+            Grid.SetRow(button, row);
+            Grid.SetColumn(button, 2);
+            root.Children.Add(button);
+        }
+
+        private static void AddLabeledText(Grid root, string label, TextBox box, int row)
+        {
+            box.Margin = new Thickness(0, 4, 0, 4);
+            box.MinHeight = 28;
+            AddLabeledControl(root, label, box, row);
+        }
+
+        private static void AddLabeledControl(Grid root, string label, Control control, int row)
+        {
+            var labelBlock = new TextBlock
+            {
+                Text = label,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9AA6AF")),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 4, 8, 4),
+            };
+            control.Margin = new Thickness(0, 4, 0, 4);
+            control.MinHeight = 28;
+            Grid.SetRow(labelBlock, row);
+            Grid.SetColumn(labelBlock, 0);
+            Grid.SetRow(control, row);
+            Grid.SetColumn(control, 1);
+            root.Children.Add(labelBlock);
+            root.Children.Add(control);
+        }
+
+        private static void AddText(Grid root, string text, int row, int column, int columnSpan, string color, bool bold = false)
+        {
+            var block = new TextBlock
+            {
+                Text = text,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color)),
+                FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
+                Margin = new Thickness(0, 0, 0, 12),
+            };
+            Grid.SetRow(block, row);
+            Grid.SetColumn(block, column);
+            Grid.SetColumnSpan(block, columnSpan);
+            root.Children.Add(block);
+        }
+    }
+
+    private sealed class SoakTestDialog : Window
+    {
+        private readonly TextBox _imageFolderText = new();
+        private readonly TextBox _durationMinutesText = new() { Text = "2" };
+        private readonly TextBox _delayMillisecondsText = new() { Text = "250" };
+        private readonly ComboBox _profileCombo = new();
+        private readonly ComboBox _engineCombo = new();
+        private readonly TextBox _outputFolderText = new();
+
+        public SoakTestOptions? Options { get; private set; }
+
+        public SoakTestDialog(string defaultOutputFolder, string defaultEngineKey)
+        {
+            Title = "Run Local Soak Test";
+            Width = 640;
+            Height = 430;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            ResizeMode = ResizeMode.NoResize;
+            Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#11161A"));
+            Foreground = Brushes.White;
+
+            _outputFolderText.Text = defaultOutputFolder;
+            ConfigureEngineOptions(defaultEngineKey);
+            ConfigureProfileOptions();
+            Content = BuildContent();
+        }
+
+        private Grid BuildContent()
+        {
+            var root = new Grid { Margin = new Thickness(16) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(92) });
+
+            AddText(root, "Controlled local soak test using Folder Camera Simulation frames. This does not connect to real camera hardware.", 0, 0, 3, "#DCE5EB", bold: true);
+            AddLabeledFolder(root, "Image folder", _imageFolderText, 1, "Select", OnSelectImageFolder);
+            AddLabeledControl(root, "Test profile", _profileCombo, 2);
+            AddLabeledText(root, "Duration (minutes)", _durationMinutesText, 3);
+            AddLabeledText(root, "Delay between inspections (ms)", _delayMillisecondsText, 4);
+            AddLabeledControl(root, "Selected engine", _engineCombo, 5);
+            AddLabeledFolder(root, "Output folder", _outputFolderText, 6, "Select", OnSelectOutputFolder);
+            AddText(root, "Factory PoC profile runs for 480 minutes. Folder Camera Simulation evidence is not real camera validation.", 7, 0, 3, "#9AA6AF");
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 16, 0, 0),
+            };
+            var cancel = new Button { Content = "Cancel", Width = 92, Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
+            var run = new Button { Content = "Run", Width = 92, IsDefault = true };
+            run.Click += OnRunClick;
+            buttons.Children.Add(cancel);
+            buttons.Children.Add(run);
+            Grid.SetRow(buttons, 8);
+            Grid.SetColumnSpan(buttons, 3);
+            root.Children.Add(buttons);
+
+            return root;
+        }
+
+        private void ConfigureEngineOptions(string defaultEngineKey)
+        {
+            _engineCombo.Items.Add(new ComboBoxItem { Content = "Pixel Difference Prototype Engine", Tag = InspectionEngineFactory.DefaultEngineKey });
+            _engineCombo.Items.Add(new ComboBoxItem { Content = "ONNX ML Model (configured)", Tag = InspectionEngineFactory.OnnxEngineKey });
+            _engineCombo.Items.Add(new ComboBoxItem { Content = "Learned PCB Visual Model (image-only Stage 1)", Tag = InspectionEngineFactory.LearnedVisualEngineKey });
+            var normalized = InspectionEngineFactory.NormalizeEngineKey(defaultEngineKey);
+            _engineCombo.SelectedIndex = normalized switch
+            {
+                InspectionEngineFactory.OnnxEngineKey => 1,
+                InspectionEngineFactory.LearnedVisualEngineKey => 2,
+                _ => 0,
+            };
+        }
+
+        private void ConfigureProfileOptions()
+        {
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "Smoke (5 min)", Tag = SoakTestProfile.Smoke });
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "30Minute (30 min)", Tag = SoakTestProfile.ThirtyMinute });
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "8HourFactoryPoC (8 hours)", Tag = SoakTestProfile.EightHourFactoryPoC });
+            _profileCombo.Items.Add(new ComboBoxItem { Content = "Custom", Tag = SoakTestProfile.Custom });
+            _profileCombo.SelectedIndex = 0;
+            _durationMinutesText.Text = "5";
+            _durationMinutesText.IsEnabled = false;
+            _profileCombo.SelectionChanged += (_, _) =>
+            {
+                var profile = SelectedProfile();
+                _durationMinutesText.IsEnabled = profile == SoakTestProfile.Custom;
+                _durationMinutesText.Text = profile switch
+                {
+                    SoakTestProfile.Smoke => "5",
+                    SoakTestProfile.ThirtyMinute => "30",
+                    SoakTestProfile.EightHourFactoryPoC => "480",
+                    _ => _durationMinutesText.Text,
+                };
+            };
+        }
+
+        private void OnSelectImageFolder(object sender, RoutedEventArgs e)
+        {
+            if (SelectFolder("Select soak-test image folder") is { } folder)
+                _imageFolderText.Text = folder;
+        }
+
+        private void OnSelectOutputFolder(object sender, RoutedEventArgs e)
+        {
+            if (SelectFolder("Select soak-test report output folder") is { } folder)
+                _outputFolderText.Text = folder;
+        }
+
+        private void OnRunClick(object sender, RoutedEventArgs e)
+        {
+            if (!Directory.Exists(_imageFolderText.Text))
+            {
+                MessageBox.Show("Select a valid image folder.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!double.TryParse(_durationMinutesText.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var durationMinutes) || durationMinutes <= 0)
+            {
+                MessageBox.Show("Enter a duration greater than 0 minutes.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!double.TryParse(_delayMillisecondsText.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var delayMs) || delayMs < 0)
+            {
+                MessageBox.Show("Enter a delay of 0 ms or greater.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(_outputFolderText.Text))
+            {
+                MessageBox.Show("Select an output folder.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var engineKey = ((_engineCombo.SelectedItem as ComboBoxItem)?.Tag as string)
+                ?? InspectionEngineFactory.DefaultEngineKey;
+            Options = new SoakTestOptions(
+                _imageFolderText.Text.Trim(),
+                TimeSpan.FromMinutes(durationMinutes),
+                TimeSpan.FromMilliseconds(delayMs),
+                engineKey,
+                _outputFolderText.Text.Trim(),
+                "UNKNOWN",
+                "TBOX-MAIN",
+                "SOAK-TEST");
+            DialogResult = true;
+        }
+
+        private SoakTestProfile SelectedProfile()
+            => (_profileCombo.SelectedItem as ComboBoxItem)?.Tag is SoakTestProfile profile
+                ? profile
+                : SoakTestProfile.Custom;
+
+        private static string? SelectFolder(string title)
+        {
+            var dialog = new OpenFolderDialog
+            {
+                Title = title,
+                Multiselect = false,
+            };
+
+            return dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName)
+                ? dialog.FolderName
+                : null;
+        }
+
+        private static void AddLabeledFolder(Grid root, string label, TextBox box, int row, string buttonText, RoutedEventHandler handler)
+        {
+            AddLabeledText(root, label, box, row);
+            var button = new Button { Content = buttonText, Margin = new Thickness(6, 4, 0, 4), MinHeight = 28 };
+            button.Click += handler;
+            Grid.SetRow(button, row);
+            Grid.SetColumn(button, 2);
+            root.Children.Add(button);
+        }
+
+        private static void AddLabeledText(Grid root, string label, TextBox box, int row)
+        {
+            box.Margin = new Thickness(0, 4, 0, 4);
+            box.MinHeight = 28;
+            AddLabeledControl(root, label, box, row);
+        }
+
+        private static void AddLabeledControl(Grid root, string label, Control control, int row)
+        {
+            var labelBlock = new TextBlock
+            {
+                Text = label,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9AA6AF")),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 4, 8, 4),
+            };
+            control.Margin = new Thickness(0, 4, 0, 4);
+            control.MinHeight = 28;
+            Grid.SetRow(labelBlock, row);
+            Grid.SetColumn(labelBlock, 0);
+            Grid.SetRow(control, row);
+            Grid.SetColumn(control, 1);
+            root.Children.Add(labelBlock);
+            root.Children.Add(control);
+        }
+
+        private static void AddText(Grid root, string text, int row, int column, int columnSpan, string color, bool bold = false)
+        {
+            var block = new TextBlock
+            {
+                Text = text,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color)),
+                FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
+                Margin = new Thickness(0, 0, 0, 12),
+            };
+            Grid.SetRow(block, row);
+            Grid.SetColumn(block, column);
+            Grid.SetColumnSpan(block, columnSpan);
+            root.Children.Add(block);
+        }
+    }
+
+    private sealed record WorkProgress(int Completed, int Total, string Message);
+
+    private sealed record LogLoadSnapshot(
+        InspectionLogRow[] Inspections,
+        ReviewLogRow[] Reviews,
+        ExportHistoryRow[] Exports,
+        AuditLogRow[] Audits,
+        MesSpoolQueueRow[] MesSpool,
+        CentralSyncQueueRow[] CentralSync,
+        PilotIssueRow[] PilotIssues,
+        FactoryReadinessRow[] Readiness,
+        string ReadinessOverallStatus,
+        Stage1ReadinessReport Stage1Readiness,
+        StandardsTraceabilityMatrix[] StandardsTraceabilityRows,
+        string StandardsTraceabilitySummary,
+        CompletionMatrixRow[] CompletionRows,
+        double CompletionOverallPercent,
+        IReadOnlyList<FactoryAcceptanceChecklistItem> FactoryAcceptanceRows,
+        PilotIssueSummary IssueSummary,
+        string BuildEvidenceSummary,
+        ManagementDashboardReport ManagementDashboardReport);
+
+    private sealed record ExportOutcome(int Count, IReadOnlyList<string> Errors);
+
+    private sealed record PackageOutcome(string PackageDir, string ReportPath, int OverlayCount, IReadOnlyList<string> Warnings);
+
+    private sealed record IntegrityOutcome(string ReportPath, string Integrity, string Status);
+
+    private sealed record IndexOutcome(string Path, int Count, IReadOnlyList<string> Errors);
+
+    public sealed class InspectionLogRow
+    {
+        public long Id { get; init; }
+        public DateTime CreatedAtUtc { get; init; }
+        public string TimestampLocal => CreatedAtUtc == DateTime.MinValue ? "--" : CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm");
+        public string BoardProgram { get; init; } = "UNKNOWN";
+        public string OperatorId { get; init; } = "UNKNOWN";
+        public string InspectionEngine { get; init; } = "Pixel Difference Prototype Engine";
+        public string ModelVersion { get; init; } = "UNKNOWN";
+        public string ModelFilePath { get; init; } = string.Empty;
+        public double ConfidenceThreshold { get; init; }
+        public string SampleImagePath { get; init; } = string.Empty;
+        public string GoldenImagePath { get; init; } = string.Empty;
+        public string ImageName => string.IsNullOrWhiteSpace(SampleImagePath) ? "--" : Path.GetFileName(SampleImagePath);
+        public string Verdict { get; init; } = "REVIEW";
+        public double DifferenceScore { get; init; }
+        public string ScoreDisplay => $"{DifferenceScore:F1}%";
+        public double Confidence { get; init; }
+        public string ConfidenceDisplay => Confidence.ToString("P0", CultureInfo.InvariantCulture);
+        public string SuggestedDefect { get; init; } = string.Empty;
+        public string DecisionReason { get; init; } = string.Empty;
+        public double HotspotX { get; init; }
+        public double HotspotY { get; init; }
+        public double HotspotWidth { get; init; }
+        public double HotspotHeight { get; init; }
+        public double ImageLoadMilliseconds { get; init; }
+        public double PreprocessingMilliseconds { get; init; }
+        public double InferenceMilliseconds { get; init; }
+        public double OverlayRenderingMilliseconds { get; init; }
+        public double TotalInspectionMilliseconds { get; init; }
+        public string TotalTimeDisplay => $"{TotalInspectionMilliseconds:F0} ms";
+
+        public static InspectionLogRow FromRecord(InspectionHistoryRecord record)
+        {
+            return new InspectionLogRow
+            {
+                Id = record.Id,
+                CreatedAtUtc = record.CreatedAtUtc,
+                BoardProgram = record.BoardProgram,
+                OperatorId = record.OperatorId,
+                InspectionEngine = record.InspectionEngine,
+                ModelVersion = record.ModelVersion,
+                ModelFilePath = record.ModelFilePath,
+                ConfidenceThreshold = record.ConfidenceThreshold,
+                SampleImagePath = record.SampleImagePath,
+                GoldenImagePath = record.GoldenImagePath,
+                Verdict = record.Verdict,
+                DifferenceScore = record.DifferenceScore,
+                Confidence = record.Confidence,
+                SuggestedDefect = record.SuggestedDefect,
+                DecisionReason = record.DecisionReason,
+                HotspotX = record.HotspotX,
+                HotspotY = record.HotspotY,
+                HotspotWidth = record.HotspotWidth,
+                HotspotHeight = record.HotspotHeight,
+                ImageLoadMilliseconds = record.ImageLoadMilliseconds,
+                PreprocessingMilliseconds = record.PreprocessingMilliseconds,
+                InferenceMilliseconds = record.InferenceMilliseconds,
+                OverlayRenderingMilliseconds = record.OverlayRenderingMilliseconds,
+                TotalInspectionMilliseconds = record.TotalInspectionMilliseconds,
+            };
+        }
+    }
+
+    public sealed class ReviewLogRow
+    {
+        public long Id { get; init; }
+        public DateTime EventTimeUtc { get; init; }
+        public string TimestampLocal => EventTimeUtc == DateTime.MinValue ? "--" : EventTimeUtc.ToLocalTime().ToString("MM-dd HH:mm");
+        public string Category { get; init; } = string.Empty;
+        public string OperatorId { get; init; } = "UNKNOWN";
+        public string Disposition { get; init; } = string.Empty;
+        public string Message { get; init; } = string.Empty;
+
+        public static ReviewLogRow FromRecord(ReviewEventRecord record)
+        {
+            return new ReviewLogRow
+            {
+                Id = record.Id,
+                EventTimeUtc = record.EventTimeUtc,
+                Category = record.Category,
+                OperatorId = record.OperatorId,
+                Disposition = record.Disposition,
+                Message = record.Message,
+            };
+        }
+    }
+
+    public sealed class ExportHistoryRow
+    {
+        public long Id { get; init; }
+        public DateTime CreatedAtUtc { get; init; }
+        public string TimestampLocal => CreatedAtUtc == DateTime.MinValue ? "--" : CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm");
+        public string ExportType { get; init; } = string.Empty;
+        public string FilePath { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public string OperatorId { get; init; } = "UNKNOWN";
+        public long? AuditEventId { get; init; }
+        public string AuditEventDisplay => AuditEventId is null ? "--" : AuditEventId.Value.ToString(CultureInfo.InvariantCulture);
+        public string VerificationStatus { get; init; } = "--";
+        public string VerificationSha256 { get; init; } = string.Empty;
+        public string VerificationShaDisplay => string.IsNullOrWhiteSpace(VerificationSha256) ? "--" : ShortHash(VerificationSha256);
+
+        public static ExportHistoryRow FromRecord(ExportHistoryRecord record, ExportVerificationRecord? verification = null)
+        {
+            return new ExportHistoryRow
+            {
+                Id = record.Id,
+                CreatedAtUtc = record.CreatedAtUtc,
+                ExportType = record.ExportType,
+                FilePath = record.FilePath,
+                Status = record.Status,
+                OperatorId = record.OperatorId,
+                AuditEventId = record.AuditEventId,
+                VerificationStatus = verification?.Status ?? "--",
+                VerificationSha256 = verification?.Sha256 ?? string.Empty,
+            };
+        }
+    }
+
+    public sealed class MesSpoolQueueRow
+    {
+        public long Id { get; init; }
+        public DateTime CreatedAtUtc { get; init; }
+        public string CreatedLocal => CreatedAtUtc == DateTime.MinValue ? "--" : CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm");
+        public string PayloadType { get; init; } = string.Empty;
+        public string EndpointUrl { get; init; } = string.Empty;
+        public int RetryCount { get; init; }
+        public int MaxRetryCount { get; init; }
+        public string RetryDisplay => $"{RetryCount}/{MaxRetryCount}";
+        public string Status { get; init; } = string.Empty;
+        public string LastError { get; init; } = string.Empty;
+        public string LotId { get; init; } = string.Empty;
+        public string BoardModel { get; init; } = string.Empty;
+        public string Result { get; init; } = string.Empty;
+
+        public static MesSpoolQueueRow FromRecord(MesSpoolQueueRecord record)
+        {
+            return new MesSpoolQueueRow
+            {
+                Id = record.Id,
+                CreatedAtUtc = record.CreatedAtUtc,
+                PayloadType = record.PayloadType,
+                EndpointUrl = MesIntegrationSettingsService.RedactSecrets(record.EndpointUrl),
+                RetryCount = record.RetryCount,
+                MaxRetryCount = record.MaxRetryCount,
+                Status = record.Status,
+                LastError = MesIntegrationSettingsService.RedactSecrets(record.LastError),
+                LotId = record.LotId,
+                BoardModel = record.BoardModel,
+                Result = record.Result,
+            };
+        }
+    }
+
+    public sealed class CentralSyncQueueRow
+    {
+        public long Id { get; init; }
+        public DateTime CreatedAtUtc { get; init; }
+        public string CreatedLocal => CreatedAtUtc == DateTime.MinValue ? "--" : CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm");
+        public string ItemType { get; init; } = string.Empty;
+        public string ItemId { get; init; } = string.Empty;
+        public string StationId { get; init; } = string.Empty;
+        public string EndpointOrFolder { get; init; } = string.Empty;
+        public int RetryCount { get; init; }
+        public int MaxRetryCount { get; init; }
+        public string RetryDisplay => $"{RetryCount}/{MaxRetryCount}";
+        public string Status { get; init; } = string.Empty;
+        public string LastError { get; init; } = string.Empty;
+
+        public static CentralSyncQueueRow FromRecord(CentralSyncQueueRecord record)
+        {
+            var settings = CentralSyncSettingsService.Load();
+            return new CentralSyncQueueRow
+            {
+                Id = record.Id,
+                CreatedAtUtc = record.CreatedAtUtc,
+                ItemType = record.ItemType,
+                ItemId = record.ItemId,
+                StationId = record.StationId,
+                EndpointOrFolder = settings.RedactEndpointInExports && !string.IsNullOrWhiteSpace(record.EndpointOrFolder)
+                    ? "***"
+                    : CentralSyncSettingsService.RedactSecrets(record.EndpointOrFolder, settings),
+                RetryCount = record.RetryCount,
+                MaxRetryCount = record.MaxRetryCount,
+                Status = record.Status,
+                LastError = CentralSyncSettingsService.RedactSecrets(record.LastError, settings),
+            };
+        }
+    }
+
+    public sealed class PilotIssueRow
+    {
+        public string IssueId { get; init; } = string.Empty;
+        public DateTime CreatedAtUtc { get; init; }
+        public string CreatedLocal => CreatedAtUtc == DateTime.MinValue ? "--" : CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm");
+        public string Category { get; init; } = string.Empty;
+        public string Severity { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public string PageName { get; init; } = string.Empty;
+        public string ReproductionSteps { get; init; } = string.Empty;
+        public string ExpectedBehavior { get; init; } = string.Empty;
+        public string ActualBehavior { get; init; } = string.Empty;
+        public string ScreenshotPath { get; init; } = string.Empty;
+        public string BoardModel { get; init; } = string.Empty;
+        public string LotId { get; init; } = string.Empty;
+        public string RelatedInspectionId { get; init; } = string.Empty;
+        public string RelatedAcceptanceRunId { get; init; } = string.Empty;
+        public string Owner { get; init; } = string.Empty;
+        public string Notes { get; init; } = string.Empty;
+
+        public static PilotIssueRow FromIssue(PilotIssue issue)
+            => new()
+            {
+                IssueId = issue.IssueId,
+                CreatedAtUtc = issue.CreatedAtUtc,
+                Category = issue.Category.ToString(),
+                Severity = issue.Severity,
+                Status = issue.Status.ToString(),
+                PageName = issue.PageName,
+                ReproductionSteps = issue.ReproductionSteps,
+                ExpectedBehavior = issue.ExpectedBehavior,
+                ActualBehavior = issue.ActualBehavior,
+                ScreenshotPath = issue.ScreenshotPath,
+                BoardModel = issue.BoardModel,
+                LotId = issue.LotId,
+                RelatedInspectionId = issue.RelatedInspectionId,
+                RelatedAcceptanceRunId = issue.RelatedAcceptanceRunId,
+                Owner = issue.Owner,
+                Notes = issue.Notes,
+            };
+    }
+
+    public sealed class FactoryReadinessRow
+    {
+        public string Name { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public string Evidence { get; init; } = string.Empty;
+        public string NextAction { get; init; } = string.Empty;
+
+        public static FactoryReadinessRow FromCategory(FactoryReadinessCategory category)
+            => new()
+            {
+                Name = category.Name,
+                Status = category.Status,
+                Evidence = category.Evidence,
+                NextAction = category.NextAction,
+            };
+    }
+
+    public sealed class Stage1ReadinessRow
+    {
+        public string Name { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public string Evidence { get; init; } = string.Empty;
+        public string NextAction { get; init; } = string.Empty;
+
+        public static Stage1ReadinessRow FromCheck(Stage1ReadinessCheck check)
+            => new()
+            {
+                Name = check.Name,
+                Status = check.Status,
+                Evidence = check.Evidence,
+                NextAction = check.NextAction,
+            };
+    }
+
+    public sealed class CompletionMatrixRow
+    {
+        public string Stage { get; init; } = string.Empty;
+        public double PercentComplete { get; init; }
+        public string PercentDisplay => PercentComplete.ToString("F1", CultureInfo.InvariantCulture) + "%";
+        public string EvidenceSummary { get; init; } = string.Empty;
+        public string MissingEvidenceDisplay { get; init; } = string.Empty;
+        public string NextActionsDisplay { get; init; } = string.Empty;
+
+        public static CompletionMatrixRow FromCategory(CompletionAssessmentCategory category)
+            => new()
+            {
+                Stage = category.Stage,
+                PercentComplete = category.PercentComplete,
+                EvidenceSummary = category.EvidenceSummary,
+                MissingEvidenceDisplay = category.MissingEvidence.Count == 0
+                    ? "None"
+                    : string.Join(" | ", category.MissingEvidence),
+                NextActionsDisplay = category.NextActions.Count == 0
+                    ? "No action required."
+                    : string.Join(" | ", category.NextActions),
+            };
+    }
+
+    public sealed class AuditLogRow
+    {
+        public long Id { get; init; }
+        public DateTime TimestampUtc { get; init; }
+        public DateTime LocalTimestamp { get; init; }
+        public string TimestampUtcDisplay => TimestampUtc == DateTime.MinValue ? "--" : TimestampUtc.ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        public string LocalTimestampDisplay => LocalTimestamp == DateTime.MinValue ? "--" : LocalTimestamp.ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        public string UserId { get; init; } = "UNKNOWN";
+        public string UserRole { get; init; } = "UNKNOWN";
+        public string StationId { get; init; } = "UNKNOWN";
+        public string ActionCategory { get; init; } = string.Empty;
+        public string ActionDetail { get; init; } = string.Empty;
+        public string RelatedEntityType { get; init; } = string.Empty;
+        public string RelatedEntityId { get; init; } = string.Empty;
+        public string RelatedPath { get; init; } = string.Empty;
+        public string RelatedEntityDisplay => string.IsNullOrWhiteSpace(RelatedEntityType) && string.IsNullOrWhiteSpace(RelatedEntityId)
+            ? "--"
+            : $"{RelatedEntityType}:{RelatedEntityId}";
+
+        public static AuditLogRow FromRecord(AuditEventRecord record)
+        {
+            return new AuditLogRow
+            {
+                Id = record.Id,
+                TimestampUtc = record.TimestampUtc,
+                LocalTimestamp = record.LocalTimestamp,
+                UserId = record.UserId,
+                UserRole = record.UserRole,
+                StationId = record.StationId,
+                ActionCategory = record.ActionCategory,
+                ActionDetail = record.ActionDetail,
+                RelatedEntityType = record.RelatedEntityType,
+                RelatedEntityId = record.RelatedEntityId,
+                RelatedPath = record.RelatedPath,
+            };
+        }
+    }
+
+    public void Dispose()
+    {
+        DisposeCancellation(ref _workCts);
+        DisposeCancellation(ref _refreshCts);
+        GC.SuppressFinalize(this);
+    }
+
+    private static void DisposeCancellation(ref CancellationTokenSource? cancellation)
+    {
+        var source = cancellation;
+        cancellation = null;
+        if (source is null)
+            return;
+
+        try
+        {
+            source.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed elsewhere; disposal must stay idempotent.
+        }
+
+        source.Dispose();
+    }
+}

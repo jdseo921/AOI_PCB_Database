@@ -89,9 +89,9 @@ public sealed class UiServiceCoverageTests
     [Fact]
     public void UiHandlersAuditEngineerAndAdminAcceptanceActions()
     {
-        var settingsCode = ReadRepoFile("AOI_Monitor", "Views", "SettingsView.xaml.cs");
-        var profileCode = ReadRepoFile("AOI_Monitor", "Views", "ProfileView.xaml.cs");
-        var reportsCode = ReadRepoFile("AOI_Monitor", "Views", "ReportsView.xaml.cs");
+        var settingsCode = ReadViewCodeBehind("SettingsView");
+        var profileCode = ReadViewCodeBehind("ProfileView");
+        var reportsCode = ReadViewCodeBehind("ReportsView");
         var combined = settingsCode + profileCode + reportsCode;
 
         foreach (var auditEvent in new[]
@@ -163,6 +163,17 @@ public sealed class UiServiceCoverageTests
 
     private static string ReadRepoFile(params string[] parts)
         => File.ReadAllText(Path.Combine(FindRepoRoot(), Path.Combine(parts)));
+
+    // Reads a view's code-behind including any `ViewName.*.cs` partial-class files, so
+    // source-inspecting assertions stay correct after a code-behind is split into partials.
+    private static string ReadViewCodeBehind(string viewName)
+    {
+        var viewsDir = Path.Combine(FindRepoRoot(), "AOI_Monitor", "Views");
+        var files = Directory.GetFiles(viewsDir, $"{viewName}.xaml.cs")
+            .Concat(Directory.GetFiles(viewsDir, $"{viewName}.*.cs"))
+            .Distinct();
+        return string.Concat(files.Select(File.ReadAllText));
+    }
 
     private static string FindRepoRoot()
     {

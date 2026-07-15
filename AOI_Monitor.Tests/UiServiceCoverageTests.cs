@@ -154,7 +154,7 @@ public sealed class UiServiceCoverageTests
     {
         var mainWindowCode = ReadRepoFile("AOI_Monitor", "MainWindow.xaml.cs");
         var viewModelCode = ReadRepoFile("AOI_Monitor", "ViewModels", "MainViewModel.cs");
-        var settingsCode = ReadRepoFile("AOI_Monitor", "Views", "SettingsView.xaml.cs");
+        var settingsCode = ReadViewCodeBehind("SettingsView");
 
         Assert.Contains("UiPreferencesService.PreferencesChanged", mainWindowCode);
         Assert.Contains("RefreshLanguage(UiLanguage language)", viewModelCode);

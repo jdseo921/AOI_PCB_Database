@@ -57,11 +57,15 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
             return result;
         }
 
+        // Golden references repeat across inspections (golden-compare loops, batch runs,
+        // benchmarks), so the decoded + normalized + grayscaled golden is served from a
+        // keyed cache. Cached bytes are bit-identical to the uncached pipeline; scores,
+        // verdicts, and hotspots are unchanged (cache-equivalence tests pin this).
         loadWatch.Restart();
-        var golden = LoadBgra32(goldenPath);
+        var goldenPixels = PixelDifferenceGoldenCache.GetOrCreate(goldenPath, () => BuildGoldenNormalizedPixels(goldenPath));
         loadWatch.Stop();
         timing.ImageLoadMilliseconds += loadWatch.Elapsed.TotalMilliseconds;
-        if (golden is null)
+        if (goldenPixels is null)
         {
             result.ErrorCode = "GOLDEN_IMAGE_LOAD_FAILED";
             result.ErrorMessage = $"Unable to load golden image: {goldenPath}";
@@ -79,7 +83,6 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
 
         preprocessingWatch.Restart();
         var sampleNorm = Resize(sample, 384, 384);
-        var goldenNorm = Resize(golden, 384, 384);
         preprocessingWatch.Stop();
         timing.PreprocessingMilliseconds += preprocessingWatch.Elapsed.TotalMilliseconds;
 
@@ -87,7 +90,7 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         if (recipeLoad.HasEnabledRois)
         {
             var recipeWatch = Stopwatch.StartNew();
-            ApplyRecipeRoiAnalysis(result, sampleNorm, goldenNorm, priority, recipeLoad);
+            ApplyRecipeRoiAnalysis(result, sampleNorm, goldenPixels.ToBitmapSource(), priority, recipeLoad);
             recipeWatch.Stop();
             timing.InferenceMilliseconds = recipeWatch.Elapsed.TotalMilliseconds;
             result.Timing.RecalculateTotal();
@@ -95,9 +98,15 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         }
 
         var inferenceWatch = Stopwatch.StartNew();
-        var diff = Compare(sampleNorm, goldenNorm, out var hotspot);
+        var diff = Compare(sampleNorm, goldenPixels, out var hotspot);
         inferenceWatch.Stop();
         timing.InferenceMilliseconds = inferenceWatch.Elapsed.TotalMilliseconds;
+        // Everything from here until the defect record is built is overlay-data
+        // preparation: the verdict, thresholds, evidence lines, and bounding-box records
+        // the overlay layer consumes. Timed as OverlayRenderingMilliseconds so the
+        // benchmark's frame-to-overlay figure covers the full operator-visible data path
+        // (the on-screen WPF draw itself is timed in-app by the latency service).
+        var overlayWatch = Stopwatch.StartNew();
         result.DifferenceScore = diff;
         result.Hotspot = hotspot;
 
@@ -131,6 +140,8 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         result.Evidence = BuildEvidence(result, priority);
         AppendRecipeWarnings(result, recipeLoad);
         result.Defects.Add(CreateDefectResult(result, result.SuggestedDefect, "ROI-HOTSPOT-001", 1, sampleNorm.PixelWidth, sampleNorm.PixelHeight));
+        overlayWatch.Stop();
+        timing.OverlayRenderingMilliseconds = overlayWatch.Elapsed.TotalMilliseconds;
         result.Timing.RecalculateTotal();
 
         return result;
@@ -451,7 +462,7 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
             result.Evidence.Add($"Recipe warning: {warning}");
     }
 
-    private static BitmapSource? LoadBgra32(string path)
+    private static BitmapSource? LoadBgra32(string path, bool ignoreImageCache = false)
     {
         if (!File.Exists(path)) return null;
 
@@ -461,6 +472,8 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         var bmp = new BitmapImage();
         bmp.BeginInit();
         bmp.CacheOption = BitmapCacheOption.OnLoad;
+        if (ignoreImageCache)
+            bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
         bmp.UriSource = new Uri(path, UriKind.Absolute);
         bmp.EndInit();
         bmp.Freeze();
@@ -543,29 +556,64 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         }
     }
 
-    private static double Compare(BitmapSource a, BitmapSource b, out Rect hotspot)
+    private static GoldenNormalizedPixels? BuildGoldenNormalizedPixels(string goldenPath)
     {
-        var w = Math.Min(a.PixelWidth, b.PixelWidth);
-        var h = Math.Min(a.PixelHeight, b.PixelHeight);
+        // Decode bypassing WPF's process-wide URI image cache: the golden cache keys on
+        // file size + last-write time, and a stale WPF-cached decode of an overwritten
+        // golden file would silently defeat that invalidation guarantee.
+        var golden = LoadBgra32(goldenPath, ignoreImageCache: true);
+        if (golden is null)
+            return null;
+
+        var goldenNorm = Resize(golden, 384, 384);
+        var width = goldenNorm.PixelWidth;
+        var height = goldenNorm.PixelHeight;
+        var stride = width * 4;
+        var bytes = new byte[stride * height];
+        goldenNorm.CopyPixels(bytes, stride, 0);
+        return new GoldenNormalizedPixels(width, height, bytes, ToGray(bytes, width, height, stride));
+    }
+
+    private static (byte[] Bgra, double[] Gray) CropGolden(GoldenNormalizedPixels golden, int width, int height)
+    {
+        if (width == golden.Width && height == golden.Height)
+            return (golden.Bgra, golden.Gray);
+
+        // Top-left crop of the cached full-size planes, byte-identical to what a
+        // CroppedBitmap(0,0,w,h) CopyPixels of the normalized golden would produce.
+        var stride = width * 4;
+        var goldenStride = golden.Width * 4;
+        var bytes = new byte[stride * height];
+        var gray = new double[width * height];
+        for (var y = 0; y < height; y++)
+        {
+            Buffer.BlockCopy(golden.Bgra, y * goldenStride, bytes, y * stride, stride);
+            Array.Copy(golden.Gray, y * golden.Width, gray, y * width, width);
+        }
+
+        return (bytes, gray);
+    }
+
+    private static double Compare(BitmapSource a, GoldenNormalizedPixels golden, out Rect hotspot)
+    {
+        var w = Math.Min(a.PixelWidth, golden.Width);
+        var h = Math.Min(a.PixelHeight, golden.Height);
 
         var stride = w * 4;
         var count = stride * h;
         var pool = ArrayPool<byte>.Shared;
         var pa = pool.Rent(count);
-        var pb = pool.Rent(count);
 
         try
         {
             var ra = new CroppedBitmap(a, new Int32Rect(0, 0, w, h));
-            var rb = new CroppedBitmap(b, new Int32Rect(0, 0, w, h));
             ra.CopyPixels(pa, stride, 0);
-            rb.CopyPixels(pb, stride, 0);
+            var (pb, grayGolden) = CropGolden(golden, w, h);
 
             // Recover small sample-to-golden translation before diffing: unaligned captures
             // shift every high-contrast edge and inflate the difference score on good boards.
             // The search is deliberately tight (~2% of frame) and keeps (0,0) unless the best
             // offset is a clear improvement, so a gross defect cannot drag the alignment.
-            var grayGolden = ToGray(pb, w, h, stride);
             var graySample = ToGray(pa, w, h, stride);
             var (dx, dy) = FindTranslation(grayGolden, graySample, w, h);
 
@@ -631,8 +679,9 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         }
         finally
         {
+            // Only the sample buffer is pool-rented; the golden planes are cache-owned
+            // (or exact-size crops) and must never be handed to the ArrayPool.
             pool.Return(pa);
-            pool.Return(pb);
         }
     }
 

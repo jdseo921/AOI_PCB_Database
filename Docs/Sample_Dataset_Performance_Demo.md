@@ -74,8 +74,22 @@ Use this short pass before a customer walkthrough:
 2. Click `Performance Benchmark`.
 3. Choose `Image folder`.
 4. Select `SampleData/DemoSet_Quick/images`.
-5. Keep the default run count or enter a higher count for repeated timing.
-6. Click `Run`.
+5. Select `SampleData/DemoSet_Quick/golden/tbox_ref_top.png` as the golden reference so
+   the benchmark measures the operator golden-compare workload (without it the default
+   engine measures the lighter no-reference path, and the report says so).
+6. Keep the default run count (and warm-up count 1 for a visible cold-start figure) or
+   enter a higher count for repeated timing.
+7. Click `Run`.
+
+For repeatable headless evidence, the same benchmark runs from the CLI:
+
+```powershell
+dotnet run --project AOI_Monitor.Tools -c Release -- benchmark `
+  --images SampleData/DemoSet_Quick/images `
+  --golden SampleData/DemoSet_Quick/golden/tbox_ref_top.png `
+  --output TestResults/perf `
+  --count 60 --warmup 1
+```
 
 Benchmark outputs are written under the benchmark export folder and include:
 
@@ -85,7 +99,58 @@ Benchmark outputs are written under the benchmark export folder and include:
 - `benchmark_results.csv`
 - latest benchmark summary JSON
 
-The benchmark report includes p50, p95, p99, max frame-to-overlay time, images per minute, over-one-second count, and separated p95 load/preprocess/inference/overlay/persistence timings.
+The benchmark report includes p50, p90, p95, p99, max frame-to-overlay time, images per
+minute, over-threshold count, separated p95 load/preprocess/inference/overlay/persistence
+timings, the engine + model configuration (execution provider — CPU-only in this build,
+detection priority, confidence threshold, threshold profile), per-sample image
+dimensions, and cold-start (warm-up) figures reported separately from steady-state
+statistics. Frame-to-overlay covers image load through overlay-data preparation as
+measured headless; the on-screen WPF draw is measured in-app by the latency service.
+
+### Golden-Reference Cache Before/After Evidence (2026-07-30)
+
+The pixel-difference engine caches the decoded + normalized + grayscaled golden
+reference per file version (`PixelDifferenceGoldenCache`), eliminating repeated golden
+preparation in golden-compare loops, batch runs, and benchmarks. Cached bytes are
+bit-identical to the uncached pipeline — scores, verdicts, and hotspots are unchanged,
+pinned by `PixelDifferenceGoldenCacheTests`. Measured on the generated demo dataset
+(60 measured samples, warm-up 1, golden `tbox_ref_top.png`, same machine, CPU,
+Pixel Difference Prototype Engine):
+
+| Metric (ms) | Before cache | After cache | Change (from raw values) |
+|---|---:|---:|---:|
+| p50 frame-to-overlay | 13.0 | 8.8 | −33% |
+| p90 frame-to-overlay | 15.8 | 10.7 | −33% |
+| p95 frame-to-overlay | 16.4 | 11.2 | −31% |
+| p99 frame-to-overlay | 17.8 | 12.5 | −30% |
+| Max frame-to-overlay | 18.2 | 12.6 | −31% |
+| p95 image load | 4.5 | 3.2 | −29% |
+| p95 inference | 8.7 | 5.6 | −36% |
+
+The cache key includes a head/tail content fingerprint (SHA-256 of the first and last
+4 KB) in addition to file size and last-write time, so timestamp-preserving golden
+overwrites also invalidate; the fingerprint read is included in the after-cache numbers.
+
+Artifacts: `TestResults/perf/before_golden_cache/benchmark_20260730_034021_BENCH-20260730034021-31f10f/`
+and `TestResults/perf/after_golden_cache/benchmark_20260730_041359_BENCH-20260730041359-ed604c/`
+(kept locally per repo hygiene — generated evidence is not committed; percentages are
+computed from the raw JSON values, not the rounded display figures). Notes:
+
+- The demo images are small synthetic boards, so absolute times are far below the
+  1000 ms budget; real multi-megapixel golden images make the cached fraction larger.
+- **Stage-split attribution changed in this change**: golden preparation moved into the
+  load span (and to ~0 on cache hits), and overlay-data preparation is newly timed, so
+  per-stage rows are not directly comparable across this boundary — only the
+  frame-to-overlay totals are (both runs above use the hardened measurement, so their
+  comparison is internally consistent).
+- The engine's own golden cache never serves sample images. Repeated *sample* decodes
+  can still be served by WPF's process-wide image cache when a benchmark's run count
+  exceeds the folder's image count (the report discloses this); both runs above cycle
+  identically, so the before/after comparison is fair.
+- Behavior note recorded per change control: after a mid-session golden overwrite the
+  engine now always scores against the current on-disk golden (keyed by size, mtime,
+  and a head/tail content fingerprint); the old build could nondeterministically reuse
+  a stale WPF-cached decode until garbage collection.
 
 ## Export The Stage 1 Readiness Report
 

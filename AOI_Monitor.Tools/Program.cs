@@ -28,6 +28,9 @@ public static class Program
         if (args.Length > 0 && string.Equals(args[0], "batch-soak", StringComparison.OrdinalIgnoreCase))
             return await BatchSoakCommand.ExecuteAsync(args, Console.Out, Console.Error);
 
+        if (args.Length > 0 && string.Equals(args[0], "benchmark", StringComparison.OrdinalIgnoreCase))
+            return BenchmarkCommand.Execute(args, Console.Out, Console.Error);
+
         return Stage1ExitCommand.Execute(args, Console.Out, Console.Error);
     }
 }

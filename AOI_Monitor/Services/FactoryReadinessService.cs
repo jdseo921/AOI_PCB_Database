@@ -561,9 +561,18 @@ public static class FactoryReadinessService
         var benchmark = BenchmarkInspectionService.GetLatestBenchmark();
         if (benchmark is not null)
         {
-            var benchmarkOk = benchmark.CompletedCount > 0 &&
+            // The one-second criterion is the ceiling: a run recorded against a looser
+            // threshold cannot satisfy this gate because its over-threshold count was
+            // computed with that looser value.
+            var thresholdAcceptable = benchmark.AcceptanceThresholdMs <= 1000;
+            var benchmarkOk = thresholdAcceptable &&
+                benchmark.CompletedCount > 0 &&
                 benchmark.P95FrameToOverlayMs <= benchmark.AcceptanceThresholdMs &&
                 benchmark.OverOneSecondCount == 0;
+            var workload = string.IsNullOrWhiteSpace(benchmark.GoldenImagePath)
+                ? "workload=no-reference (lighter path)"
+                : "workload=golden-compare";
+            var coldStart = $"cold-start={benchmark.ColdStartSampleCount} sample(s), max {benchmark.ColdStartMaxFrameToOverlayMs:F0} ms, over-threshold {benchmark.ColdStartOverThresholdCount}";
             var realCameraBenchmarkRequired = !criteria.Stage1Only &&
                 (criteria.RequireCameraAcceptance || criteria.RequireRealHardwareAcceptance);
             if (realCameraBenchmarkRequired)
@@ -573,17 +582,26 @@ public static class FactoryReadinessService
                     report,
                     "Inspection performance benchmark",
                     realCameraOk ? "Go" : "No-Go",
-                    $"Latest benchmark source={benchmark.SourceKind}; realCamera={benchmark.IsRealCameraSource}; count={benchmark.CompletedCount}; p95 frame-to-overlay={benchmark.P95FrameToOverlayMs:F0} ms; p99={benchmark.P99FrameToOverlayMs:F0} ms; max={benchmark.MaxFrameToOverlayMs:F0} ms; over1s={benchmark.OverOneSecondCount}; throughput={benchmark.ThroughputImagesPerMinute:F1}/min; report={benchmark.ReportFolder}.",
+                    $"Latest benchmark source={benchmark.SourceKind}; realCamera={benchmark.IsRealCameraSource}; count={benchmark.CompletedCount}; p95 frame-to-overlay={benchmark.P95FrameToOverlayMs:F0} ms; p99={benchmark.P99FrameToOverlayMs:F0} ms; max={benchmark.MaxFrameToOverlayMs:F0} ms; over-threshold={benchmark.OverOneSecondCount} (threshold={benchmark.AcceptanceThresholdMs:F0} ms); {coldStart}; {workload}; throughput={benchmark.ThroughputImagesPerMinute:F1}/min; report={benchmark.ReportFolder}.",
                     realCameraOk ? "No action required." : "Run Performance Benchmark against the active real camera source. Folder simulation evidence cannot satisfy Stage 2 or full factory real-camera latency acceptance.");
                 return;
             }
 
+            var localStatus = benchmarkOk
+                ? benchmark.ColdStartOverThresholdCount > 0 ? "Conditional" : "Go"
+                : "Conditional";
             Add(
                 report,
                 "Inspection performance benchmark",
-                benchmarkOk ? "Go" : "Conditional",
-                $"Latest local benchmark source={benchmark.SourceKind}; count={benchmark.CompletedCount}; p50={benchmark.P50FrameToOverlayMs:F0} ms; p95={benchmark.P95FrameToOverlayMs:F0} ms; p99={benchmark.P99FrameToOverlayMs:F0} ms; max={benchmark.MaxFrameToOverlayMs:F0} ms; over1s={benchmark.OverOneSecondCount}; throughput={benchmark.ThroughputImagesPerMinute:F1}/min; report={benchmark.ReportFolder}.",
-                benchmarkOk ? "No action required." : "Reduce load/preprocessing/inference/overlay/persistence time and rerun the image-folder benchmark.");
+                localStatus,
+                $"Latest local benchmark source={benchmark.SourceKind}; count={benchmark.CompletedCount}; p50={benchmark.P50FrameToOverlayMs:F0} ms; p95={benchmark.P95FrameToOverlayMs:F0} ms; p99={benchmark.P99FrameToOverlayMs:F0} ms; max={benchmark.MaxFrameToOverlayMs:F0} ms; over-threshold={benchmark.OverOneSecondCount} (threshold={benchmark.AcceptanceThresholdMs:F0} ms); {coldStart}; {workload}; throughput={benchmark.ThroughputImagesPerMinute:F1}/min; report={benchmark.ReportFolder}.",
+                localStatus == "Go"
+                    ? "No action required."
+                    : benchmarkOk
+                        ? "Steady-state timing passes; cold-start sample(s) exceeded the threshold — review the cold-start figures in the benchmark report."
+                        : thresholdAcceptable
+                            ? "Reduce load/preprocessing/inference/overlay/persistence time and rerun the image-folder benchmark."
+                            : "Benchmark was recorded against a threshold looser than 1000 ms; rerun with the default acceptance threshold.");
             return;
         }
 

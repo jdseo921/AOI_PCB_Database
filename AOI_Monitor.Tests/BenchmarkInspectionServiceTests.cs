@@ -118,6 +118,86 @@ public sealed class BenchmarkInspectionServiceTests : IDisposable
         => Convert.FromBase64String(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=");
 
+    [Fact]
+    public void WarmupSamplesAreExcludedFromStatsAndReportedAsColdStart()
+    {
+        AoiDatabase.Initialize();
+        var imageFolder = WriteImages(3);
+
+        var result = BenchmarkInspectionService.Run(
+            new BenchmarkInspectionOptions
+            {
+                SourceKind = BenchmarkInspectionSourceKind.ImageFolder,
+                ImageFolder = imageFolder,
+                RunCount = 3,
+                WarmupCount = 1,
+                OutputRoot = Path.Combine(_root, "benchmark-warmup"),
+            },
+            engineOverride: new SequenceTimingEngine(1200, 100, 110, 120));
+
+        Assert.Equal("PASS", result.Status);
+        Assert.Equal(3, result.CompletedCount);
+        Assert.Equal(1, result.ColdStartSampleCount);
+        Assert.Equal(1, result.ColdStartOverThresholdCount);
+        Assert.True(result.ColdStartMaxFrameToOverlayMs >= 1200);
+        Assert.Equal(0, result.OverOneSecondCount);
+        Assert.True(result.P95FrameToOverlayMs < 1000);
+        Assert.True(result.Samples[0].IsWarmup);
+        Assert.All(result.Samples.Skip(1), sample => Assert.False(sample.IsWarmup));
+        Assert.Equal(result.Samples.Count, result.Samples.Select(sample => sample.Sequence).Distinct().Count());
+        Assert.Contains(result.Messages, message => message.Contains("cold-start", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void GoldenPathIsForwardedAndConfigurationIsRecorded()
+    {
+        AoiDatabase.Initialize();
+        var imageFolder = WriteImages(2);
+        var goldenPath = Path.Combine(imageFolder, "image-00.png");
+        var capture = new GoldenCapturingEngine();
+
+        var result = BenchmarkInspectionService.Run(
+            new BenchmarkInspectionOptions
+            {
+                SourceKind = BenchmarkInspectionSourceKind.ImageFolder,
+                ImageFolder = imageFolder,
+                GoldenImagePath = goldenPath,
+                RunCount = 2,
+                OutputRoot = Path.Combine(_root, "benchmark-golden"),
+            },
+            engineOverride: capture);
+
+        Assert.All(capture.GoldenPaths, path => Assert.Equal(goldenPath, path));
+        Assert.Equal(goldenPath, result.GoldenImagePath);
+        Assert.Contains("CPU", result.ExecutionProvider, StringComparison.Ordinal);
+        Assert.Equal("Balanced", result.DetectionPriority);
+        Assert.All(result.Samples, sample =>
+        {
+            Assert.True(sample.ImageWidth > 0);
+            Assert.True(sample.ImageHeight > 0);
+        });
+        var csvHeader = File.ReadLines(result.CsvPath).First();
+        Assert.Contains("IsWarmup", csvHeader, StringComparison.Ordinal);
+        Assert.Contains("ImageWidth", csvHeader, StringComparison.Ordinal);
+        var html = File.ReadAllText(result.HtmlPath);
+        Assert.Contains("Execution provider", html, StringComparison.Ordinal);
+        Assert.Contains("Cold-start samples", html, StringComparison.Ordinal);
+    }
+
+    private sealed class GoldenCapturingEngine : IInspectionEngine
+    {
+        public List<string?> GoldenPaths { get; } = new();
+
+        public string Name => "Golden Capturing Engine";
+        public string Version => "TEST-GOLD";
+
+        public AnalysisResult Analyze(string samplePath, string? goldenPath, DetectionPriority priority)
+        {
+            GoldenPaths.Add(goldenPath);
+            return Result(samplePath, 5, 5, 5, 5);
+        }
+    }
+
     private sealed class FixedTimingEngine : IInspectionEngine
     {
         private readonly double _load;

@@ -192,11 +192,15 @@ public static class BatchSoakCommand
             maxPasses = parsed;
         }
 
+        // The inspection engines require absolute paths (image URIs); resolve here so
+        // relative CLI arguments behave the same as the UI's absolute-path pickers.
         return new ParseResult(true, string.Empty, new BatchSoakOptions
         {
-            ImageFolder = values["images"],
-            ManifestPath = values.TryGetValue("manifest", out var manifest) ? manifest : null,
-            OutputFolder = values["output"],
+            ImageFolder = Path.GetFullPath(values["images"]),
+            ManifestPath = values.TryGetValue("manifest", out var manifest) && !string.IsNullOrWhiteSpace(manifest)
+                ? Path.GetFullPath(manifest)
+                : null,
+            OutputFolder = Path.GetFullPath(values["output"]),
             OperatorId = values["operator"],
             Duration = duration,
             DelayBetweenPasses = TimeSpan.FromSeconds(delaySeconds),

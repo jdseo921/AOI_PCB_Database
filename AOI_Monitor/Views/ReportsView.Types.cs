@@ -22,7 +22,9 @@ public partial class ReportsView
     {
         private readonly ComboBox _sourceCombo = new();
         private readonly TextBox _imageFolderText = new();
+        private readonly TextBox _goldenFileText = new();
         private readonly TextBox _runCountText = new() { Text = "25" };
+        private readonly TextBox _warmupCountText = new() { Text = "1" };
         private readonly TextBox _durationSecondsText = new();
         private readonly TextBox _outputFolderText = new();
 
@@ -32,7 +34,7 @@ public partial class ReportsView
         {
             Title = "Performance Benchmark";
             Width = 640;
-            Height = 360;
+            Height = 470;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.NoResize;
             Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#11161A"));
@@ -45,7 +47,7 @@ public partial class ReportsView
         private Grid BuildContent()
         {
             var root = new Grid { Margin = new Thickness(16) };
-            for (var i = 0; i < 8; i++)
+            for (var i = 0; i < 10; i++)
                 root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(165) });
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -54,10 +56,12 @@ public partial class ReportsView
             AddText(root, "Runs the current inspection engine and records latency traces for every benchmarked image/frame.", 0, 0, 3, "#DCE5EB", bold: true);
             AddLabeledControl(root, "Source", _sourceCombo, 1);
             AddLabeledFolder(root, "Image folder", _imageFolderText, 2, "Select", OnSelectImageFolder);
-            AddLabeledText(root, "Run count", _runCountText, 3);
-            AddLabeledText(root, "Duration seconds (optional)", _durationSecondsText, 4);
-            AddLabeledFolder(root, "Output folder", _outputFolderText, 5, "Select", OnSelectOutputFolder);
-            AddText(root, "Stage 2 and Full Factory readiness require Active Camera Source with real, non-simulated camera frames. Folder simulation is labeled simulation-only.", 6, 0, 3, "#E1A334");
+            AddLabeledFolder(root, "Golden reference (optional)", _goldenFileText, 3, "Select", OnSelectGoldenFile);
+            AddLabeledText(root, "Run count", _runCountText, 4);
+            AddLabeledText(root, "Warm-up count (0-3, cold-start)", _warmupCountText, 5);
+            AddLabeledText(root, "Duration seconds (optional)", _durationSecondsText, 6);
+            AddLabeledFolder(root, "Output folder", _outputFolderText, 7, "Select", OnSelectOutputFolder);
+            AddText(root, "Stage 2 and Full Factory readiness require Active Camera Source with real, non-simulated camera frames. Folder simulation is labeled simulation-only. Without a golden reference the default engine measures the lighter no-reference path.", 8, 0, 3, "#E1A334");
 
             var buttons = new StackPanel
             {
@@ -70,7 +74,7 @@ public partial class ReportsView
             run.Click += OnRunClick;
             buttons.Children.Add(cancel);
             buttons.Children.Add(run);
-            Grid.SetRow(buttons, 7);
+            Grid.SetRow(buttons, 9);
             Grid.SetColumnSpan(buttons, 3);
             root.Children.Add(buttons);
 
@@ -96,6 +100,18 @@ public partial class ReportsView
                 _imageFolderText.Text = folder;
         }
 
+        private void OnSelectGoldenFile(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "Select golden reference image",
+                Filter = "Images (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|All files (*.*)|*.*",
+                Multiselect = false,
+            };
+            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FileName))
+                _goldenFileText.Text = dialog.FileName;
+        }
+
         private void OnSelectOutputFolder(object sender, RoutedEventArgs e)
         {
             if (SelectFolder("Select benchmark report output folder") is { } folder)
@@ -118,6 +134,19 @@ public partial class ReportsView
                 return;
             }
 
+            if (!int.TryParse(_warmupCountText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var warmupCount) || warmupCount < 0 || warmupCount > 3)
+            {
+                MessageBox.Show("Warm-up count must be between 0 and 3.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var goldenPath = _goldenFileText.Text.Trim();
+            if (!string.IsNullOrWhiteSpace(goldenPath) && !File.Exists(goldenPath))
+            {
+                MessageBox.Show("The golden reference image was not found. Clear the field or select a valid image file.", "AOI Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             TimeSpan? duration = null;
             if (!string.IsNullOrWhiteSpace(_durationSecondsText.Text))
             {
@@ -133,8 +162,12 @@ public partial class ReportsView
             Options = new BenchmarkInspectionOptions
             {
                 SourceKind = source,
-                ImageFolder = _imageFolderText.Text.Trim(),
+                // Full paths: the inspection engines build absolute image URIs, and a
+                // relative path that passes File.Exists here would fail at analysis time.
+                ImageFolder = string.IsNullOrWhiteSpace(_imageFolderText.Text) ? string.Empty : Path.GetFullPath(_imageFolderText.Text.Trim()),
+                GoldenImagePath = string.IsNullOrWhiteSpace(goldenPath) ? string.Empty : Path.GetFullPath(goldenPath),
                 RunCount = runCount,
+                WarmupCount = warmupCount,
                 Duration = duration,
                 OutputRoot = string.IsNullOrWhiteSpace(_outputFolderText.Text) ? BenchmarkInspectionService.BenchmarkRoot : _outputFolderText.Text.Trim(),
                 AcceptanceThresholdMs = 1000,

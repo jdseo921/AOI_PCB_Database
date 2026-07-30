@@ -161,6 +161,20 @@ public sealed class BenchmarkInspectionOptions
     public double AcceptanceThresholdMs { get; set; } = 1000;
     public string OutputRoot { get; set; } = string.Empty;
     public DetectionPriority DetectionPriority { get; set; } = DetectionPriority.Balanced;
+
+    /// <summary>
+    /// Optional golden reference passed to every benchmarked inspection so the measured
+    /// workload matches the operator golden-compare flow instead of the lighter
+    /// no-reference path. Blank keeps the historical no-golden behavior.
+    /// </summary>
+    public string GoldenImagePath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Cold-start samples run before the measured loop (clamped 0..3). Warm-up samples
+    /// are recorded and reported as cold-start metrics but excluded from steady-state
+    /// statistics; threshold overruns during warm-up are always reported, never hidden.
+    /// </summary>
+    public int WarmupCount { get; set; }
 }
 
 public sealed class BenchmarkInspectionResult
@@ -174,9 +188,26 @@ public sealed class BenchmarkInspectionResult
     public string EngineName { get; set; } = string.Empty;
     public string EngineVersion { get; set; } = string.Empty;
     public string ModelId { get; set; } = string.Empty;
+
+    /// <summary>Inference execution provider; always a CPU variant in this build (no GPU EP is bundled — SD-12/OD-02).</summary>
+    public string ExecutionProvider { get; set; } = string.Empty;
+    public string DetectionPriority { get; set; } = string.Empty;
+    public double ConfidenceThreshold { get; set; }
+    public string ActiveModelSha256 { get; set; } = string.Empty;
+    public string GoldenImagePath { get; set; } = string.Empty;
+    public string ThresholdProfileId { get; set; } = string.Empty;
+    public string ThresholdProfileRevision { get; set; } = string.Empty;
     public double AcceptanceThresholdMs { get; set; } = 1000;
     public int RequestedCount { get; set; }
+
+    /// <summary>Wall-clock seconds spent in warm-up sampling; excluded from the throughput denominator.</summary>
+    public double WarmupDurationSeconds { get; set; }
+
+    /// <summary>Measured (non-warm-up) sample count; all percentile/threshold statistics cover these samples.</summary>
     public int CompletedCount { get; set; }
+    public int ColdStartSampleCount { get; set; }
+    public double ColdStartMaxFrameToOverlayMs { get; set; }
+    public int ColdStartOverThresholdCount { get; set; }
     public double DurationSeconds { get; set; }
     public double ThroughputImagesPerMinute { get; set; }
     public double P50FrameToOverlayMs { get; set; }
@@ -206,6 +237,11 @@ public sealed class BenchmarkInspectionSample
     public string SourcePath { get; set; } = string.Empty;
     public string FrameId { get; set; } = string.Empty;
     public bool IsSimulated { get; set; }
+
+    /// <summary>True for cold-start warm-up samples excluded from steady-state statistics.</summary>
+    public bool IsWarmup { get; set; }
+    public int ImageWidth { get; set; }
+    public int ImageHeight { get; set; }
     public string SourceKind { get; set; } = string.Empty;
     public string Verdict { get; set; } = string.Empty;
     public double LoadMs { get; set; }

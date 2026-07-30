@@ -393,12 +393,23 @@ public static class Stage1ReadinessGateService
         report.P95FrameToOverlayMs = benchmark.P95FrameToOverlayMs;
         report.OverOneSecondCount = benchmark.OverOneSecondCount;
         report.ImagesPerMinute = benchmark.ThroughputImagesPerMinute;
+        var workload = string.IsNullOrWhiteSpace(benchmark.GoldenImagePath)
+            ? "workload=no-reference (lighter path; supply a golden reference to benchmark the golden-compare workload)"
+            : $"workload=golden-compare ({benchmark.GoldenImagePath})";
         report.LatestBenchmarkSummary =
-            $"Benchmark {benchmark.RunId}; status={benchmark.Status}; count={benchmark.CompletedCount}; p50={benchmark.P50FrameToOverlayMs:F1} ms; p95={benchmark.P95FrameToOverlayMs:F1} ms; max={benchmark.MaxFrameToOverlayMs:F1} ms; over1s={benchmark.OverOneSecondCount}; source={benchmark.SourceKind}; folder={benchmark.ReportFolder}.";
+            $"Benchmark {benchmark.RunId}; status={benchmark.Status}; count={benchmark.CompletedCount}; p50={benchmark.P50FrameToOverlayMs:F1} ms; p95={benchmark.P95FrameToOverlayMs:F1} ms; max={benchmark.MaxFrameToOverlayMs:F1} ms; over-threshold={benchmark.OverOneSecondCount} (threshold={benchmark.AcceptanceThresholdMs:F0} ms); cold-start={benchmark.ColdStartSampleCount} sample(s), max {benchmark.ColdStartMaxFrameToOverlayMs:F1} ms, over-threshold {benchmark.ColdStartOverThresholdCount}; {workload}; source={benchmark.SourceKind}; folder={benchmark.ReportFolder}.";
 
         if (benchmark.CompletedCount <= 0)
         {
             report.Checks.Add(Check("Inspection performance benchmark", Fail, report.LatestBenchmarkSummary, "Rerun benchmark with a readable image folder."));
+            return;
+        }
+
+        if (benchmark.AcceptanceThresholdMs > p95TargetMs)
+        {
+            // A run measured against a looser threshold than this gate's target cannot
+            // satisfy the gate: its over-threshold count was computed with that looser value.
+            report.Checks.Add(Check("Inspection performance benchmark", Fail, report.LatestBenchmarkSummary, $"Benchmark acceptance threshold ({benchmark.AcceptanceThresholdMs:F0} ms) is looser than the gate target ({p95TargetMs:F0} ms). Rerun the benchmark with the default threshold."));
             return;
         }
 
@@ -408,7 +419,13 @@ public static class Stage1ReadinessGateService
             return;
         }
 
-        report.Checks.Add(Check("Inspection performance benchmark", Pass, report.LatestBenchmarkSummary, "No action required."));
+        report.Checks.Add(Check(
+            "Inspection performance benchmark",
+            Pass,
+            report.LatestBenchmarkSummary,
+            benchmark.ColdStartOverThresholdCount > 0
+                ? "Steady-state timing passes; cold-start sample(s) exceeded the threshold — review the cold-start figures in the benchmark report."
+                : "No action required."));
     }
 
     private static void AddValidationPackage(Stage1ReadinessReport report, ValidationPackageRecord? latestPackage)

@@ -338,45 +338,10 @@ public sealed class SimulatedPlcSafetyController : IPlcSafetyController
     public SafetyStatus GetDiagnostics() => GetSafetyStatus();
 }
 
-public sealed class TcpTextPlcSafetyController : IPlcSafetyController
-{
-    private readonly string _endpointSummary;
-
-    public TcpTextPlcSafetyController(string endpointSummary = "")
-    {
-        _endpointSummary = endpointSummary;
-    }
-
-    public string Name => "TCP Text PLC Safety Boundary";
-    public IntegrationConnectionStatus Status => string.IsNullOrWhiteSpace(_endpointSummary) ? IntegrationConnectionStatus.NotConnected : IntegrationConnectionStatus.Ready;
-    public string StatusMessage => Status == IntegrationConnectionStatus.Ready
-        ? $"TCP text PLC boundary configured for {_endpointSummary}. Commands are sent only by explicit PLC integration code."
-        : "TCP text PLC boundary is not configured; no network safety command will be sent.";
-    public bool IsGuardDoorClosed => false;
-    public bool IsEmergencyStopActive => false;
-    public bool IsAirPressureOk => false;
-    public bool IsRobotServoReady => false;
-    public bool IsBoardClampReady => false;
-    public bool IsLightCurtainClear => false;
-
-    public Task<IntegrationCommandResult> ResetSafetyFaultAsync(CancellationToken cancellationToken = default)
-        => Task.FromResult(IntegrationCommandResult.NotConnected("TCP text PLC reset is a boundary only in this build. No vendor PLC or safety-certified reset command was sent."));
-
-    public SafetyStatus GetSafetyStatus()
-        => new()
-        {
-            IsGuardDoorClosed = false,
-            IsEmergencyStopActive = false,
-            IsAirPressureOk = false,
-            IsRobotServoReady = false,
-            IsBoardClampReady = false,
-            IsLightCurtainClear = false,
-            ActiveFaults = { "TCP text PLC boundary does not read safety state in this build" },
-            Message = StatusMessage,
-        };
-
-    public SafetyStatus GetDiagnostics() => GetSafetyStatus();
-}
+// TcpTextPlcSafetyController was removed here: it was unreferenced, performed no TCP I/O
+// despite its name, and reported Ready without reading any safety state (standard VOL11
+// Nonconformity 3). A future PLC integration must arrive as a reviewed vendor adapter
+// registered through the commissioning bootstrap, never as a name-only placeholder.
 
 public sealed class SimulatedRobotController : IRobotController
 {

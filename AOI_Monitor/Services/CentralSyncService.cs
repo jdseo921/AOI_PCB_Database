@@ -182,8 +182,11 @@ public static class CentralSyncService
             return new CentralSyncRetrySummary(0, 0, 0, 0);
 
         var settings = CentralSyncSettingsService.Load();
-        var items = AoiDatabase.GetCentralSyncQueue(1000)
-            .Where(item => ids.Contains(item.Id) && item.Status == CentralSyncStatus.Pending.ToString())
+        // Fetch by the exact ids: intersecting with a newest-N queue snapshot silently
+        // dropped the oldest pending items once the queue grew past the window, so a
+        // backlog could never drain.
+        var items = AoiDatabase.GetCentralSyncItemsByIds(ids)
+            .Where(item => item.Status == CentralSyncStatus.Pending.ToString())
             .OrderBy(item => item.CreatedAtUtc)
             .ToArray();
 
@@ -392,6 +395,12 @@ public static class CentralSyncService
         var count = 0;
         foreach (var row in AoiDatabase.GetAuditEvents(new LogFilter(), limit))
         {
+            // Central-sync bookkeeping events must not feed back into the queue: every
+            // enqueue/status change records its own CENTRAL_SYNC_* audit event, so
+            // syncing them would grow the queue on every pass even on an idle line.
+            if (row.ActionCategory?.StartsWith("CENTRAL_SYNC", StringComparison.OrdinalIgnoreCase) == true)
+                continue;
+
             var itemId = row.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (AoiDatabase.CentralSyncQueueContains("AuditEvent", itemId))
                 continue;

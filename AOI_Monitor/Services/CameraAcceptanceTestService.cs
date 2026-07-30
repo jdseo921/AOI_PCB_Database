@@ -203,6 +203,7 @@ public static class CameraAcceptanceTestService
             metrics.Failures.Add($"{view}: connect time {metrics.ConnectMs:F1} ms exceeds {criteria.MaxConnectMs:F1} ms.");
 
         DateTime? previousCaptured = null;
+        var missingSourcePathCount = 0;
         var firstFrameWatch = Stopwatch.StartNew();
         for (var i = 0; i < criteria.FramesPerView; i++)
         {
@@ -236,6 +237,8 @@ public static class CameraAcceptanceTestService
                 ? 0
                 : Math.Max(0, (frame.EffectiveCapturedAtUtc - previousCaptured.Value).TotalMilliseconds);
             previousCaptured = frame.EffectiveCapturedAtUtc;
+            if (string.IsNullOrWhiteSpace(frame.SourcePath) || !File.Exists(frame.SourcePath))
+                missingSourcePathCount++;
             var metadataMessage = ValidateMetadata(frame, view, criteria);
             var record = new CameraAcceptanceFrameRecord
             {
@@ -268,6 +271,12 @@ public static class CameraAcceptanceTestService
         {
             metrics.Warnings.Add($"{view}: camera acquisition stop reported: {ex.Message}");
         }
+
+        // The inspection pipeline consumes frames as image files on disk (MonitorView,
+        // benchmark, and every engine reject a frame whose SourcePath does not exist),
+        // so a metadata-only adapter passes acceptance yet delivers nothing inspectable.
+        if (missingSourcePathCount > 0)
+            metrics.Warnings.Add($"{view}: {missingSourcePathCount} frame(s) had no readable on-disk SourcePath. The inspection pipeline consumes frames as image files and will reject such frames; the adapter must persist each frame and set SourcePath.");
 
         var viewFrames = run.Frames.Where(frame => string.Equals(frame.ViewType, view.ToString(), StringComparison.OrdinalIgnoreCase)).ToArray();
         metrics.AverageFrameIntervalMs = viewFrames.Count(frame => frame.IntervalMs > 0) == 0

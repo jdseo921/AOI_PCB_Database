@@ -199,6 +199,7 @@ public static class ConfigurationBackupService
                 "raw production images",
                 "SQLite WAL/SHM runtime files",
                 "SQLite database runtime files",
+                "calibration profiles (CalibrationProfiles/CalibrationPoints tables) - re-run 2D calibration after a restore until backup coverage is added",
             },
         };
     }

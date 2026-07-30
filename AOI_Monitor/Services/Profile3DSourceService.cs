@@ -397,7 +397,15 @@ public static class Profile3DAcceptanceTestService
         if (frame.HeightValues.Length != frame.Width * frame.Height)
             run.Failures.Add($"Height value count {frame.HeightValues.Length} does not match dimensions {frame.Width}x{frame.Height}.");
         if (run.NaNHeightCount > 0)
-            run.Failures.Add($"Height map contains {run.NaNHeightCount} NaN or infinite height value(s).");
+        {
+            var nanFractionPercent = frame.HeightValues.Length == 0
+                ? 100.0
+                : run.NaNHeightCount * 100.0 / frame.HeightValues.Length;
+            if (nanFractionPercent > criteria.MaxNaNFractionPercent)
+                run.Failures.Add($"Height map contains {run.NaNHeightCount} NaN or infinite height value(s) ({nanFractionPercent:F2}%), above the {criteria.MaxNaNFractionPercent:F1}% dropout tolerance.");
+            else
+                run.Warnings.Add($"Height map contains {run.NaNHeightCount} NaN or infinite dropout value(s) ({nanFractionPercent:F2}%), within the {criteria.MaxNaNFractionPercent:F1}% dropout tolerance.");
+        }
         if (!criteria.AcceptedUnits.Any(unit => string.Equals(unit, frame.Unit, StringComparison.OrdinalIgnoreCase)))
             run.Failures.Add($"Height unit '{frame.Unit}' is not accepted.");
         if (criteria.RequirePositivePitch && (frame.XPitchMicrons <= 0 || frame.YPitchMicrons <= 0))

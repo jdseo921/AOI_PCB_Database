@@ -32,6 +32,11 @@ Every accepted frame must provide:
 - pixel format from the configured required set
 - `SourceKind` naming the real adapter/source
 - `IsSimulated = false` only when the frame came from real hardware
+- `SourcePath` pointing at a readable image file on disk: the inspection pipeline
+  (Main Inspection, benchmark, and every engine) consumes frames as image files and
+  rejects frames whose `SourcePath` does not exist, so the adapter must persist each
+  captured frame (or a rolling buffer) and report the persisted frame's true
+  dimensions. Camera acceptance warns on frames without a readable `SourcePath`.
 
 Fake, replay, folder, SDK sample, or metadata-only frames must set `IsSimulated = true`.
 

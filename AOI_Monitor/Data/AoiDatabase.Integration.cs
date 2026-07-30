@@ -577,6 +577,43 @@ public static partial class AoiDatabase
         return records;
     }
 
+    /// <summary>Fetches queue rows by exact id (chunked parameterized IN), regardless of queue depth.</summary>
+    public static IReadOnlyList<CentralSyncQueueRecord> GetCentralSyncItemsByIds(IReadOnlyCollection<long> ids)
+    {
+        EnsureInitialized();
+
+        var records = new List<CentralSyncQueueRecord>();
+        if (ids.Count == 0)
+            return records;
+
+        using var connection = OpenConnection();
+        foreach (var chunk in ids.Chunk(100))
+        {
+            using var command = connection.CreateCommand();
+            var parameterNames = new List<string>(chunk.Length);
+            for (var i = 0; i < chunk.Length; i++)
+            {
+                var name = $"$id{i}";
+                parameterNames.Add(name);
+                command.Parameters.AddWithValue(name, chunk[i]);
+            }
+
+            command.CommandText =
+                $"""
+                SELECT Id, CreatedAtUtc, LastAttemptAtUtc, NextAttemptAtUtc, ItemType, ItemId, PayloadJson,
+                       PayloadPath, EndpointOrFolder, StationId, RetryCount, MaxRetryCount, Status, LastError
+                FROM CentralSyncQueue
+                WHERE Id IN ({string.Join(", ", parameterNames)});
+                """;
+
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                records.Add(ReadCentralSyncQueueRecord(reader));
+        }
+
+        return records;
+    }
+
     public static void MarkCentralSyncItemSent(long id, string payloadPath, string message)
         => UpdateCentralSyncItem(id, "Sent", payloadPath, message, retryBackoffMs: 0, incrementRetry: false);
 

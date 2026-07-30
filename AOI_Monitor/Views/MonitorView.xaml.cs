@@ -47,13 +47,17 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
     private InspectionLatencyTraceBuilder? _currentLatencyTrace;
     private InspectionLatencyTrace? _lastLatencyTrace;
     private CalibrationProfileRecord? _selectedCalibrationProfile;
+    private readonly SimulatedPlcSafetyController _plcSafetyController = new();
+    private IRobotController? _previousRobotController;
+    private IEmergencyStopMonitor? _previousEmergencyStopMonitor;
+    private IPlcSafetyController? _previousPlcSafetyController;
 
     public MonitorView()
     {
         InitializeComponent();
         _emergencyStopMonitor = new SimulatedEmergencyStopMonitor(_robotController);
-        IntegrationBoundaryRegistry.RobotController = _robotController;
-        IntegrationBoundaryRegistry.EmergencyStopMonitor = _emergencyStopMonitor;
+        RegisterSimulationBoundaries();
+        Loaded += OnLoaded;
         _robotCycleService = new RobotCycleService();
         _robotCycleService.StateChanged += OnRobotCycleStateChanged;
         LightingSettingsService.ApplyIntegrationBoundary();
@@ -68,6 +72,31 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         LogEvent("READY", "Main Inspection ready. Use folder simulation or Image Library imported images.");
     }
 
+    private void OnLoaded(object sender, RoutedEventArgs e)
+        => RegisterSimulationBoundaries();
+
+    /// <summary>
+    /// Installs this page's clearly-labeled simulators only over the fail-safe Null
+    /// defaults. A commissioned real robot/PLC controller registered by a reviewed
+    /// bootstrap must survive operators opening Main Inspection; the simulators never
+    /// replace a non-null registration.
+    /// </summary>
+    private void RegisterSimulationBoundaries()
+    {
+        _previousRobotController = IntegrationBoundaryRegistry.RobotController;
+        if (_previousRobotController is NullRobotController)
+            IntegrationBoundaryRegistry.RobotController = _robotController;
+        _previousEmergencyStopMonitor = IntegrationBoundaryRegistry.EmergencyStopMonitor;
+        if (_previousEmergencyStopMonitor is NullEmergencyStopMonitor)
+            IntegrationBoundaryRegistry.EmergencyStopMonitor = _emergencyStopMonitor;
+        // The simulated PLC accompanies the simulated robot so the simulation cycle can
+        // pass the fail-safe interlock check honestly; without it the Null PLC (which
+        // reports an active fault by design) blocks every simulated command.
+        _previousPlcSafetyController = IntegrationBoundaryRegistry.PlcSafetyController;
+        if (_previousPlcSafetyController is NullPlcSafetyController)
+            IntegrationBoundaryRegistry.PlcSafetyController = _plcSafetyController;
+    }
+
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         WorkflowState.Instance.StateChanged -= OnWorkflowStateChanged;
@@ -77,9 +106,11 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         CancelAndDispose(ref _robotCycleCancellation);
         CancelAndDispose(ref _refreshCancellation);
         if (ReferenceEquals(IntegrationBoundaryRegistry.RobotController, _robotController))
-            IntegrationBoundaryRegistry.RobotController = new NullRobotController();
+            IntegrationBoundaryRegistry.RobotController = _previousRobotController ?? new NullRobotController();
         if (ReferenceEquals(IntegrationBoundaryRegistry.EmergencyStopMonitor, _emergencyStopMonitor))
-            IntegrationBoundaryRegistry.EmergencyStopMonitor = new NullEmergencyStopMonitor();
+            IntegrationBoundaryRegistry.EmergencyStopMonitor = _previousEmergencyStopMonitor ?? new NullEmergencyStopMonitor();
+        if (ReferenceEquals(IntegrationBoundaryRegistry.PlcSafetyController, _plcSafetyController))
+            IntegrationBoundaryRegistry.PlcSafetyController = _previousPlcSafetyController ?? new NullPlcSafetyController();
     }
 
     private void OnWorkflowStateChanged() => UiDispatcher.InvokeIfAvailable(Dispatcher, () => _ = RefreshSafeAsync());

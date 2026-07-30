@@ -19,6 +19,14 @@ public sealed record SoakTestOptions(
     string LotId)
 {
     public int? MaxIterations { get; init; }
+
+    /// <summary>
+    /// Optional camera source for the soak. Null keeps the historical Folder Camera
+    /// Simulation over <see cref="SoakTestOptions.ImageFolder"/>; a Stage 2 pilot can
+    /// inject the real vendor-adapter source so factory endurance evidence
+    /// (IsCompletedFactoryEvidence) becomes reachable with real hardware.
+    /// </summary>
+    public ICameraSource? CameraSourceOverride { get; init; }
 }
 
 public enum SoakTestProfile
@@ -185,7 +193,7 @@ public static class SoakTestService
             PeakWorkingSetMegabytes = BytesToMegabytes(process.WorkingSet64),
         };
 
-        var source = new FolderCameraSource(
+        var source = options.CameraSourceOverride ?? new FolderCameraSource(
             new Dictionary<CameraViewType, string> { [CameraViewType.Top] = options.ImageFolder },
             result.BoardModel,
             result.LotId)
@@ -202,11 +210,13 @@ public static class SoakTestService
         result.EngineName = engine.Name;
         result.EngineVersion = engine.Version;
 
-        if (source.ConnectionStatus != CameraSourceStatus.Simulated)
+        if (source.ConnectionStatus is not (CameraSourceStatus.Simulated or CameraSourceStatus.Ready))
         {
-            result.Errors.Add($"Folder Camera Simulation is not ready: {source.StatusMessage}");
+            result.Errors.Add(options.CameraSourceOverride is null
+                ? $"Folder Camera Simulation is not ready: {source.StatusMessage}"
+                : $"Camera source '{source.Name}' is not ready: {source.StatusMessage}");
             CompleteResult(result, process);
-            progress?.Report(new SoakTestProgress(0, Math.Max(1, (int)options.Duration.TotalSeconds), "Soak test could not start; no readable simulation images.", options.Duration, result.SuccessfulCycles, result.FailedCycles));
+            progress?.Report(new SoakTestProgress(0, Math.Max(1, (int)options.Duration.TotalSeconds), "Soak test could not start; the camera source is not ready.", options.Duration, result.SuccessfulCycles, result.FailedCycles));
             return result;
         }
 

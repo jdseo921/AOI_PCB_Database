@@ -94,6 +94,38 @@ public sealed class FakeVisionCameraAdapter : IVisionCameraAdapter
         return _connected && _started;
     }
 
+    // The inspection pipeline consumes frames as image files on disk: MonitorView, the
+    // benchmark, and every engine reject a frame whose SourcePath is not a readable
+    // file. A REAL vendor adapter must therefore persist each captured frame (or a
+    // rolling buffer) and set SourcePath to it, reporting the persisted frame's true
+    // dimensions. The template demonstrates the obligation with one tiny placeholder
+    // PNG written to the temp folder (declared Width/Height stay illustrative values).
+    private const string PlaceholderPngBase64 =
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+    private string _frameFilePath = "";
+
+    private string EnsureFrameFileOnDisk()
+    {
+        if (!string.IsNullOrWhiteSpace(_frameFilePath) && File.Exists(_frameFilePath))
+            return _frameFilePath;
+
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), "aoi_camera_template_frame.png");
+            File.WriteAllBytes(path, Convert.FromBase64String(PlaceholderPngBase64));
+            _frameFilePath = path;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Frame persistence failed; the frame will carry no SourcePath and the
+            // acceptance run will surface the missing-file warning.
+            _frameFilePath = "";
+        }
+
+        return _frameFilePath;
+    }
+
     public bool TryGetFrame(CameraViewType viewType, int timeoutMs, out CameraFrame? frame)
     {
         if (!_connected || !_started)
@@ -106,7 +138,7 @@ public sealed class FakeVisionCameraAdapter : IVisionCameraAdapter
         _sequence++;
         frame = new CameraFrame(
             FrameId: $"FAKE-{viewType}-{_sequence:D6}",
-            SourcePath: "",
+            SourcePath: EnsureFrameFileOnDisk(),
             ViewType: viewType,
             CapturedAt: now,
             SourceName: "Template Fake Vision Camera Adapter",

@@ -63,6 +63,7 @@ public static class TraceabilityAcceptanceTestService
             result = "string required: OK, NG, REVIEW, or site-defined code",
             timestampUtc = "ISO-8601 UTC timestamp required",
             defectSummary = "string required",
+            defectCodes = "array of strings; MES defect codes mapped from the defect taxonomy",
             imagePath = "string optional; local path is not sent unless customer adapter maps it",
             overlayPath = "string optional",
             inspectionEngine = "string required",

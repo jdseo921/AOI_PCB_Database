@@ -782,6 +782,15 @@ public sealed class Profile3DAcceptanceCriteria
     public double MaxAcquisitionMs { get; set; } = 1000;
     public List<string> AcceptedUnits { get; set; } = new() { "microns", "um", "micrometer", "micrometers" };
     public bool RequirePositivePitch { get; set; } = true;
+
+    /// <summary>
+    /// Dropout tolerance: real profilometers always produce some NaN samples from
+    /// occlusion and specular reflection (the repo's own NaN-for-missing convention).
+    /// Runs fail above this NaN percentage and warn for any dropout below it; 0 restores
+    /// the previous zero-tolerance behavior. Persisted criteria rows without this field
+    /// deserialize to the default.
+    /// </summary>
+    public double MaxNaNFractionPercent { get; set; } = 5.0;
 }
 
 public sealed class Profile3DAcceptanceRun

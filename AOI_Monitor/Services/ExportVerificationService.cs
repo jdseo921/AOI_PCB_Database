@@ -224,7 +224,10 @@ public static class ExportVerificationService
 
     private static void VerifyCsv(ExportVerificationResult result, string path, string exportType)
     {
-        var firstLine = File.ReadLines(path).FirstOrDefault();
+        // Leading '#' lines are evidence-scope/identity comments (e.g. batch-soak passes
+        // CSV); the header contract applies to the first non-comment line.
+        var firstLine = File.ReadLines(path)
+            .FirstOrDefault(line => !line.StartsWith("#", StringComparison.Ordinal));
         if (string.IsNullOrWhiteSpace(firstLine))
         {
             Add(result, ExportVerificationStatus.ERROR, $"CSV has no header: {Path.GetFileName(path)}.");
@@ -434,6 +437,10 @@ public static class ExportVerificationService
             fileName.Contains("ui_stability_events", StringComparison.OrdinalIgnoreCase))
             return new[] { "TimestampUtc", "Cycle", "PageName", "EventType", "PageLoadMilliseconds", "Status" };
 
+        if (exportType.Contains("BatchSoak", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Contains("batch_soak_passes", StringComparison.OrdinalIgnoreCase))
+            return new[] { "run_id", "pass_number", "started_at_utc", "duration_ms", "images", "errors", "managed_mb", "working_set_mb", "handle_count", "database_mb" };
+
         return new[] { "Image", "Ground Truth", "AI/Engine Result", "Inspection Engine", "Score", "Pass/Fail" };
     }
 
@@ -459,6 +466,10 @@ public static class ExportVerificationService
             exportType.Contains("Traceability", StringComparison.OrdinalIgnoreCase) ||
             fileName.Contains("traceability", StringComparison.OrdinalIgnoreCase))
             return new[] { "integrationMode", "lotId", "boardModel", "result", "timestampUtc", "defectSummary" };
+
+        if (exportType.Contains("BatchSoak", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Contains("batch_soak_report", StringComparison.OrdinalIgnoreCase))
+            return new[] { "runId", "scopeStatement", "softwareVersion", "status", "engineConfig", "passes" };
 
         return Array.Empty<string>();
     }

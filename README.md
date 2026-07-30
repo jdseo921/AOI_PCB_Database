@@ -175,6 +175,26 @@ Generated files are written below the running application's `exports/` folder, u
 AOI_Monitor/bin/Debug/net10.0-windows/exports/
 ```
 
+## Stage 1 Batch Soak Test
+
+For the 8-hour continuous-operation acceptance criterion, a headless soak harness loops
+the real batch-inspection pipeline over an image folder and emits HTML/JSON/CSV stability
+evidence (timing, managed memory, handle counts, SQLite growth, error/alarm capture, and
+crash/stuck/memory-trend failure detection):
+
+```powershell
+dotnet run --project AOI_Monitor.Tools -c Release -- batch-soak `
+  --images <folder> `
+  --output TestResults/batch-soak `
+  --operator <id> `
+  --profile eight-hour
+```
+
+Use `--profile smoke` for a 5-minute rehearsal. Reports are labeled as uploaded-image
+pipeline evidence only, never camera or factory-automation readiness. See
+[Docs/Stage1_Soak_Test_Procedure.md](Docs/Stage1_Soak_Test_Procedure.md) for the full
+operator procedure.
+
 ## Stage 1 Demo Workflow
 
 Use [Docs/Stage1_Acceptance_Checklist.md](Docs/Stage1_Acceptance_Checklist.md) as the formal verification script. Use [Docs/User_Manual.md](Docs/User_Manual.md) for operating steps, [Docs/Installation_Guide.md](Docs/Installation_Guide.md) for setup, and [SampleData/README.md](SampleData/README.md) to prepare small, non-confidential demo images.

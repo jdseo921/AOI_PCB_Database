@@ -4,7 +4,7 @@ namespace AOI_Monitor.Tools;
 
 public static class Program
 {
-    public static int Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
         var storageRoot = Environment.GetEnvironmentVariable("AOI_MONITOR_STORAGE_ROOT");
         if (!string.IsNullOrWhiteSpace(storageRoot))
@@ -24,6 +24,9 @@ public static class Program
 
         if (args.Length > 0 && string.Equals(args[0], "learn-from-images", StringComparison.OrdinalIgnoreCase))
             return LearnFromImagesCommand.Execute(args, Console.Out, Console.Error);
+
+        if (args.Length > 0 && string.Equals(args[0], "batch-soak", StringComparison.OrdinalIgnoreCase))
+            return await BatchSoakCommand.ExecuteAsync(args, Console.Out, Console.Error);
 
         return Stage1ExitCommand.Execute(args, Console.Out, Console.Error);
     }

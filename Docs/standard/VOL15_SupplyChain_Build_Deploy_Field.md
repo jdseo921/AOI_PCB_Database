@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL15 Supply Chain, Build, Deployment, and Field Operations — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: this volume governs everything between "the code is correct" and "a customer station runs it safely": software supply-chain security (§42), build/packaging/signing/release/update engineering (§43), installation and Windows hardening of production stations (§44), and field operations including remote support and fleet management (§45) for the AOI Monitor product (`jdseo921/AOI_PCB_Database`).
 
-Supersedes/Related existing docs: §43–§44 are the normative layer above `Docs/Deployment_Package_Guide.md` and `Docs/Installation_Guide.md` (those remain as operator instructions; where they conflict with this volume, this volume prevails — both still name Windows 10, see DEP-002). `Docs/Branch_Protection_and_Quality_Gates.md` and `Docs/Developer_CI.md` remain as CI operating instructions; branch-protection *governance* is owned by the CHG catalogue (§48–53/VOL17), while this volume owns the pipeline's supply-chain hardening. `Docs/ONNX_Model_Training.md` remains the training-environment how-to; its dependency handling is bound by SUP-005/SUP-006.
+Supersedes/Related existing docs: §43–§44 are the normative layer above `Docs/DEPLOYMENT.md` and `Docs/DEPLOYMENT.md` (those remain as operator instructions; where they conflict with this volume, this volume prevails — both still name Windows 10, see DEP-002). `CONTRIBUTING.md` and `CONTRIBUTING.md` remain as CI operating instructions; branch-protection *governance* is owned by the CHG catalogue (§48–53/VOL17), while this volume owns the pipeline's supply-chain hardening. `Docs/DATA_PIPELINE.md` remains the training-environment how-to; its dependency handling is bound by SUP-005/SUP-006.
 
 Requirement IDs owned by this volume: **SUP-001..045, BLD-001..025, RELS-001..025, DEP-001..025, OPS-001..022** (142 records). Assumptions: **A-VOL15-1..5**. Open decisions: **OD-VOL15-1..6** (§45.6; merged into §6/VOL01).
 
@@ -33,7 +35,7 @@ Table 42-1 — Supply-chain inventory classes
 | 11 | Camera / lighting SDKs | none in the main app (hygiene gate bans vendor packages there); Stage-2 adapter plugins load out-of-app (§15/VOL03) |
 | 12 | Robot SDKs / PLC libraries | none yet (Stage 3) |
 | 13 | OPC UA stacks | none yet (Stage 4); UA-.NETStandard (MIT-licensed since Dec 2025) is the assessed candidate [OPCUA-P2] |
-| 14 | Python interpreter + wheels (training env) | Python 3.11 + anomalib toolchain via uv (`Scripts/ml`, `Docs/ONNX_Model_Training.md`) |
+| 14 | Python interpreter + wheels (training env) | Python 3.11 + anomalib toolchain via uv (`Scripts/ml`, `Docs/DATA_PIPELINE.md`) |
 | 15 | CUDA / cuDNN / GPU drivers | not adopted (CPU EP baseline, D-01; adoption tracked as OD-VOL15-4) |
 | 16 | Model runtimes | ONNX Runtime 1.27.0 — no vendor LTS exists; the product defines its own support window (D-03) |
 | 17 | AI models incl. base/pretrained lineage | anomalib pretrained backbones consumed in training; shipped artifact = single-file ONNX + signed manifest (D-03) |
@@ -754,7 +756,7 @@ An update bundle containing models or recipes SHALL be treated as Confidential-c
 
 ## 44. Installation and Windows Hardening
 
-This section governs the state of the Windows workstation the product runs on: which OS editions are permitted, how the machine is hardened at install, and which OS-level controls the product depends on. It exists because the strongest application code is undermined by a soft host, and because the repository ships two customer-facing deployment documents (`Docs/Deployment_Package_Guide.md`, `Docs/Installation_Guide.md`) that still name Windows 10 — an out-of-support OS since 2025-10-14 (DEP-002) — and because the current storage root sits under a OneDrive-synced profile path (repo reality; DEP-019). Boundary with neighbors: §43 owns the installer and update artifacts that land here; §32/VOL10 owns camera-network segmentation (GVCP/GVSP have no authentication, so the host firewall and zoning are the only controls); §27–28/VOL07 own the application-level security architecture and identity model that these OS controls sit beneath; the CRY catalogue (§30/VOL08) owns DPAPI and key-custody mechanics referenced by DEP-017.
+This section governs the state of the Windows workstation the product runs on: which OS editions are permitted, how the machine is hardened at install, and which OS-level controls the product depends on. It exists because the strongest application code is undermined by a soft host, and because the repository ships two customer-facing deployment documents (`Docs/DEPLOYMENT.md`, `Docs/DEPLOYMENT.md`) that still name Windows 10 — an out-of-support OS since 2025-10-14 (DEP-002) — and because the current storage root sits under a OneDrive-synced profile path (repo reality; DEP-019). Boundary with neighbors: §43 owns the installer and update artifacts that land here; §32/VOL10 owns camera-network segmentation (GVCP/GVSP have no authentication, so the host firewall and zoning are the only controls); §27–28/VOL07 own the application-level security architecture and identity model that these OS controls sit beneath; the CRY catalogue (§30/VOL08) owns DPAPI and key-custody mechanics referenced by DEP-017.
 
 Table 44-1 — Windows Firewall inbound posture (DEP-009; deny-by-default, allow only these per stage)
 
@@ -776,7 +778,7 @@ New AOI stations SHALL run Windows 11 IoT Enterprise LTSC 2024 as the baseline e
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
 **[DEP-002]** (P1 | ALL | Config, Installer)
-The client-facing repository documents that still name Windows 10 as a supported platform (`Docs/Deployment_Package_Guide.md`, `Docs/Installation_Guide.md`, and the two further deployment/CI documents identified at the doc-fix per A-VOL15-4) SHALL be corrected to state the D-02 supported-OS matrix before the next customer release.
+The client-facing repository documents that still name Windows 10 as a supported platform (`Docs/DEPLOYMENT.md`, `Docs/DEPLOYMENT.md`, and the two further deployment/CI documents identified at the doc-fix per A-VOL15-4) SHALL be corrected to state the D-02 supported-OS matrix before the next customer release.
 - Why: customer-facing docs that name an out-of-support OS invite a customer to deploy onto Windows 10 in direct conflict with DEP-001, and the docs are the platform statement operators actually read. Maps: WIN-LC; CWE-1104; Internal.
 - Verify: documentation review confirms no client-facing `Docs/*.md` file lists Windows 10 as supported (grep gate over `Docs`). Evidence: doc-review record + grep gate log. Owner: Release Manager. Auto: Partially automated.
 - Exception: Not allowed. Review: Per release.
@@ -1112,7 +1114,7 @@ These entries are declared here and merged into the global specification-defects
 - **A-VOL15-1** — No installer, signing, or SBOM toolchain exists in the repository yet, so the exact pinned versions of the WiX toolset, `signtool`, and the CycloneDX generator (SUP-045) are assumed to be the current stable releases at first adoption and are pinned at that point. Risk: a version chosen later may carry a known advisory; mitigated by SUP-045's pin-and-verify obligation.
 - **A-VOL15-2** — The GitHub remote is a personal account, not an organization, so platform-level enforcement of SHA-pinning (SUP-036), branch protection (SUP-031), immutable releases (BLD-018), and protected release environments (SUP-044) is settings-limited until an owning organization exists. Risk: the release protections remain advisory until then; mitigated by the workflow-lint fitness functions that enforce the same properties in-repo.
 - **A-VOL15-3** — Customer sites are assumed air-gapped or tightly egress-filtered by default through Stage 3; any connected-site behavior (fleet dashboard, telemetry, SOC forwarding) is opt-in per contract. Risk: a connected Stage-4 site changes the network threat model; mitigated by the deny-by-default firewall (DEP-009) and no-egress default (SUP-033, OPS-016).
-- **A-VOL15-4** — The client-facing documents naming Windows 10 (DEP-002) are assumed to be `Docs/Deployment_Package_Guide.md`, `Docs/Installation_Guide.md`, and two further deployment/CI documents; the exact set is confirmed at the doc-fix. Risk: more than four documents may reference Windows 10; mitigated by DEP-002's grep gate over all of `Docs`.
+- **A-VOL15-4** — The client-facing documents naming Windows 10 (DEP-002) are assumed to be `Docs/DEPLOYMENT.md`, `Docs/DEPLOYMENT.md`, and two further deployment/CI documents; the exact set is confirmed at the doc-fix. Risk: more than four documents may reference Windows 10; mitigated by DEP-002's grep gate over all of `Docs`.
 - **A-VOL15-5** — The customer-administrator role that controls the maintenance window (RELS-017) and much of the station-hardening ownership (§44) is assumed to map to the IT Admin (customer) role of §7; where a site has no such role, the vendor Release Manager holds it under contract. Risk: role ambiguity at small sites; mitigated by recording the acting role-hat per the §7 solo-team compensating control.
 
 ### Open Decisions

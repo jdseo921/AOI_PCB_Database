@@ -42,5 +42,5 @@ AOI_Monitor/Services/*Traceability* @jdseo921/software-quality-reviewers @jdseo9
 .github/ @jdseo921/maintainers
 Scripts/ @jdseo921/maintainers
 DESIGN.md @jdseo921/maintainers @jdseo921/ui-quality-reviewers
-Docs/Branch_Protection_and_Quality_Gates.md @jdseo921/maintainers
+CONTRIBUTING.md @jdseo921/maintainers
 AOI_PCB_Database.slnx @jdseo921/maintainers

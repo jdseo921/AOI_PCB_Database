@@ -8,7 +8,7 @@ public sealed class UiServiceCoverageTests
     [Fact]
     public void MajorBackendServicesHaveDocumentedUiCoverage()
     {
-        var doc = ReadRepoFile("Docs", "UI_Service_Coverage.md");
+        var doc = ReadRepoFile("Docs", "ARCHITECTURE.md");
         foreach (var service in new[]
         {
             "ModelAcceptanceService",

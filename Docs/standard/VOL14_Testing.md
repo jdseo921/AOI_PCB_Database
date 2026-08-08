@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL14 Testing — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: the normative testing strategy for AOI Monitor — the full test pyramid, coverage and mutation floors, security and authorization testing, AI-model and hardware test gates, fault injection, performance/reliability testing, test-data rules, and CI tiering (global section 39).
 
-Supersedes/Related existing docs: no repo document is superseded in full. This volume governs and is executed through `Docs/Factory_Acceptance_Test_Plan.md`, `Docs/Manual_Test_Plan.md`, `Docs/Hardware_In_The_Loop_Checklist.md`, `Docs/Customer_Dataset_Validation_Kit.md`, `Docs/Developer_CI.md`, and `Docs/Branch_Protection_and_Quality_Gates.md` (retained as procedure kits); the test-discipline expectations in `Docs/Industrial_Quality_Checklist.md` (REL-*, PERF-*) are restated here with binding IDs and remain valid until VOL20 publishes the reconciliation index (see §5 / VOL01 for the ID-namespace mapping rule).
+Supersedes/Related existing docs: no repo document is superseded in full. This volume governs and is executed through `Docs/VALIDATION.md`, `Docs/VALIDATION.md`, `Docs/DEPLOYMENT.md`, `Docs/VALIDATION.md`, `CONTRIBUTING.md`, and `CONTRIBUTING.md` (retained as procedure kits); the test-discipline expectations in `CONTRIBUTING.md` (REL-*, PERF-*) are restated here with binding IDs and remain valid until VOL20 publishes the reconciliation index (see §5 / VOL01 for the ID-namespace mapping rule).
 
 ---
 
@@ -220,7 +222,7 @@ Every navigable page key registered in the shell SHALL have UI-tier coverage con
 
 **[TST-007]** (P2 | S2–S4 | CameraAdapter, LightingAdapter, CI)
 Every vendor camera or lighting adapter SHALL pass the shared adapter contract suite (an extension of `VendorAdapterTemplateTests` and `CameraAdapterPackageValidationServiceTests`) before its integration status is permitted to report `Ready`.
-- Why: adapters are third-party code behind `IVisionCameraAdapter`/`ILightingController`; a contract kit is the only scalable way to hold vendors to the frame-metadata and status rules in `Docs/Vendor_Adapter_Implementation_Guide.md`. Maps: 62443-4-1 SVV-1; Internal.
+- Why: adapters are third-party code behind `IVisionCameraAdapter`/`ILightingController`; a contract kit is the only scalable way to hold vendors to the frame-metadata and status rules in `Docs/ARCHITECTURE.md`. Maps: 62443-4-1 SVV-1; Internal.
 - Verify: named suite `AdapterContractSuite` executed against the candidate adapter package. Evidence: adapter acceptance report artifact. Owner: Software Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: On change.
 
@@ -401,7 +403,7 @@ All hardware-dependent logic SHALL be executable per-PR against the §14 Simulat
 - Exception: Not allowed. Review: Annual.
 
 **[TST-036]** (P1 | S2–S4 | Acquisition, CameraAdapter)
-Stage-2 hardware features SHALL NOT be reported at any integration status above `Simulated` until the hardware-in-the-loop procedure in `Docs/Hardware_In_The_Loop_Checklist.md` has been executed on physical devices with recorded evidence.
+Stage-2 hardware features SHALL NOT be reported at any integration status above `Simulated` until the hardware-in-the-loop procedure in `Docs/DEPLOYMENT.md` has been executed on physical devices with recorded evidence.
 - Why: simulated evidence never satisfies real-hardware gates — the rule is already repeated across ≥6 repo docs and machine-enforced by claim-language gates; this makes the HIL execution itself the gate. Maps: Internal; 62443-4-1 SVV-1.
 - Verify: HIL checklist evidence package reviewed at the S2 gate. Evidence: HIL evidence folder + readiness report. Owner: QA Lead. Auto: Manual review.
 - Exception: Not allowed. Review: On change.

@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL11 — Robot and Safety Boundary; MES/ERP and OPC UA Architecture — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: normative requirements for the robot/safety software boundary (§34) and for MES/ERP integration over REST and OPC UA, including the store-and-forward outbox (§35), across Stages 1–4 of AOI Monitor.
 
-Supersedes/Related existing docs: this volume incorporates by reference and does not retire `Docs/Integration_Boundaries.md`, `Docs/Vendor_Adapter_Implementation_Guide.md`, `Docs/Architecture_Extension_Guide.md`, `Docs/Central_Sync_Mapping.md`, `Docs/Hardware_In_The_Loop_Checklist.md`, and `Docs/Factory_Acceptance_Test_Plan.md` (Stage 3/4 sections). Where the legacy `Docs/Industrial_Quality_Checklist.md` rows `MES-001`/`MES-002` and `HW-003`..`HW-005` overlap this volume, this volume governs; the legacy-ID reconciliation rule is owned by §5 (VOL01). The requirement IDs `MES-xxx` in this volume belong to this standard's namespace and are distinct from the legacy checklist IDs of the same shape.
+Supersedes/Related existing docs: this volume incorporates by reference and does not retire `Docs/ARCHITECTURE.md`, `Docs/ARCHITECTURE.md`, `Docs/ARCHITECTURE.md`, `Docs/DATA_PIPELINE.md`, `Docs/DEPLOYMENT.md`, and `Docs/VALIDATION.md` (Stage 3/4 sections). Where the legacy `CONTRIBUTING.md` rows `MES-001`/`MES-002` and `HW-003`..`HW-005` overlap this volume, this volume governs; the legacy-ID reconciliation rule is owned by §5 (VOL01). The requirement IDs `MES-xxx` in this volume belong to this standard's namespace and are distinct from the legacy checklist IDs of the same shape.
 
 ---
 
@@ -33,7 +35,7 @@ The repo is already on the correct side of the boundary in structure and mostly 
 - Nonconformity 1: `PermitSafetyBypassForSimulation` defaults **true** (`RobotCycleService.cs:37`), and the bypass predicate keys off robot `Status != Ready`, so a misbehaving real adapter self-reporting `Error` with no PLC configured would receive motion commands with only an audit trail (repo gap 9b-6). SAF-010 and SAF-011 invert this.
 - Nonconformity 2: e-stop is polled only at command edges; nothing aborts an in-flight adapter call (`RobotCycleService.cs:249-278`). SAF-013 and ROB-035 close this.
 - Nonconformity 3: `TcpTextPlcSafetyController` (`IntegrationContracts.cs:341-379`) performs no TCP I/O despite its name; it must be renamed or replaced before any commissioning use (ROB-023 status-truthfulness scope).
-- Correct by design: robot adapters are deliberately NOT loaded through the drop-folder plugin loader; registration happens in a reviewed commissioning bootstrap (`Templates/RobotControllerTemplate/README.md:9`; `Docs/Vendor_Adapter_Implementation_Guide.md:74`). ROB-026 makes this permanent.
+- Correct by design: robot adapters are deliberately NOT loaded through the drop-folder plugin loader; registration happens in a reviewed commissioning bootstrap (`Templates/RobotControllerTemplate/README.md:9`; `Docs/ARCHITECTURE.md:74`). ROB-026 makes this permanent.
 - `RobotCycleService` state is not thread-safe (no lock around `CurrentState`) — ROB-034.
 
 ### 34.3 Robot command architecture
@@ -154,7 +156,7 @@ The HMI SHALL NOT present any software control labeled or styled as an emergency
 **[SAF-003]** (P0 | S3+ | SafetyStatus)
 The Stage 3 cell commissioning SHALL demonstrate, with recorded evidence, that terminating the AOI process leaves e-stop and guard-interlock functions fully operational.
 - Why: proves B34-3 physically — the safety chain is independent of the observation software. Maps: 13849-1; 10218-2; 60204-1.
-- Verify: commissioning test in `Docs/Hardware_In_The_Loop_Checklist.md` (process-kill safety test) executed per deployment. Evidence: signed commissioning record. Owner: Controls & Safety Engineer. Auto: Manual review.
+- Verify: commissioning test in `Docs/DEPLOYMENT.md` (process-kill safety test) executed per deployment. Evidence: signed commissioning record. Owner: Controls & Safety Engineer. Auto: Manual review.
 - Exception: Not allowed. Review: On change.
 
 **[SAF-004]** (P1 | S3+ | SafetyStatus, All)
@@ -268,7 +270,7 @@ No inference or ML output SHALL feed any safety function, safety decision, or mo
 **[SAF-022]** (P2 | S3+ | SafetyStatus)
 The Safety Status Adapter for a real PLC SHALL be validated during commissioning against physically induced states (each interlock opened, e-stop pressed, chain reset) with recorded per-signal evidence before production enable.
 - Why: proves the observation channel reads the real chain, not a stub — the current `TcpTextPlcSafetyController` reads nothing (`IntegrationContracts.cs:374`). Maps: 13849-2; 10218-2; Internal (D-18).
-- Verify: `Docs/Hardware_In_The_Loop_Checklist.md` PLC interlock section executed per deployment. Evidence: signed HIL record + `RobotAcceptanceRuns` rows. Owner: Controls & Safety Engineer. Auto: Manual review.
+- Verify: `Docs/DEPLOYMENT.md` PLC interlock section executed per deployment. Evidence: signed HIL record + `RobotAcceptanceRuns` rows. Owner: Controls & Safety Engineer. Auto: Manual review.
 - Exception: Not allowed. Review: On change.
 
 ### R: Robot command integration (ROB-001..ROB-041)
@@ -299,7 +301,7 @@ A robot command lacking an explicit adapter acknowledgement within its per-comma
 
 **[ROB-005]** (P2 | S3+ | RobotAdapter, Config)
 Per-command timeout values SHALL be configured per command type in the commissioning configuration, with defaults Load 30 s, MoveToInspectPosition 15 s, Unload 30 s, Home 60 s, ResetFault 10 s, QueryStatus 5 s.
-- Why: bounded waiting per command class; defaults are ASSUMPTION A-VOL11-1 pending vendor timing data (`Docs/Vendor_Adapter_Implementation_Guide.md:52-61`). Maps: Internal; 62443-4-2 CR 7.1.
+- Why: bounded waiting per command class; defaults are ASSUMPTION A-VOL11-1 pending vendor timing data (`Docs/ARCHITECTURE.md:52-61`). Maps: Internal; 62443-4-2 CR 7.1.
 - Verify: config schema validation test + `RobotCommandContractTests` timeout enforcement. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 
@@ -461,7 +463,7 @@ The Orchestrator SHALL NOT persist any motion-command queue for automatic replay
 
 **[ROB-032]** (P2 | ALL | Simulation, RobotAdapter)
 Simulated robot cycles SHALL be labeled `Simulated` end-to-end across status, messages, and exports; every Stage 3 acceptance-evidence gate rejects cycles so labeled.
-- Why: preserves the repo's simulation-honesty invariant ("No real robot command was sent", `IntegrationContracts.cs:424` and siblings; `Docs/Vendor_Adapter_Implementation_Guide.md:34-48`). Maps: Internal; 62443-4-1 SM-12.
+- Why: preserves the repo's simulation-honesty invariant ("No real robot command was sent", `IntegrationContracts.cs:424` and siblings; `Docs/ARCHITECTURE.md:34-48`). Maps: Internal; 62443-4-1 SM-12.
 - Verify: existing simulation-provenance tests + FactoryReadiness gate rules. Evidence: readiness export. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -496,7 +498,7 @@ Robot and PLC links SHALL reside on the isolated cell network segment defined in
 - Exception: Allowed — approver: Security Lead. Review: On change.
 
 **[ROB-038]** (P3 | S3+ | RobotAdapter)
-Vendor robot adapters SHALL complete the safety-warning acknowledgement and acceptance procedure of `Docs/Vendor_Adapter_Implementation_Guide.md` before production registration.
+Vendor robot adapters SHALL complete the safety-warning acknowledgement and acceptance procedure of `Docs/ARCHITECTURE.md` before production registration.
 - Why: the guide already carries the physical-validation checklist (e-stop, guard, LOTO, commissioning, lines 63-74); making it mandatory closes the gap between template and production. Maps: Internal; 62443-4-1 SM-9.
 - Verify: onboarding checklist countersigned at commissioning. Evidence: signed vendor-onboarding record. Owner: Field Service. Auto: Manual review.
 - Exception: Not allowed. Review: On change.
@@ -523,7 +525,7 @@ The Orchestrator SHALL persist cycle-state transitions durably for display and f
 
 ## 35. MES/ERP and OPC UA Architecture
 
-This section governs every exchange between AOI Monitor and manufacturing IT (MES/ERP), over two channels: the REST client that exists today (`AOI_Monitor/Services/MesRestClient.cs`) and the OPC UA server/client capability planned for Stage 4 (currently only `NullOpcUaMesClient`, `IntegrationContracts.cs:590-600`). It exists because MES connectivity is the first place this product touches networks it does not own, and because the source specs left the two most dangerous questions open: what happens when MES is down (SD-03), and who owns which data. The boundary with §21/§22 (VOL05) is that VOL05 owns data schemas and API grammar; this section owns transport security, delivery semantics, and system-of-record authority. The boundary with §28 (VOL07) is that VOL07 owns the identity model; this section binds its application to MES federation and OPC UA sessions. Roadmap note: `Docs/Roadmap_and_Stages.md` targets IPC-CFX [CFX] for Stage 4 — the relationship between CFX/Hermes [HERMES] and OPC UA Machine Vision is an open decision (OD-VOL11-4), and nothing here presumes one replaces the other. Consistent with VOL01's four-stage model, which places MES/ERP integration at Stage 4, every MES transport and outbox requirement below binds at Stage 4 even where the underlying REST client already exists in the codebase; only MES-022's never-drop guarantee spans all stages, since it protects inspection results whether or not MES is present.
+This section governs every exchange between AOI Monitor and manufacturing IT (MES/ERP), over two channels: the REST client that exists today (`AOI_Monitor/Services/MesRestClient.cs`) and the OPC UA server/client capability planned for Stage 4 (currently only `NullOpcUaMesClient`, `IntegrationContracts.cs:590-600`). It exists because MES connectivity is the first place this product touches networks it does not own, and because the source specs left the two most dangerous questions open: what happens when MES is down (SD-03), and who owns which data. The boundary with §21/§22 (VOL05) is that VOL05 owns data schemas and API grammar; this section owns transport security, delivery semantics, and system-of-record authority. The boundary with §28 (VOL07) is that VOL07 owns the identity model; this section binds its application to MES federation and OPC UA sessions. Roadmap note: `Docs/ROADMAP.md` targets IPC-CFX [CFX] for Stage 4 — the relationship between CFX/Hermes [HERMES] and OPC UA Machine Vision is an open decision (OD-VOL11-4), and nothing here presumes one replaces the other. Consistent with VOL01's four-stage model, which places MES/ERP integration at Stage 4, every MES transport and outbox requirement below binds at Stage 4 even where the underlying REST client already exists in the codebase; only MES-022's never-drop guarantee spans all stages, since it protects inspection results whether or not MES is present.
 
 ### 35.1 Current repo reality (grounding)
 

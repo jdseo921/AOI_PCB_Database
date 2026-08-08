@@ -1,3 +1,5 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # Sample Data
 
 This folder contains non-confidential Stage 1 validation templates and a local demo dataset generator. Do not commit customer images, private production data, or large generated datasets.

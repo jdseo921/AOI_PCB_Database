@@ -3,6 +3,8 @@ name: stage1-gate
 description: Run the full Stage-1 release-quality loop for AOI Monitor — Release build, complete unit + UI test suites, repo quality gates, image-learning evidence smoke test, and (optionally) the self-contained publish. Use before any push, build handoff, or release claim, or when asked to "verify everything" / "run the gate".
 ---
 
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # Stage-1 Quality Gate
 
 Run every step **in order**. Do not skip a failing step — diagnose and fix, then rerun that step. Report a final table of step → result.

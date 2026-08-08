@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # AI/ML Security, Quality, and Defect Taxonomy — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: this volume owns global section §31 — the separated AI/ML lifecycles from data acquisition through deletion, dataset governance, ML security including the AI training-environment threat model, robustness and drift, the metrics mandate, reproducibility and provenance, MLOps, and the canonical defect taxonomy (D-17) — binding on every inspection engine type in AOI Monitor.
 
-Supersedes/Related existing docs: `Docs/ONNX_Model_Training.md` remains as an operating procedure but its normative statements are superseded where they conflict with this volume; `Docs/Stage_Mapping.md`, `Docs/Integration_Boundaries.md`, and `AGENTS.md` remain authoritative for stage/evidence boundaries and the truthfulness contract and are compatible with this volume; the model state machine and activation sequence diagrams live in §19/VOL04.
+Supersedes/Related existing docs: `Docs/DATA_PIPELINE.md` remains as an operating procedure but its normative statements are superseded where they conflict with this volume; `Docs/ROADMAP.md`, `Docs/ARCHITECTURE.md`, and `AGENTS.md` remain authoritative for stage/evidence boundaries and the truthfulness contract and are compatible with this volume; the model state machine and activation sequence diagrams live in §19/VOL04.
 
 ## 31. AI/ML Security and Quality
 

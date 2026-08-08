@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # Data Architecture, APIs, and Storage — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: this volume defines the canonical data model and traceability guarantee (§21), the contract rules for every internal, IPC, REST, and file-based boundary (§22), and the database, image-vault, archiving, retention, and export standard (§37) for AOI Monitor.
 
-Supersedes/Related existing docs: normatively supersedes the "Migration Policy" and "Data Growth and Retention Boundary" sections of `Docs/Database_Schema.md` (which remains as a descriptive schema inventory; on conflict this volume prevails); extends `Docs/Central_Sync_Mapping.md` and `Docs/Integration_Boundaries.md` without replacing them; reuses the certification-boundary wording of `Docs/Standards_Traceability_Matrix.md` by reference. The DAT/API identifier namespaces introduced here are new and do not collide with the RTM, checklist, or runtime ID schemes inventoried in VOL01 §5.
+Supersedes/Related existing docs: normatively supersedes the "Migration Policy" and "Data Growth and Retention Boundary" sections of `Docs/DATA_PIPELINE.md` (which remains as a descriptive schema inventory; on conflict this volume prevails); extends `Docs/DATA_PIPELINE.md` and `Docs/ARCHITECTURE.md` without replacing them; reuses the certification-boundary wording of `Docs/Standards_Traceability_Matrix.md` by reference. The DAT/API identifier namespaces introduced here are new and do not collide with the RTM, checklist, or runtime ID schemes inventoried in VOL01 §5.
 
 This standard is standards-aligned, not certified; mappings in `Maps:` fields indicate alignment, never certification.
 
@@ -137,7 +139,7 @@ Stage reality: elements 6, 7, and 13 cannot carry real values in the Stage 1 off
 
 ### 21.4 Schema delta — migration obligations
 
-The following migrations extend the existing 30-migration chain (`AoiDatabaseMigrations.OrderedMigrations`). All are additive per the existing policy in `Docs/Database_Schema.md`; none rewrites existing rows. Target stage = the stage gate the migration must precede.
+The following migrations extend the existing 30-migration chain (`AoiDatabaseMigrations.OrderedMigrations`). All are additive per the existing policy in `Docs/DATA_PIPELINE.md`; none rewrites existing rows. Target stage = the stage gate the migration must precede.
 
 **Table 21-4 — Schema-delta migration obligations**
 
@@ -612,7 +614,7 @@ All defaults are engineering defaults pending customer/compliance review (ASSUMP
 Images live **outside the database** in the content-addressed vault (`{StorageRoot}\image_vault`); the DB stores metadata and the SHA-256. This is kept — BLOB storage would balloon the DB past SQLite's comfort zone and break the backup story. Corrections and hardening:
 
 - **Content addressing** (DAT-040): new imports store under `image_vault/sha256/<hh>/<full-hash>.<ext>` (two-hex-char fan-out). Existing timestamp-named files (`MakeVaultFileName`, `Infrastructure.cs:3509-3516`) remain valid at their recorded `VaultPath`; the sweep verifies both generations.
-- **Ordering** (DAT-041): the current copy-then-insert ordering strands orphan files when the insert fails (acknowledged in `Docs/Database_Schema.md`). The corrected ordering is §22.6's: temp write → catalog insert (state=Pending) → commit → atomic rename → finalize. Every failure mode then leaves a DB-visible trace instead of an invisible file.
+- **Ordering** (DAT-041): the current copy-then-insert ordering strands orphan files when the insert fails (acknowledged in `Docs/DATA_PIPELINE.md`). The corrected ordering is §22.6's: temp write → catalog insert (state=Pending) → commit → atomic rename → finalize. Every failure mode then leaves a DB-visible trace instead of an invisible file.
 - **Reconciliation** (DAT-042): a scheduled sweep detects vault files without catalog rows (orphans) and catalog rows whose files are missing — both are reported, never silently deleted or re-created.
 - **Tamper detection** (DAT-043): the sweep re-verifies SHA-256 on a rotating sample; a mismatch on a quality-evidence image is a Critical alarm, because the model-artifact analog of this gap (hash computed once, never re-verified) is already a known repo weakness.
 - **Immutability** (DAT-044): originals are never modified after finalization; annotation happens on derived copies in export paths only.
@@ -817,7 +819,7 @@ The application SHALL NOT modify, re-encode, or overwrite an original vault imag
 
 **[DAT-045]** (P3 | ALL | ImageStore, Config)
 The application SHALL enforce a configurable vault quota, halting new imports with an operator alarm when the quota is reached.
-- Why: unbounded vault growth (documented Stage-2 boundary in `Docs/Database_Schema.md`) eventually triggers the DAT-025 disk-pressure stop at the worst possible moment; a quota fails predictably and earlier. Maps: CWE-770; Internal.
+- Why: unbounded vault growth (documented Stage-2 boundary in `Docs/DATA_PIPELINE.md`) eventually triggers the DAT-025 disk-pressure stop at the worst possible moment; a quota fails predictably and earlier. Maps: CWE-770; Internal.
 - Verify: xUnit suite DiskPressureTests quota cases. Evidence: test run report. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: On change.
 

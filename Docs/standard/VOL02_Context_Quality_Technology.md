@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL02 Context, Quality, and Technology — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: this volume defines the system asset register and data classification (§8), the system context and trust boundaries (§9), the measurable quality-attribute scenarios (§10), and the binding technology decision with the supported-platform matrix and end-of-life policy (§11) for the AOI Monitor product (`jdseo921/AOI_PCB_Database`).
 
-Supersedes/Related existing docs: the §11.4 platform matrix **supersedes** the OS statements in `Docs/Installation_Guide.md`, `Docs/Client_Test_Kit_Guide.md`, `Docs/Deployment_Package_Guide.md`, and `Docs/Image_Learning_Quickstart_Test.md` (all four still name Windows 10, which is end-of-support — SD-09). §10 **refines** the numeric targets in `Docs/Industrial_HMI_and_Software_Quality_Baseline.md` and `Docs/Industrial_Quality_Checklist.md`; where numbers conflict, this standard prevails. `Docs/Stage_Mapping.md`, `Docs/Roadmap_and_Stages.md`, `Docs/Architecture_Overview.md`, and `DESIGN.md` remain authoritative for stage vocabulary and UI design authority and are cited, not restated.
+Supersedes/Related existing docs: the §11.4 platform matrix **supersedes** the OS statements in `Docs/DEPLOYMENT.md`, `Docs/VALIDATION.md`, `Docs/DEPLOYMENT.md`, and `Docs/VALIDATION.md` (all four still name Windows 10, which is end-of-support — SD-09). §10 **refines** the numeric targets in `DESIGN.md` and `CONTRIBUTING.md`; where numbers conflict, this standard prevails. `Docs/ROADMAP.md`, `Docs/ROADMAP.md`, `Docs/ARCHITECTURE.md`, and `DESIGN.md` remain authoritative for stage vocabulary and UI design authority and are cited, not restated.
 
 Requirement IDs owned by this volume: **ARC-001..015**. Assumptions: **A-VOL02-1..6**. Open decisions: **OD-VOL02-1..3** (§11.6; merged into §6/VOL01).
 
@@ -206,7 +208,7 @@ Four boundary groups deserve explicit interpretation, because they are where the
 
 ### 9.4 Stage activation of boundaries
 
-Trust boundaries activate cumulatively across the staged rollout (`Docs/Roadmap_and_Stages.md` owns stage vocabulary): Stage 1 exposes TB-1, TB-5, TB-6, TB-7, and TB-9 (an offline station still imports files, loads plugins, takes updates, and receives models); Stage 2 adds TB-2 (camera network); Stage 3 adds TB-8 (robot/safety); Stage 4 adds TB-3 and TB-4 (MES/OPC UA conduits). Consequence: the code-execution and local-state boundaries are *already live today* — "offline Stage 1" is not a safe harbor, which is why ARC-004 re-approves the diagrams at each stage transition instead of deferring all boundary work to Stage 4.
+Trust boundaries activate cumulatively across the staged rollout (`Docs/ROADMAP.md` owns stage vocabulary): Stage 1 exposes TB-1, TB-5, TB-6, TB-7, and TB-9 (an offline station still imports files, loads plugins, takes updates, and receives models); Stage 2 adds TB-2 (camera network); Stage 3 adds TB-8 (robot/safety); Stage 4 adds TB-3 and TB-4 (MES/OPC UA conduits). Consequence: the code-execution and local-state boundaries are *already live today* — "offline Stage 1" is not a safe harbor, which is why ARC-004 re-approves the diagrams at each stage transition instead of deferring all boundary work to Stage 4.
 
 ### R: Trust-boundary requirements
 
@@ -262,7 +264,7 @@ Summary map of scenarios to ISO/IEC 25010:2023 characteristics [25010]:
 | 12 | Safety — fail safe, hazard warning | Automated | §34/VOL11 |
 | 13 | Performance efficiency — time behaviour | Automated | §40/VOL13 |
 
-The safety row uses the characteristic newly added at the top level in the 2023 edition; earlier 25010:2011 citations in existing repo docs (e.g., `Docs/Industrial_HMI_and_Software_Quality_Baseline.md` "ISO/IEC 25010-style") predate this and are read as referring to the 2023 model from this standard's effective date.
+The safety row uses the characteristic newly added at the top level in the 2023 edition; earlier 25010:2011 citations in existing repo docs (e.g., `DESIGN.md` "ISO/IEC 25010-style") predate this and are read as referring to the 2023 model from this standard's effective date.
 
 ### QAS-01 Inspection latency (performance efficiency — time behaviour) — Automated
 

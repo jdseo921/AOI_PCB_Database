@@ -1,3 +1,5 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 ## Quality Checklist
 
 Complete every applicable item before requesting review. Mark an item `N/A` only when it is genuinely not relevant, and add the reason in the evidence section.

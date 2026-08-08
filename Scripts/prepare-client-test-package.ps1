@@ -84,7 +84,7 @@ This folder is ready for client software evaluation.
 2. Run `AOI_Monitor.exe`.
 3. Use Demo Mode unless LocalUsers authentication was configured for this evaluation.
 4. Use Admin or Engineer role for setup, import, validation, and export tests.
-5. Follow `Docs/Client_Test_Kit_Guide.md`.
+5. Follow the client test kit section in `Docs/VALIDATION.md`.
 
 ## Run Stage 1 Demo in 10 Minutes
 

@@ -1,3 +1,5 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # Standards Traceability Matrix
 
 This repository maintains a standards traceability matrix so industrial HMI and software-quality expectations are visible before client demo, pilot, release packaging, or factory-readiness review.

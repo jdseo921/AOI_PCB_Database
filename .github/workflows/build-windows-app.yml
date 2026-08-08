@@ -51,7 +51,7 @@ jobs:
             '3. On first launch the app creates local storage (SQLite database, image vault, settings).',
             '',
             'This is a prototype test build. Camera, lighting, robot, and MES stay Not Connected or',
-            'Simulated by design. See Docs/Manual_Test_Plan.md and Docs/Image_Learning_Quickstart_Test.md.'
+            'Simulated by design. See Docs/VALIDATION.md.'
           ) | Set-Content -Path publish/AOI_Monitor/HOW_TO_RUN.txt -Encoding UTF8
 
       - name: Upload Windows build artifact

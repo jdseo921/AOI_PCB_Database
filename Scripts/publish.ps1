@@ -23,7 +23,6 @@ $templatesPath = Join-Path $repoRoot "Templates"
 $sampleManifestTemplatePath = Join-Path $repoRoot "SampleData\customer_validation_manifest_template.csv"
 $sampleDataReadmePath = Join-Path $repoRoot "SampleData\README.md"
 $sampleDataGeneratorPath = Join-Path $repoRoot "SampleData\demo_dataset_generator.ps1"
-$featureDocPath = Join-Path $repoRoot "IMPLEMENTED_FEATURES.md"
 $rootReadmePath = Join-Path $repoRoot "README.md"
 $releaseRoot = if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     if ($ValidationOnly) {
@@ -152,9 +151,6 @@ if ($IncludeDocs -or !$ValidationOnly) {
     Write-Host "Copying documentation..."
     Copy-Item -LiteralPath $docsPath -Destination $releaseDocsDir -Recurse -Force
     Copy-Item -LiteralPath $rootReadmePath -Destination (Join-Path $releaseDir "README.md") -Force
-    if (Test-Path $featureDocPath) {
-        Copy-Item -LiteralPath $featureDocPath -Destination (Join-Path $releaseDir "IMPLEMENTED_FEATURES.md") -Force
-    }
 } else {
     Write-Host "Skipping documentation copy. Pass -IncludeDocs to include docs during validation-only packaging."
 }
@@ -206,7 +202,7 @@ Publish mode: $(if ($SelfContained) { "Self-contained" } else { "Framework-depen
 ## Client Test Path
 
 1. Read CLIENT_HANDOFF_README.md if present.
-2. Open Docs/Client_Test_Kit_Guide.md.
+2. Open Docs/VALIDATION.md (client test kit section).
 3. Use small non-confidential PNG/JPG/JPEG images for evaluation.
 4. Confirm simulated/mock/not-connected readiness states are visible.
 5. Export Stage 1 Readiness, Factory Readiness, Client Demo Readiness, and Standards Traceability reports after testing.
@@ -214,7 +210,7 @@ Publish mode: $(if ($SelfContained) { "Self-contained" } else { "Framework-depen
 ## Included
 
 - app/ - Published Windows desktop application files.
-$(if ($IncludeDocs -or !$ValidationOnly) { "- Docs/ - Installation guide, deployment package guide, user manual, stage mapping, integration boundaries, and acceptance checklist.`n- README.md - Repository-level overview and operating notes.`n- IMPLEMENTED_FEATURES.md - Current PoC feature inventory." } else { "- Docs were skipped for this validation-only package. Pass -IncludeDocs to include them." })
+$(if ($IncludeDocs -or !$ValidationOnly) { "- Docs/ - Architecture, deployment, runbook, validation, metrics, user manual, roadmap, and traceability documentation plus the engineering standard.`n- README.md - Repository-level overview and operating notes." } else { "- Docs were skipped for this validation-only package. Pass -IncludeDocs to include them." })
 $(if ($IncludeTemplates) { "- Templates/ - Fake/no-op adapter template source projects for camera, lighting, and robot integrations." } else { "- Adapter templates were not included. Pass -IncludeTemplates for developer handoff packages." })
 $(if ($IncludeSampleManifestTemplate) { "- SampleData/README.md - Safe sample-data operating notes.`n- SampleData/customer_validation_manifest_template.csv - Empty customer validation manifest template.`n- SampleData/demo_dataset_generator.ps1 - Synthetic Stage 1 demo dataset generator; generated images are not prepacked." } else { "- Sample validation kit was not included. Pass -IncludeSampleManifestTemplate when preparing customer validation kits." })
 

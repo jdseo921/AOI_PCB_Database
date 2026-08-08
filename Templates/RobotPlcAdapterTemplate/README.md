@@ -1,3 +1,5 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # Robot + PLC Adapter Template
 
 This project is a vendor/customer engineering starting point for robot and PLC safety integration.
@@ -18,4 +20,4 @@ Vendor SDK calls belong in:
 - `FakePlcSafetyController.GetSafetyStatus`
 - `FakePlcSafetyController.ResetSafetyFaultAsync`
 
-Before any real factory claim, run the hardware-in-the-loop checklist in `Docs/Hardware_In_The_Loop_Checklist.md`.
+Before any real factory claim, run the hardware-in-the-loop checklist in `Docs/DEPLOYMENT.md`.

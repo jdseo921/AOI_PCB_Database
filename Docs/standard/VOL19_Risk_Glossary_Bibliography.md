@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # Risk Register, Glossary, and Bibliography — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: this volume carries the standard's initial product risk register (§56), the canonical glossary for every specialized term used across VOL01–VOL20 (§59), and the full verified bibliography behind the citation keys used in `Maps:` fields (§60). It contains no requirement records; its content is itself the deliverable.
 
-Supersedes/Related existing docs: supersedes none. §59 is the canonical terminology source for this standard. Related: `Docs/Standards_Traceability_Matrix.md` (its certification-boundary wording — "standards-aligned, not certified" — is reused verbatim by this volume), `Docs/Requirements_Traceability_Matrix.md` (pre-existing requirement-ID namespaces; reconciliation rule in §5/VOL01), `Docs/Industrial_Quality_Checklist.md` and `Tools/quality-gates/industrial_quality_gates.json` (gate IDs referenced by several risks below).
+Supersedes/Related existing docs: supersedes none. §59 is the canonical terminology source for this standard. Related: `Docs/Standards_Traceability_Matrix.md` (its certification-boundary wording — "standards-aligned, not certified" — is reused verbatim by this volume), `Docs/Requirements_Traceability_Matrix.md` (pre-existing requirement-ID namespaces; reconciliation rule in §5/VOL01), `CONTRIBUTING.md` and `Tools/quality-gates/industrial_quality_gates.json` (gate IDs referenced by several risks below).
 
 ---
 
@@ -190,7 +192,7 @@ flowchart LR
 | RSK-25 | Only 3 app NuGet packages; `packages.lock.json` committed | Vulnerability gate in CI; `--locked-mode` restore; Dependabot; 30-day security-patch SLA for ORT and deps (D-03/D-07) | L | Sec Lead | 2026-08-31 | Open | SUP, BLD |
 | RSK-26 | Minimal action set (checkout, setup-dotnet, upload-artifact) | Full-SHA pinning + org policy enforcement; least-privilege `permissions:`; `timeout-minutes`; branch protection (SUP §42, CHG §49) | L | Sec Lead | 2026-08-31 | Open | SUP, CHG |
 | RSK-27 | None (builds currently unsigned) | OV cert with HSM/token custody per D-12; keys never on dev machines or ordinary runners; revocation + re-signing runbook (IR §54) | L | Rel Mgr | First signed release | Open | CRY, RELS, IR |
-| RSK-28 | `Docs/Deployment_Package_Guide.md` manual rollback plan | Signed WiX MSI + staged activation + automated rollback criteria and drill (D-08; RELS §43, OPS §45) | L | Rel Mgr | First field deploy | Open | RELS, DEP, REL |
+| RSK-28 | `Docs/DEPLOYMENT.md` manual rollback plan | Signed WiX MSI + staged activation + automated rollback criteria and drill (D-08; RELS §43, OPS §45) | L | Rel Mgr | First field deploy | Open | RELS, DEP, REL |
 | RSK-29 | Model lifecycle states + retire audit; prior versions retained in registry | Documented rollback criteria; one-action revert to last-accepted model; post-rollback verification run (ORC §19, AIM §31) | L | ML Lead | 2026-11-30 | Open | ORC, AIM, REL |
 
 ### 56.8 Theme G — Platform and field operations
@@ -198,7 +200,7 @@ flowchart LR
 | ID | Scenario | Cause | Asset |
 |---|---|---|---|
 | RSK-30 | Vendor remote-support session becomes a standing backdoor into the customer network | No remote-support standard; commodity remote-desktop tools; robot controllers with embedded vendor routers | Customer network, station |
-| RSK-31 | Station runs Windows 10 (EOL 2025-10-14) unpatched; exposed to actively exploited vulnerabilities | Four client-facing repo docs still name Windows 10 (`Docs/Installation_Guide.md:11` et al., SD-09); customer-supplied PCs | Station OS, everything on it |
+| RSK-31 | Station runs Windows 10 (EOL 2025-10-14) unpatched; exposed to actively exploited vulnerabilities | Four client-facing repo docs still name Windows 10 (`Docs/DEPLOYMENT.md:11` et al., SD-09); customer-supplied PCs | Station OS, everything on it |
 
 | ID | Security impact | Safety impact | Quality impact | L | S | D |
 |---|---|---|---|---|---|---|
@@ -248,7 +250,7 @@ flowchart LR
 
 ### 56.11 Assumptions and Open Decisions
 
-- **ASSUMPTION A-VOL19-1:** Due dates anchored to stage gates assume Stage 2 hardware entry no earlier than 2026-Q4 and Stage 3 no earlier than 2027, per `Docs/Roadmap_and_Stages.md`. Risk: earlier hardware arrival compresses treatment windows; the stage-entry register review is the correction mechanism.
+- **ASSUMPTION A-VOL19-1:** Due dates anchored to stage gates assume Stage 2 hardware entry no earlier than 2026-Q4 and Stage 3 no earlier than 2027, per `Docs/ROADMAP.md`. Risk: earlier hardware arrival compresses treatment windows; the stage-entry register review is the correction mechanism.
 - **ASSUMPTION A-VOL19-2:** Scoring baseline is the repository state at commit `a0d8b29` (2026-07-15) and current solo-developer staffing; likelihood scores for the process risks (RSK-32 to RSK-36) assume no second engineer joins before 2027. Risk: staffing changes invalidate the scores; re-score at the next quarterly review after any staffing change.
 - **ASSUMPTION A-VOL19-3:** The register is maintained as this Markdown section under version control; every edit is a normal change under the CHG catalogue (§48–53/VOL17). Risk: Markdown offers no workflow enforcement; see OD-VOL19-1.
 - **OD-VOL19-1 (open decision):** Register tooling — remain Markdown-in-repo or mirror into an issue tracker with due-date automation. Decide by 2026-10-31. Owner: Product Owner.

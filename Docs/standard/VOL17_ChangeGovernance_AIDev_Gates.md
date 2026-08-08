@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL17 Change Governance, AI-Assisted Development, and Gates — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: the change-governance layer of the standard — AI-assisted development and vibe-coding controls, the pull-request and code-review standard, the emergency-hotfix standard, the Definition of Done, the machine-enforcement plan (architecture fitness functions), and the exception and risk-acceptance process (global sections 48–53).
 
-Supersedes/Related existing docs: this volume supersedes the process rules in `Docs/Branch_Protection_and_Quality_Gates.md` (retained as an operational how-to; where it conflicts, this volume wins) and extends `.github/pull_request_template.md` and `Docs/Contributor_Quality_Checklist.md` (both remain in force and must be updated to match §49/§51 within one release cycle). `AGENTS.md` remains the concise AI-agent contract; §48 defines what it must contain. The gate scripts (`Scripts/run-quality-gates.ps1`, `Scripts/check-code-quality.ps1`, `Scripts/check-pr-quality.ps1`, `Scripts/check-repo-hygiene.ps1`) and hooks (`.claude/hooks/push-gate.ps1`, `.claude/hooks/stop-build-check.ps1`) are the existing enforcement substrate that §52 catalogues and extends.
+Supersedes/Related existing docs: this volume supersedes the process rules in `CONTRIBUTING.md` (retained as an operational how-to; where it conflicts, this volume wins) and extends `.github/pull_request_template.md` and `CONTRIBUTING.md` (both remain in force and must be updated to match §49/§51 within one release cycle). `AGENTS.md` remains the concise AI-agent contract; §48 defines what it must contain. The gate scripts (`Scripts/run-quality-gates.ps1`, `Scripts/check-code-quality.ps1`, `Scripts/check-pr-quality.ps1`, `Scripts/check-repo-hygiene.ps1`) and hooks (`.claude/hooks/push-gate.ps1`, `.claude/hooks/stop-build-check.ps1`) are the existing enforcement substrate that §52 catalogues and extends.
 
 ---
 
@@ -42,7 +44,7 @@ The requirements in this section are written against the real current workflow, 
 |---|---|---|
 | Team | Solo developer + AI agents; one human holds several roles | Roles per VOL01 §7; separation of duties as team grows |
 | Merge path | Direct pushes to `main`; no pull-request requirement | PR-based flow per §49 once team size > 1 (OD-VOL17-1) |
-| Branch protection | Not enforced (personal GitHub account; documented in `Docs/Branch_Protection_and_Quality_Gates.md` but aspirational) | Protected `main` + required status checks (CHG-035) |
+| Branch protection | Not enforced (personal GitHub account; documented in `CONTRIBUTING.md` but aspirational) | Protected `main` + required status checks (CHG-035) |
 | CODEOWNERS | `.github/CODEOWNERS` names teams that cannot exist under a user account — inert | Real owner routing once an org/team exists |
 | Local gates | `.claude/hooks/push-gate.ps1` (PreToolUse: build + hygiene + code quality blocks `git push`); `.claude/hooks/stop-build-check.ps1` (blocks "done" on broken build); `/stage1-gate` skill | Retained permanently as defense-in-depth (VOL01 §7 CC-2) |
 | CI | `.github/workflows/dotnet-ci.yml` runs the full gate chain on every push/PR but blocks nothing — a detector, not a gate | Required check on protected `main` (CHG-035, FF-CI-01/02) |

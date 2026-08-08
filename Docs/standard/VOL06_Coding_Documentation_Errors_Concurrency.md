@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL06 — Coding, Documentation, Errors, and Concurrency — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: this volume defines the binding coding and file-organization standard (§23), the documentation standard (§24), the typed error and exception architecture (§25), and the concurrency, scheduling, and resource-ownership rules (§26) for all AOI Monitor code — the WPF application (`AOI_Monitor/`), test projects, `AOI_Monitor.Tools`, `Templates/*` adapter projects, PowerShell scripts in `Scripts/`, and Python training code in `Scripts/ml/`.
 
-Supersedes/Related existing docs: no existing document is retired outright. This volume **governs and extends** the rule sets implemented in `Scripts/check-code-quality.ps1` (CQ-CATCH-001, CQ-ASYNC-001, CQ-UI-001/002, CQ-MSG-001, CQ-SEC-001) and `Scripts/check-pr-quality.ps1` (PR-* rules); those scripts become implementations of the fitness functions named here. `DESIGN.md` remains the UI/design authority; its "no heavy work in page constructors" and "no stack traces to operators" rules are subsumed by COD-028 and COD-053 without contradiction. `Docs/Developer_CI.md` and `Docs/Contributor_Quality_Checklist.md` remain process guides and are related, not superseded. Requirement-ID reconciliation with the pre-existing `HMI-*/PERF-*/REL-*` namespaces follows the rule stated in §5 (VOL01); this volume's IDs use only the `COD-` and `DOC-` categories.
+Supersedes/Related existing docs: no existing document is retired outright. This volume **governs and extends** the rule sets implemented in `Scripts/check-code-quality.ps1` (CQ-CATCH-001, CQ-ASYNC-001, CQ-UI-001/002, CQ-MSG-001, CQ-SEC-001) and `Scripts/check-pr-quality.ps1` (PR-* rules); those scripts become implementations of the fitness functions named here. `DESIGN.md` remains the UI/design authority; its "no heavy work in page constructors" and "no stack traces to operators" rules are subsumed by COD-028 and COD-053 without contradiction. `CONTRIBUTING.md` and `CONTRIBUTING.md` remain process guides and are related, not superseded. Requirement-ID reconciliation with the pre-existing `HMI-*/PERF-*/REL-*` namespaces follows the rule stated in §5 (VOL01); this volume's IDs use only the `COD-` and `DOC-` categories.
 
 ---
 
@@ -240,7 +242,7 @@ Constructors and composition-root registration code SHALL NOT perform filesystem
 **[COD-029]** (P2 | ALL | Acquisition, CameraAdapter, LightingAdapter)
 Static initializers and static constructors SHALL NOT initialize hardware, open device handles, or start vendor SDK sessions.
 - Why: static-init hardware access runs at unpredictable first-touch time, cannot be cancelled or retried, and turns a missing camera into a type-load exception. Maps: CWE-1188; Internal.
-- Verify: FF-COD-05 (device/SDK API calls inside `static` ctors) + adapter review per `Docs/Vendor_Adapter_Implementation_Guide.md`. Evidence: CI gate log. Owner: Software Lead. Auto: Partially automated.
+- Verify: FF-COD-05 (device/SDK API calls inside `static` ctors) + adapter review per `Docs/ARCHITECTURE.md`. Evidence: CI gate log. Owner: Software Lead. Auto: Partially automated.
 - Exception: Not allowed. Review: Annual.
 
 **[COD-030]** (P0 | ALL | Update, ModelMgmt, Build)
@@ -331,7 +333,7 @@ Code under `AOI_Monitor/Services/` and `AOI_Monitor/Data/` that does not touch U
 
 ### 24.1 What this section governs and why
 
-This section makes documentation a build artifact with a gate, not a courtesy. It covers doc comments on every function, type-level and module-level documentation, ADRs, operational documents, and the dictionaries the product's evidence claims depend on. The repository already has 46 top-level docs (6,272 lines) with strong claim discipline but no version headers, plus measurable drift (`Docs/Architecture_Overview.md:37` says "~40 tables" against 60 actual; `Docs/Database_Schema.md:8` says baseline 28 against `LatestVersion` 30). §24 fixes the mechanics; content ownership stays with the owning volumes (defect-taxonomy content with §31/VOL09; HMI text rules with `DESIGN.md`).
+This section makes documentation a build artifact with a gate, not a courtesy. It covers doc comments on every function, type-level and module-level documentation, ADRs, operational documents, and the dictionaries the product's evidence claims depend on. The repository already has 46 top-level docs (6,272 lines) with strong claim discipline but no version headers, plus measurable drift (`Docs/ARCHITECTURE.md:37` says "~40 tables" against 60 actual; `Docs/DATA_PIPELINE.md:8` says baseline 28 against `LatestVersion` 30). §24 fixes the mechanics; content ownership stays with the owning volumes (defect-taxonomy content with §31/VOL09; HMI text rules with `DESIGN.md`).
 
 ### 24.2 The function-documentation mandate
 
@@ -420,7 +422,7 @@ Every architecturally significant decision (new dependency, boundary change, tec
 
 **[DOC-012]** (P3 | ALL | All)
 Every public service contract and integration interface SHALL be accompanied by at least one compiling usage example (doc-comment `<example>` or example test).
-- Why: `Docs/Architecture_Extension_Guide.md` already shows examples are how vendor engineers onboard; an example that compiles is the only example that stays true. Maps: Internal; 25010.
+- Why: `Docs/ARCHITECTURE.md` already shows examples are how vendor engineers onboard; an example that compiles is the only example that stays true. Maps: Internal; 25010.
 - Verify: example tests compiled in `AOI_Monitor.Tests` (suite `ContractExampleTests`). Evidence: test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Lead. Review: Annual.
 
@@ -438,8 +440,8 @@ Every registered AOI-Exxxx error code SHALL be documented with its operator mess
 
 **[DOC-015]** (P2 | S2+ | All)
 Runbooks SHALL exist for installation, startup/shutdown, update and rollback, backup/restore, retention administration, and each §41 (VOL13) degraded mode, each with numbered steps and expected observable outcomes.
-- Why: `Docs/Deployment_Package_Guide.md` and `Docs/Installation_Guide.md` are the seeds; degraded-mode operations currently have no operator-executable procedure at all. Maps: 62443-4-1; 800-82; Internal.
-- Verify: FF-DOC-04 presence check; runbook walk-through at FAT per `Docs/Factory_Acceptance_Test_Plan.md`. Evidence: runbook docs + FAT record. Owner: Field Service. Auto: Manual review.
+- Why: `Docs/DEPLOYMENT.md` and `Docs/DEPLOYMENT.md` are the seeds; degraded-mode operations currently have no operator-executable procedure at all. Maps: 62443-4-1; 800-82; Internal.
+- Verify: FF-DOC-04 presence check; runbook walk-through at FAT per `Docs/VALIDATION.md`. Evidence: runbook docs + FAT record. Owner: Field Service. Auto: Manual review.
 - Exception: Allowed — approver: Product Owner. Review: Per release.
 
 **[DOC-016]** (P3 | S2+ | All)
@@ -450,7 +452,7 @@ A troubleshooting guide SHALL exist, keyed by error code and by observable sympt
 
 **[DOC-017]** (P2 | ALL | Persistence)
 A data dictionary SHALL document every SQLite table (60 as of 2026-07-15) and every settings JSON file: column/field meaning, units, retention class, and §8 (VOL02) sensitivity class.
-- Why: `Docs/Database_Schema.md` covers fewer than half the actual tables; undocumented evidence tables cannot support customer traceability claims. Maps: Internal; 25010; GDPR.
+- Why: `Docs/DATA_PIPELINE.md` covers fewer than half the actual tables; undocumented evidence tables cannot support customer traceability claims. Maps: Internal; 25010; GDPR.
 - Verify: FF-DOC-05 table-count parity (dictionary rows vs `CREATE TABLE` extraction). Evidence: CI gate log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 

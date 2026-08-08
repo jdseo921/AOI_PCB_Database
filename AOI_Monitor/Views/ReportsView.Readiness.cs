@@ -237,7 +237,7 @@ public partial class ReportsView
 
     private void OnOpenSampleDatasetGuideClick(object sender, RoutedEventArgs e)
     {
-        var guide = Path.Combine(FindRepositoryRootForDocs(), "Docs", "Sample_Dataset_Performance_Demo.md");
+        var guide = Path.Combine(FindRepositoryRootForDocs(), "Docs", "VALIDATION.md");
         OpenPathOrWarn(guide, "Sample Dataset Guide");
     }
 

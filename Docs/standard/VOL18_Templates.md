@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL18 Templates — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: the complete, immediately usable set of 25 engineering record templates required by this standard (global section 57), with filing, completion, and approval rules for each.
 
-Supersedes/Related existing docs: the Pull Request Description template (§57.5) supersedes the content of `.github/pull_request_template.md` (the file remains, its body is replaced by the §57.5 skeleton); the Code Review Checklist (§57.6) absorbs the review items of `Docs/Contributor_Quality_Checklist.md` (retained as a contributor quick-reference). All other templates are new record types; they are executed alongside — not instead of — the procedure kits `Docs/Factory_Acceptance_Test_Plan.md`, `Docs/Hardware_In_The_Loop_Checklist.md`, and `Docs/Customer_Dataset_Validation_Kit.md`.
+Supersedes/Related existing docs: the Pull Request Description template (§57.5) supersedes the content of `.github/pull_request_template.md` (the file remains, its body is replaced by the §57.5 skeleton); the Code Review Checklist (§57.6) absorbs the review items of `CONTRIBUTING.md` (retained as a contributor quick-reference). All other templates are new record types; they are executed alongside — not instead of — the procedure kits `Docs/VALIDATION.md`, `Docs/DEPLOYMENT.md`, and `Docs/VALIDATION.md`.
 
 ---
 
@@ -434,7 +436,7 @@ Targets (stations/stages): <list> · Rollback model: <previous modelId or
 - **Per-image content hash manifest:** <path + SHA-256 of the manifest itself>
   (mandatory — the app's `DatasetHash` covers only folder name + CSV; image
   substitution is otherwise undetectable, §31/VOL09)
-- Balance/coverage gates of `Docs/Customer_Dataset_Validation_Kit.md`: PASS/FAIL detail
+- Balance/coverage gates of `Docs/VALIDATION.md`: PASS/FAIL detail
 
 ## Rights and privacy (§46/VOL16)
 - Customer authorization for this use: <document ref + date, or "internal data">
@@ -483,7 +485,7 @@ Effective from: <UTC datetime> · Approvals: <table>
 ### 57.13 Template 12 — Database Migration Plan (`db-migration`, prefix DBM)
 
 **Purpose:** plan and evidence every schema version increment so field databases upgrade predictably and reversibly.
-**Mandatory when:** required by §37 (VOL05) for every increment of `AoiDatabaseMigrations.LatestVersion`; CEC-M11 requires the forward test before merge. The additive-only policy of `Docs/Database_Schema.md` applies; a destructive migration additionally requires an EXC record.
+**Mandatory when:** required by §37 (VOL05) for every increment of `AoiDatabaseMigrations.LatestVersion`; CEC-M11 requires the forward test before merge. The additive-only policy of `Docs/DATA_PIPELINE.md` applies; a destructive migration additionally requires an EXC record.
 **Fills:** change author. **Approves:** Software Architect. **Files to:** `Docs/records/db-migration/YYYY/DBM-YYYY-NNN-v<NN>.md`.
 
 ```markdown
@@ -557,7 +559,7 @@ Approvals: <table>
 ### 57.15 Template 14 — Hardware Adapter Review (`hw-adapter`, prefix HAR)
 
 **Purpose:** gate every camera or lighting adapter package before a station loads it — the plugin path is in-process code execution, so this review is a code-trust decision, not a device checklist.
-**Mandatory when:** required by §32 (VOL10) and the §15 (VOL03) plugin rule before any adapter package is placed in a station's adapter folder, and again on every adapter version change. `Docs/Vendor_Adapter_Implementation_Guide.md` is the companion procedure.
+**Mandatory when:** required by §32 (VOL10) and the §15 (VOL03) plugin rule before any adapter package is placed in a station's adapter folder, and again on every adapter version change. `Docs/ARCHITECTURE.md` is the companion procedure.
 **Fills:** the integrating Engineer. **Approves:** Security Lead (code trust) + QA Lead (acceptance evidence). **Files to:** `Docs/records/hw-adapter/YYYY/HAR-YYYY-NNN-<adapterId>.md`.
 
 ```markdown
@@ -584,7 +586,7 @@ Approvals: <table>
       as a limitation, §32/VOL10)
 
 ## Evidence
-- HIL checklist rows executed (`Docs/Hardware_In_The_Loop_Checklist.md`): <refs>
+- HIL checklist rows executed (`Docs/DEPLOYMENT.md`): <refs>
 - Acceptance run: CameraAcceptanceRuns/LightingAcceptanceRuns id <n>, labeled
   **real hardware** (simulated evidence cannot pass this review)
 - SDK license + redistribution terms: <summary>

@@ -1,3 +1,5 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # AOI Software Architecture, Secure Development, and Change-Control Standard
 
 **Volume 00 — Document Control and Navigation**
@@ -80,7 +82,7 @@ Stage tags: S1 offline images · S2 live cameras · S3 robot cell · S4
 MES-connected · ALL.
 
 Pre-existing repo ID namespaces (`Docs/Requirements_Traceability_Matrix.md`
-prefixes, `Docs/Industrial_Quality_Checklist.md` IDs, runtime
+prefixes, `CONTRIBUTING.md` IDs, runtime
 `StandardsTraceabilityService` IDs) remain valid in their own documents; this
 standard's category set is disjoint by construction, and VOL01 §5 defines the
 mapping between them.

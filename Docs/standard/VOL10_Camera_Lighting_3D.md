@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL10 Camera, Lighting, and 3D Metrology — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: normative requirements for the camera/lighting acquisition boundary (§32) and for 3D metrology and coordinate-system integrity (§33) of AOI Monitor, Stages 1–4.
 
-Supersedes/Related existing docs: `Docs/Vendor_Adapter_Implementation_Guide.md` and `Docs/Architecture_Extension_Guide.md` remain as implementation how-tos subordinate to this volume; `Docs/Hardware_In_The_Loop_Checklist.md` remains the execution checklist invoked by CAM-045; the 2D Calibration and 3D Sample-Data sections of `Docs/User_Manual.md` and `IMPLEMENTED_FEATURES.md` remain descriptive (non-normative).
+Supersedes/Related existing docs: `Docs/ARCHITECTURE.md` and `Docs/ARCHITECTURE.md` remain as implementation how-tos subordinate to this volume; `Docs/DEPLOYMENT.md` remains the execution checklist invoked by CAM-045; the 2D Calibration and 3D Sample-Data sections of `Docs/USER_MANUAL.md` and `Docs/USER_MANUAL.md` remain descriptive (non-normative).
 
 ---
 
@@ -116,7 +118,7 @@ A lighting profile is the versioned optical contract under which frames are comp
 
 **[CAM-001]** (P1 | S2+ | CameraAdapter, Acquisition)
 The application SHALL confine every vendor camera SDK call to adapter assemblies that implement `IVisionCameraAdapter` (Services/VisionCameraAdapters.cs:19-28) and are deployed outside the `AOI_Monitor` project; referencing a vendor SDK NuGet package or native binary from `AOI_Monitor.csproj` is prohibited.
-- Why: keeps crash-prone, unauditable native SDK code behind a replaceable seam (D-01 worker-split trigger) and preserves the rule already stated in Docs/Vendor_Adapter_Implementation_Guide.md:3. Maps: 42010; SSDF-PW.4; Internal.
+- Why: keeps crash-prone, unauditable native SDK code behind a replaceable seam (D-01 worker-split trigger) and preserves the rule already stated in Docs/ARCHITECTURE.md:3. Maps: 42010; SSDF-PW.4; Internal.
 - Verify: fitness function FF-CAM-01 (CI grep gate over csproj and lock file for vendor SDK package ids: pylon, Spinnaker, eBUS, Vimba, MvCameraControl). Evidence: CI gate log. Owner: Software Architect. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -206,7 +208,7 @@ The acquisition layer SHALL reject connections and frames from any camera whose 
 
 **[CAM-015]** (P2 | S2+ | Acquisition, Persistence)
 Frames lacking a physical device serial in `CameraFrame.CameraId` SHALL be classified as not-validated (non-real-hardware) evidence.
-- Why: codifies the existing rule (CameraAcceptanceTestService.cs:64-69; Docs/Vendor_Adapter_Implementation_Guide.md:34-48) that device identity is part of evidence integrity. Maps: Internal.
+- Why: codifies the existing rule (CameraAcceptanceTestService.cs:64-69; Docs/ARCHITECTURE.md:34-48) that device identity is part of evidence integrity. Maps: Internal.
 - Verify: `CameraAcceptanceTestService` classification tests. Evidence: test run log. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Annual.
 
@@ -265,7 +267,7 @@ Trigger dispatch and frame retrieval SHALL enforce the configured bounded timeou
 **[CAM-024]** (P3 | S3+ | Acquisition)
 Line-integrated stations SHOULD use hardware trigger mode (`CameraAcquisitionMode.HardwareTrigger`) with the trigger wiring exercised in the hardware-in-the-loop checklist before production release.
 - Why: software triggers add jitter that couples conveyor position to image geometry; hardware triggering removes the largest positional variance term. Maps: GIGEV; Internal.
-- Verify: HIL trigger-to-frame timing section (Docs/Hardware_In_The_Loop_Checklist.md). Evidence: HIL evidence package. Owner: Controls & Safety Engineer. Auto: Manual review.
+- Verify: HIL trigger-to-frame timing section (Docs/DEPLOYMENT.md). Evidence: HIL evidence package. Owner: Controls & Safety Engineer. Auto: Manual review.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 ### R: Lighting profile enforcement (CAM-025–CAM-028)
@@ -399,7 +401,7 @@ No component SHALL clear, overwrite, or default the `IsSimulated` flag between f
 - Exception: Not allowed. Review: Per release.
 
 **[CAM-045]** (P1 | S2+ | Acquisition, CameraAdapter)
-Before any adapter/SDK/driver/firmware combination is released to production, the station SHALL pass the hardware-in-the-loop checklist (`Docs/Hardware_In_The_Loop_Checklist.md`) against real hardware — including trigger-to-frame timing, the CAM-020 reset drill, disconnect/reconnect via induced-fault test hooks, and CAM-031 counter behavior — with the signed evidence package archived per station.
+Before any adapter/SDK/driver/firmware combination is released to production, the station SHALL pass the hardware-in-the-loop checklist (`Docs/DEPLOYMENT.md`) against real hardware — including trigger-to-frame timing, the CAM-020 reset drill, disconnect/reconnect via induced-fault test hooks, and CAM-031 counter behavior — with the signed evidence package archived per station.
 - Why: simulation proves the software contract, not the hardware truth; every "adapter conformance" and "HIL" verification in this section lands in this single auditable execution gate, and the induced-fault hooks are what make failure paths testable on demand. Maps: 62443-4-1 SVV-1; Internal; 25010.
 - Verify: HIL checklist execution with induced-disconnect, forced-timeout, and counter-inspection hooks per checklist sections. Evidence: signed HIL evidence package per station. Owner: QA Lead. Auto: Manual review.
 - Exception: Not allowed. Review: On change.

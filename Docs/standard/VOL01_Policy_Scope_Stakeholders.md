@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL01 Policy, Scope, and Stakeholders — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope of this volume: the engineering constitution of AOI Monitor — executive policy (§2), the mandatory Change Execution Contract (§3), product scope and non-scope (§4), source-requirement traceability (§5), the specification-defect and open-decision registers (§6), and the stakeholder/responsibility model with the GOV requirement catalogue (§7).
 
-Supersedes/Related existing docs: supersedes the change-process portions of `Docs/Contributor_Quality_Checklist.md` where they conflict with §3 (that document remains as a quick reference). Incorporates by reference, without restating: `AGENTS.md` (concise AI-agent contract), `Docs/Standards_Traceability_Matrix.md` (certification-boundary wording), `Docs/Branch_Protection_and_Quality_Gates.md`, `Docs/Completion_Assessment_Methodology.md`, `Docs/Requirements_Traceability_Matrix.md` (legacy requirement-ID registry), `Docs/Stage_Mapping.md` and `Docs/Roadmap_and_Stages.md` (stage vocabulary and boundaries), `DESIGN.md` (UI design authority).
+Supersedes/Related existing docs: supersedes the change-process portions of `CONTRIBUTING.md` where they conflict with §3 (that document remains as a quick reference). Incorporates by reference, without restating: `AGENTS.md` (concise AI-agent contract), `Docs/Standards_Traceability_Matrix.md` (certification-boundary wording), `CONTRIBUTING.md`, `Docs/METRICS_VAL.md`, `Docs/Requirements_Traceability_Matrix.md` (legacy requirement-ID registry), `Docs/ROADMAP.md` and `Docs/ROADMAP.md` (stage vocabulary and boundaries), `DESIGN.md` (UI design authority).
 
 ---
 
@@ -14,7 +16,7 @@ Document Control — version history, volume register, ownership table, and navi
 
 ## 2. Executive Engineering Policy
 
-This section is the constitution. Every other section of every volume elaborates one of the clauses below; where prose elsewhere appears to permit what this section prohibits, this section wins. The policy exists because the analysis behind this standard (§6) found that the dominant failure pattern of this project is not bad code — the codebase is more rigorous than its specifications — but ungoverned divergence: three source documents that contradict each other, the implementation, and current law, plus a repository whose elaborate quality gates are advisory in practice (`Docs/Branch_Protection_and_Quality_Gates.md` prescribes branch protection that is not enforced; CI failure currently blocks nothing).
+This section is the constitution. Every other section of every volume elaborates one of the clauses below; where prose elsewhere appears to permit what this section prohibits, this section wins. The policy exists because the analysis behind this standard (§6) found that the dominant failure pattern of this project is not bad code — the codebase is more rigorous than its specifications — but ungoverned divergence: three source documents that contradict each other, the implementation, and current law, plus a repository whose elaborate quality gates are advisory in practice (`CONTRIBUTING.md` prescribes branch protection that is not enforced; CI failure currently blocks nothing).
 
 **EP-1 — No change without the standard.** Every change — code, XAML, SQL schema, model artifact, recipe, configuration, script, CI workflow, or document — is made under the Change Execution Contract (§3). There is no category of change that is outside it.
 
@@ -22,7 +24,7 @@ This section is the constitution. Every other section of every volume elaborates
 
 **EP-3 — Simplest architecture that satisfies.** The selected design for any change is the one with the fewest new processes, dependencies, technologies, and abstractions that satisfies the affected requirements of this standard. D-01 (modular monolith, .NET-first, in-process ONNX Runtime, worker split only on defined triggers) is the product-level application of this clause. Complexity is admitted only against a recorded trigger or requirement, never speculatively. The burden of proof is on the more complex option.
 
-**EP-4 — Truthfulness.** The product and its documents are standards-aligned, never certified, unless a certificate from an accredited body exists and is on file. The exact wording discipline of `Docs/Standards_Traceability_Matrix.md` ("Certification Boundary" section) applies to every artifact: "standards-aligned evidence" is permitted; "ISO certified" and equivalents are forbidden. Simulated or mock evidence never satisfies a real-hardware or real-integration gate — the rule already stated in ≥6 repo documents (e.g. `Docs/Factory_Acceptance_Test_Plan.md`, `Docs/Completion_Assessment_Methodology.md`) is hereby elevated to standard level. This mirrors the `AGENTS.md` truthfulness contract.
+**EP-4 — Truthfulness.** The product and its documents are standards-aligned, never certified, unless a certificate from an accredited body exists and is on file. The exact wording discipline of `Docs/Standards_Traceability_Matrix.md` ("Certification Boundary" section) applies to every artifact: "standards-aligned evidence" is permitted; "ISO certified" and equivalents are forbidden. Simulated or mock evidence never satisfies a real-hardware or real-integration gate — the rule already stated in ≥6 repo documents (e.g. `Docs/VALIDATION.md`, `Docs/METRICS_VAL.md`) is hereby elevated to standard level. This mirrors the `AGENTS.md` truthfulness contract.
 
 **EP-5 — Decisions bind.** The Decision Register D-01..D-18 (recorded long-form in §11/VOL02) is settled. Requirements, reviews, and designs are written consistent with it. Reopening a decision requires an ADR that names the decision's recorded revisit condition and demonstrates it has been met; re-litigation in review threads, commit messages, or new documents is a §3 violation.
 
@@ -135,7 +137,7 @@ flowchart LR
 | CEC-M9 | Authorization tests executed if permissions, roles, or page/service gates changed (extends `RoleAuthorizationTests`). |
 | CEC-M10 | Fuzz/negative-input tests executed if any parser, decoder, or deserializer changed (INP catalogue, §29/VOL08). |
 | CEC-M11 | Migration tests (forward + rollback on representative data) executed if schema or storage format changed (`AoiDatabaseMigrations.cs` discipline). |
-| CEC-M12 | Simulator or hardware-in-the-loop evidence captured if device-facing behavior changed (camera/lighting/robot/3D — `Docs/Hardware_In_The_Loop_Checklist.md`), labeled simulated vs real per EP-4. |
+| CEC-M12 | Simulator or hardware-in-the-loop evidence captured if device-facing behavior changed (camera/lighting/robot/3D — `Docs/DEPLOYMENT.md`), labeled simulated vs real per EP-4. |
 | CEC-M13 | Model regression suite executed if inference, preprocessing, postprocessing, thresholds, or taxonomy mapping changed (AIM catalogue, §31/VOL09). |
 | CEC-M14 | Log-leak review done: new/changed log statements checked for secrets, personal data, customer image paths (extends `SecretProtectionService.RedactKnownSecrets` coverage). |
 | CEC-M15 | Rollback from CEC-B8 verified as executable (revert builds; down-migration runs; field rollback documented). |
@@ -155,7 +157,7 @@ flowchart LR
 | CEC-A4 | Resource growth watched over the observation window: memory, DB size, image-vault growth, log volume. |
 | CEC-A5 | Authorization regression spot-checked for changed roles/pages (default-deny still holding). |
 | CEC-A6 | Escape and false-call trend watched where detection behavior changed (existing false-call target and escape-evidence reporting). |
-| CEC-A7 | Field rollback readiness confirmed for shipped changes: previous package retained, rollback steps tested per `Docs/Deployment_Package_Guide.md`. |
+| CEC-A7 | Field rollback readiness confirmed for shipped changes: previous package retained, rollback steps tested per `Docs/DEPLOYMENT.md`. |
 | CEC-A8 | Risk register (§56/VOL19) updated with any new or retired risk the change created or removed. |
 
 ### R: Contract recording requirements
@@ -180,7 +182,7 @@ This section fixes what the standard governs, so that CEC-B3 has an authoritativ
 
 ### 4.1 In scope
 
-**The four stages** (vocabulary per `Docs/Roadmap_and_Stages.md` and `Docs/Stage_Mapping.md`):
+**The four stages** (vocabulary per `Docs/ROADMAP.md` and `Docs/ROADMAP.md`):
 
 | Stage | Content | Current status (2026-07-15) |
 |---|---|---|
@@ -195,7 +197,7 @@ This section fixes what the standard governs, so that CEC-B3 has an authoritativ
 - `AOI_Monitor.Tools` — the evidence/CLI companion (stage-exit evidence, image-learning demo commands).
 - `AOI_Monitor.Tests`, `AOI_Monitor.UiTests` — the test estate (D-13).
 - `Templates/*` — the four vendor adapter template projects and the plugin loading surface (camera/lighting adapters; the current unsigned `Assembly.LoadFrom` path is a recorded nonconformity, §15/VOL03 plugin rule).
-- The offline training pipeline on engineering machines (D-01 confines Python here; currently documented in `Docs/ONNX_Model_Training.md` — anomalib-based ONNX export; a `Scripts/ml` home is the target layout).
+- The offline training pipeline on engineering machines (D-01 confines Python here; currently documented in `Docs/DATA_PIPELINE.md` — anomalib-based ONNX export; a `Scripts/ml` home is the target layout).
 - Build, CI, and release machinery: `.github/workflows/dotnet-ci.yml`, `.github/workflows/build-windows-app.yml`, `Scripts/*.ps1` quality gates, `Tools/quality-gates/*.json`, the future WiX MSI installer and signed update pipeline (D-08, D-12).
 - The documentation set (`Docs/`, `README.md`, `DESIGN.md`, `AGENTS.md`, this standard).
 - Local persistence and evidence stores: SQLite database, image vault, export/evidence directories (D-04).
@@ -206,7 +208,7 @@ This section fixes what the standard governs, so that CEC-B3 has an authoritativ
 |---|---|
 | Safety-function engineering | E-stop, guard interlocks, safe stop, and their risk assessment per 12100/13849-1 belong to the machine builder's certified safety chain (D-18). This standard governs only the software's observation of safety status and its fail-safe reaction to losing that observation (§34/VOL11). No requirement in this standard is a safety-function requirement. |
 | Customer MES/ERP internals | The standard governs AOI Monitor's client behavior up to the MES interface contract (§35/VOL11). MES server configuration, uptime, and data handling beyond the interface are the customer's domain (IT Admin role). |
-| PCB design-data interpretation beyond images | The product interprets images (2D/3D/side-view). CAD/Gerber/BOM semantic interpretation is not governed by v1.0; the post-Stage-1 roadmap names CAD/BOM-driven programming as a future priority (`Docs/Roadmap_and_Stages.md`), and its adoption requires a scope amendment ADR. |
+| PCB design-data interpretation beyond images | The product interprets images (2D/3D/side-view). CAD/Gerber/BOM semantic interpretation is not governed by v1.0; the post-Stage-1 roadmap names CAD/BOM-driven programming as a future priority (`Docs/ROADMAP.md`), and its adoption requires a scope amendment ADR. |
 | Cloud SaaS / multi-station cloud aggregation | Named "Future Expansion" in the GUI spec (`gui-spec.md:182-186`). Excluded from v1.0; any cloud feature triggers a new threat model and a scope amendment ADR before the first line of code. |
 | PCB manufacturing process engineering | The defect taxonomy (D-17) classifies observations; it does not prescribe SMT process corrections. |
 
@@ -315,7 +317,7 @@ The three customer-facing source documents are scope inputs, not correct archite
 | gui-spec:146 | "TensorFlow / PyTorch inference engine" | REJECTED — SD-01 | D-03: ONNX Runtime (pinned) |
 | gui-spec:147 | Model version control | ADOPTED | §19 (ORC) |
 | gui-spec:148 | Configurable confidence threshold | ADOPTED | §18 (ORC), §31 (AIM) |
-| gui-spec:151–155 | UI guidelines: 1920×1080 min, sans-serif ≥14 pt, buttons ≥120×40 px, 12-column grid | ADOPTED | §36 (HMI); matches existing `Docs/Industrial_HMI_and_Software_Quality_Baseline.md` |
+| gui-spec:151–155 | UI guidelines: 1920×1080 min, sans-serif ≥14 pt, buttons ≥120×40 px, 12-column grid | ADOPTED | §36 (HMI); matches existing `DESIGN.md` |
 | gui-spec:152 | "green/red/yellow indicators" | SUPERSEDED — SD-11 | §36 (HMI) |
 | gui-spec:157–160 | Roles: Operator, Engineer, Admin | SUPERSEDED — SD-10 | §28 (IAM): expanded role model |
 | gui-spec:162–166 | Data flow summary | ADOPTED (informative) | §12 (ARC), §17 (ORC) |
@@ -340,7 +342,7 @@ The three customer-facing source documents are scope inputs, not correct archite
 
 ### 5.4 Requirement-ID namespaces and reconciliation rule
 
-Three legacy ID vocabularies exist and partially collide (verified 2026-07-15): `Docs/Requirements_Traceability_Matrix.md` (119 rows: MI/RE/AI/LE/3D/S1–S4/TR/RP/AC), `Docs/Industrial_Quality_Checklist.md` (30 rows: HMI/COLOR/ALARM/PERF/REL/SEC/MAINT/EXPORT/HW/MES/PKG), and the runtime matrix in `AOI_Monitor/Services/StandardsTraceabilityService.cs` (HMI/PERF/REL/EXPORT/HW/MES/CI/ALARM/QUAL rows). At least seven IDs (HMI-003, HMI-004, PERF-001, PERF-002, REL-001, ALARM-002, HW-001) carry different meanings in the checklist document versus the runtime service.
+Three legacy ID vocabularies exist and partially collide (verified 2026-07-15): `Docs/Requirements_Traceability_Matrix.md` (119 rows: MI/RE/AI/LE/3D/S1–S4/TR/RP/AC), `CONTRIBUTING.md` (30 rows: HMI/COLOR/ALARM/PERF/REL/SEC/MAINT/EXPORT/HW/MES/PKG), and the runtime matrix in `AOI_Monitor/Services/StandardsTraceabilityService.cs` (HMI/PERF/REL/EXPORT/HW/MES/CI/ALARM/QUAL rows). At least seven IDs (HMI-003, HMI-004, PERF-001, PERF-002, REL-001, ALARM-002, HW-001) carry different meanings in the checklist document versus the runtime service.
 
 The reconciliation rule, normative for all repository documents:
 
@@ -359,7 +361,7 @@ The §5 traceability tables SHALL be updated in the same change that modifies a 
 
 **[GOV-009]** (P2 | ALL | All)
 A requirement identifier outside this standard's category set (§5.4 item 1) SHALL NOT be created in any repository document after adoption of v1.0.
-- Why: the repo already has 7+ colliding IDs between `Docs/Industrial_Quality_Checklist.md` and `StandardsTraceabilityService.cs`; a single namespace authority stops further collisions. Maps: Internal.
+- Why: the repo already has 7+ colliding IDs between `CONTRIBUTING.md` and `StandardsTraceabilityService.cs`; a single namespace authority stops further collisions. Maps: Internal.
 - Verify: repository documentation review during CEC-M16. Evidence: CEC record; doc diff. Owner: Software Architect. Auto: Manual review.
 - Exception: Allowed — approver: Software Architect. Review: Annual.
 
@@ -397,7 +399,7 @@ Each SD entry records: exact quote + source, defect class (contradiction / unsaf
 **SD-04 — Safety interlock/e-stop assigned to application software.**
 - Quote: "Safety interlock & emergency stop" (`roadmap.md:47`); "Safety interlock and emergency stop integration" (`gui-spec.md:116`).
 - Class: unsafe. Severity: **Blocker**.
-- Assessment: a non-real-time Windows WPF application cannot implement an e-stop or interlock safety function under 60204-1/13849-1; as written, a contractor is free to "satisfy" the requirement with an in-app stop button — a machine-safety liability. The repo already takes the correct monitor-only posture (`IEmergencyStopMonitor`, `Docs/Stage_Mapping.md`).
+- Assessment: a non-real-time Windows WPF application cannot implement an e-stop or interlock safety function under 60204-1/13849-1; as written, a contractor is free to "satisfy" the requirement with an in-app stop button — a machine-safety liability. The repo already takes the correct monitor-only posture (`IEmergencyStopMonitor`, `Docs/ROADMAP.md`).
 - Resolution: the application interfaces with the hardware safety circuit (monitors state, honors interlock inputs, reports trips); the safety function is realized in certified hardware outside software scope; software failure must never defeat the interlock.
 - Status: **Resolved-by-D-18**.
 
@@ -425,7 +427,7 @@ Each SD entry records: exact quote + source, defect class (contradiction / unsaf
 **SD-08 — 8-hour stability as the only stability criterion.**
 - Quote: "Stable operation for 8-hour continuous PoC testing." (`gui-spec.md:178`).
 - Class: ambiguous + unrealistic (as a production gate). Severity: **Major**.
-- Assessment: "stable" undefined; 8 h is a PoC number sitting in a whole-document acceptance list while production SMT lines run 24/7; repo docs already distinguish PoC vs factory soak (`Docs/Factory_Acceptance_Test_Plan.md`).
+- Assessment: "stable" undefined; 8 h is a PoC number sitting in a whole-document acceptance list while production SMT lines run 24/7; repo docs already distinguish PoC vs factory soak (`Docs/VALIDATION.md`).
 - Resolution: keep 8 h soak (zero crashes, bounded memory growth, all cycles logged) as the PoC minimum; production gates use ≥72 h soak with MTBF and resource-growth targets, defined separately.
 - Status: **Resolved-by-§39/§40** (TST/PER catalogues).
 
@@ -486,7 +488,7 @@ Each SD entry records: exact quote + source, defect class (contradiction / unsaf
 - Quote: "Successful integration with camera, robot, and MES." (`gui-spec.md:180`) in the single acceptance list beside PoC items.
 - Class: contradiction. Severity: **Major**.
 - Assessment: read literally, no stage can be accepted (and Stage-1 milestones can be withheld) until robot and MES integration completes in 2027 — contradicting the roadmap's own staged deliverable structure.
-- Resolution: per-stage acceptance criteria matching stage deliverables; Stage-1 exit is image-based validation only (as `Docs/Roadmap_and_Stages.md` already states).
+- Resolution: per-stage acceptance criteria matching stage deliverables; Stage-1 exit is image-based validation only (as `Docs/ROADMAP.md` already states).
 - Status: **Resolved-by-§39** (TST catalogue) + §4 stage scope.
 
 **SD-18 — Filter on a column the log table does not define.**
@@ -502,7 +504,7 @@ Each SD entry records: exact quote + source, defect class (contradiction / unsaf
 - Status: **Open** — decision tracked as OD-05.
 
 **SD-20 — Stage-1 model deliverable defined three different ways.**
-- Quote: "AI model (v1.0)" (`roadmap.md:21`) vs "AI model (.pt or .h5 format)" (`gui-spec.md:95`) vs repo reality: learned reference + tolerance map + evidence package + optional customer-supplied ONNX, no trained production model bundled (`Docs/Stage_Mapping.md`).
+- Quote: "AI model (v1.0)" (`roadmap.md:21`) vs "AI model (.pt or .h5 format)" (`gui-spec.md:95`) vs repo reality: learned reference + tolerance map + evidence package + optional customer-supplied ONNX, no trained production model bundled (`Docs/ROADMAP.md`).
 - Class: contradiction. Severity: **Major**.
 - Resolution: one deliverable definition referenced by both documents — Stage 1 delivers the image-learning evidence package (learned reference, tolerance map, validation report, CSV/overlays) and, where a trained ONNX model is supplied and accepted, the model + acceptance record per D-03.
 - Status: **Resolved-by-§19** (ORC catalogue) + D-03.
@@ -520,7 +522,7 @@ Each SD entry records: exact quote + source, defect class (contradiction / unsaf
 - Status: **Open** — remediation issue; owner: Software Lead.
 
 **SD-23 — Windows 10 in four client-facing repo docs without EOL/LTSC caveat.**
-- Quote/locations: `Docs/Installation_Guide.md:11`, `Docs/Client_Test_Kit_Guide.md:23`, `Docs/Deployment_Package_Guide.md:7`, `Docs/Image_Learning_Quickstart_Test.md:11`.
+- Quote/locations: `Docs/DEPLOYMENT.md:11`, `Docs/VALIDATION.md:23`, `Docs/DEPLOYMENT.md:7`, `Docs/VALIDATION.md:11`.
 - Class: obsolete (repo-internal docs). Severity: **Minor**.
 - Resolution: align the four documents with D-02 (Windows 11 IoT Enterprise LTSC 2024 primary; Windows 10 prohibited for new deployments).
 - Status: **Resolved-by-D-02** at policy level; document updates **Open** — remediation issue; owner: Software Lead.

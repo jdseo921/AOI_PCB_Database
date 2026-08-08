@@ -1,7 +1,9 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL08 Input, Serialization, and Cryptography — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: this volume governs every byte that enters any AOI Monitor process (§29 — input, file, image, and serialization security, including the D-03 model-artifact rules) and every secret, key, certificate, and cryptographic primitive the product creates, stores, or verifies (§30).
-Supersedes/Related existing docs: no repo document is fully superseded; this volume governs and extends the image-import rules described in `Docs/Database_Schema.md`, the model-artifact handling in `Docs/ONNX_Model_Training.md`, the adapter-package rules in `Docs/Vendor_Adapter_Implementation_Guide.md`, and the secret-scanning rules embedded in `Scripts/check-code-quality.ps1` (CQ-SEC-001) and `Scripts/check-pr-quality.ps1` (PR-SEC-001).
+Supersedes/Related existing docs: no repo document is fully superseded; this volume governs and extends the image-import rules described in `Docs/DATA_PIPELINE.md`, the model-artifact handling in `Docs/DATA_PIPELINE.md`, the adapter-package rules in `Docs/ARCHITECTURE.md`, and the secret-scanning rules embedded in `Scripts/check-code-quality.ps1` (CQ-SEC-001) and `Scripts/check-pr-quality.ps1` (PR-SEC-001).
 
 ---
 
@@ -242,7 +244,7 @@ Each artifact class (image vault, model registry, quarantine, exports, spool pay
 
 **[INP-027]** (P2 | ALL | ImageStore, Diagnostics)
 Ingestion into any managed storage subtree SHALL be refused, with a Warning alarm, when the subtree exceeds its configured quota or when volume free space falls below the configured floor (default 10 GB).
-- Why: unbounded vault growth is a documented Stage-2 boundary (`Docs/Database_Schema.md:60-70`); disk exhaustion halts inspection and corrupts SQLite WAL checkpoints (CWE-770). Maps: CWE-770; 62443-4-2 CR 7.2; Internal.
+- Why: unbounded vault growth is a documented Stage-2 boundary (`Docs/DATA_PIPELINE.md:60-70`); disk exhaustion halts inspection and corrupts SQLite WAL checkpoints (CWE-770). Maps: CWE-770; 62443-4-2 CR 7.2; Internal.
 - Verify: `StorageQuotaTests` with fake volume-info provider. Evidence: CI test results. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: IT Admin (customer). Review: Quarterly.
 

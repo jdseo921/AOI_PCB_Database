@@ -11,7 +11,7 @@ using Xunit;
 namespace AOI_Monitor.Tests;
 
 /// <summary>
-/// Contract tests added by the Stage 2-4 de-risking review (Docs/Stage2_Derisking_Review.md):
+/// Contract tests added by the Stage 2-4 de-risking review (Docs/ARCHITECTURE.md, seam inventory):
 /// real-hardware camera classification, soak-source injection, TCP lighting transport,
 /// integration-registry survival, MES contract drift lock, central-sync queue correctness,
 /// 3D dropout tolerance, and the template frame-on-disk obligation.

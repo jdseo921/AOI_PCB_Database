@@ -217,7 +217,7 @@ public sealed class VendorAdapterTemplateTests
     [Fact]
     public void VendorGuideDocumentsSafetyAndPackagingBoundaries()
     {
-        var guide = File.ReadAllText(Path.Combine(FindRepoRoot(), "Docs", "Vendor_Adapter_Implementation_Guide.md"));
+        var guide = File.ReadAllText(Path.Combine(FindRepoRoot(), "Docs", "ARCHITECTURE.md"));
 
         Assert.Contains("Camera Adapter Requirements", guide);
         Assert.Contains("manifest schema", guide, StringComparison.OrdinalIgnoreCase);
@@ -234,7 +234,7 @@ public sealed class VendorAdapterTemplateTests
     [Fact]
     public void HardwareInTheLoopChecklistCoversRequiredCommissioningEvidence()
     {
-        var checklist = File.ReadAllText(Path.Combine(FindRepoRoot(), "Docs", "Hardware_In_The_Loop_Checklist.md"));
+        var checklist = File.ReadAllText(Path.Combine(FindRepoRoot(), "Docs", "DEPLOYMENT.md"));
 
         foreach (var required in new[]
         {

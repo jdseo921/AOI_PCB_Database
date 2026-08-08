@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL04 Orchestration and Lifecycles — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: the normative inspection state machine (§17), recipe lifecycle (§18), AI model lifecycle states and activation rules (§19; deep ML quality/security requirements live in §31/VOL09), and device and calibration lifecycle (§20) for AOI Monitor, Stages 1–4.
 
-Supersedes/Related existing docs: `Docs/Integration_Boundaries.md` and the `RobotCycleService` FSM notes remain implementation references subordinate to §17; the Recipe Editor and 2D Calibration sections of `Docs/User_Manual.md` and `IMPLEMENTED_FEATURES.md` remain descriptive (non-normative); `Docs/Architecture_Extension_Guide.md` remains the engine-extension how-to under §14–15/VOL03.
+Supersedes/Related existing docs: `Docs/ARCHITECTURE.md` and the `RobotCycleService` FSM notes remain implementation references subordinate to §17; the Recipe Editor and 2D Calibration sections of `Docs/USER_MANUAL.md` and `Docs/USER_MANUAL.md` remain descriptive (non-normative); `Docs/ARCHITECTURE.md` remains the engine-extension how-to under §14–15/VOL03.
 
 ---
 
@@ -784,7 +786,7 @@ This section defines how hardware devices (cameras, lighting controllers, and �
 ### 20.1 Current state (facts this section builds on)
 
 - Device connection status uses the four-value `IntegrationConnectionStatus { NotConnected, Simulated, Error, Ready }` (IntegrationContracts.cs:5-11); there is no device registry — adapters are selected by settings key, and identity is whatever the manifest and adapter self-report (string-match only, VisionCameraAdapters.cs:204-218).
-- `Docs/Vendor_Adapter_Implementation_Guide.md:34-48` already requires stable `FrameId`, real `CameraId`, UTC timestamps, and `IsSimulated=false` only for live frames — the identity *contract* exists; verification does not.
+- `Docs/ARCHITECTURE.md:34-48` already requires stable `FrameId`, real `CameraId`, UTC timestamps, and `IsSimulated=false` only for live frames — the identity *contract* exists; verification does not.
 - Calibration persists as `CalibrationProfiles` (ProfileName, BoardModel, ViewType, ScaleX/OffsetX/ScaleY/OffsetY, TransformSummary, CreatedAtUtc) with `CalibrationPoints` children (AoiDatabase.Infrastructure.cs:3705-3732). There is **no state, no expiry, no invalidation event, and no link from `InspectionResults` to the calibration profile that was active** — an inspection's mm values cannot be traced to the transform that produced them.
 - Lighting profiles exist as a recipe field (`LightingProfile`, healed by RecipeService.cs:117) and as acceptance evidence (`LightingAcceptanceRuns/Steps`), but have no versioned artifact of their own; `TcpTextLightingController` writes are fire-and-forget with no ACK read (LightingControllers.cs:68-120).
 

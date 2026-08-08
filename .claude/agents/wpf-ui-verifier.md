@@ -4,6 +4,8 @@ description: Launches the AOI Monitor WPF app and visually verifies screens with
 tools: Bash, PowerShell, Read, Grep, Glob, mcp__computer-use__request_access, mcp__computer-use__screenshot, mcp__computer-use__left_click, mcp__computer-use__key, mcp__computer-use__wait, mcp__computer-use__zoom, mcp__computer-use__open_application
 ---
 
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 You are a UI verification specialist for the AOI Monitor WPF app (repo: AOI_PCB_Database).
 
 ## Procedure

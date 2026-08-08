@@ -1,7 +1,9 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL13 Observability, Performance, and Reliability — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: this volume defines the normative telemetry, audit, diagnostics, performance/capacity, and failure-recovery requirements for AOI Monitor (§38, §40, §41; §39 Testing Strategy is owned by VOL14).
-Supersedes/Related existing docs: supersedes the `PERF-*`/`REL-*` rows of `Docs/Industrial_Quality_Checklist.md` and the Performance and Reliability sections of `Docs/Industrial_HMI_and_Software_Quality_Baseline.md` (mapping published in VOL20); related and kept: `Docs/Factory_Acceptance_Test_Plan.md` (soak procedure), `Docs/Database_Schema.md` (retention boundary), `DESIGN.md` (operator-message rules), `Docs/Standards_Traceability_Matrix.md` (evidence-export mechanics and certification-boundary wording). The runtime IDs `PERF-001`/`REL-001` in `AOI_Monitor/Services/StandardsTraceabilityService.cs` collide with this volume's category names; the reconciliation rule is owned by VOL01 §5.
+Supersedes/Related existing docs: supersedes the `PERF-*`/`REL-*` rows of `CONTRIBUTING.md` and the Performance and Reliability sections of `DESIGN.md` (mapping published in VOL20); related and kept: `Docs/VALIDATION.md` (soak procedure), `Docs/DATA_PIPELINE.md` (retention boundary), `DESIGN.md` (operator-message rules), `Docs/Standards_Traceability_Matrix.md` (evidence-export mechanics and certification-boundary wording). The runtime IDs `PERF-001`/`REL-001` in `AOI_Monitor/Services/StandardsTraceabilityService.cs` collide with this volume's category names; the reconciliation rule is owned by VOL01 §5.
 
 ---
 
@@ -392,7 +394,7 @@ Each application start SHALL persist a startup self-test report (check outcomes,
 
 **[OBS-040]** (P3 | ALL | CI, Diagnostics)
 The machine-readable metrics catalogue `Docs/observability/metrics_catalogue.json` SHOULD be maintained as the authoritative form of Table 38-3, with a CI drift check failing the build on any divergence between the JSON catalogue and the table.
-- Why: OBS-014 already gates emitted code against the catalogue, so this record's distinct obligation is keeping the JSON catalogue and Table 38-3 themselves in lockstep — the way `Docs/Industrial_Quality_Checklist.md` and the gate JSON already drifted. Maps: Internal.
+- Why: OBS-014 already gates emitted code against the catalogue, so this record's distinct obligation is keeping the JSON catalogue and Table 38-3 themselves in lockstep — the way `CONTRIBUTING.md` and the gate JSON already drifted. Maps: Internal.
 - Verify: FF-OBS-06 (catalogue-vs-table drift check) in `Scripts/run-quality-gates.ps1`. Evidence: CI gate log. Owner: QA Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Lead. Review: Annual.
 

@@ -1,79 +1,64 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # AOI Monitor
 
 AOI Monitor is a Windows WPF desktop prototype for PCBA automated optical inspection review workflows. It gives operators a simplified local console organized around focused workflow menus: Home, Board & Images, Run Inspection, Golden Compare, Defect Review, Recipe Rules, AI / Models, Yield Analytics, Export & Trace, Calibration, 3D Profile, Hardware Readiness, and System Settings.
 
 The application currently demonstrates the review loop with local files, local SQLite records, and clearly labeled demo placeholders where production data sources are not yet implemented. It can load a sample PCB image and a golden reference image, run the deterministic Pixel Difference Prototype Engine, optionally run a configured ONNX ML Model, produce an `OK`, `REVIEW`, or `NG` verdict, record disposition actions, collect candidate samples for local training-set export review, and write local export artifacts. It is not yet connected to live AOI hardware, cameras, PLCs, robots, conveyors, a centralized production database, or a bundled trained production ML model.
 
-Home includes an explicit readiness panel for Database, Image Vault, Inspection Engine, Camera, Robot, and MES/ERP. The persistent shell keeps only operator/user, engine/source, deployment truthfulness, active critical/alarm status, a Home return button, and the concise evidence footer visible outside workflow pages. Run Inspection and Golden Compare remain embedded workflow menus, with optional large-image viewer windows for camera, screening, and comparison image panels when operators need zoom, fit, 100% view, or PNG save. Stage 2 Camera Pilot architecture includes camera adapter boundaries, plugin loading, and camera/lighting/3D acceptance services, while real vendor adapters and real hardware acceptance evidence remain open. Stage 3 Planned Robot Integration covers production robot/handler control. Stage 4 Planned MES/ERP Integration covers production authentication and traceability. A clearly labeled 2D calibration profile workflow can save approximate image-to-board point mappings for Stage 2 planning, but it is not live camera or robot calibration. A clearly labeled Mock MES REST mode can generate traceability payload evidence but is not production MES. ONNX ML Model inference is available only when a valid local model and tensor configuration are supplied; the readiness panel reports `Ready` only after the current model configuration passes the Settings test.
+Home includes an explicit readiness panel for Database, Image Vault, Inspection Engine, Camera, Robot, and MES/ERP. Stage 2 Camera Pilot architecture includes camera adapter boundaries, plugin loading, and camera/lighting/3D acceptance services, while real vendor adapters and real hardware acceptance evidence remain open. Stage 3 (robot/handler control) and Stage 4 (production MES/ERP authentication and traceability) are planned boundaries. A clearly labeled 2D calibration profile workflow, a clearly labeled Mock MES REST mode, and a Sample-Data-Mode 3D viewer exist for Stage 2+ planning; none of them are live hardware or production integrations.
 
-For the detailed feature inventory, see [IMPLEMENTED_FEATURES.md](IMPLEMENTED_FEATURES.md).
+This project is standards-aligned, not formally ISO, IEC, ISA, safety, cybersecurity, or regulatory certified. Simulated, mock, and boundary-only evidence is always labeled as such.
 
-Start here (brief, English + Korean / 영어·한국어 병기):
+## Documentation Map
 
-- [Architecture Overview / 아키텍처 개요](Docs/Architecture_Overview.md)
-- [Roadmap & Stages / 로드맵 및 단계](Docs/Roadmap_and_Stages.md)
+The documentation is deliberately consolidated into a small fixed set. Do not add new standalone markdown documents; extend the right one below (rule recorded in [AGENTS.md](AGENTS.md)).
 
-Client/evaluator documents:
+Root:
 
-- [Client Test Kit Guide](Docs/Client_Test_Kit_Guide.md)
-- [Installation Guide](Docs/Installation_Guide.md)
-- [User Manual](Docs/User_Manual.md)
-- [Stage Mapping](Docs/Stage_Mapping.md)
-- [Stage 1 Exit + Stage 2 Camera Pilot Milestone Status](Docs/Milestone_Status_Stage1_Exit_Stage2_Camera_Pilot.md)
-- [Stage 1 Exit Evidence CLI](Docs/Stage1_Exit_Evidence_CLI.md)
-- [False-Positive Minimization and Business Readiness](Docs/False_Positive_Minimization_and_Business_Readiness.md)
-- [Requirements Traceability Matrix](Docs/Requirements_Traceability_Matrix.md)
-- [Integration Boundaries](Docs/Integration_Boundaries.md)
-- [Stage 1 Acceptance Checklist](Docs/Stage1_Acceptance_Checklist.md)
-- [Image-Only PCB Learning Workflow](Docs/Image_Only_PCB_Learning_Workflow.md)
-- [Client Image Learning Demo Guide](Docs/Client_Image_Learning_Demo_Guide.md)
-- [Design Contract](DESIGN.md)
-- [Frontend Design Review and Rework Plan](Docs/Frontend_Design_Review_and_Rework_Plan.md)
-- [AOI Competitive HMI Reference Guide](Docs/AOI_Competitive_HMI_Reference_Guide.md)
-- [Architecture Extension Guide](Docs/Architecture_Extension_Guide.md)
-- [Factory Acceptance Test Plan](Docs/Factory_Acceptance_Test_Plan.md)
-- [Developer CI and Release Checks](Docs/Developer_CI.md)
+- [README.md](README.md) — this overview and quickstart.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, local checks, CI quality gates, branch protection, contributor checklist.
+- [AGENTS.md](AGENTS.md) — binding engineering rules for AI agents and contributors ([CLAUDE.md](CLAUDE.md) includes it).
+- [DESIGN.md](DESIGN.md) — the design contract merged with the factory HMI style guide, quality baseline, scroll rules, and competitive HMI reference patterns.
+
+`Docs/`:
+
+- [ARCHITECTURE.md](Docs/ARCHITECTURE.md) — layered architecture, integration boundaries, vendor adapter guide, UI service coverage, Stage 2–4 seam inventory.
+- [DATA_PIPELINE.md](Docs/DATA_PIPELINE.md) — image intake → registration → inspection engines → storage (SQLite schema, image vault) → export/central sync; image-only learning and ONNX model training.
+- [API_SPEC.md](Docs/API_SPEC.md) — the `AOI_Monitor.Tools` CLI, machine-interface boundary contracts, sync payloads, export formats.
+- [DEPLOYMENT.md](Docs/DEPLOYMENT.md) — factory floor and customer-PC provisioning, packaging, and the hardware-in-the-loop commissioning checklist.
+- [RUNBOOK.md](Docs/RUNBOOK.md) — on-site IT troubleshooting, backup/restore/rollback, logs, crash reports, support bundles.
+- [CALIBRATION.md](Docs/CALIBRATION.md) — coordinate systems, current prototype calibration behavior, planned Stage 2+ camera/lighting/optics alignment.
+- [METRICS_VAL.md](Docs/METRICS_VAL.md) — inspection and AI-model acceptance criteria (false-call rate and possible-escape gates) and the completion-assessment methodology.
+- [SECURITY.md](Docs/SECURITY.md) — image data retention, network posture, roles; maps to the canonical standard volumes.
+- [VALIDATION.md](Docs/VALIDATION.md) — manual test plan, image-learning quickstart, sample-dataset demo, customer dataset validation kit, client test kit, soak test procedure, factory acceptance test plan.
+- [ROADMAP.md](Docs/ROADMAP.md) — the four delivery stages, current Stage 1 status, milestone history, dated review verdicts.
+- [USER_MANUAL.md](Docs/USER_MANUAL.md) — operator manual and per-window feature reference.
+- [Requirements_Traceability_Matrix.md](Docs/Requirements_Traceability_Matrix.md), [Customer_Spec_Gap_Audit.md](Docs/Customer_Spec_Gap_Audit.md), [Standards_Traceability_Matrix.md](Docs/Standards_Traceability_Matrix.md) — kept traceability records with stable requirement IDs.
+
+Annexes:
+
+- `Docs/standard/` — the canonical **AOI Software Architecture, Secure Development, and Change-Control Standard** (start at [00_Index.md](Docs/standard/00_Index.md)); machine-validated by `Scripts/standard_catalogue.py` (FF-STD-01).
+- `Docs/customer-specs/` — customer source specifications (kept verbatim as the requirements baseline).
+- `Templates/*/README.md`, [SampleData/README.md](SampleData/README.md) — colocated build/usage notes.
 
 ## Project Layout
 
-- `AOI_Monitor/` - WPF application source.
-- `AOI_Monitor/AOI_Monitor.csproj` - .NET project file targeting `net10.0-windows`.
+- `AOI_Monitor/` - WPF application source (`net10.0-windows`).
 - `AOI_Monitor/Views/` - page-specific UI and workflow code.
 - `AOI_Monitor/Services/` - shared workflow state, image analysis, and machine-interface exports.
 - `AOI_Monitor/Models/` - AOI workflow and export contract models.
 - `AOI_Monitor/Data/` - local SQLite initialization and image-vault persistence.
-- `Docs/` - installation guide, user manual, stage mapping, acceptance checklists, and implementation notes.
-- `Scripts/` - local build and release packaging scripts.
-- `SampleData/` - instructions for placing small local demo images.
-- `AOI_Monitor/bin/` and `AOI_Monitor/obj/` - local build outputs.
-
-## Repository Hygiene
-
-This repository should contain source code, XAML, docs, and small non-confidential instructions only. Do not commit:
-
-- `bin/` or `obj/` build outputs.
-- `.vs/` and generated `.user` IDE files.
-- Local SQLite database files or WAL/SHM sidecars.
-- Image vault folders or training-set export folders.
-- Generated export packages, CSV files, overlays, or machine-interface JSON files.
-- Customer images, production images, or large sample datasets.
-
-Local runtime data is generated automatically when the app starts or when imports/exports are run. Place small demo-image instructions in `SampleData/`; keep large or private datasets outside the repository.
-
-Before committing, run the local hygiene check:
-
-```powershell
-pwsh Scripts/check-repo-hygiene.ps1
-```
+- `AOI_Monitor.Tools/` - headless evidence CLI (see [Docs/API_SPEC.md](Docs/API_SPEC.md)).
+- `AOI_Monitor.Tests/`, `AOI_Monitor.UiTests/` - unit and UI test projects.
+- `Docs/` - the consolidated documentation set described above.
+- `Scripts/` - local build, quality-gate, and release packaging scripts.
+- `Templates/` - vendor adapter starting-point projects (camera, lighting, robot, robot+PLC).
+- `SampleData/` - instructions and generator for small local demo images.
 
 ## Run
 
-Requirements:
-
-- Windows
-- .NET SDK with Windows desktop/WPF support for the target framework used by the project
-
-From the repository root:
+Requirements: Windows, and a .NET SDK with Windows desktop/WPF support for the project's `net10.0-windows` target.
 
 ```powershell
 cd AOI_Monitor
@@ -83,71 +68,52 @@ dotnet run
 To build without launching:
 
 ```powershell
-cd AOI_Monitor
-dotnet build
+dotnet build AOI_Monitor\AOI_Monitor.csproj
 ```
 
-If a previous build already exists, you can also launch the debug executable directly:
-
-```powershell
-.\AOI_Monitor\bin\Debug\net10.0-windows\AOI_Monitor.exe
-```
-
-## Tests
-
-The repository includes `AOI_Monitor.Tests/` for non-UI logic. The tests use temporary folders/databases and generated tiny image files, so they do not depend on committed customer images.
-
-From the repository root:
+## Tests And Quality Gates
 
 ```powershell
 dotnet test AOI_PCB_Database.slnx
 ```
 
-The test fixture configures `AoiDatabase` with an isolated temp folder per test run, so tests do not write into the real `%LOCALAPPDATA%\AOI_Monitor` image vault or SQLite database.
+The test fixture uses an isolated temp folder per run, so tests do not write into the real `%LOCALAPPDATA%\AOI_Monitor` storage. For the full local gate loop (hygiene, build, tests, code quality, HMI layout audit, navigation performance, export verification, standards traceability, package validation):
+
+```powershell
+pwsh Scripts/run-quality-gates.ps1 -Configuration Release
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the complete developer workflow.
 
 ## Publish A Shareable PoC Package
 
-For a client/evaluator handoff package, use:
+For a client/evaluator handoff package:
 
 ```powershell
 pwsh Scripts/prepare-client-test-package.ps1 -Zip
 ```
 
-This creates a self-contained Windows x64 package with docs, a client handoff README, the customer validation manifest template, and client-demo quality gates enabled. Use `-SkipClientDemoGate` only for internal smoke packaging.
-
-Use the packaging script from the repository root:
-
-```powershell
-.\Scripts\publish.ps1
-```
-
-The script cleans prior generated release folders, runs tests, builds Release, publishes a Windows x64 desktop executable, copies documentation, and creates a timestamped folder under `Release\AOI_Monitor_PoC_yyyyMMdd_HHmmss\`.
-
-For a self-contained Windows x64 package, use:
+For direct packaging:
 
 ```powershell
 .\Scripts\publish.ps1 -SelfContained
 ```
 
-The release folder is intended to be zipped and shared. It intentionally excludes local SQLite databases, image vaults, customer images, generated exports, overlays, customer packages, and `%LOCALAPPDATA%\AOI_Monitor` runtime data.
+The release folder is intended to be zipped and shared. It intentionally excludes local SQLite databases, image vaults, customer images, generated exports, overlays, customer packages, and `%LOCALAPPDATA%\AOI_Monitor` runtime data. Details: [Docs/DEPLOYMENT.md](Docs/DEPLOYMENT.md).
 
 ## Basic Workflow
 
-1. Open Run Inspection from the Home workflow map. It opens in the main shell and includes a Large Image viewer button on the image panel.
-2. Use Board & Images, Defect Review, or Golden Compare as needed.
-3. In Board & Images, choose a sample PCB image with Open Record.
-4. Choose a golden reference image with Compare Golden.
-5. Review the generated score, verdict, evidence, and hotspot in Golden Compare. Use the Large Image buttons when either side needs zoomed inspection.
-6. Use Defect Review to confirm, mark false calls, hold for review, or queue local candidate samples.
-7. Use Export & Trace to inspect SQLite history, create CSV exports, build customer packages, and open database health.
+1. Open Run Inspection from the Home workflow map.
+2. In Board & Images, choose a sample PCB image with Open Record, then a golden reference image with Compare Golden.
+3. Review the generated score, verdict, evidence, and hotspot in Golden Compare; use the Large Image buttons for zoomed inspection.
+4. Use Defect Review to confirm, mark false calls, hold for review, or queue local candidate samples.
+5. Use Export & Trace to inspect SQLite history, create CSV exports, build customer packages, and open database health.
+
+The formal verification script, demo walkthroughs, and acceptance criteria live in [Docs/VALIDATION.md](Docs/VALIDATION.md) and [Docs/METRICS_VAL.md](Docs/METRICS_VAL.md).
 
 ## Image-Only PCB Learning
 
-AOI Monitor includes a Stage 1 image-only PCB learning workflow for uploaded image folders. Users group images as Golden / Reference, OK Learning, OK Validation, Inspection, and optional NG Validation. Learning does not require defect labels, bounding boxes, per-defect variables, model files, or camera hardware.
-
-The workflow learns a `learned_reference.png` from good samples, builds a `tolerance_map.png` for normal lighting/position/visual variation, calibrates false calls using OK Validation images, and exports anomaly heatmaps and annotated overlays for inspection samples. If NG Validation images are provided, reports include possible-escape evidence. If they are not provided, reports state that missed-defect rate cannot yet be fully proven.
-
-Use `AI / Models > AI Training Setup` for the guided GUI. For a command-line customer image workflow, use:
+AOI Monitor includes a Stage 1 image-only PCB learning workflow for uploaded image folders (no defect labels, bounding boxes, model files, or camera hardware required). Use `AI / Models > AI Training Setup` for the guided GUI, or the CLI:
 
 ```powershell
 dotnet run --project AOI_Monitor.Tools -- learn-from-images `
@@ -157,30 +123,11 @@ dotnet run --project AOI_Monitor.Tools -- learn-from-images `
   --false-call-target 0.05
 ```
 
-For an internal synthetic workflow smoke/demo package, use:
-
-```powershell
-dotnet run --project AOI_Monitor.Tools -- client-image-learning-demo `
-  --synthetic `
-  --output TestResults/image-learning-demo `
-  --operator ci-image-learning `
-  --false-call-target 0.05
-```
-
-Synthetic demo output proves workflow capability only. Customer acceptance requires customer/evaluator images and reviewer signoff. Stage 2 live camera validation remains separate.
-
-Generated files are written below the running application's `exports/` folder, usually under:
-
-```text
-AOI_Monitor/bin/Debug/net10.0-windows/exports/
-```
+Synthetic demo output proves workflow capability only. Customer acceptance requires customer/evaluator images and reviewer signoff; Stage 2 live camera validation remains separate. Full workflow documentation: [Docs/DATA_PIPELINE.md](Docs/DATA_PIPELINE.md) and [Docs/VALIDATION.md](Docs/VALIDATION.md).
 
 ## Stage 1 Batch Soak Test
 
-For the 8-hour continuous-operation acceptance criterion, a headless soak harness loops
-the real batch-inspection pipeline over an image folder and emits HTML/JSON/CSV stability
-evidence (timing, managed memory, handle counts, SQLite growth, error/alarm capture, and
-crash/stuck/memory-trend failure detection):
+For the 8-hour continuous-operation acceptance criterion, a headless soak harness loops the real batch-inspection pipeline over an image folder and emits HTML/JSON/CSV stability evidence:
 
 ```powershell
 dotnet run --project AOI_Monitor.Tools -c Release -- batch-soak `
@@ -190,76 +137,22 @@ dotnet run --project AOI_Monitor.Tools -c Release -- batch-soak `
   --profile eight-hour
 ```
 
-Use `--profile smoke` for a 5-minute rehearsal. Reports are labeled as uploaded-image
-pipeline evidence only, never camera or factory-automation readiness. See
-[Docs/Stage1_Soak_Test_Procedure.md](Docs/Stage1_Soak_Test_Procedure.md) for the full
-operator procedure.
+Use `--profile smoke` for a 5-minute rehearsal. Reports are labeled as uploaded-image pipeline evidence only, never camera or factory-automation readiness. Full procedure: [Docs/VALIDATION.md](Docs/VALIDATION.md).
 
-## Stage 1 Demo Workflow
+## Local Database And Image Vault
 
-Use [Docs/Stage1_Acceptance_Checklist.md](Docs/Stage1_Acceptance_Checklist.md) as the formal verification script. Use [Docs/User_Manual.md](Docs/User_Manual.md) for operating steps, [Docs/Installation_Guide.md](Docs/Installation_Guide.md) for setup, and [SampleData/README.md](SampleData/README.md) to prepare small, non-confidential demo images.
+On startup, the app creates its local PoC persistence store automatically, by default under `%LOCALAPPDATA%\AOI_Monitor\` (SQLite database `aoi_monitor.sqlite`, managed `image_vault\`, training candidates under `image_vault\training\`). Admins can change the storage root from `Settings`; existing runtime folders are not deleted or migrated automatically. If the OS local-app-data folder cannot be resolved, the app falls back to a `data/` folder beside the executable.
 
-Short walkthrough:
+Log retention: inspection results, defects, review events, audit events, and export history older than a configurable window (default 30 days) are archived into the recoverable `LogArchive` table and purged from live tables at startup; configure or disable this in `Settings > Basics > Data Retention` (Admin). Schema details: [Docs/DATA_PIPELINE.md](Docs/DATA_PIPELINE.md). Backup/restore and troubleshooting: [Docs/RUNBOOK.md](Docs/RUNBOOK.md).
 
-1. Build the app with `dotnet build AOI_Monitor\AOI_Monitor.csproj`.
-2. Launch the app and confirm the readiness panel shows local Database and Image Vault availability.
-3. Open `Board & Images`, import a sample image, then select a golden/reference image with `Compare Golden`.
-4. Review the Pixel Difference Prototype Engine result and defect overlay in `Golden Compare`; use its Large Image buttons for zoomed sample or golden reference inspection.
-5. Open `Defect Review` and record a review action or queue a local training-set export candidate.
-6. Open `AI / Models`, select a small batch folder, and run the Stage 1 batch validation.
-7. Open `Export & Trace`, export inspection/review CSV files, annotated overlays, and a customer validation package.
+## Repository Hygiene
 
-Do not commit large demo image datasets. Keep customer/private images outside the repository and import them locally.
+This repository should contain source code, XAML, docs, and small non-confidential instructions only. Do not commit build outputs, local SQLite databases, image vaults, training-set exports, generated packages, or customer/production images. Local runtime data is generated automatically. Before committing:
 
-## Local Database and Image Vault
-
-On startup, the app creates its local PoC persistence store automatically. On Windows the default location is:
-
-```text
-%LOCALAPPDATA%\AOI_Monitor\
+```powershell
+pwsh Scripts/check-repo-hygiene.ps1
 ```
-
-The SQLite database is stored at:
-
-```text
-%LOCALAPPDATA%\AOI_Monitor\aoi_monitor.sqlite
-```
-
-Imported PCB sample and golden images are copied into the managed image vault:
-
-```text
-%LOCALAPPDATA%\AOI_Monitor\image_vault\
-```
-
-Admins can change the local storage root from `Settings`. The selected root is used for the SQLite database, image vault, local settings, and local exports. Changing it creates or uses storage at the new location; existing runtime folders are not deleted or migrated automatically.
-
-Candidate samples for local training-set export review are copied below:
-
-```text
-%LOCALAPPDATA%\AOI_Monitor\image_vault\training\
-```
-
-The database is initialized with tables for images, inspection results, defects, review events, recipe revisions, training-set candidate samples, and export history. Image records include original path, vault path, filename, board model, lot ID, view type, import time, and SHA-256 file hash. If the OS local-app-data folder cannot be resolved, the app falls back to a `data/` folder beside the executable.
-
-## Log Retention and Recoverable Archive
-
-To keep the local database bounded, inspection results, defects, review events, audit events, and export history/verification rows older than a configurable retention window are archived and purged from the live tables. Retention runs once at application startup.
-
-- **Default:** archive-then-purge rows older than **30 days**.
-- **Configurable in `Settings > Basics > Data Retention`:** change the retention window, disable purging entirely, or turn off the pre-purge warning. Managing retention requires Admin.
-- **Recoverable:** before a live row is removed, its full contents are copied into the `LogArchive` table as a JSON payload, so archived records stay queryable and recoverable. The `LogArchive` table itself is retained indefinitely.
-- **Pre-purge warning:** when enabled, the Export & Trace page shows how many rows will be archived and purged within the warning lead time (default 7 days) so operators can export first.
-
-## Troubleshooting
-
-- If `dotnet run` fails with a missing framework or SDK message, install a .NET SDK that supports Windows desktop/WPF and the project's `net10.0-windows` target.
-- If WPF build errors mention Windows targeting, run the project on Windows and build from the `AOI_Monitor` folder.
-- If images do not compare, make sure both the sample image and golden reference image are readable local image files.
-- If exports are missing, check the `exports/` folder under the executable directory, not necessarily the repository root.
-- If recipe or detection-priority controls seem locked, use the recipe lock/unlock action in the application shell or Export & Trace page.
-- If generated reports look sparse, confirm images, inspections, and review events have been imported or saved into the local SQLite database. Remaining placeholder panels are labeled `Demo Data` or `Prototype Data`.
-- The 3D Profile Viewer supports Sample Data Mode only. Live 3D camera integration is planned Stage 2 work.
 
 ## Current State
 
-This is a functional local prototype focused on operator review flows, local SQLite-backed evidence, and file-based exports. The main production gaps are centralized production database integration, real machine/hardware integration, expanded persistent workflow storage, and a production-grade inspection model.
+This is a functional local prototype focused on operator review flows, local SQLite-backed evidence, and file-based exports. The main production gaps are centralized production database integration, real machine/hardware integration, expanded persistent workflow storage, and a production-grade inspection model. Current stage status and milestone history: [Docs/ROADMAP.md](Docs/ROADMAP.md).

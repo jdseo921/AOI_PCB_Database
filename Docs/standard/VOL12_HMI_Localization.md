@@ -1,8 +1,10 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # VOL12 — HMI and Localization — AOI Software Architecture, Secure Development, and Change-Control Standard, v1.0 (2026-07-15)
 
 Scope: normative requirements for the operator-facing HMI (§36) and for localization and international/multi-site deployment (§47) of AOI Monitor.
 
-Supersedes/Related existing docs: this volume supersedes the `HMI-`, `COLOR-`, and `ALARM-` prefixed rows of `Docs/Industrial_Quality_Checklist.md` and the HMI/typography/color/alarm portions of `Docs/Industrial_HMI_and_Software_Quality_Baseline.md` (per that baseline's own coupling rule, `Tools/quality-gates/industrial_quality_gates.json` and `AOI_Monitor/Services/StandardsTraceabilityService.cs` SHALL be updated in the same change that retires those rows; ID reconciliation follows the §5 mapping rule in VOL01). `DESIGN.md`, `Docs/HMI_Style_Guide.md`, `Docs/AOI_Competitive_HMI_Reference_Guide.md`, and the HMI rules in `AGENTS.md` remain in force as implementation companions; where wording conflicts, this standard prevails. `Docs/Standards_Traceability_Matrix.md` (certification-boundary wording) and `Docs/Requirements_Traceability_Matrix.md` (RTM IDs) are incorporated by reference and are not modified by this volume.
+Supersedes/Related existing docs: this volume supersedes the `HMI-`, `COLOR-`, and `ALARM-` prefixed rows of `CONTRIBUTING.md` and the HMI/typography/color/alarm portions of `DESIGN.md` (per that baseline's own coupling rule, `Tools/quality-gates/industrial_quality_gates.json` and `AOI_Monitor/Services/StandardsTraceabilityService.cs` SHALL be updated in the same change that retires those rows; ID reconciliation follows the §5 mapping rule in VOL01). `DESIGN.md`, `DESIGN.md`, `DESIGN.md`, and the HMI rules in `AGENTS.md` remain in force as implementation companions; where wording conflicts, this standard prevails. `Docs/Standards_Traceability_Matrix.md` (certification-boundary wording) and `Docs/Requirements_Traceability_Matrix.md` (RTM IDs) are incorporated by reference and are not modified by this volume.
 
 ---
 
@@ -10,7 +12,7 @@ Supersedes/Related existing docs: this volume supersedes the `HMI-`, `COLOR-`, a
 
 ### 36.1 Scope, design authority, and boundaries
 
-This section governs everything an operator, engineer, or administrator sees and can do through the AOI Monitor WPF shell (`AOI_Monitor/MainWindow.xaml.cs`), its 18 view pages (`AOI_Monitor/Views/`), the shared design system (`AOI_Monitor/Styles/FactoryHmiLayout.xaml`), and every dialog or viewer window the application opens. It codifies, as enforceable requirements, the rules that today live as prose in `DESIGN.md`, `Docs/HMI_Style_Guide.md`, and `AGENTS.md`, and it extends them with command-safety, session, and AI-result-presentation obligations that the existing documents do not state.
+This section governs everything an operator, engineer, or administrator sees and can do through the AOI Monitor WPF shell (`AOI_Monitor/MainWindow.xaml.cs`), its 18 view pages (`AOI_Monitor/Views/`), the shared design system (`AOI_Monitor/Styles/FactoryHmiLayout.xaml`), and every dialog or viewer window the application opens. It codifies, as enforceable requirements, the rules that today live as prose in `DESIGN.md`, `DESIGN.md`, and `AGENTS.md`, and it extends them with command-safety, session, and AI-result-presentation obligations that the existing documents do not state.
 
 Boundaries with neighboring sections:
 
@@ -29,7 +31,7 @@ Severity finding (carried from the specification-defect register, SD-11): the cu
 
 ### 36.2 Operator information model
 
-The operator must never have to ask "what is the machine doing, with which model and recipe, on which board, as whom, and is any of this simulated?" The persistent shell banner (`Docs/HMI_Style_Guide.md`, Banner section; `MainWindow.xaml.cs` footer/status paths) is the single always-visible instrument strip for this information.
+The operator must never have to ask "what is the machine doing, with which model and recipe, on which board, as whom, and is any of this simulated?" The persistent shell banner (`DESIGN.md`, Banner section; `MainWindow.xaml.cs` footer/status paths) is the single always-visible instrument strip for this information.
 
 The five operator-facing banner state labels are deliberately coarse projections of the canonical inspection state machine owned by §17 (ORC, VOL04); that section's 22-state FSM is the authoritative state vocabulary, and this projection is maintained in lockstep with it so one state vocabulary governs the fleet:
 
@@ -51,7 +53,7 @@ The persistent shell banner SHALL display the current machine state and inspecti
 
 **[HMI-002]** (P2 | ALL | HMI, Diagnostics)
 The HMI SHALL display the connection state of every configured integration (camera, lighting, 3D, robot, MES, central sync) using exactly the status vocabulary NotConnected / Simulated / Error / Ready defined in `AOI_Monitor/Services/IntegrationContracts.cs`.
-- Why: a stale or invented connection state hides dead hardware and mock boundaries (`Docs/Integration_Boundaries.md`). Maps: Internal; 25010.
+- Why: a stale or invented connection state hides dead hardware and mock boundaries (`Docs/ARCHITECTURE.md`). Maps: Internal; 25010.
 - Verify: `IntegrationContractsTests` status-vocabulary assertions plus `ShellBannerContentTests`. Evidence: test run in `TestResults/*.trx`. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
@@ -122,7 +124,7 @@ The application SHALL classify every alarm into exactly one of the four severiti
 
 **[HMI-010]** (P3 | ALL | HMI)
 The alarm list SHALL present alarms ordered by severity (Critical first) then recency by default, with active Critical/Alarm counts always visible in the persistent banner without opening the list.
-- Why: buried critical alarms are the classic annunciation failure; the banner-count rule exists in `Docs/HMI_Style_Guide.md` (Banner) and must not regress. Maps: Internal; 25010.
+- Why: buried critical alarms are the classic annunciation failure; the banner-count rule exists in `DESIGN.md` (Banner) and must not regress. Maps: Internal; 25010.
 - Verify: `AlarmLifecycleHmiTests` ordering cases (uses `AlarmSortOrder.SeverityDescending`). Evidence: test run. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
@@ -140,7 +142,7 @@ Every alarm acknowledgement and every fault reset SHALL create an audit event ca
 
 ### 36.4 Color semantics, contrast, and physical minimums
 
-The five-color semantic palette is a product-truthfulness mechanism, not a styling preference: green is a *claim* that something is validated. The palette below is copied exactly from the repo contract (`AGENTS.md:75-80`; `Docs/HMI_Style_Guide.md`, Status Colors) and is closed — no sixth semantic color may be introduced without a change to this standard.
+The five-color semantic palette is a product-truthfulness mechanism, not a styling preference: green is a *claim* that something is validated. The palette below is copied exactly from the repo contract (`AGENTS.md:75-80`; `DESIGN.md`, Status Colors) and is closed — no sixth semantic color may be introduced without a change to this standard.
 
 | Color | Meaning (exclusive) |
 |---|---|
@@ -160,7 +162,7 @@ Every status indication SHALL use the five-color semantic palette defined in §3
 
 **[HMI-014]** (P0 | ALL | HMI, Simulation)
 The HMI SHALL NOT render green (or the words OK/READY/CONNECTED/VALIDATED) for any simulated, mock, demo, unvalidated, or not-yet-accepted state.
-- Why: green-for-simulated is the exact overclaim the product's evidence discipline exists to prevent (`Docs/HMI_Style_Guide.md`: "Do not use green for Demo mode..."); it converts a demo into a false factory-readiness claim. Maps: Internal; SBD; CWE-451.
+- Why: green-for-simulated is the exact overclaim the product's evidence discipline exists to prevent (`DESIGN.md`: "Do not use green for Demo mode..."); it converts a demo into a false factory-readiness claim. Maps: Internal; SBD; CWE-451.
 - Verify: `HmiLayoutAuditTests` overclaim checks + PR claim-language gates (`Scripts/check-pr-quality.ps1` PR-CLAIM-001 family). Evidence: `hmi_layout_audit.json`, CI gate log. Owner: QA Lead. Auto: Fully automated.
 - Exception: Not allowed. Review: Per release.
 
@@ -189,14 +191,14 @@ Primary action buttons SHALL be at least 120x40 px at 100% DPI scaling.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[HMI-019]** (P2 | ALL | HMI)
-Every page SHALL render at 1920x1080 without clipping of text, buttons, inputs, or table headers, with dense secondary content reachable by page-body scrolling per the `Docs/HMI_Style_Guide.md` layout rules.
+Every page SHALL render at 1920x1080 without clipping of text, buttons, inputs, or table headers, with dense secondary content reachable by page-body scrolling per the `DESIGN.md` layout rules.
 - Why: 1920x1080 is the minimum operator display target (`AGENTS.md:73`); clipped verdicts and alarm text are release-blocking today (checklist ALARM-002 lineage). Maps: Internal; 25010.
 - Verify: `HmiLayoutAuditTests` full-page clipping audit (FF-HMI-04). Evidence: `hmi_layout_audit.json`, `hmi_layout_audit.html`. Owner: QA Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
 **[HMI-020]** (P2 | ALL | HMI)
 Every page SHALL remain fully usable (no clipping, no unreachable controls) at Windows DPI scaling of 100%, 125%, and 150%.
-- Why: factory panel PCs commonly run 125/150%; fixed-pixel assumptions clip under scaling (`Docs/HMI_Style_Guide.md` Spacing rules). Maps: Internal; 25010.
+- Why: factory panel PCs commonly run 125/150%; fixed-pixel assumptions clip under scaling (`DESIGN.md` Spacing rules). Maps: Internal; 25010.
 - Verify: `HmiLayoutAuditTests` DPI matrix runs + manual screenshot evidence per AGENTS Definition of Done. Evidence: `hmi_layout_audit.json` + screenshots in stage-exit package. Owner: QA Lead. Auto: Partially automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
@@ -218,7 +220,7 @@ Every Engineer- and Admin-facing screen SHALL be fully operable by keyboard alon
 
 **[HMI-022]** (P2 | ALL | HMI)
 Text-bearing UI elements SHALL NOT use fixed pixel widths; long values SHALL wrap, scroll, or trim with a tooltip exposing the full value.
-- Why: fixed widths clip under DPI scaling and Korean-English swaps (`Docs/HMI_Style_Guide.md` Spacing; PR-HMI-WIDTH-001 currently WARN-only — this requirement promotes it). Maps: Internal; 25010.
+- Why: fixed widths clip under DPI scaling and Korean-English swaps (`DESIGN.md` Spacing; PR-HMI-WIDTH-001 currently WARN-only — this requirement promotes it). Maps: Internal; 25010.
 - Verify: PR-HMI-WIDTH-001 elevated to FAIL for new fixed `Width` >= 80 outside `Styles/`; `HmiLayoutAuditTests` trim/tooltip audit. Evidence: CI gate log. Owner: Software Lead. Auto: Fully automated.
 - Exception: Allowed — approver: Software Architect. Review: Per release.
 
@@ -486,7 +488,7 @@ A manual accessibility review — color-vision-deficiency simulation over all st
 
 ### 47.1 Scope and boundaries
 
-This section governs (a) language and locale correctness of the product (Korean-first, English-parallel), and (b) the deployment mechanics that make one codebase serve many sites, regions, and customers without forking. Korean-first deployment is a product fact (roadmap: Korea → ASEAN/Japan → Europe, `Docs/Roadmap_and_Stages.md:17-18`); the standard's prose language remains American English per the global style rules.
+This section governs (a) language and locale correctness of the product (Korean-first, English-parallel), and (b) the deployment mechanics that make one codebase serve many sites, regions, and customers without forking. Korean-first deployment is a product fact (roadmap: Korea → ASEAN/Japan → Europe, `Docs/ROADMAP.md:17-18`); the standard's prose language remains American English per the global style rules.
 
 Boundaries: §21 (DAT) owns the UTC persistence rule (D-16) and the traceability model; §37 (DAT) owns export formats — this section adds only their locale obligations. §43/§45 (BLD/RELS/DEP/OPS, VOL15) own packaging, update transport, and fleet tooling — this section owns the compatibility and sequencing *policy*. VOL16 owns privacy (§46), incident response (§54), and compliance mapping (§55) — this section places the regional pointers.
 

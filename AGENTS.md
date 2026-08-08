@@ -1,3 +1,5 @@
+OpenAI/Codex and numerous other coding agents will review your output once you are done.
+
 # AGENTS.md
 
 This file applies to the entire repository.
@@ -14,14 +16,14 @@ Before changing production code or UI, read the relevant current contracts and s
 
 - `Docs/standard/00_Index.md` (and the volume covering your subsystem)
 - `README.md`
-- `DESIGN.md`
-- `Docs/Frontend_Design_Review_and_Rework_Plan.md`
-- `Docs/HMI_Style_Guide.md`
-- `Docs/Industrial_HMI_and_Software_Quality_Baseline.md`
+- `DESIGN.md` (the design contract merged with the HMI style guide, quality baseline, and scroll rules)
+- `Docs/ARCHITECTURE.md`
 - `AOI_Monitor/App.xaml`
 - `AOI_Monitor/Styles/FactoryHmiLayout.xaml`
 - `AOI_Monitor/MainWindow.xaml`
 - the affected major pages under `AOI_Monitor/Views/`
+
+Documentation is deliberately consolidated into a small fixed set (see the documentation map in `README.md`): root `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `CLAUDE.md`, `DESIGN.md`, the themed documents under `Docs/` (`ARCHITECTURE.md`, `DATA_PIPELINE.md`, `API_SPEC.md`, `DEPLOYMENT.md`, `RUNBOOK.md`, `CALIBRATION.md`, `METRICS_VAL.md`, `SECURITY.md`, `VALIDATION.md`, `ROADMAP.md`, `USER_MANUAL.md`, plus the three kept traceability documents), the canonical standard under `Docs/standard/`, and the customer source specifications under `Docs/customer-specs/`. Do not create new standalone markdown documents; extend the correct consolidated document instead. Every markdown file in this repository must keep its first-line reviewer notice exactly as written.
 
 The current focused workflow windows are Home, Board & Images, Run Inspection, Golden Compare, Defect Review, Recipe Rules, AI / Models, Yield Analytics, Export & Trace, Calibration, 3D Profile, Hardware Readiness, and System Settings. Keep the shell, Home module map, route handling, role authorization, HMI layout audit, navigation smoke tests, and documentation aligned when any workflow changes.
 

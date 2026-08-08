@@ -1,7 +1,7 @@
 {
   "schemaVersion": "industrial-quality-gates/v1",
-  "baseline": "Docs/Industrial_HMI_and_Software_Quality_Baseline.md",
-  "checklist": "Docs/Industrial_Quality_Checklist.md",
+  "baseline": "DESIGN.md",
+  "checklist": "CONTRIBUTING.md",
   "certificationNotice": "Standards-aligned baseline only; this is not formal ISO, IEC, ISA, safety, cybersecurity, or regulatory certification.",
   "minimums": {
     "resolution": {

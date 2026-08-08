@@ -31,6 +31,9 @@ public static class Program
         if (args.Length > 0 && string.Equals(args[0], "benchmark", StringComparison.OrdinalIgnoreCase))
             return BenchmarkCommand.Execute(args, Console.Out, Console.Error);
 
+        if (args.Length > 0 && string.Equals(args[0], "prepare-dataset", StringComparison.OrdinalIgnoreCase))
+            return PrepareDatasetCommand.Execute(args, Console.Out, Console.Error);
+
         if (args.Length > 0 && string.Equals(args[0], "stage1-readiness", StringComparison.OrdinalIgnoreCase))
             return Stage1ReadinessCommand.Execute(args, Console.Out, Console.Error);
 

@@ -170,6 +170,47 @@ After preflight, batch validation, false-call review, package export, benchmark:
 
 **Limitations.** Generated sample images are synthetic and non-production; Pixel Difference Prototype Engine evidence is deterministic prototype workflow evidence, not a trained production ML model claim; remaining boundaries per §1.
 
+## 4.5 Running a third-party or public PCB dataset
+
+Synthetic data proves the pipeline runs. Real boards prove it works. Public PCB datasets each ship in their own folder shape and none match the Stage 1 dataset contract, so `prepare-dataset` converts one into that contract and reports what it could and could not infer:
+
+```powershell
+dotnet run --project AOI_Monitor.Tools -c Release -- prepare-dataset `
+  --source <folder you downloaded> `
+  --output TestResults/stage1/thirdparty `
+  --board <board-name> --emit-learning
+```
+
+Then run the normal chain against `--output`:
+
+```powershell
+dotnet run --project AOI_Monitor.Tools -c Release -- stage1-exit `
+  --dataset TestResults/stage1/thirdparty/dataset/images `
+  --manifest TestResults/stage1/thirdparty/dataset/customer_validation_manifest.csv `
+  --output TestResults/stage1/thirdparty/evidence --operator <id> --priority maximize-defect-recall --allow-simulation
+```
+
+**The tool downloads nothing.** Obtaining the data and confirming its licence — especially for anything shipped to or shown to a customer — is the operator's responsibility. Several widely used PCB datasets are research-use-only.
+
+### What to check before trusting the numbers
+
+1. **Registration.** The pixel-difference engine compares a sample against a golden. That only works if the two are framed alike. Photographs taken free-hand differ by pose, not by defect. When the report says the golden was promoted `FromNormal`, open two or three Golden Compare overlays and confirm the highlighted region is the defect and not the board edge. If it is the board edge, the dataset is anomaly-detection material (use the learned visual model via `--emit-learning`), not golden-compare material.
+2. **Preflight gates.** The preparation report lists every default gate the dataset will fail (>= 50 images, >= 20 OK, >= 20 NG, >= 2 defect classes, >= 5 per class) before a run is attempted.
+3. **Unmapped defect classes.** Class folder names are normalized through the active defect taxonomy. Anything unmapped is reported by name; add it through `System Settings > Defect Taxonomy` CSV import rather than renaming the customer's folders.
+4. **Duplicates.** Byte-identical images across class folders are reported. They inflate apparent accuracy and are a preflight blocker.
+5. **Ambiguous boards are the point.** Run the same dataset at all three `--priority` settings. Boards that flip between OK, REVIEW, and NG across policies are the ambiguous population, and they are what `Analyze False Calls` (§5.4) and the threshold sweep exist to tune. A dataset where every board is unambiguous proves far less.
+
+### Dataset shapes recognised
+
+| Source shape | Example structure | Ground truth from | Golden from |
+|---|---|---|---|
+| MVTec-AD style | `train/good`, `test/good`, `test/<defect>` | folder name | promoted known-good image |
+| VisA style | `Data/Images/Normal`, `Data/Images/Anomaly` | folder name (no per-image defect type) | promoted known-good image |
+| One folder per class | `good/`, `solder_bridge/`, ... | folder name | promoted known-good image |
+| Paired sample/template | `<stem>_test.jpg` + `<stem>_temp.jpg` + sidecar | annotation sidecar (empty = OK) | the paired template |
+
+Use `--layout` to override detection, and `--golden per-board --golden-folder <templates>` when a dataset ships board templates in a separate folder.
+
 ## 5. Customer dataset validation kit
 
 Repeatable Stage 1 customer-data validation: an engineer runs it; management reviews the package without rerunning the software.

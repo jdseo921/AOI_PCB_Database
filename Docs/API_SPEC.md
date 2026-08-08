@@ -72,6 +72,28 @@ AOI_Monitor.Tools client-image-learning-demo --output <folder> --operator <id> [
 
 Runs the image-learning demo from a real `--project-folder` or `--synthetic` generated data. Synthetic output proves workflow capability only — not customer acceptance, not production model certification.
 
+### prepare-dataset
+
+```text
+AOI_Monitor.Tools prepare-dataset --source <folder> --output <folder>
+      [--layout auto|mvtec|visa|class-folders|paired-template]
+      [--golden auto|paired|per-board|from-normal|none] [--golden-folder <folder>]
+      [--board <name>] [--lot <id>] [--max-ok <n>] [--max-ng-per-class <n>]
+      [--seed <n>] [--emit-learning]
+```
+
+Converts a third-party PCB image dataset into the Stage 1 dataset contract (`images/`, `golden/`, `customer_validation_manifest.csv`), so a public or customer dataset can be run without hand-writing a manifest for hundreds of images. `--emit-learning` additionally writes the image-only learning role folders (`golden/`, `ok_learning/`, `ok_validation/`, `inspection/`, `ng_validation/`).
+
+**It downloads nothing.** It reads `--source` and writes `--output`; the source folder is never modified. Licensing and redistribution rights for the source images are the operator's responsibility.
+
+Recognised layouts: MVTec-AD style (`train/good`, `test/<defect>`), VisA style (`Data/Images/Normal|Anomaly`), one-folder-per-class, and paired sample/template (`<stem>_test` + `<stem>_temp`, with the annotation sidecar deciding OK vs NG). Auto-detection falls back to class folders and reports what it saw rather than guessing.
+
+Golden assignment: `paired` (per-sample template), `per-board` (longest name-prefix match against `--golden-folder`), `from-normal` (promote a known-good image — **only sound for registered captures**, and the report says so), or `none` (learned/ONNX engines only).
+
+The report (`prepare_dataset_report.txt`/`.json`) states the detected layout, per-class counts and their taxonomy mapping, every defect class not in the active taxonomy, byte-identical duplicate images, and each default preflight gate the dataset will fail — before a run is attempted. Sampling caps are seeded, so the same source always yields the same prepared dataset.
+
+Exit codes: `0` prepared with no warnings, `1` prepared with warnings (read them first), `2` usage or input error.
+
 ### stage1-readiness
 
 ```text

@@ -51,7 +51,7 @@ public partial class ReportsView
             cancellationToken.ThrowIfCancellationRequested();
             var inspections = AoiDatabase.GetInspectionHistory(filter).Select(InspectionLogRow.FromRecord).ToArray();
             var reviews = AoiDatabase.GetReviewEvents(filter).Select(ReviewLogRow.FromRecord).ToArray();
-            var exports = AoiDatabase.GetExportHistory()
+            var exports = AoiDatabase.GetExportHistory(filter)
                 .Select(record => ExportHistoryRow.FromRecord(record, AoiDatabase.GetLatestExportVerification(record.Id)))
                 .ToArray();
             var audits = AoiDatabase.GetAuditEvents(filter).Select(AuditLogRow.FromRecord).ToArray();

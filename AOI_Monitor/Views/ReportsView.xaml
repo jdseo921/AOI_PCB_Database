@@ -568,7 +568,7 @@
         <StackPanel>
           <TextBlock Text="Auto-Archive Policy" Foreground="#9AA6AF" FontSize="14" Margin="0,0,0,3"/>
           <TextBlock x:Name="ArchivePolicyText"
-                     Text="Logs older than 30 days are copied into LogArchive during startup. Source rows remain in place, so the archive is reversible and audit-safe."
+                     Text="Archive-then-purge: logs older than the configured retention window are copied to the recoverable LogArchive and removed from the live tables at startup."
                      TextWrapping="Wrap" FontSize="14" Foreground="#DCE5EB"/>
           <TextBlock x:Name="StatusText" Text="Ready." Foreground="#9AA6AF" FontSize="14" Margin="0,6,0,0"/>
           <TextBlock x:Name="PackagePathText" Text="Latest customer package: --" Foreground="#DCE5EB" FontSize="14" Margin="0,3,0,0" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>

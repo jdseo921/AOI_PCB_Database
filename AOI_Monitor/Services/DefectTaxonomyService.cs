@@ -51,8 +51,38 @@ public static class DefectTaxonomyService
 
         var mes = snapshot.MesMappings.FirstOrDefault(item => Key(item.CanonicalClass) == Key(entry.CanonicalClass))?.MesCode ?? string.Empty;
         var customer = string.IsNullOrWhiteSpace(entry.CustomerLabel) ? entry.CanonicalClass : entry.CustomerLabel;
-        return new DefectTaxonomyNormalization(input, entry.CanonicalClass, customer, mes, true, string.Empty);
+        return new DefectTaxonomyNormalization(input, entry.CanonicalClass, customer, mes, true, string.Empty)
+        {
+            Severity = ResolveSeverity(entry),
+            DetectionMethod = ResolveDetectionMethod(entry),
+        };
     }
+
+    /// <summary>
+    /// Customer classification-table Severity for a label, resolved through the active taxonomy.
+    /// Returns an empty string when the label is unknown or the class carries no severity.
+    /// </summary>
+    public static string SeverityFor(string? label)
+        => Normalize(label).Severity;
+
+    /// <summary>
+    /// Customer classification-table Detection Method for a label, resolved through the active
+    /// taxonomy. Returns an empty string when the label is unknown or unclassified.
+    /// </summary>
+    public static string DetectionMethodFor(string? label)
+        => Normalize(label).DetectionMethod;
+
+    // Persisted values win; the shipped catalogue is the fallback so taxonomies saved before
+    // severity/detection-method existed still resolve without a destructive rewrite.
+    private static string ResolveSeverity(DefectTaxonomyEntry entry)
+        => string.IsNullOrWhiteSpace(entry.Severity)
+            ? DefectClassCatalog.SeverityFor(entry.CanonicalClass)
+            : entry.Severity.Trim();
+
+    private static string ResolveDetectionMethod(DefectTaxonomyEntry entry)
+        => string.IsNullOrWhiteSpace(entry.DetectionMethod)
+            ? DefectClassCatalog.DetectionMethodFor(entry.CanonicalClass)
+            : entry.DetectionMethod.Trim();
 
     public static string NormalizeForBatch(string? label)
     {
@@ -83,6 +113,17 @@ public static class DefectTaxonomyService
             .Select(entry => entry.CanonicalClass)
             .ToArray();
 
+    /// <summary>
+    /// Active classes this product can actually inspect for at some roadmap stage. Classes that
+    /// belong to another machine type (SPI/X-ray/ICT) are catalogued for labelling and reporting
+    /// but are excluded here, so operator-facing pickers never imply an inspection capability
+    /// this software does not have.
+    /// </summary>
+    public static IReadOnlyList<string> InspectableCanonicalClasses(bool includeOk = false)
+        => ActiveCanonicalClasses(includeOk)
+            .Where(DefectDetectionCapability.IsInspectableByThisProduct)
+            .ToArray();
+
     public static ModelLabelTaxonomyValidation ValidateModelLabels(IReadOnlyDictionary<int, string> labelMap)
         => ValidateModelLabels(labelMap.OrderBy(pair => pair.Key).Select(pair => pair.Value).ToArray());
 
@@ -109,6 +150,21 @@ public static class DefectTaxonomyService
                 result.UnknownLabels.Add(label);
                 result.Messages.Add($"CONDITIONAL: Unknown model label '{label}' is not mapped in the active defect taxonomy.");
             }
+        }
+
+        // Truthfulness gate: a label map may only claim classes this product can actually
+        // inspect for. Classes needing hardware this station does not have (3D, side view) or
+        // belonging to another machine type (SPI/X-ray/ICT) are called out explicitly so a model
+        // can never silently imply a capability the software does not deliver.
+        foreach (var claimed in mapped.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
+        {
+            var capability = DefectDetectionCapability.Find(claimed);
+            if (capability is null || capability.Tier is InspectionCapabilityTier.Anomaly2D or InspectionCapabilityTier.RequiresTrainedClassifier)
+                continue;
+
+            result.HardwareDependentClasses.Add(claimed);
+            result.Messages.Add(
+                $"CONDITIONAL: Model label map claims '{claimed}', which {DefectDetectionCapability.RequirementSummary(claimed)}.");
         }
 
         var required = GetActiveTaxonomy().Entries
@@ -140,7 +196,7 @@ public static class DefectTaxonomyService
         var snapshot = GetActiveTaxonomy();
         Directory.CreateDirectory(Path.GetDirectoryName(path) ?? AoiDatabase.StorageRoot);
         var sb = new StringBuilder();
-        sb.AppendLine("canonical_class,customer_label,model_label_id,mes_code,is_required,aliases");
+        sb.AppendLine("canonical_class,customer_label,model_label_id,mes_code,is_required,severity,detection_method,detection_capability,aliases");
         foreach (var entry in snapshot.Entries.OrderBy(item => item.SortOrder))
         {
             var aliases = snapshot.Aliases
@@ -153,6 +209,11 @@ public static class DefectTaxonomyService
                 Csv(entry.ModelLabelId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty),
                 Csv(mes),
                 Csv(entry.IsRequired ? "true" : "false"),
+                Csv(ResolveSeverity(entry)),
+                Csv(ResolveDetectionMethod(entry)),
+                // Honest statement of what THIS software needs to detect the class; exported so a
+                // customer reading the taxonomy never mistakes a labelling class for a capability.
+                Csv(DefectDetectionCapability.RequirementSummary(entry.CanonicalClass)),
                 Csv(string.Join("|", aliases))));
         }
 
@@ -192,6 +253,8 @@ public static class DefectTaxonomyService
         var labelIdIndex = Array.IndexOf(headers, "model_label_id");
         var mesIndex = Array.IndexOf(headers, "mes_code");
         var requiredIndex = Array.IndexOf(headers, "is_required");
+        var severityIndex = Array.IndexOf(headers, "severity");
+        var detectionMethodIndex = Array.IndexOf(headers, "detection_method");
         var aliasesIndex = Array.IndexOf(headers, "aliases");
 
         for (var i = 1; i < lines.Length; i++)
@@ -201,6 +264,14 @@ public static class DefectTaxonomyService
                 continue;
 
             var canonical = cells[canonicalIndex].Trim();
+            var severity = Cell(cells, severityIndex, string.Empty);
+            if (!string.IsNullOrWhiteSpace(severity) && !DefectSeverityLevels.IsKnown(severity))
+            {
+                throw new InvalidDataException(
+                    $"Defect taxonomy CSV row {i + 1} ('{canonical}') has severity '{severity}'. " +
+                    $"Allowed values are {string.Join(", ", DefectSeverityLevels.All)}.");
+            }
+
             var entry = new DefectTaxonomyEntry
             {
                 TaxonomyId = snapshot.Taxonomy.TaxonomyId,
@@ -208,6 +279,8 @@ public static class DefectTaxonomyService
                 CustomerLabel = Cell(cells, customerIndex, canonical),
                 ModelLabelId = int.TryParse(Cell(cells, labelIdIndex, string.Empty), NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ? id : null,
                 IsRequired = !bool.TryParse(Cell(cells, requiredIndex, "true"), out var required) || required,
+                Severity = severity,
+                DetectionMethod = Cell(cells, detectionMethodIndex, string.Empty),
                 SortOrder = snapshot.Entries.Count,
                 IsActive = true,
             };
@@ -223,29 +296,17 @@ public static class DefectTaxonomyService
         return snapshot;
     }
 
+    /// <summary>
+    /// The shipped default taxonomy: every row of the customer defect classification table
+    /// (<c>Docs/customer-specs/PCBA_Defect_Classification_Table.md</c>) as a first-class entry,
+    /// carrying the spec's Severity and Detection Method columns.
+    ///
+    /// Cataloguing a class is a labelling/reporting capability, not a detection claim — what
+    /// this software can actually inspect for is stated separately and conservatively in
+    /// <see cref="DefectDetectionCapability"/>.
+    /// </summary>
     public static DefectTaxonomySnapshot CreateDefaultTaxonomy()
     {
-        // Canonical AOI defect classes covering the client classification table. Model-label IDs for the
-        // original eight classes are kept stable (0-7) so existing model label maps are unaffected; newly
-        // added classes take IDs 8+. Detection depth for some classes (e.g. Solder Volume, Coplanarity)
-        // depends on future 3D hardware, but the classes must exist for labeling, MES codes, and reporting.
-        var names = new[]
-        {
-            ("OK", 0, "OK", false, "OK"),
-            ("Solder Bridge", 1, "SB", true, "Bridge|SolderBridge|Short|Solder Short"),
-            ("Insufficient Solder", 2, "IS", true, "Insufficient|Low Solder|Open Solder"),
-            ("Solder Volume", 8, "VOL", true, "Solder Volume|Excess Solder|Excessive Solder|Volume Error"),
-            ("Cold Joint", 9, "CJ", true, "Cold Joint|Cold Solder|Cold Solder Joint|Dry Joint"),
-            ("Polarity Error", 3, "POL", true, "Polarity|Reversed|Wrong Polarity"),
-            ("Tombstone", 4, "TOMB", true, "Tombstoned"),
-            ("Missing Component", 5, "MISS", true, "Missing|Missing Part|Component Missing"),
-            ("Misalignment", 10, "MIS", true, "Misalignment|Misaligned|Shift|Offset|Placement Shift"),
-            ("Height Error", 6, "HGT", true, "Height|Height Defect"),
-            ("Connector Pin Height", 11, "CPH", true, "Pin Height Error|Connector Pin Height|Pin Height"),
-            ("3D Coplanarity", 12, "COP", true, "Coplanarity|Lead Coplanarity|3D Coplanarity"),
-            ("Shield Can Gap", 13, "SCG", true, "Shield Can Gap|Shield Gap|Can Gap|Shield Can"),
-            ("Anomaly", 7, "ANOM", false, "Unknown Defect|Other"),
-        };
         var snapshot = new DefectTaxonomySnapshot
         {
             Taxonomy = new DefectTaxonomyRecord
@@ -257,22 +318,29 @@ public static class DefectTaxonomyService
             },
         };
 
-        for (var i = 0; i < names.Length; i++)
+        for (var i = 0; i < DefectClassCatalog.Default.Count; i++)
         {
-            var (canonical, labelId, mes, required, aliases) = names[i];
+            var definition = DefectClassCatalog.Default[i];
             snapshot.Entries.Add(new DefectTaxonomyEntry
             {
                 TaxonomyId = DefaultTaxonomyId,
-                CanonicalClass = canonical,
-                CustomerLabel = canonical,
-                ModelLabelId = labelId,
-                IsRequired = required,
+                CanonicalClass = definition.CanonicalClass,
+                CustomerLabel = definition.CanonicalClass,
+                ModelLabelId = definition.ModelLabelId,
+                IsRequired = definition.IsRequired,
+                Severity = definition.Severity,
+                DetectionMethod = definition.DetectionMethod,
                 SortOrder = i,
                 IsActive = true,
             });
-            snapshot.MesMappings.Add(new MesDefectCodeMappingRecord { TaxonomyId = DefaultTaxonomyId, CanonicalClass = canonical, MesCode = mes });
-            foreach (var alias in aliases.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                snapshot.Aliases.Add(new DefectClassAliasRecord { TaxonomyId = DefaultTaxonomyId, Alias = alias, CanonicalClass = canonical });
+            snapshot.MesMappings.Add(new MesDefectCodeMappingRecord
+            {
+                TaxonomyId = DefaultTaxonomyId,
+                CanonicalClass = definition.CanonicalClass,
+                MesCode = definition.MesCode,
+            });
+            foreach (var alias in definition.Aliases.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                snapshot.Aliases.Add(new DefectClassAliasRecord { TaxonomyId = DefaultTaxonomyId, Alias = alias, CanonicalClass = definition.CanonicalClass });
         }
 
         return snapshot;

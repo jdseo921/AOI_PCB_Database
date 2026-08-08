@@ -37,6 +37,13 @@ public sealed class DefectTaxonomyEntry
     public string CustomerLabel { get; set; } = string.Empty;
     public int? ModelLabelId { get; set; }
     public bool IsRequired { get; set; } = true;
+
+    /// <summary>Customer classification-table Severity (Critical/Major/Minor). Empty when not classified.</summary>
+    public string Severity { get; set; } = string.Empty;
+
+    /// <summary>Customer classification-table Detection Method (e.g. "AOI / 3D", "Side-View AOI").</summary>
+    public string DetectionMethod { get; set; } = string.Empty;
+
     public int SortOrder { get; set; }
     public bool IsActive { get; set; } = true;
 }
@@ -69,13 +76,27 @@ public sealed record DefectTaxonomyNormalization(
     string CustomerLabel,
     string MesCode,
     bool IsKnown,
-    string Warning);
+    string Warning)
+{
+    /// <summary>Customer classification-table Severity for the resolved class, or empty when unknown.</summary>
+    public string Severity { get; init; } = string.Empty;
+
+    /// <summary>Customer classification-table Detection Method for the resolved class, or empty when unknown.</summary>
+    public string DetectionMethod { get; init; } = string.Empty;
+}
 
 public sealed class ModelLabelTaxonomyValidation
 {
     public string Status { get; set; } = "PASS";
     public List<string> MissingRequiredClasses { get; set; } = new();
     public List<string> UnknownLabels { get; set; } = new();
+
+    /// <summary>
+    /// Claimed classes that this software cannot detect from Stage-1 uploaded images alone —
+    /// they need 3D or side-view acquisition, or belong to another machine type entirely.
+    /// </summary>
+    public List<string> HardwareDependentClasses { get; set; } = new();
+
     public List<string> Messages { get; set; } = new();
 }
 

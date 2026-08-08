@@ -166,7 +166,7 @@ Mock MES upload is not production MES/ERP integration: it builds a MES-style tra
 
 ### Data retention
 
-Live log rows are kept 30 days by default. At startup, older rows are copied into a recoverable local archive with their full payload, then purged from live tables; with the pre-purge warning enabled, Export & Trace shows an advisory a configurable number of days ahead (default 7). Configure in `System Settings > Data Retention` (Engineer/Admin): enable/disable purge, retention window in days, warning lead time. Disabling purge keeps all live rows; the archive is retained indefinitely so purged history can be reconstructed for audits.
+Live log rows are kept 30 days by default. At startup, older rows are copied into a recoverable local archive with their full payload, then purged from live tables; with the pre-purge warning enabled, Export & Trace shows an advisory a configurable number of days ahead (default 7). Configure in `System Settings > Data Retention` (Admin only): enable/disable purge, retention window in days, warning lead time. Disabling purge keeps all live rows; the archive is retained indefinitely so purged history can be reconstructed for audits.
 
 ## 3D Profile
 
@@ -179,10 +179,10 @@ Sample Data Mode only — an interactive 3D height surface from a sample CSV; no
 x,y,height
 ```
 
-3. Review the surface: left-drag to rotate (yaw/pitch), mouse wheel to zoom, right-drag or middle-drag to pan, `Reset View` to reset.
+3. Review the surface: left-drag to rotate (yaw/pitch), mouse wheel to zoom, right-drag to pan, `Reset View` to reset.
 4. Use the 2D top-down height-map inset; click it to select a point — surface, inset, and height slice stay in sync.
 5. Review the height legend (min/max), selected-point height, and the slice/profile line; notable peaks are marked automatically.
-6. Review the feature/defect list (Type, Height, Volume placeholder, X, Y); row and surface/inset selection are synchronized; Volume remains a placeholder pending calibrated Z data from real 3D hardware.
+6. Review the feature/defect list (Type, Height, Volume, X, Y); row and surface/inset selection are synchronized. Volume is a real flood-fill estimate of the connected out-of-tolerance region, summed as height deviation from the mean plane and reported in **grid units cubed** — not calibrated mm³. Absolute volume requires calibrated Z data from Stage 2 3D hardware.
 7. Click `Accept Defect` or `Reject Defect`; the disposition is recorded as a SQLite review event.
 
 Optional: `Run 3D Acceptance Test` records a sample-data acceptance evidence run; `Export 3D Report` writes the acceptance summary. Both are labeled sample-data evidence, not live 3D sensor acceptance.

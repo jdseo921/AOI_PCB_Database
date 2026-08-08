@@ -672,7 +672,10 @@ public partial class RecipeView : UserControl, IReleasablePageResources, IAsyncN
     {
         var selected = SelectedRoiType();
         RoiTypeCombo.Items.Clear();
-        foreach (var roiType in new[] { "Presence", "Polarity" }.Concat(DefectTaxonomyService.ActiveCanonicalClasses()).Distinct(StringComparer.OrdinalIgnoreCase))
+        // Only classes this product can inspect for become ROI types. Classes catalogued for
+        // labelling/reporting that belong to other machine types (SPI, X-ray, ICT) are excluded
+        // so the editor never implies an inspection capability the software does not have.
+        foreach (var roiType in new[] { "Presence", "Polarity" }.Concat(DefectTaxonomyService.InspectableCanonicalClasses()).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             RoiTypeCombo.Items.Add(new ComboBoxItem { Content = roiType, Tag = roiType });
         }

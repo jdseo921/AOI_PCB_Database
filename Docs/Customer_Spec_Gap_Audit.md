@@ -7,9 +7,16 @@ This audit maps every atomic requirement in the three customer specification doc
 honest implementation status. It is the Phase 1 deliverable of the Stage 1 readiness program
 and the working companion to `Docs/Requirements_Traceability_Matrix.md` (RTM).
 
+> **Remediation milestone M1 applied 2026-08-08.** The defect-classification conformance gap and
+> eight of the twelve §12 defects are closed. Changes: all 33 classification-table rows are now
+> taxonomy entries (32 first-class + `Short Circuit` as a documented alias), every entry carries
+> the spec's `Severity` and `Detection Method`, the capability catalogue gained `RequiresSideViewImaging`
+> and `OutOfProductScope` tiers and is now consulted at runtime, and D1/D2/D4/D5/D7/D9/D11/D12 are
+> resolved. Statuses below are updated in place; per-row detail is in §11 and §12.
+
 | Field | Value |
 |---|---|
-| Audit date | 2026-07-30 |
+| Audit date | 2026-07-30 (statuses refreshed 2026-08-08, milestone M1) |
 | Source specs | `AOI_PoC_GUI_Concept_and_Functional_Specification.md` · `PCBA_Defect_Classification_Table.md` · `AOI_PoC_Development_Roadmap_and_Commercialization_Plan.md` |
 | Repo state audited | branch `main` at commit `92ebaa6` (specs present untracked in `Docs/customer-specs/`) |
 | Method | 143 atomic requirements assigned stable IDs; each mapped to code/tests/docs by a dedicated audit pass, then **adversarially verified** by an independent pass that re-opened every cited file and re-tested every status claim. 134 findings confirmed, 10 adjusted (all adjustments applied below), 0 refuted. |
@@ -27,24 +34,31 @@ and the working companion to `Docs/Requirements_Traceability_Matrix.md` (RTM).
 
 143 atomic requirements (plus one boundary-readiness cross-check, TECH-6.2-01b).
 
-| Status | Count | Notes |
+| Status | Count (2026-07-30 → M1) | Notes |
 |---|---:|---|
-| Implemented | 70 (+1 cross-check) | Concentrated in GUI §4 module functions, Stage-1 scope (§5.1), technical data-management (§6.3), model governance (§6.4), roles (§8) |
-| Partial | 26 | Mostly per-class defect-taxonomy conformance (severity not modeled), acceptance-criteria evidence gaps, and UI-guideline reinterpretations |
-| Missing | 23 | 22 defect-classification classes absent from the taxonomy + the `.pt/.h5` model-artifact deliverable (deliberately substituted, but with no customer-facing sign-off) |
+| Implemented | 70 → **101** (+1 cross-check) | GUI §4 module functions, Stage-1 scope (§5.1), technical data-management (§6.3), model governance (§6.4), roles (§8), **and all 32 defect-classification classes now carrying spec Severity + Detection Method** |
+| Partial | 26 → **17** | Acceptance-criteria evidence gaps and UI-guideline reinterpretations. Per-class taxonomy conformance is no longer a Partial driver. |
+| Missing | 23 → **1** | Only the `.pt/.h5` model-artifact deliverable (deliberately substituted with ONNX, still without a customer-facing sign-off — DEV-01) |
 | Deferred-to-Stage-2 | 10 | Cameras, lighting, GPU decision, live feed, on-board validation |
 | Deferred-to-Stage-3 | 6 | Robot transport, commands, trigger sync, safety interlock |
 | Deferred-to-Stage-4 | 8 | MES/ERP REST/OPC UA, uploads, MES auth, plus Future items with Stage-4 prerequisites |
+
+**"Implemented" for a defect class means it is catalogued, labellable, MES-codable, and carries
+its spec severity/method — never that this software can detect it.** Detection capability is a
+separate, deliberately conservative statement per class (§11).
 
 Headline conclusions:
 
 1. **The Stage-1 functional surface is genuinely strong.** All five spec GUI modules exist as
    working, tested views; the Stage-1 scope items (image upload, offline inference, overlays,
    batch validation, CSV/annotated exports) are Implemented with real code and test citations.
-2. **The single largest conformance gap is the defect classification table**: 21 of 33 spec
+2. ~~**The single largest conformance gap is the defect classification table**: 21 of 33 spec
    defect classes have no taxonomy representation at all, and no taxonomy entry anywhere
-   carries the spec's Severity or Detection Method columns. All 10 mandatory-set classes are,
-   however, present, required-flagged, and test-asserted.
+   carries the spec's Severity or Detection Method columns.~~ **Closed 2026-08-08 (M1).** All 33
+   rows are represented (32 first-class canonical classes + `Short Circuit` as a documented alias
+   of Solder Bridge), every entry carries the spec's Severity and Detection Method, and both
+   columns round-trip through the taxonomy CSV. All 10 mandatory-set classes remain present,
+   required-flagged, and test-asserted.
 3. **The most important customer-facing omission is the model-format deviation**: ONNX replaces
    `.pt/.h5` for sound security reasons (SD-01/D-03 in the standard), but no customer-facing
    document states the substitution and no sign-off line exists.
@@ -86,7 +100,7 @@ customer-facing document with a one-line acknowledgment (see Deviation Register 
 |---|---|---|---|---|
 | GUI-4.1-01 | Live camera feed (Top/Side/Bottom) | Deferred-to-Stage-2 | `MonitorView.xaml(.cs)`, `FolderCameraSource`, `ICameraSource`/`GenericVisionCameraSource`; tests `CameraSourceContractTests` | Full display path + view selector exist; every source is Folder Camera Simulation or null-adapter. UI labels it honestly ("Image / Simulated Live Feed", "No Camera Connected"). Large-image viewer (`ImageViewerWindow`) covers the big-display need. |
 | GUI-4.1-02 | Defect overlays w/ bounding boxes + labels | Implemented | `MonitorView.RenderOverlay` (box + `{DefectType} [RoiId] {Confidence:P0}` label), toggleable layer | Overlay color follows board verdict, not per-defect severity. Coverage is render-smoke only — no test asserts overlay geometry. |
-| GUI-4.1-03 | Defect list: No, Type, Score, Side, X, Y | Implemented | `MonitorView.xaml` DefectGrid; `RefreshDefectRows` | All six spec columns present plus ROI/ROI Type/Severity/Board-mm extras. **Defect found:** the Severity column binding path does not exist on `DefectRow`, so it always renders blank (see §12 D1). Score/X/Y show as percentages, not pixels (DEV-15). |
+| GUI-4.1-03 | Defect list: No, Type, Score, Side, X, Y | Implemented | `MonitorView.xaml` DefectGrid; `RefreshDefectRows` | All six spec columns present plus ROI/ROI Type/Severity/Board-mm extras. Severity now renders the classification-table severity of the defect class (D1 closed at M1). Score/X/Y show as percentages, not pixels (DEV-15). |
 | GUI-4.1-04 | Start / Stop / Next Board / Save Result | Implemented | `MonitorView` handlers + F5/F6/F7/Ctrl+S hotkeys; tests `UiNavigationSmokeTests.OperatorCriticalButtonsAreDiscoverableByName` | Start/Stop control simulated acquisition, honestly logged as simulated. |
 | GUI-4.1-05 | Alarm log w/ timestamps + messages | Implemented | In-page Alarm/Event grid + persistent severity-graded `AlarmEventService` (ack/resolve/export; well tested) feeding the shell banner | In-page grid is an 80-row in-memory rolling log with no dedicated test. |
 | GUI-4.1-06 | Real-time overlay updates | Partial | Synchronous overlay redraw per analysis, instrumented frame-to-overlay latency, session p95, >1 s warning; `InspectionLatencyService` (+tests) | Mechanism complete for Stage-1 sources; continuous live-video overlay cadence is only demonstrable with Stage-2 cameras. |
@@ -98,18 +112,18 @@ customer-facing document with a one-line acknowledgment (see Deviation Register 
 | ID | Requirement | Status | Key evidence | Notes |
 |---|---|---|---|---|
 | GUI-4.2-01 | ROI drawing/editing on image | Implemented | `RecipeView` draw/move/resize/delete state machine; normalized ROI persistence unit-tested | Role- and lock-gated. Bonus: pick-and-place centroid CSV import auto-generates Presence ROIs. |
-| GUI-4.2-02 | ROI types: Presence, Polarity, Solder Bridge, Height, Anomaly | Implemented | ROI type combo populated from Presence/Polarity + active taxonomy canonical classes; types scope per-ROI judgments and threshold rules | All five selectable ("Height" appears as taxonomy class "Height Error"); list is a superset. |
-| GUI-4.2-03 | Params: AI Score, Height Min/Max, Volume Min/Max | Implemented | All five fields live-update and persist into recipe JSON; AI Score genuinely gates 2D inspection; Height/Volume enforced in the 3D profile path | Test gap: no unit test round-trips the per-ROI Height/Volume values (only AiScoreThreshold asserted). |
+| GUI-4.2-02 | ROI types: Presence, Polarity, Solder Bridge, Height, Anomaly | Implemented | ROI type combo populated from Presence/Polarity + `InspectableCanonicalClasses()`; types scope per-ROI judgments and threshold rules | All five selectable ("Height" appears as taxonomy class "Height Error"); list is a superset. At M1 the combo was narrowed to classes this product can inspect for, so the newly catalogued SPI/X-ray classes are labellable but never offered as ROI types. |
+| GUI-4.2-03 | Params: AI Score, Height Min/Max, Volume Min/Max | Implemented | All five fields live-update and persist into recipe JSON; AI Score genuinely gates 2D inspection; Height/Volume enforced in the 3D profile path; save→load→parse round-trip asserted at M1 (`PerRoiHeightAndVolumeLimitsSurviveSaveLoadAndParse`) | |
 | GUI-4.2-04 | Buttons: Test Run, Save Recipe | Implemented | Test Run runs a real inspection honoring **unsaved** edits via a unit-tested preview-override; Save writes immutable `RecipeRevisions` row | |
 | GUI-4.2-05 | ROI colors: yellow active, green saved | Implemented | `RenderRois` + on-screen legend | Adds a third blue "unsaved" state beyond spec. |
 | GUI-4.2-06 | Zoom/pan for ROI placement | Implemented | Wheel zoom, buttons, fit-to-view, right-drag pan; zoom-compensated resize tolerance | |
 | GUI-4.2-07 | Recipe revisions w/ timestamp + user ID | Implemented | Immutable revision rows (UTC revision stamp, OperatorId, ISO-8601 CreatedAtUtc) + linked RECIPE_SAVE audit event; round-trip tested | Backup/restore of recipe revisions exists in `ConfigurationBackupService` but is untested (verifier struck the wrongly-cited test). |
 | GUI-4.4-01 | Log table: Time, Model, Result, Defects | Implemented | Export & Trace Inspection History tab from SQLite | "Model" rendered as Board + separate Engine column; Defects is a single suggested class per row (DEV-15 family). |
 | GUI-4.4-02 | Export: CSV, Image Overlay | Implemented | CSV (inspection/review/audit) + annotated overlay PNGs; every export SHA-256-verified into ExportHistory | |
-| GUI-4.4-03 | Filter by date, model, operator | Implemented | Parameterized SQL filters + extra Result/Role/Action filters | Minor gap: Export History tab ignores page filters (latest 100 rows). |
+| GUI-4.4-03 | Filter by date, model, operator | Implemented | Parameterized SQL filters + extra Result/Role/Action filters; Export History honours the shared date/operator filter as of M1 | Board/result/role have no counterpart on an export row and are documented as ignored there. |
 | GUI-4.4-04 | Sortable columns | Implemented | `CanUserSortColumns` on all grids with correct `SortMemberPath` (Time sorts by UTC value) | |
 | GUI-4.4-05 | Confirmation dialog before export | Implemented | Yes/No "Confirm Export" before both spec export options and all major packages | Nine auxiliary repo-added report exports (readiness/MES/sync reports) write without confirmation — beyond spec scope but worth aligning. |
-| GUI-4.4-06 | Auto-archive logs older than 30 days | Implemented | Startup archive-then-purge into recoverable `LogArchive` (default 30 d, Admin-configurable, pre-purge warning); thoroughly tested (`LogRetentionTests`) | **Defect found:** static on-screen label `ArchivePolicyText` still claims copy-only archiving, contradicting actual purge behavior; `Docs/USER_MANUAL.md:292` repeats it (§12 D2/D3). |
+| GUI-4.4-06 | Auto-archive logs older than 30 days | Implemented | Startup archive-then-purge into recoverable `LogArchive` (default 30 d, Admin-configurable, pre-purge warning); thoroughly tested (`LogRetentionTests`) | On-screen `ArchivePolicyText` is refreshed from `DescribeRetentionPolicy()` so it states archive-then-purge and the configured window (D2/D3 closed at M1). |
 
 ## 6. GUI §4.3 AI Model Test and §4.5 3D Profile Viewer
 
@@ -205,101 +219,134 @@ localized-name facet (picked up in the taxonomy remediation, §11).
 Deep audit of `DefectTaxonomyService`, `DefectDetectionCapability`, and their tests against all
 six spec tables and the ten-item Mandatory AOI Defect Set.
 
-**Coverage arithmetic:** of 33 classification-table rows, **10 are first-class taxonomy
-entries, 2 survive only as aliases** (Excess Solder→Solder Volume; Short/Solder Short→Solder
-Bridge), **21 have no representation at all** — not even as labeling classes. All **10
-mandatory-set classes are first-class, `IsRequired=true`, and test-asserted**
-(`DefaultTaxonomyIncludesMandatoryDefectClasses`). The default taxonomy adds two non-spec
-classes (Height Error, Anomaly) plus OK.
+**Coverage arithmetic (M1, 2026-08-08):** of 33 classification-table rows, **32 are first-class
+taxonomy entries** and **1 survives as a documented alias** (`Short Circuit` → Solder Bridge, per
+standard deviation SD-16 — the optically visible short *is* a solder bridge). **None are
+unrepresented.** All **10 mandatory-set classes are first-class, `IsRequired=true`, and
+test-asserted** (`DefaultTaxonomyIncludesMandatoryDefectClasses`, `MandatoryAoiDefectSetIsFlaggedRequired`).
+The default taxonomy adds five non-spec entries: OK, Anomaly, Height Error, plus the two §4
+mandatory-set names that have no §3 row (Solder Volume, 3D Coplanarity) — 37 entries in total.
 
-**Cross-cutting findings (all verified):**
+The catalogue is a single source of truth in the domain layer
+(`AOI_Monitor/Models/DefectClassCatalog.cs`); `DefectTaxonomyService.CreateDefaultTaxonomy` and
+schema migration 31 both read it, so the shipped default and an already-seeded install cannot
+drift apart.
 
-1. **Severity and Detection Method are not modeled on any entry.** `DefectTaxonomyEntry` has no
-   Severity/DetectionMethod field; the only severity on output derives from judgment status
-   (NG→Major). The spec's Critical/Major/Minor column is dropped for every class. The standard
-   already registers per-class severity as unimplemented future work (VOL09 AIM-111/AIM-117).
-   This is why every present class grades Partial on its DEF-3.x row.
-2. **Honest 3-tier detectability catalog exists** (`DefectDetectionCapability`: Anomaly2D /
-   RequiresTrainedClassifier / RequiresThreeDHardware) and is test-covered — the honest
-   Stage-1-vs-3D statements the spec audit demands are genuinely encoded. **But it is dead code
-   at runtime**: no engine, view, or acceptance path consults it. The Stage-1 engines are
-   honest by construction anyway, but nothing programmatically stops an ONNX label map from
-   claiming 3D-only classes beyond an advisory CONDITIONAL.
-3. **One detectability over-claim:** Shield Can Gap is tiered **Anomaly2D** although the spec
-   requires **Side-View AOI** — a top-down image generally cannot see a gap under a can edge.
-   The least defensible image-only claim in the catalog, and the only mandatory class with no
-   dedicated tier test (§12 D4).
-4. **Versioning is Partial** (AGENTS.md rule 10): snapshots persist under distinct TaxonomyIds
-   (import mints `taxonomy-yyyyMMddHHmmss`, priors are deactivated never deleted, saves are
-   audited with operator+role, exports hash-verified) — but there is no semantic version
+**Cross-cutting findings:**
+
+1. ~~**Severity and Detection Method are not modeled on any entry.**~~ **Closed (M1).**
+   `DefectTaxonomyEntry` now carries `Severity` (Critical/Major/Minor/Informational, validated on
+   import) and `DetectionMethod` (spec wording verbatim). Both persist (migration 31), round-trip
+   through the taxonomy CSV, surface on `DefectTaxonomyNormalization`, and drive the Run
+   Inspection defect list's Severity column. The per-occurrence judgment severity on
+   `DefectResult` is unchanged and remains a separate concept, so persisted defect history keeps
+   its original meaning.
+2. ~~**Honest 3-tier detectability catalog … is dead code at runtime.**~~ **Closed (M1).**
+   `DefectDetectionCapability` now has five tiers (Anomaly2D / RequiresTrainedClassifier /
+   RequiresSideViewImaging / RequiresThreeDHardware / OutOfProductScope), covers every catalogued
+   class, and is consulted at runtime in three places: `ValidateModelLabels` emits an explicit
+   CONDITIONAL naming the hardware or machine-type dependency for any claimed class beyond
+   Stage-1 reach; the Recipe Rules ROI-type picker offers only classes this product can inspect
+   for; and the taxonomy CSV export carries a `detection_capability` column so a customer reading
+   the taxonomy cannot mistake a labelling class for a capability.
+3. ~~**One detectability over-claim:** Shield Can Gap is tiered Anomaly2D…~~ **Closed (M1).**
+   Shield Can Gap, Partial Insertion, Bent Pin, and Pad Lift are tiered `RequiresSideViewImaging`
+   (Stage 2), each with a dedicated tier test.
+4. **Versioning is Partial** (AGENTS.md rule 10) — *unchanged*: snapshots persist under distinct
+   TaxonomyIds (import mints `taxonomy-yyyyMMddHHmmss`, priors are deactivated never deleted,
+   saves are audited with operator+role, exports hash-verified) — but there is no semantic version
    number, no migration mapping, and re-saving the *same* TaxonomyId destructively replaces its
-   children. AIM-110/115/116/120 register full versioning as future work.
-5. **Mandatory-set enforcement is advisory-only**: a model label map missing a required class
-   goes CONDITIONAL (not FAIL) at acceptance; the per-recipe "must be in all AOI recipes" gate
-   (AIM-119/FF-AIM-TAX-09) is documented but unimplemented.
-6. **Normalization gap:** the literal label `Short Circuit` does not match the `Short` alias
-   under the normalizer's rules, so a ground-truth CSV using the spec's exact wording produces
-   an unknown-label warning (§12 D5).
-7. **Localization**: canonical classes/customer labels are English-only (see §10).
-8. **Mitigating mechanism:** the role-gated taxonomy **CSV import** is a shipped path by which
-   every Missing class could be added as a labeling class without code change — but the shipped
-   default taxonomy does not include them, and per-class severity/method still has no field.
+   children. AIM-110/115/116/120 register full versioning as future work. Migration 31 rewrites
+   the children of `default-aoi-defect-taxonomy` only; customer-imported taxonomies are provably
+   untouched (`MigrationLeavesCustomerImportedTaxonomiesAlone`).
+5. **Mandatory-set enforcement is advisory-only** — *unchanged*: a model label map missing a
+   required class goes CONDITIONAL (not FAIL) at acceptance; the per-recipe "must be in all AOI
+   recipes" gate (AIM-119/FF-AIM-TAX-09) is documented but unimplemented.
+6. ~~**Normalization gap:** the literal label `Short Circuit` does not match…~~ **Closed (M1).**
+   `Short Circuit` is now an explicit alias and normalizes without warning
+   (`ShortCircuitLabelFromSpecNormalizesOntoSolderBridge`).
+7. **Localization**: canonical classes/customer labels are English-only (see §10) — *unchanged*.
+8. **Model label ids are frozen**: ids 0–13 keep their existing class assignments so customer
+   label maps and persisted results are not silently re-mapped; new classes take 14+. Enforced by
+   `ModelLabelIdsAreUniqueAndStableForPreExistingClasses`.
+
+All DEF rows below are **Implemented as of M1 (2026-08-08)**: every class is a first-class
+taxonomy entry (except DEF-3.5-02, a documented alias) carrying the spec's Severity and Detection
+Method, an MES code, and aliases. The "Capability" column is the separate, conservative statement
+of what *this software* needs to detect the class — cataloguing is never a detection claim. Every
+row is covered by `DefaultTaxonomyCarriesSpecSeverityAndDetectionMethod`.
+
+Capability legend: **2D** = Anomaly2D (Stage-1 image-only engines may flag it) · **CLS** =
+RequiresTrainedClassifier · **SIDE** = RequiresSideViewImaging (Stage 2) · **3D** =
+RequiresThreeDHardware (Stage 2) · **OUT** = OutOfProductScope (SPI/X-ray/ICT machine types,
+outside every roadmap stage — labelling and reporting only).
 
 ### DEF-3.1 Solder-related
 
-| ID | Defect (spec severity · method) | Status | Representation & honest Stage-1 detectability |
-|---|---|---|---|
-| DEF-3.1-01 | Solder Bridge (Critical · AOI/Visual) | Partial | First-class, MES `SB`, required; tier Anomaly2D (honest); engine suggests only hedged "Possible Solder Bridge". Severity/method not modeled. |
-| DEF-3.1-02 | Insufficient Solder (Major · AOI/3D) | Partial | First-class, MES `IS`; tier RequiresTrainedClassifier (test-asserted: image-only engines must NOT claim it). 3D half → Stage 2. |
-| DEF-3.1-03 | Excess Solder (Major · AOI) | Partial | Alias of 3D-only Solder Volume — **under-claims Stage-1**: a gross blob is 2D-visible; loses the distinct labeling class. Un-merge recommended. |
-| DEF-3.1-04 | Cold Joint (Major · Visual) | Partial | First-class, required; tier RequiresTrainedClassifier (none ships). Spec's own Visual-vs-mandatory-AOI conflict is registered (VOL09 §31.10), not hidden. |
-| DEF-3.1-05 | Poor Wetting (Major · AOI) | Missing | No entry/alias/capability row. |
-| DEF-3.1-06 | Solder Crack (Major · Visual) | Missing | No representation. |
-| DEF-3.1-07 | Solder Ball (Minor · AOI) | Missing | No representation despite 2D-AOI detectability per spec. |
-| DEF-3.1-08 | Fillet Shape Defect (Minor · AOI) | Missing | Mentioned only as prose in a capability note. |
+| ID | Defect (spec severity · method) | Status | MES | Capability | Notes |
+|---|---|---|---|---|---|
+| DEF-3.1-01 | Solder Bridge (Critical · AOI/Visual) | Implemented | `SB` | 2D | Required. Engine suggests only the hedged "Possible Solder Bridge". |
+| DEF-3.1-02 | Insufficient Solder (Major · AOI/3D) | Implemented | `IS` | CLS | Required. Test-asserted: image-only engines must NOT claim it. 3D half → Stage 2. |
+| DEF-3.1-03 | Excess Solder (Major · AOI) | Implemented | `ES` | 2D | **Un-merged from Solder Volume at M1** (DEV-13): a gross blob is 2D-visible; quantifying it stays 3D-only. |
+| DEF-3.1-04 | Cold Joint (Major · Visual) | Implemented | `CJ` | CLS | Required; no classifier ships. Spec's Visual-vs-mandatory-AOI conflict registered (VOL09 §31.10). |
+| DEF-3.1-05 | Poor Wetting (Major · AOI) | Implemented | `PW` | CLS | Added at M1. Wetting angle overlaps acceptable variation. |
+| DEF-3.1-06 | Solder Crack (Major · Visual) | Implemented | `SCK` | CLS | Added at M1. Many cracks are only visible in cross-section. |
+| DEF-3.1-07 | Solder Ball (Minor · AOI) | Implemented | `SBL` | CLS | Added at M1. Easily confused with speckle/flux. |
+| DEF-3.1-08 | Fillet Shape Defect (Minor · AOI) | Implemented | `FSD` | CLS | Added at M1. Fillet grading is classification, not generic anomaly. |
 
 ### DEF-3.2 Component-related
 
-| ID | Defect | Status | Representation |
-|---|---|---|---|
-| DEF-3.2-01 | Missing Component (Critical · AOI) | Partial | Strongest class: first-class, required, label-map omission → CONDITIONAL (tested); tier Anomaly2D. Severity not modeled. |
-| DEF-3.2-02 | Misalignment (Major · AOI) | Partial | First-class (added in documented remediation), tier Anomaly2D. |
-| DEF-3.2-03 | Tombstone (Major · AOI) | Partial | First-class, required, Anomaly2D. |
-| DEF-3.2-04 | Polarity Error (Critical · AOI/Visual) | Partial | First-class, required; tier RequiresTrainedClassifier (honest — marks too subtle for generic anomaly). |
-| DEF-3.2-05 | Rotation Error (Major · AOI) | Missing | Only a recipe tolerance parameter and robustness-study perturbation — no class. |
-| DEF-3.2-06 | Bent Lead (Major · AOI/Visual) | Missing | No representation. |
-| DEF-3.2-07 | Damaged Component (Major · Visual) | Missing | Nearest is the "Anomaly" catch-all; no class. |
+| ID | Defect (spec severity · method) | Status | MES | Capability | Notes |
+|---|---|---|---|---|---|
+| DEF-3.2-01 | Missing Component (Critical · AOI) | Implemented | `MISS` | 2D | Strongest class: required, label-map omission → CONDITIONAL (tested). |
+| DEF-3.2-02 | Misalignment (Major · AOI) | Implemented | `MIS` | 2D | Required. |
+| DEF-3.2-03 | Tombstone (Major · AOI) | Implemented | `TOMB` | 2D | Required. |
+| DEF-3.2-04 | Polarity Error (Critical · AOI/Visual) | Implemented | `POL` | CLS | Required; marks too subtle for generic anomaly. |
+| DEF-3.2-05 | Rotation Error (Major · AOI) | Implemented | `ROT` | 2D | Added at M1. 90° rotation is a silhouette anomaly; 180° flips of symmetric packages belong to Polarity Error. |
+| DEF-3.2-06 | Bent Lead (Major · AOI/Visual) | Implemented | `BL` | CLS | Added at M1. |
+| DEF-3.2-07 | Damaged Component (Major · Visual) | Implemented | `DMG` | CLS | Added at M1; no longer swallowed by the "Anomaly" catch-all. |
 
 ### DEF-3.3 Solder paste printing (SPI/X-ray domain)
 
-DEF-3.3-01..05 (Paste Misalignment, Insufficient, Excess, Slump, Void): **all Missing.**
-SPI and X-ray are separate machine types outside **every** roadmap stage (Stage 2 adds AOI
-cameras, not SPI) — detection is out of product scope entirely; but even the Stage-1
-labeling/reporting classes are absent from the taxonomy.
+| ID | Defect (spec severity · method) | Status | MES | Capability | Notes |
+|---|---|---|---|---|---|
+| DEF-3.3-01 | Paste Misalignment (Major · SPI/AOI) | Implemented | `PMA` | OUT | Added at M1 as a labelling/reporting class. |
+| DEF-3.3-02 | Paste Insufficient (Major · SPI) | Implemented | `PIN` | OUT | Added at M1. |
+| DEF-3.3-03 | Paste Excess (Major · SPI) | Implemented | `PEX` | OUT | Added at M1. |
+| DEF-3.3-04 | Paste Slump (Major · SPI) | Implemented | `PSL` | OUT | Added at M1. |
+| DEF-3.3-05 | Paste Void (Minor · X-ray) | Implemented | `PVD` | OUT | Added at M1. |
+
+SPI and X-ray remain separate machine types outside **every** roadmap stage (Stage 2 adds AOI
+cameras, not SPI). Detection stays out of product scope; the classes now exist so paste defects
+can be labelled, reported, and MES-coded, and they are excluded from the ROI-type picker.
 
 ### DEF-3.4 PCB / pad / surface
 
-DEF-3.4-01..05 (Pad Lift **[Critical]**, Contamination, Scratch, Silkscreen Error, Copper
-Exposure): **all Missing.** The RecipeView "Surface Defect" ROI type is a region-marking
-concept, not a classification entry.
+| ID | Defect (spec severity · method) | Status | MES | Capability | Notes |
+|---|---|---|---|---|---|
+| DEF-3.4-01 | Pad Lift (Critical · Visual) | Implemented | `PDL` | SIDE | Added at M1. Pad elevation is out-of-plane; top-down 2D cannot see it. |
+| DEF-3.4-02 | Contamination (Major · AOI/Visual) | Implemented | `CON` | 2D | Added at M1. |
+| DEF-3.4-03 | Scratch (Minor · Visual) | Implemented | `SCR` | 2D | Added at M1. |
+| DEF-3.4-04 | Silkscreen Error (Minor · Visual) | Implemented | `SLK` | 2D | Added at M1. |
+| DEF-3.4-05 | Copper Exposure (Major · Visual) | Implemented | `CUE` | 2D | Added at M1. |
 
 ### DEF-3.5 Electrical / circuit
 
-| ID | Defect | Status | Representation |
-|---|---|---|---|
-| DEF-3.5-01 | Open Circuit (Critical · ICT/AOI) | Missing | ICT beyond all stages; AOI-visible broken-trace aspect unrepresented ("Open Solder" alias maps to Insufficient Solder — different concept). |
-| DEF-3.5-02 | Short Circuit (Critical · AOI) | Partial | Deliberately folded into Solder Bridge for the visible-bridge case — formally documented (SD-16). Literal "Short Circuit" label fails to normalize (§12 D5). |
-| DEF-3.5-03 | Trace Damage (Major · Visual) | Missing | No representation. |
-| DEF-3.5-04 | Via Defect (Major · X-ray) | Missing | X-ray beyond all stages; no labeling class either. |
+| ID | Defect (spec severity · method) | Status | MES | Capability | Notes |
+|---|---|---|---|---|---|
+| DEF-3.5-01 | Open Circuit (Critical · ICT/AOI) | Implemented | `OPC` | CLS | Added at M1. Only the optically visible broken-trace subset is image-detectable; electrical continuity needs ICT, outside every stage. |
+| DEF-3.5-02 | Short Circuit (Critical · AOI) | Implemented (alias) | `SB` | 2D | Folded into Solder Bridge for the visible-bridge case (SD-16). **The literal spec label now normalizes** (§12 D5 closed). |
+| DEF-3.5-03 | Trace Damage (Major · Visual) | Implemented | `TRD` | 2D | Added at M1. |
+| DEF-3.5-04 | Via Defect (Major · X-ray) | Implemented | `VIA` | OUT | Added at M1 as a labelling class; X-ray is beyond all stages. |
 
 ### DEF-3.6 Connector / mechanical
 
-| ID | Defect | Status | Representation |
-|---|---|---|---|
-| DEF-3.6-01 | Bent Pin (Major · AOI/Visual) | Missing | Connector entries cover pin height only, not deformation. |
-| DEF-3.6-02 | Pin Height Error (Major · 3D AOI) | Partial | First-class as "Connector Pin Height" (spec row name preserved as alias), MES `CPH`, required; tier RequiresThreeDHardware (tested). Detection → Stage 2. |
-| DEF-3.6-03 | Partial Insertion (Critical · AOI/Visual) | Missing | No representation despite Critical severity. |
-| DEF-3.6-04 | Shield Can Gap (Major · Side-View AOI) | Partial | First-class, required, MES `SCG` — but tiered Anomaly2D with no side-view dependency encoded: **the one catalog over-claim** (§12 D4). Side-view acquisition is Stage-2. |
+| ID | Defect (spec severity · method) | Status | MES | Capability | Notes |
+|---|---|---|---|---|---|
+| DEF-3.6-01 | Bent Pin (Major · AOI/Visual) | Implemented | `BPN` | SIDE | Added at M1; distinct from pin height. |
+| DEF-3.6-02 | Pin Height Error (Major · 3D AOI) | Implemented | `CPH` | 3D | First-class as "Connector Pin Height" (spec row name kept as alias), required. Detection → Stage 2. |
+| DEF-3.6-03 | Partial Insertion (Critical · AOI/Visual) | Implemented | `PIS` | SIDE | Added at M1. Seating depth is a height relationship. |
+| DEF-3.6-04 | Shield Can Gap (Major · Side-View AOI) | Implemented | `SCG` | SIDE | Required. **Re-tiered from Anomaly2D at M1** — the spec's Side-View AOI dependency is now encoded and tested (§12 D4 closed). |
 
 ### DEF-4 Mandatory AOI Defect Set (all ten)
 
@@ -307,27 +354,31 @@ DEF-4-01..10 — Missing Component, Misalignment, Polarity Error, Solder Bridge,
 Cold Joint, Shield Can Gap, Connector Pin Height, 3D Coplanarity, Solder Volume: **all
 Implemented** as first-class `IsRequired=true` entries with test-asserted presence and honest
 capability tiers (3D Coplanarity / Solder Volume / Connector Pin Height are
-RequiresThreeDHardware — truthfully labeled 3D-dependent; the spec defect that "3D Coplanarity"
-matches no classification-table row is registered in the standard). Enforcement depth caveat:
-advisory CONDITIONAL only (cross-cutting finding 5). The shipped `BuiltInLabelMap` covers only
-7 classes and would itself grade CONDITIONAL against the default taxonomy.
+RequiresThreeDHardware and Shield Can Gap is RequiresSideViewImaging — truthfully labeled
+hardware-dependent; the spec defect that "3D Coplanarity" matches no classification-table row is
+registered in the standard). Required-flagging is re-asserted at M1 by
+`MandatoryAoiDefectSetIsFlaggedRequired`, which reads the set from
+`DefectClassCatalog.MandatoryAoiDefectSet`. Enforcement depth caveat: advisory CONDITIONAL only
+(cross-cutting finding 5) — but a label map claiming a hardware-dependent or out-of-scope class
+now produces an explicit CONDITIONAL naming the dependency. The shipped `BuiltInLabelMap` covers
+only 7 classes and would itself grade CONDITIONAL against the default taxonomy.
 
 ## 12. Defects and Documentation-Accuracy Issues Found (actionable)
 
 | # | Severity | Finding | Where |
 |---|---|---|---|
-| D1 | UI defect | Defect list "Severity" column always blank — binding path doesn't exist on `DefectRow` (`DefectResult.Severity` never mapped; one-line fix + test) | `MonitorView.xaml` / `RefreshDefectRows` |
-| D2 | Truthfulness (label) | On-screen Auto-Archive Policy label claims "source rows remain in place, so the archive is reversible" — actual behavior is archive-then-purge. Accurate text exists only in exported reports | `ReportsView.xaml:570-572` (`ArchivePolicyText`) |
-| D3 | Doc accuracy | `Docs/USER_MANUAL.md` is stale: "six top-level modules" shell (lists seven) with pre-rework page names; line 292 repeats the copy-only-archive claim | `Docs/USER_MANUAL.md` |
-| D4 | Truthfulness (capability) | Shield Can Gap tiered Anomaly2D despite spec's Side-View AOI dependency — over-claims image-only detectability; only mandatory class without a dedicated tier test | `DefectDetectionCapability.cs` |
-| D5 | Functional gap | Literal ground-truth label "Short Circuit" does not normalize (only "Short"/"Solder Short" alias) → unknown-label warning on spec-exact CSVs | `DefectTaxonomyService` aliases |
+| D1 | UI defect | **Resolved 2026-08-08 (M1).** `DefectRow` carries `Severity`, resolved from the active taxonomy (the spec defines severity per defect *class*) with the engine's per-occurrence severity as fallback, so the column is never blank. Covered by `DefectOverlayDrawsPerDefectBoxesInVerdictColourAndPopulatesTheDefectList` | `MonitorView.xaml.cs` |
+| D2 | Truthfulness (label) | **Resolved 2026-08-08 (M1).** `ArchivePolicyText` is now refreshed from `DescribeRetentionPolicy()` on every page refresh, so the on-screen statement equals the exported one and reflects the configured window; the XAML fallback text no longer claims copy-only archiving | `ReportsView.xaml`, `ReportsView.xaml.cs` |
+| D3 | Doc accuracy | **Resolved 2026-08-08.** Manual re-consolidated; the copy-only-archive claim is gone | `Docs/USER_MANUAL.md` |
+| D4 | Truthfulness (capability) | **Resolved 2026-08-08 (M1).** Shield Can Gap re-tiered to `RequiresSideViewImaging` alongside Partial Insertion, Bent Pin, and Pad Lift, each with a dedicated tier test | `DefectDetectionCapability.cs`, `DefectDetectionCapabilityTests` |
+| D5 | Functional gap | **Resolved 2026-08-08 (M1).** `Short Circuit` is now an explicit alias of Solder Bridge; the spec-exact label normalizes without warning (test `ShortCircuitLabelFromSpecNormalizesOntoSolderBridge`) | `DefectClassCatalog`, `DefectTaxonomyServiceTests` |
 | D6 | Doc accuracy | **Resolved 2026-08-08.** RTM AI-005 note now references `PdfExportService`; the schema section in `Docs/DATA_PIPELINE.md` now records schema version 30 (30 ordered migrations, migration 1 = consolidated baseline) and the full 60-table inventory including `DefectTaxonomies`, `DefectTaxonomyEntries`, `DefectClassAliases`, and `MesDefectCodeMappings` | `Requirements_Traceability_Matrix.md`, `Docs/DATA_PIPELINE.md` |
-| D7 | Doc accuracy | User_Manual: 3D volume called "placeholder" (now a real estimator); "middle-drag" pan not wired; retention settings attributed to "Engineer or Admin" but gated Admin-only | `Docs/USER_MANUAL.md` |
-| D8 | Change control | `Docs/customer-specs/` — the requirement baseline this audit maps against — is **untracked in git** | git status |
-| D9 | Architecture hygiene | `DefectDetectionCapability` is runtime-dead (only tests/docs reference it); wire it into label-map validation/evidence text or record the intent | `DefectDetectionCapability.cs` |
-| D10 | Repo hygiene | Stale duplicate worktree at `.claude/worktrees/vigorous-jones-098ec2/` mirrors the repo | `.claude/worktrees/` |
-| D11 | Minor gap | Export History tab ignores page filters (returns latest 100 rows) | `AoiDatabase.GetExportHistory` |
-| D12 | Test gaps | No test round-trips per-ROI Height/Volume params; `ConfigurationBackupService` recipe-revision backup untested; no successful-inference ONNX test (failure paths only); MonitorView overlay/verdict-color rendering untested | tests |
+| D7 | Doc accuracy | **Resolved 2026-08-08 (M1).** 3D volume is now described as a real flood-fill estimate reported in grid units cubed (not mm³, not a placeholder); the unwired "middle-drag" pan claim is removed (pan is right-drag); Data Retention is correctly attributed to Admin only | `Docs/USER_MANUAL.md` |
+| D8 | Change control | **Resolved.** All three source specs are tracked under `Docs/customer-specs/` | git |
+| D9 | Architecture hygiene | **Resolved 2026-08-08 (M1).** `DefectDetectionCapability` is consulted at runtime in three places: `ValidateModelLabels` hardware-dependency CONDITIONALs, the Recipe Rules ROI-type picker (`InspectableCanonicalClasses`), and the `detection_capability` column of the taxonomy CSV export | `DefectTaxonomyService.cs`, `RecipeView.xaml.cs` |
+| D10 | Repo hygiene | **Open.** Stale duplicate worktree at `.claude/worktrees/vigorous-jones-098ec2/` (branch `claude/vigorous-jones-098ec2` at `4a87793`) mirrors the repo. Left in place deliberately — removing another session's worktree is the owner's call: `git worktree remove .claude/worktrees/vigorous-jones-098ec2` | `.claude/worktrees/` |
+| D11 | Minor gap | **Resolved 2026-08-08 (M1).** `GetExportHistory` accepts the shared `LogFilter`; date range and operator are applied with parameterized SQL. Board/result/role have no counterpart on an export row and are documented as ignored rather than silently excluding everything | `AoiDatabase.GetExportHistory`, `ReportsView.Readiness.cs` |
+| D12 | Test gaps | **Mostly resolved 2026-08-08 (M1).** Added: per-ROI Height/Volume save→load→parse round-trip (`PerRoiHeightAndVolumeLimitsSurviveSaveLoadAndParse`); recipe-revision backup restored onto a clean storage root (`BackupCapturesAndRestoresRecipeRevisions`); overlay geometry, label text, verdict colour, and the Severity column (`DefectOverlayDrawsPerDefectBoxesInVerdictColourAndPopulatesTheDefectList`, `OverlayVerdictColourFollowsTheSpecColourCoding`). **Still open:** no successful-inference ONNX test — that needs a shipped or fixture model and is tracked with DEV-01 | tests |
 
 ## 13. Acceptance Criteria — §11 evidence state (audit item f)
 
@@ -377,7 +428,7 @@ lines (remediation M1).
 | DEV-10 | "Within 1 second per image" | P95 frame-to-overlay latency budget (default 1000 ms) + zero-tolerance over-threshold count | SD-07 | Note only (stricter) |
 | DEV-11 | "8-hour continuous testing" | 8-hour PoC soak as minimum; production soak tracked separately; 30-min UI soak accepted for client-demo gate only | SD-08 | Note only |
 | DEV-12 | MES via REST **or** OPC UA; "TCP/IP" | REST-over-HTTP invested; OPC UA a named null boundary | OD-VOL11-4 | Note only (spec-allowed choice) |
-| DEV-13 | Distinct Short Circuit / Excess Solder classes | Merged into Solder Bridge / Solder Volume | SD-16 | Yes for Excess Solder (un-merge recommended — it under-claims Stage-1) |
+| DEV-13 | Distinct Short Circuit / Excess Solder classes | **Excess Solder un-merged at M1** — now its own first-class entry (MES `ES`, tier Anomaly2D). Short Circuit remains a documented alias of Solder Bridge for the optically visible case | SD-16 | Note only (Short Circuit); Excess Solder closed |
 | DEV-14 | Windows 10/11 **Industrial Edition** | Generic Win 10/11; Win 11 IoT LTSC as reference perf platform | REF-HW | Note only |
 | DEV-15 | Defect list X/Y (pixels implied); log "Model" column | Percent-normalized coordinates; Board + Engine columns | — | Note only |
 

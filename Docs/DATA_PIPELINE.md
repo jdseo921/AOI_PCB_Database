@@ -196,7 +196,7 @@ Synthetic-data evidence proves the pipeline, not customer acceptance — rerun b
 The SQLite database is versioned through the `SchemaInfo` table.
 
 - `SchemaInfo.Key = SchemaVersion`
-- Current schema version: `30` (`AoiDatabaseMigrations.LatestVersion`). Migration `1` is the consolidated baseline ("Current AOI Monitor schema baseline and compatibility repairs."); migrations `2`–`30` layer feature persistence on top.
+- Current schema version: `31` (`AoiDatabaseMigrations.LatestVersion`). Migration `1` is the consolidated baseline ("Current AOI Monitor schema baseline and compatibility repairs."); migrations `2`–`31` layer feature persistence on top.
 - Runtime database path: `%LOCALAPPDATA%\AOI_Monitor\aoi_monitor.sqlite` by default, or the configured storage root.
 
 ### Migration policy
@@ -239,7 +239,7 @@ Schema changes must be added to `AOI_Monitor/Data/AoiDatabaseMigrations.cs` as o
 - `MesUploadAttempts` - MES/mock/REST upload attempt audit trail.
 - `MesSpoolQueue` - offline MES REST retry queue.
 - `LogArchive` - recoverable archive for purged log rows; stores the full source-row payload as JSON (`PayloadJson`) so archived records stay queryable and restorable.
-- `DefectTaxonomies`, `DefectTaxonomyEntries`, `DefectClassAliases`, `MesDefectCodeMappings` - governable defect taxonomy versions, entries, class aliases, and MES defect code mappings.
+- `DefectTaxonomies`, `DefectTaxonomyEntries`, `DefectClassAliases`, `MesDefectCodeMappings` - governable defect taxonomy versions, entries, class aliases, and MES defect code mappings. `DefectTaxonomyEntries` carries the customer classification-table `Severity` (Critical/Major/Minor) and `DetectionMethod` columns added in migration `31`; the shipped default taxonomy is upgraded in place by that migration and covers all 33 classification-table rows. Customer-imported taxonomies (their own `TaxonomyId`) are never rewritten.
 - `ThresholdProfiles`, `ThresholdProfileRules`, `ThresholdProfileDeployments` - versioned threshold profiles and deployment markers.
 - `FalseCallReductionRuns`, `FalseCallReductionPoints` - false-call reduction recommendation persistence.
 - `ValidationBreakdownMetrics` - validation breakdown evidence by class, side, and ROI.
@@ -257,7 +257,7 @@ Schema changes must be added to `AOI_Monitor/Data/AoiDatabaseMigrations.cs` as o
 - `CustomerPilotSessions`, `CustomerPilotSteps` - guided customer pilot wizard session persistence.
 - `PilotIssues`, `PilotIssueEvents` - pilot issue tracking persistence.
 
-The authoritative table inventory is the code (`AOI_Monitor/Data/AoiDatabase*.cs`): 60 tables including `SchemaInfo` as of schema version `30`.
+The authoritative table inventory is the code (`AOI_Monitor/Data/AoiDatabase*.cs`): 60 tables including `SchemaInfo` as of schema version `31`.
 
 ### Indexes
 

@@ -28,11 +28,13 @@ public sealed class ConfigurationBackupServiceTests : IDisposable
             if (Directory.Exists(_root))
                 Directory.Delete(_root, recursive: true);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Configuration backup test cleanup skipped: {ex.Message}");
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            System.Diagnostics.Trace.WriteLine($"Configuration backup test cleanup skipped: {ex.Message}");
         }
     }
 
@@ -236,6 +238,47 @@ public sealed class ConfigurationBackupServiceTests : IDisposable
         Assert.Contains(preview.Warnings, warning => warning.Contains("model file", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(preview.Warnings, warning => warning.Contains("plugin folder", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(preview.SecretProtectionStatus, status => status.Contains("mesIntegration.apiKey", StringComparison.OrdinalIgnoreCase) || status.Contains("ApiKey", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void BackupCapturesAndRestoresRecipeRevisions()
+    {
+        // Recipe revisions are inspection-affecting configuration (AGENTS.md rule 10). They were
+        // exported and imported by the backup service but nothing asserted the round trip, so a
+        // regression would have shipped silently.
+        AoiDatabase.Initialize();
+        const string board = "BOARD-BACKUP";
+        const string recipeJson = """{"RecipeName":"BACKUP_RECIPE","Rois":[{"Id":"ROI-1","HeightMin":0.05,"HeightMax":0.4}]}""";
+        AoiDatabase.SaveRecipeRevision("BACKUP_RECIPE", board, "Engineer01 [Engineer]", "Balanced", string.Empty, recipeJson);
+
+        var backupPath = ConfigurationBackupService.Export(Path.Combine(_root, "recipes"), "Admin01 [Admin]").BackupPath;
+
+        var preview = ConfigurationBackupService.Preview(backupPath);
+        Assert.True(preview.RecipeRevisionCount >= 1);
+
+        // Restore onto a clean storage root — the real "rebuild this station" scenario. The root
+        // is global mutable state, so it is put back before the test returns; leaving it dangling
+        // would make whatever runs next order-dependent.
+        var restoreRoot = Path.Combine(_root, "restored-station");
+        try
+        {
+            AoiDatabase.ConfigureStorageRoot(restoreRoot);
+            RecipeService.Invalidate();
+            AoiDatabase.Initialize();
+            Assert.DoesNotContain(AoiDatabase.GetRecipeRevisions(), revision => revision.BoardProgram == board);
+
+            ConfigurationBackupService.Import(backupPath, "Admin01 [Admin]");
+
+            var restored = AoiDatabase.GetRecipeRevisions().Where(revision => revision.BoardProgram == board).ToArray();
+            Assert.NotEmpty(restored);
+            Assert.Equal("BACKUP_RECIPE", restored[0].RecipeName);
+            Assert.Contains("HeightMin", restored[0].RecipeJson, StringComparison.Ordinal);
+        }
+        finally
+        {
+            AoiDatabase.ConfigureStorageRoot(_root);
+            RecipeService.Invalidate();
+        }
     }
 
     [Fact]

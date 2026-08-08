@@ -1309,7 +1309,7 @@ public static partial class AoiDatabase
         using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT TaxonomyId, CanonicalClass, CustomerLabel, ModelLabelId, IsRequired, SortOrder, IsActive
+            SELECT TaxonomyId, CanonicalClass, CustomerLabel, ModelLabelId, IsRequired, SortOrder, IsActive, Severity, DetectionMethod
             FROM DefectTaxonomyEntries
             WHERE TaxonomyId = $taxonomyId
             ORDER BY SortOrder, CanonicalClass;
@@ -1327,6 +1327,8 @@ public static partial class AoiDatabase
                 IsRequired = reader.GetInt32(4) != 0,
                 SortOrder = reader.GetInt32(5),
                 IsActive = reader.GetInt32(6) != 0,
+                Severity = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+                DetectionMethod = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
             });
         }
 
@@ -1407,15 +1409,17 @@ public static partial class AoiDatabase
         command.CommandText =
             """
             INSERT INTO DefectTaxonomyEntries
-                (TaxonomyId, CanonicalClass, CustomerLabel, ModelLabelId, IsRequired, SortOrder, IsActive)
+                (TaxonomyId, CanonicalClass, CustomerLabel, ModelLabelId, IsRequired, Severity, DetectionMethod, SortOrder, IsActive)
             VALUES
-                ($taxonomyId, $canonicalClass, $customerLabel, $modelLabelId, $isRequired, $sortOrder, $isActive);
+                ($taxonomyId, $canonicalClass, $customerLabel, $modelLabelId, $isRequired, $severity, $detectionMethod, $sortOrder, $isActive);
             """;
         command.Parameters.AddWithValue("$taxonomyId", taxonomyId);
         command.Parameters.AddWithValue("$canonicalClass", entry.CanonicalClass.Trim());
         command.Parameters.AddWithValue("$customerLabel", string.IsNullOrWhiteSpace(entry.CustomerLabel) ? entry.CanonicalClass.Trim() : entry.CustomerLabel.Trim());
         command.Parameters.AddWithValue("$modelLabelId", entry.ModelLabelId is { } id ? (object)id : DBNull.Value);
         command.Parameters.AddWithValue("$isRequired", entry.IsRequired ? 1 : 0);
+        command.Parameters.AddWithValue("$severity", (entry.Severity ?? string.Empty).Trim());
+        command.Parameters.AddWithValue("$detectionMethod", (entry.DetectionMethod ?? string.Empty).Trim());
         command.Parameters.AddWithValue("$sortOrder", entry.SortOrder);
         command.Parameters.AddWithValue("$isActive", entry.IsActive ? 1 : 0);
         command.ExecuteNonQuery();
@@ -2331,6 +2335,8 @@ public static partial class AoiDatabase
                 CustomerLabel TEXT NOT NULL DEFAULT '',
                 ModelLabelId INTEGER NULL,
                 IsRequired INTEGER NOT NULL DEFAULT 1,
+                Severity TEXT NOT NULL DEFAULT '',
+                DetectionMethod TEXT NOT NULL DEFAULT '',
                 SortOrder INTEGER NOT NULL DEFAULT 0,
                 IsActive INTEGER NOT NULL DEFAULT 1,
                 UNIQUE(TaxonomyId, CanonicalClass),
@@ -2362,6 +2368,98 @@ public static partial class AoiDatabase
             CREATE INDEX IF NOT EXISTS IX_MesDefectCodeMappings_Taxonomy ON MesDefectCodeMappings(TaxonomyId, CanonicalClass);
             """;
         command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Brings the shipped default defect taxonomy up to the current classification catalogue in
+    /// place, so an existing install gains newly catalogued classes, severities, and detection
+    /// methods without an operator re-import.
+    ///
+    /// Scope is deliberately limited to <c>default-aoi-defect-taxonomy</c>: customer-imported
+    /// taxonomies mint their own IDs and are never rewritten. Nothing happens when the default
+    /// taxonomy has not been seeded yet — first-run seeding already writes the current catalogue.
+    /// </summary>
+    public static void UpgradeDefaultDefectTaxonomy(SqliteConnection connection, SqliteTransaction? transaction = null)
+    {
+        const string defaultTaxonomyId = "default-aoi-defect-taxonomy";
+
+        using (var exists = connection.CreateCommand())
+        {
+            exists.Transaction = transaction;
+            exists.CommandText = "SELECT COUNT(1) FROM DefectTaxonomies WHERE TaxonomyId = $id;";
+            exists.Parameters.AddWithValue("$id", defaultTaxonomyId);
+            if (Convert.ToInt64(exists.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture) == 0)
+                return;
+        }
+
+        // The default taxonomy is system-owned and has no operator edit path, so rewriting its
+        // children is deterministic rather than destructive.
+        using (var delete = connection.CreateCommand())
+        {
+            delete.Transaction = transaction;
+            delete.CommandText =
+                """
+                DELETE FROM DefectTaxonomyEntries WHERE TaxonomyId = $id;
+                DELETE FROM DefectClassAliases WHERE TaxonomyId = $id;
+                DELETE FROM MesDefectCodeMappings WHERE TaxonomyId = $id;
+                """;
+            delete.Parameters.AddWithValue("$id", defaultTaxonomyId);
+            delete.ExecuteNonQuery();
+        }
+
+        for (var i = 0; i < DefectClassCatalog.Default.Count; i++)
+        {
+            var definition = DefectClassCatalog.Default[i];
+
+            using (var entry = connection.CreateCommand())
+            {
+                entry.Transaction = transaction;
+                entry.CommandText =
+                    """
+                    INSERT INTO DefectTaxonomyEntries
+                        (TaxonomyId, CanonicalClass, CustomerLabel, ModelLabelId, IsRequired, Severity, DetectionMethod, SortOrder, IsActive)
+                    VALUES
+                        ($id, $canonicalClass, $canonicalClass, $modelLabelId, $isRequired, $severity, $detectionMethod, $sortOrder, 1);
+                    """;
+                entry.Parameters.AddWithValue("$id", defaultTaxonomyId);
+                entry.Parameters.AddWithValue("$canonicalClass", definition.CanonicalClass);
+                entry.Parameters.AddWithValue("$modelLabelId", definition.ModelLabelId);
+                entry.Parameters.AddWithValue("$isRequired", definition.IsRequired ? 1 : 0);
+                entry.Parameters.AddWithValue("$severity", definition.Severity);
+                entry.Parameters.AddWithValue("$detectionMethod", definition.DetectionMethod);
+                entry.Parameters.AddWithValue("$sortOrder", i);
+                entry.ExecuteNonQuery();
+            }
+
+            using (var mes = connection.CreateCommand())
+            {
+                mes.Transaction = transaction;
+                mes.CommandText =
+                    """
+                    INSERT OR IGNORE INTO MesDefectCodeMappings (TaxonomyId, CanonicalClass, MesCode)
+                    VALUES ($id, $canonicalClass, $mesCode);
+                    """;
+                mes.Parameters.AddWithValue("$id", defaultTaxonomyId);
+                mes.Parameters.AddWithValue("$canonicalClass", definition.CanonicalClass);
+                mes.Parameters.AddWithValue("$mesCode", definition.MesCode);
+                mes.ExecuteNonQuery();
+            }
+
+            foreach (var alias in definition.Aliases.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                using var aliasCommand = connection.CreateCommand();
+                aliasCommand.Transaction = transaction;
+                aliasCommand.CommandText =
+                    """
+                    INSERT OR IGNORE INTO DefectClassAliases (TaxonomyId, Alias, CanonicalClass)
+                    VALUES ($id, $alias, $canonicalClass);
+                    """;
+                aliasCommand.Parameters.AddWithValue("$id", defaultTaxonomyId);
+                aliasCommand.Parameters.AddWithValue("$alias", alias);
+                aliasCommand.Parameters.AddWithValue("$canonicalClass", definition.CanonicalClass);
+                aliasCommand.ExecuteNonQuery();
+            }
+        }
     }
 
     internal static void EnsureBuildTestEvidenceTable(SqliteConnection connection, SqliteTransaction? transaction = null)

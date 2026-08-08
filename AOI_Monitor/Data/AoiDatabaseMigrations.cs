@@ -41,6 +41,7 @@ public static class AoiDatabaseMigrations
         new(28, "Add image-only anomaly region scoring evidence.", ApplyImageLearningAnomalyEvidence),
         new(29, "Add recoverable payload to log archive for archive-then-purge retention.", ApplyLogArchivePayload),
         new(30, "Add held-out false-call estimate to image-learning calibration results.", ApplyCalibrationHeldOutEstimate),
+        new(31, "Add customer classification-table severity and detection method to the defect taxonomy.", ApplyDefectClassificationColumns),
     };
 
     public static int LatestVersion => OrderedMigrations[^1].Version;
@@ -227,6 +228,18 @@ public static class AoiDatabaseMigrations
         AoiDatabase.AddColumnIfMissing(connection, transaction, "ImageLearningCalibrationResults", "HeldOutOkCount", "INTEGER NOT NULL DEFAULT 0");
         AoiDatabase.AddColumnIfMissing(connection, transaction, "ImageLearningCalibrationResults", "HeldOutFalseCalls", "INTEGER NOT NULL DEFAULT 0");
         AoiDatabase.AddColumnIfMissing(connection, transaction, "ImageLearningCalibrationResults", "HeldOutFalseCallRate", "REAL NULL");
+    }
+
+    private static void ApplyDefectClassificationColumns(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // The customer classification table carries a Severity (Critical/Major/Minor) and a
+        // Detection Method per defect class. Both were previously dropped on import and had no
+        // storage. They are added here and the shipped default taxonomy is brought up to the
+        // full classification table; operator/customer-imported taxonomies are never touched.
+        AoiDatabase.EnsureDefectTaxonomyTables(connection, transaction);
+        AoiDatabase.AddColumnIfMissing(connection, transaction, "DefectTaxonomyEntries", "Severity", "TEXT NOT NULL DEFAULT ''");
+        AoiDatabase.AddColumnIfMissing(connection, transaction, "DefectTaxonomyEntries", "DetectionMethod", "TEXT NOT NULL DEFAULT ''");
+        AoiDatabase.UpgradeDefaultDefectTaxonomy(connection, transaction);
     }
 
     private static void ApplyExportVerification(SqliteConnection connection, SqliteTransaction transaction)

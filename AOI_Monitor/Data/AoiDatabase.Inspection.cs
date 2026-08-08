@@ -420,16 +420,26 @@ public static partial class AoiDatabase
     }
 
     public static IReadOnlyList<ExportHistoryRecord> GetExportHistory(int limit = 100)
+        => GetExportHistory(null, limit);
+
+    /// <summary>
+    /// Export history, optionally narrowed by the shared log page filter. Date range and operator
+    /// map onto real columns; board/result/role have no counterpart on an export row and are
+    /// ignored rather than silently excluding everything.
+    /// </summary>
+    public static IReadOnlyList<ExportHistoryRecord> GetExportHistory(LogFilter? filter, int limit = 100)
     {
         EnsureInitialized();
 
         var records = new List<ExportHistoryRecord>();
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
+        var where = BuildExportHistoryWhere(filter, command);
         command.CommandText =
-            """
+            $"""
             SELECT Id, CreatedAtUtc, ExportType, FilePath, Status, OperatorId, AuditEventId
             FROM ExportHistory
+            {where}
             ORDER BY datetime(CreatedAtUtc) DESC, Id DESC
             LIMIT $limit;
             """;
@@ -442,6 +452,23 @@ public static partial class AoiDatabase
         }
 
         return records;
+    }
+
+    private static string BuildExportHistoryWhere(LogFilter? filter, SqliteCommand command)
+    {
+        if (filter is null)
+            return string.Empty;
+
+        var clauses = new List<string>();
+        AddDateRangeClauses("CreatedAtUtc", filter, clauses, command);
+
+        if (!string.IsNullOrWhiteSpace(filter.OperatorId))
+        {
+            clauses.Add("OperatorId LIKE $exportOperatorId");
+            command.Parameters.AddWithValue("$exportOperatorId", $"%{filter.OperatorId}%");
+        }
+
+        return clauses.Count == 0 ? string.Empty : "WHERE " + string.Join(" AND ", clauses);
     }
 
     public static ExportVerificationRecord? GetLatestExportVerification(long exportHistoryId)

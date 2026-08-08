@@ -94,6 +94,92 @@ public sealed class UiRegressionSmokeTests : IDisposable
     }
 
     [Fact]
+    public void DefectOverlayDrawsPerDefectBoxesInVerdictColourAndPopulatesTheDefectList()
+    {
+        // Customer spec §4.1: overlays with bounding boxes and labels, a defect list carrying
+        // Severity, and green/red/amber verdict colouring. Previously nothing asserted that the
+        // overlay drew anything at all, nor that the Severity column resolved to a value.
+        var (overlayChildren, boxCount, labels, strokeColours, severities) = RunOnSta(() =>
+        {
+            EnsureApplicationResources();
+
+            var analysis = new AnalysisResult
+            {
+                Verdict = "NG",
+                BoardProgram = "BOARD-OVERLAY",
+                LotId = "LOT-OVERLAY",
+                Confidence = 0.91,
+            };
+            analysis.Defects.Add(new DefectResult
+            {
+                DefectType = "Missing Component",
+                RoiId = "ROI-1",
+                RoiType = "Presence",
+                Confidence = 0.91,
+                JudgmentStatus = "NG",
+                BoundingBox = new Rect(0.10, 0.20, 0.15, 0.10),
+            });
+            analysis.Defects.Add(new DefectResult
+            {
+                DefectType = "Solder Ball",
+                RoiId = "ROI-2",
+                RoiType = "Anomaly",
+                Confidence = 0.55,
+                JudgmentStatus = "REVIEW",
+                BoundingBox = new Rect(0.50, 0.55, 0.08, 0.08),
+            });
+
+            var view = new MonitorView();
+            SetPrivate(view, "_currentBitmap", CreateTestBitmap());
+            SetPrivate(view, "_currentAnalysis", analysis);
+            InvokePrivate(view, "RefreshDefectRows");
+            InvokePrivate(view, "RenderOverlay");
+
+            var canvas = (Canvas)FindByName(view, "DefectOverlayCanvas")!;
+            var grid = (DataGrid)FindByName(view, "DefectGrid")!;
+            var rows = grid.ItemsSource!.Cast<object>().ToArray();
+
+            return (
+                canvas.Children.Count,
+                canvas.Children.OfType<System.Windows.Shapes.Rectangle>().Count(),
+                canvas.Children.OfType<TextBlock>().Select(text => text.Text).ToArray(),
+                canvas.Children.OfType<System.Windows.Shapes.Rectangle>()
+                    .Select(rect => ((SolidColorBrush)rect.Stroke).Color)
+                    .ToArray(),
+                rows.Select(row => (string)row.GetType().GetProperty("Severity")!.GetValue(row)!).ToArray());
+        });
+
+        // One box + one label per defect.
+        Assert.Equal(2, boxCount);
+        Assert.Equal(4, overlayChildren);
+        Assert.Contains(labels, label => label.StartsWith("Missing Component [ROI-1]", StringComparison.Ordinal));
+        Assert.Contains(labels, label => label.StartsWith("Solder Ball [ROI-2]", StringComparison.Ordinal));
+
+        // NG verdict must render red, never green or amber (spec §4.1 colour coding).
+        Assert.All(strokeColours, colour => Assert.Equal(Colors.Red, colour));
+
+        // Severity column resolves the classification-table severity of each class.
+        Assert.Equal(new[] { "Critical", "Minor" }, severities);
+    }
+
+    [Fact]
+    public void OverlayVerdictColourFollowsTheSpecColourCoding()
+    {
+        var colours = RunOnSta(() =>
+        {
+            EnsureApplicationResources();
+            var method = typeof(MonitorView).GetMethod("ToVerdictColor", BindingFlags.Static | BindingFlags.NonPublic)!;
+            return new[] { "OK", "NG", "REVIEW" }
+                .Select(verdict => (Color)method.Invoke(null, new object[] { verdict })!)
+                .ToArray();
+        });
+
+        Assert.Equal(Colors.LimeGreen, colours[0]);
+        Assert.Equal(Colors.Red, colours[1]);
+        Assert.Equal(Colors.Orange, colours[2]);
+    }
+
+    [Fact]
     public void NavigationLoopUsesCachedPagesAndStaysUnderThreshold()
     {
         var report = RunOnSta(() =>
@@ -285,6 +371,24 @@ public sealed class UiRegressionSmokeTests : IDisposable
             new UiPageDefinition("install", "Installation Notes", () => new InstallView(), true, new[] { "RuntimeGrid", "BoundaryGrid" }),
             new UiPageDefinition("guide", "Guide", () => new GuideView(), true, new[] { "StepsGrid" }),
         };
+    }
+
+    private static void SetPrivate(object target, string fieldName, object? value)
+        => target.GetType()
+            .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(target, value);
+
+    private static void InvokePrivate(object target, string methodName)
+        => target.GetType()
+            .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(target, null);
+
+    private static BitmapSource CreateTestBitmap()
+    {
+        const int width = 640;
+        const int height = 480;
+        var stride = width * 4;
+        return BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, new byte[stride * height], stride);
     }
 
     private static void EnsureApplicationResources()

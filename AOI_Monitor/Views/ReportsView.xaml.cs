@@ -81,8 +81,27 @@ public partial class ReportsView : UserControl, IAsyncNavigationPage, IDisposabl
         _refreshCts?.Cancel();
         _refreshCts?.Dispose();
         _refreshCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        RefreshArchivePolicyText();
         await LoadLogsAsync(_refreshCts.Token);
         await RefreshRetentionWarningAsync(_refreshCts.Token);
+    }
+
+    /// <summary>
+    /// Keeps the on-screen policy statement equal to the exported one and to the configured
+    /// retention window. The static XAML text previously described a copy-only archive, which
+    /// contradicted the actual archive-then-purge behaviour.
+    /// </summary>
+    private void RefreshArchivePolicyText()
+    {
+        try
+        {
+            ArchivePolicyText.Text = DescribeRetentionPolicy();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Archive policy text not refreshed: {ex.Message}");
+            ArchivePolicyText.Text = "Auto-archive policy unavailable — open Settings > Basics > Data Retention to confirm the configured window.";
+        }
     }
 
     public void RefreshFromState() => _ = RefreshAsync(CancellationToken.None);

@@ -968,12 +968,29 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
                 defect.RoiId,
                 defect.RoiType,
                 defect.Confidence,
+                // Classification-table severity of the defect *class* (Critical/Major/Minor),
+                // resolved through the active taxonomy. Falls back to the engine's per-occurrence
+                // severity when the class is not in the taxonomy, so the column is never blank.
+                ResolveDefectSeverity(defect),
                 string.IsNullOrWhiteSpace(defect.SideOrViewType) || defect.SideOrViewType == "sample" ? side : defect.SideOrViewType,
                 defect.XPosition,
                 defect.YPosition,
                 boardXMillimeters,
                 boardYMillimeters));
         }
+    }
+
+    /// <summary>
+    /// Severity shown in the defect list. The customer classification table defines severity per
+    /// defect class, so the active taxonomy is the source of truth; the engine's per-occurrence
+    /// severity is the fallback for classes the taxonomy does not carry.
+    /// </summary>
+    private static string ResolveDefectSeverity(DefectResult defect)
+    {
+        var classSeverity = DefectTaxonomyService.SeverityFor(defect.DefectType);
+        return string.IsNullOrWhiteSpace(classSeverity)
+            ? (string.IsNullOrWhiteSpace(defect.Severity) ? "--" : defect.Severity)
+            : classSeverity;
     }
 
     private bool TryMapDefectToBoard(DefectResult defect, out double boardXMillimeters, out double boardYMillimeters)
@@ -1429,7 +1446,7 @@ public partial class MonitorView : UserControl, IReleasablePageResources, IAsync
         _ => Colors.Orange,
     };
 
-    public sealed record DefectRow(int No, string Type, string RoiId, string RoiType, double Score, string Side, double X, double Y, double? BoardX, double? BoardY)
+    public sealed record DefectRow(int No, string Type, string RoiId, string RoiType, double Score, string Severity, string Side, double X, double Y, double? BoardX, double? BoardY)
     {
         public string ScoreDisplay => Score.ToString("P0", CultureInfo.InvariantCulture);
         public string XDisplay => X.ToString("P0", CultureInfo.InvariantCulture);

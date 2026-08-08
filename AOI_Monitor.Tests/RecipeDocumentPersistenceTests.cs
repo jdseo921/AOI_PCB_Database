@@ -61,6 +61,57 @@ public sealed class RecipeDocumentPersistenceTests : IDisposable
     }
 
     [Fact]
+    public void PerRoiHeightAndVolumeLimitsSurviveSaveLoadAndParse()
+    {
+        // Customer spec §4.2 requires Height Min/Max and Volume Min/Max as per-ROI parameters.
+        // Only AiScoreThreshold was previously asserted anywhere, so the four dimensional limits
+        // could have silently stopped persisting without any test noticing.
+        var doc = new RecipeDocument
+        {
+            RecipeName = "DIMENSIONAL",
+            BoardProgram = "BOARD-DIM",
+            Rois = new List<RecipeRoiDocument>
+            {
+                new()
+                {
+                    Id = "ROI-DIM-1",
+                    Name = "J1 Pin Field",
+                    RoiType = "Connector Pin Height",
+                    X = 0.10,
+                    Y = 0.20,
+                    Width = 0.30,
+                    Height = 0.15,
+                    AiScoreThreshold = 0.80,
+                    HeightMin = 0.045,
+                    HeightMax = 0.310,
+                    VolumeMin = 1.25,
+                    VolumeMax = 9.75,
+                },
+            },
+        };
+
+        var json = JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true });
+        var restored = JsonSerializer.Deserialize<RecipeDocument>(json);
+
+        Assert.NotNull(restored);
+        var restoredRoi = Assert.Single(restored!.Rois);
+        Assert.Equal(0.045, restoredRoi.HeightMin);
+        Assert.Equal(0.310, restoredRoi.HeightMax);
+        Assert.Equal(1.25, restoredRoi.VolumeMin);
+        Assert.Equal(9.75, restoredRoi.VolumeMax);
+
+        var parsed = RecipeService.ParseDocument(restored, "REV-DIM", "Balanced", "BOARD-DIM", string.Empty, "DIMENSIONAL", "unit test");
+
+        Assert.NotNull(parsed.Recipe);
+        var thresholds = Assert.Single(parsed.Recipe!.Rois).Thresholds;
+        Assert.Equal(0.80, thresholds.AiScoreThreshold);
+        Assert.Equal(0.045, thresholds.HeightMin);
+        Assert.Equal(0.310, thresholds.HeightMax);
+        Assert.Equal(1.25, thresholds.VolumeMin);
+        Assert.Equal(9.75, thresholds.VolumeMax);
+    }
+
+    [Fact]
     public void LegacyRecipeJsonWithoutNewFieldsFallsBackToDefaults()
     {
         const string legacyJson = "{\"RecipeName\":\"OLD\",\"BoardProgram\":\"B\",\"Rois\":[]}";

@@ -176,7 +176,7 @@ public static class DefectClassCatalog
         new("3D Coplanarity", 12, "COP", true, DefectSeverityLevels.Major, "3D AOI", "4",
             "Coplanarity|Lead Coplanarity"),
         new("Height Error", 6, "HGT", true, DefectSeverityLevels.Major, "3D AOI", "local",
-            "Height|Height Defect"),
+            "Height|Height Defect|Height Anomaly"),
         new("Anomaly", 7, "ANOM", false, DefectSeverityLevels.Major, "AOI", "local",
             "Unknown Defect|Other"),
     };

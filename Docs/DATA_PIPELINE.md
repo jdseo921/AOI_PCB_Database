@@ -46,11 +46,21 @@ Synthetic demo projects (demo evidence only): `pwsh SampleData/generate_image_le
 
 Engine choices (active inspection source, set in Settings or AI Training Setup):
 
-- **Pixel Difference Prototype Engine** — Stage 1 statistical prototype (workflow review, not production model acceptance).
+- **Pixel Difference Prototype Engine** (`PIXEL_DIFF_0.2`) — Stage 1 statistical prototype (workflow review, not production model acceptance). See below for its decision statistic.
 - **ONNX ML Model** — accepts anomaly heat-map models (anomalib PatchCore/PaDiM/FastFlow exports) in addition to detection-row models; `AnomalyHeatmapOutputParser` converts map regions into defect detections automatically.
 - **Learned PCB Visual Model** — the image-only learned model described below.
 
 When Learned PCB Visual Model is active, Run Inspection uses the learned tolerance map and recommended threshold, Golden Compare shows learned reference/tolerance/anomaly views, and AI Model Test includes false-call and possible-escape metrics where validation data exists.
+
+### Pixel Difference decision statistic (`PIXEL_DIFF_0.2`)
+
+The whole-board compare path aligns the sample to the golden reference (tight translation search), then scores the **worst region** of the board: the frame is binned into an 8x8 grid and the decision statistic is the highest per-cell mean absolute BGR difference, expressed as a percentage of full scale (0-100). Verdict thresholds are compared against that value, and the reported hotspot is the same cell, so the score and the operator overlay always refer to the same region.
+
+The whole-frame mean is still computed and reported as `FrameMeanDifferenceScore` (evidence line "Whole-frame mean difference"). It remains the right signal for gross whole-board problems — wrong board loaded, gross mis-registration — but it is deliberately **not** the decision statistic: a localized defect is diluted by the frame-area / defect-area ratio, so a frame mean cannot reach a sensible NG threshold.
+
+**Version history.** `PIXEL_DIFF_0.1` judged on the whole-frame mean. Measured on the shipped demo dataset that produced OK verdicts for all 40 known-defect boards (recall 0 %) despite the underlying signal separating good from defective boards by more than an order of magnitude; the localized-defect regression tests in `PixelDifferenceLocalizedDefectTests` pin the corrected behaviour. Results from the two versions are not comparable, which is why the engine version changed — persisted history stays distinguishable (AGENTS.md rule 10). Per-ROI recipe inspection was always regional (`CompareRegion`) and is unaffected.
+
+Detection policy thresholds (NG / REVIEW, same 0-100 units): Minimize False Positives 24 / 12, Balanced 18 / 8, Maximize Defect Recall 14 / 5. Measured demo-dataset outcomes per policy: `Docs/VALIDATION.md` §4.0.
 
 ## Image-only PCB learning workflow
 

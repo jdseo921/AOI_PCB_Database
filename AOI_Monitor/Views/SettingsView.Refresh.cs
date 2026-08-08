@@ -313,7 +313,7 @@ public partial class SettingsView
         EngineRuntimeStatusText.Foreground = StatusBrush(status);
         EngineVersionText.Text = configuration.IsOnnxSelected || configuration.IsLearnedVisualModelSelected
             ? configuration.EffectiveModelVersion
-            : "PIXEL_DIFF_0.1";
+            : PixelDifferenceInspectionEngine.EngineVersion;
         ModelCheckResultText.Text = ModelConfigurationValidator.ToDisplay(configuration.LastModelCheckResult);
         ModelCheckResultText.Foreground = StatusBrush(configuration.LastModelCheckResult);
         ModelCheckTimestampText.Text = configuration.LastModelCheckTimestampUtc is { } timestamp

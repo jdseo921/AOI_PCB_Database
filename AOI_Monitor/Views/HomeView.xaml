@@ -218,7 +218,7 @@
                 <TextBlock Grid.Row="4" Text="Score" Style="{StaticResource HomeStatusLabel}"/>
                 <TextBlock x:Name="HomeScoreText" Grid.Row="4" Grid.Column="1" Text="--" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
                 <TextBlock Grid.Row="6" Text="Recipe" Style="{StaticResource HomeStatusLabel}"/>
-                <TextBlock x:Name="HomeRecipeText" Grid.Row="6" Grid.Column="1" Text="PIXEL_DIFF_0.1" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
+                <TextBlock x:Name="HomeRecipeText" Grid.Row="6" Grid.Column="1" Text="PIXEL_DIFF_0.2" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
                 <Border x:Name="HomeVerdictBorder" Grid.Row="8" Grid.ColumnSpan="2" Background="#372914" BorderBrush="#987538" BorderThickness="2" Padding="8,5">
                   <DockPanel LastChildFill="True">
                     <TextBlock Text="Verdict" Foreground="{DynamicResource MutedBrush}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>

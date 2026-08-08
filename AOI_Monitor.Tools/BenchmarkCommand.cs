@@ -124,23 +124,8 @@ public static class BenchmarkCommand
         }
 
         var priority = DetectionPriority.Balanced;
-        if (values.TryGetValue("priority", out var priorityText))
-        {
-            switch (priorityText.Trim().ToLowerInvariant())
-            {
-                case "balanced":
-                    priority = DetectionPriority.Balanced;
-                    break;
-                case "minimize-false-positives":
-                    priority = DetectionPriority.MinimizeFalsePositives;
-                    break;
-                case "maximize-defect-recall":
-                    priority = DetectionPriority.MaximizeDefectRecall;
-                    break;
-                default:
-                    return ParseResult.Fail($"Unknown --priority value: {priorityText}. Use balanced, minimize-false-positives, or maximize-defect-recall.");
-            }
-        }
+        if (values.TryGetValue("priority", out var priorityText) && !DetectionPriorityOption.TryParse(priorityText, out priority))
+            return ParseResult.Fail(DetectionPriorityOption.FailureMessage(priorityText));
 
         // The inspection engines require absolute paths (image URIs); resolve here so
         // relative CLI arguments behave the same as the UI's absolute-path pickers.

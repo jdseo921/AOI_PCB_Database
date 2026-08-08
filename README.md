@@ -125,6 +125,18 @@ dotnet run --project AOI_Monitor.Tools -- learn-from-images `
 
 Synthetic demo output proves workflow capability only. Customer acceptance requires customer/evaluator images and reviewer signoff; Stage 2 live camera validation remains separate. Full workflow documentation: [Docs/DATA_PIPELINE.md](Docs/DATA_PIPELINE.md) and [Docs/VALIDATION.md](Docs/VALIDATION.md).
 
+## Stage 1 Testing
+
+The complete Stage 1 evidence chain runs headlessly. One command generates the demo dataset, runs the exit-evidence workflow, the performance benchmark, and the build-evidence record, then evaluates the readiness gate:
+
+```powershell
+pwsh Scripts/run-stage1-testing.ps1 -Operator <your-id>
+```
+
+It exits `0` when the Stage 1 readiness gate reports PASS and `1` on CONDITIONAL, and prints every check with its evidence and next action. Individual commands, expected demo-dataset results, and the customer deviation statement with sign-off lines: [Docs/VALIDATION.md](Docs/VALIDATION.md) §4.0 and §10.
+
+Stage 1 covers uploaded-image validation only. No Stage 1 artifact claims real camera, lighting, 3D, robot, PLC safety, MES/ERP, or factory-automation readiness.
+
 ## Stage 1 Batch Soak Test
 
 For the 8-hour continuous-operation acceptance criterion, a headless soak harness loops the real batch-inspection pipeline over an image folder and emits HTML/JSON/CSV stability evidence:

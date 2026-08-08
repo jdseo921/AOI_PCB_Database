@@ -10,8 +10,16 @@ namespace AOI_Monitor.Services;
 
 public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
 {
+    /// <summary>
+    /// Prototype engine version. Bumped to 0.2 when the verdict decision statistic changed from
+    /// the whole-frame mean difference to the worst-region mean difference; results produced by
+    /// the two versions are not comparable, so persisted history must stay distinguishable
+    /// (AGENTS.md rule 10). This constant is the single source of truth — do not re-literal it.
+    /// </summary>
+    public const string EngineVersion = "PIXEL_DIFF_0.2";
+
     public string Name => "Pixel Difference Prototype Engine";
-    public string Version => "PIXEL_DIFF_0.1";
+    public string Version => EngineVersion;
 
     // Reject implausibly large images before decode. A valid-but-enormous PNG/JPEG (a
     // "decompression bomb", or an accidental gigapixel scan) would otherwise force a multi-GB
@@ -98,7 +106,7 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         }
 
         var inferenceWatch = Stopwatch.StartNew();
-        var diff = Compare(sampleNorm, goldenPixels, out var hotspot);
+        var diff = Compare(sampleNorm, goldenPixels, out var hotspot, out var frameMeanDiff);
         inferenceWatch.Stop();
         timing.InferenceMilliseconds = inferenceWatch.Elapsed.TotalMilliseconds;
         // Everything from here until the defect record is built is overlay-data
@@ -108,6 +116,7 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         // (the on-screen WPF draw itself is timed in-app by the latency service).
         var overlayWatch = Stopwatch.StartNew();
         result.DifferenceScore = diff;
+        result.FrameMeanDifferenceScore = frameMeanDiff;
         result.Hotspot = hotspot;
 
         var (ngThreshold, reviewThreshold) = GetThresholds(priority);
@@ -380,7 +389,8 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
     {
         return new List<string>
         {
-            $"Difference score: {result.DifferenceScore:F1}% (Review >= {result.ReviewThreshold:F1}%, NG >= {result.NgThreshold:F1}%).",
+            $"Difference score (worst region): {result.DifferenceScore:F1}% (Review >= {result.ReviewThreshold:F1}%, NG >= {result.NgThreshold:F1}%).",
+            $"Whole-frame mean difference: {result.FrameMeanDifferenceScore:F2}% (context only; a localized defect is diluted by frame area and is not the decision statistic).",
             $"Threshold source: {result.ThresholdSource}.",
             $"Policy: {ToPolicyDisplay(priority)}.",
             $"Hotspot: x={result.Hotspot.X:P0}, y={result.Hotspot.Y:P0}, w={result.Hotspot.Width:P0}, h={result.Hotspot.Height:P0}.",
@@ -594,7 +604,20 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
         return (bytes, gray);
     }
 
-    private static double Compare(BitmapSource a, GoldenNormalizedPixels golden, out Rect hotspot)
+    /// <summary>
+    /// Compares a sample against the golden reference and returns the **decision statistic**: the
+    /// mean absolute BGR difference of the worst region of the board, as a percentage of full
+    /// scale (0-100), matching the units of <see cref="GetThresholds"/>.
+    ///
+    /// The statistic is deliberately regional, not frame-wide. A real PCB defect — a solder
+    /// bridge, a missing 0402, a shifted connector — occupies a small fraction of the frame, so a
+    /// whole-image mean dilutes it by roughly the ratio of frame area to defect area and can never
+    /// reach a sensible NG threshold. Judging the worst region keeps the threshold units meaningful
+    /// while making localized defects detectable. The frame-wide mean is still returned through
+    /// <paramref name="frameMeanDifference"/> and recorded as evidence, because it remains the
+    /// right statistic for gross whole-board problems (wrong board loaded, gross mis-registration).
+    /// </summary>
+    private static double Compare(BitmapSource a, GoldenNormalizedPixels golden, out Rect hotspot, out double frameMeanDifference)
     {
         var w = Math.Min(a.PixelWidth, golden.Width);
         var h = Math.Min(a.PixelHeight, golden.Height);
@@ -622,6 +645,9 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
             const int gridX = 8;
             const int gridY = 8;
             var bins = new double[gridX * gridY];
+            // Per-cell overlap counts: edge cells and the alignment-trimmed border carry fewer
+            // pixels than interior cells, so a cell mean needs its own denominator.
+            var binCounts = new long[gridX * gridY];
             int cw = Math.Max(1, w / gridX);
             int ch = Math.Max(1, h / gridY);
 
@@ -652,16 +678,23 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
                     total += d;
                     overlap++;
                     bins[gy * gridX + gx] += d;
+                    binCounts[gy * gridX + gx]++;
                 }
             }
 
+            // Worst region by mean, not by sum: a sum-ranked search favours whichever cell simply
+            // has the most overlapping pixels, which is a size artefact rather than a defect.
             int idx = 0;
-            double best = double.MinValue;
+            double worstCellMean = 0;
             for (int i = 0; i < bins.Length; i++)
             {
-                if (bins[i] > best)
+                if (binCounts[i] == 0)
+                    continue;
+
+                var cellMean = bins[i] / binCounts[i];
+                if (cellMean > worstCellMean)
                 {
-                    best = bins[i];
+                    worstCellMean = cellMean;
                     idx = i;
                 }
             }
@@ -674,8 +707,9 @@ public sealed class PixelDifferenceInspectionEngine : IInspectionEngine
                 1.0 / gridX,
                 1.0 / gridY);
 
-            var mad = overlap == 0 ? 0 : total / overlap;
-            return Math.Min(100.0, mad / 255.0 * 100.0);
+            var frameMad = overlap == 0 ? 0 : total / overlap;
+            frameMeanDifference = Math.Min(100.0, frameMad / 255.0 * 100.0);
+            return Math.Min(100.0, worstCellMean / 255.0 * 100.0);
         }
         finally
         {

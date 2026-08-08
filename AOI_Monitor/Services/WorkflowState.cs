@@ -23,7 +23,7 @@ public sealed class WorkflowState
     public UserRole CurrentRole => CurrentUser.Role;
     public AuthenticationMode AuthenticationMode => CurrentUser.AuthenticationMode;
     public string BoardProgram { get; } = "TBOX-MAIN";
-    public string ModelVersion { get; } = "PIXEL_DIFF_0.1";
+    public string ModelVersion { get; } = PixelDifferenceInspectionEngine.EngineVersion;
     public bool IsRecipeLocked { get; set; }
     public DetectionPriority DetectionPriority { get; private set; } = DetectionPriority.MinimizeFalsePositives;
     public TrainingSessionState Training { get; } = new();

@@ -491,7 +491,7 @@
                     <TextBlock Text="Runtime status" Style="{StaticResource SettingsLabel}"/>
                     <TextBlock x:Name="EngineRuntimeStatusText" Text="Pixel Difference Prototype Engine" FontWeight="Bold" FontSize="14" Foreground="#E1A334" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="Saved version" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="EngineVersionText" Text="PIXEL_DIFF_0.1" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="EngineVersionText" Text="PIXEL_DIFF_0.2" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="Last model check" Style="{StaticResource SettingsLabel}"/>
                     <TextBlock x:Name="ModelCheckResultText" Text="Not Tested" FontWeight="Bold" FontSize="14" Foreground="#E1A334" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="Checked at" Style="{StaticResource SettingsLabel}"/>

@@ -17,7 +17,8 @@ dotnet run --project AOI_Monitor.Tools -- <command> [options]
 ### stage1-exit
 
 ```text
-AOI_Monitor.Tools stage1-exit --dataset <folder> --manifest <csv> --output <folder> --operator <id> [--allow-simulation]
+AOI_Monitor.Tools stage1-exit --dataset <folder> --manifest <csv> --output <folder> --operator <id>
+                              [--priority balanced|minimize-false-positives|maximize-defect-recall] [--allow-simulation]
 ```
 
 Example:
@@ -27,8 +28,11 @@ dotnet run --project AOI_Monitor.Tools -- stage1-exit `
   --dataset C:\AOI\Validation\CustomerDataset01 `
   --manifest C:\AOI\Validation\CustomerDataset01\customer_validation_manifest.csv `
   --output C:\AOI\Evidence\Stage1Exit `
-  --operator ENG-042
+  --operator ENG-042 `
+  --priority maximize-defect-recall
 ```
+
+`--priority` selects the detection policy thresholds (default `balanced`); the chosen policy is echoed on the console and carried into the evidence. All commands share one `--priority` parser, so a policy name is spelled the same everywhere.
 
 Runs the same service boundaries as the WPF app: customer dataset preflight; Stage 1 batch validation against the manifest; model acceptance when an active ONNX model is configured and runtime-validated as `Ready`; false-call and possible-escape metric generation; Stage 1 customer validation package export; explicit export verification; Stage 1 factory readiness Go/No-Go package export; and a concise PASS/WARN/FAIL console summary.
 
@@ -67,6 +71,30 @@ AOI_Monitor.Tools client-image-learning-demo --output <folder> --operator <id> [
 ```
 
 Runs the image-learning demo from a real `--project-folder` or `--synthetic` generated data. Synthetic output proves workflow capability only — not customer acceptance, not production model certification.
+
+### stage1-readiness
+
+```text
+AOI_Monitor.Tools stage1-readiness [--dataset <folder>] [--manifest <csv>] [--output <folder>] [--p95-target-ms <ms>]
+```
+
+Evaluates the Stage 1 readiness gate — the same service behind `Export & Trace > Stage 1 Readiness` — against persisted evidence, prints every check with its evidence and next action, and writes `stage1_readiness_report.html`, `.pdf`, and `.json`. Omit `--dataset`/`--manifest` to fall back to the latest persisted batch run, then to the generated `SampleData/DemoSet_Quick` dataset.
+
+Exit codes: `0` PASS, `1` CONDITIONAL, `2` FAIL, `3` usage error. CONDITIONAL has its own code so a pipeline can distinguish "evidence incomplete" from "evidence contradicts readiness".
+
+The gate reads evidence that earlier steps persist, so it is only meaningful after `stage1-exit`, `benchmark`, and `record-build-evidence` have run. `Scripts/run-stage1-testing.ps1` runs all four in order.
+
+### record-build-evidence
+
+```text
+AOI_Monitor.Tools record-build-evidence [--configuration Release] [--hygiene PASS|FAIL] [--restore PASS|FAIL]
+                                        [--build PASS|FAIL] [--test PASS|FAIL] [--publish-validation PASS|FAIL]
+                                        [--test-results <path>] [--operator <id>]
+```
+
+Records a build/test/quality-gate outcome as persisted evidence, which the readiness gate's "App build/test evidence" check reads. The record carries the git commit, configuration, machine name, and operator.
+
+The command **does not run or infer the gates** — it records the statuses the caller supplies. A tool that asserted its own PASS would be evidence of nothing. Run `pwsh Scripts/run-quality-gates.ps1 -Configuration Release` first and pass the real outcome; defaults are `PASS`, so state a failure explicitly.
 
 ### Additional commands
 

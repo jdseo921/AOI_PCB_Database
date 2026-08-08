@@ -219,7 +219,7 @@
               <TextBlock Grid.Row="4" Text="Engine" Style="{StaticResource MonitorStatusLabel}"/>
               <TextBlock Grid.Row="4" Grid.Column="1" x:Name="EngineText" Text="Pixel Difference Prototype Engine" Style="{StaticResource MonitorStatusWrappedValue}"/>
               <TextBlock Grid.Row="5" Text="Model Version" Style="{StaticResource MonitorStatusLabel}"/>
-              <TextBlock Grid.Row="5" Grid.Column="1" x:Name="ModelVersionText" Text="PIXEL_DIFF_0.1" Style="{StaticResource MonitorStatusWrappedValue}"/>
+              <TextBlock Grid.Row="5" Grid.Column="1" x:Name="ModelVersionText" Text="PIXEL_DIFF_0.2" Style="{StaticResource MonitorStatusWrappedValue}"/>
               <TextBlock Grid.Row="6" Text="Learned Evidence" Style="{StaticResource MonitorStatusLabel}"/>
               <TextBlock Grid.Row="6" Grid.Column="1" x:Name="LearnedModelEvidenceText" Text="Learned visual model: not active." Style="{StaticResource MonitorStatusWrappedValue}" Foreground="#C084FC"/>
               <TextBlock Grid.Row="7" Text="2D Cal Profile" Style="{StaticResource MonitorStatusLabel}"/>

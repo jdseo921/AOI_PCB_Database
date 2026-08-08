@@ -31,6 +31,12 @@ public static class Program
         if (args.Length > 0 && string.Equals(args[0], "benchmark", StringComparison.OrdinalIgnoreCase))
             return BenchmarkCommand.Execute(args, Console.Out, Console.Error);
 
+        if (args.Length > 0 && string.Equals(args[0], "stage1-readiness", StringComparison.OrdinalIgnoreCase))
+            return Stage1ReadinessCommand.Execute(args, Console.Out, Console.Error);
+
+        if (args.Length > 0 && string.Equals(args[0], "record-build-evidence", StringComparison.OrdinalIgnoreCase))
+            return RecordBuildEvidenceCommand.Execute(args, Console.Out, Console.Error);
+
         return Stage1ExitCommand.Execute(args, Console.Out, Console.Error);
     }
 }

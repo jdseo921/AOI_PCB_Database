@@ -1,3 +1,4 @@
+using AOI_Monitor.Models;
 using AOI_Monitor.Services;
 
 namespace AOI_Monitor.Tools;
@@ -36,9 +37,11 @@ public static class Stage1ExitCommand
                 OutputFolder = parse.OutputFolder,
                 OperatorId = parse.OperatorId,
                 AllowSimulation = parse.AllowSimulation,
+                DetectionPriority = parse.DetectionPriority,
             });
 
             output.WriteLine($"{result.Status} Stage 1 exit evidence workflow complete.");
+            output.WriteLine($"Detection priority: {parse.DetectionPriority}");
             output.WriteLine($"Preflight: {result.PreflightStatus}; rows={result.ManifestRows}; OK={result.OkCount}; NG={result.NgCount}");
             output.WriteLine($"Metrics: precision={result.Precision:P1}; recall={result.Recall:P1}; false-call={result.FalseCallRate:P1}; possible-escapes={result.PossibleEscapeCount}");
             output.WriteLine($"Model acceptance: {result.ModelAcceptanceStatus}");
@@ -97,6 +100,10 @@ public static class Stage1ExitCommand
                 return ParseResult.Fail($"Missing required option --{name}.");
         }
 
+        var priority = DetectionPriority.Balanced;
+        if (values.TryGetValue("priority", out var priorityText) && !DetectionPriorityOption.TryParse(priorityText, out priority))
+            return ParseResult.Fail(DetectionPriorityOption.FailureMessage(priorityText));
+
         return new ParseResult(
             true,
             string.Empty,
@@ -104,8 +111,10 @@ public static class Stage1ExitCommand
             values["manifest"],
             values["output"],
             values["operator"],
-            values.ContainsKey("allow-simulation"));
+            values.ContainsKey("allow-simulation"),
+            priority);
     }
+
 
     private static bool IsHelp(string value)
         => string.Equals(value, "-h", StringComparison.OrdinalIgnoreCase) ||
@@ -115,7 +124,10 @@ public static class Stage1ExitCommand
     private static void WriteUsage(TextWriter writer)
     {
         writer.WriteLine("Usage:");
-        writer.WriteLine("  AOI_Monitor.Tools stage1-exit --dataset <folder> --manifest <csv> --output <folder> --operator <id> [--allow-simulation]");
+        writer.WriteLine("  AOI_Monitor.Tools stage1-exit --dataset <folder> --manifest <csv> --output <folder> --operator <id>");
+        writer.WriteLine("                               [--priority balanced|minimize-false-positives|maximize-defect-recall] [--allow-simulation]");
+        writer.WriteLine();
+        writer.WriteLine("  --priority selects the detection policy thresholds (default: balanced).");
     }
 
     private sealed record ParseResult(
@@ -125,9 +137,10 @@ public static class Stage1ExitCommand
         string ManifestPath,
         string OutputFolder,
         string OperatorId,
-        bool AllowSimulation)
+        bool AllowSimulation,
+        DetectionPriority DetectionPriority)
     {
         public static ParseResult Fail(string message)
-            => new(false, message, string.Empty, string.Empty, string.Empty, string.Empty, false);
+            => new(false, message, string.Empty, string.Empty, string.Empty, string.Empty, false, DetectionPriority.Balanced);
     }
 }

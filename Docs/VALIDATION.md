@@ -96,6 +96,50 @@ image,ground_truth,golden_image,defect_type,side,refdes,roi_id,roi_type,lot_id,b
 
 **Readiness smoke:** `pwsh Scripts/run-stage1-readiness-smoke.ps1` generates the dataset (skip: `-SkipGenerate`), verifies both manifests, runs the Stage 1 preflight/benchmark service smoke, writes `TestResults/stage1_readiness_smoke_report.txt`, `.json`, and `TestResults/stage1_readiness_smoke.trx`. Service-level only (no WPF, no hardware validation); uses `dotnet test --no-restore` for offline repeatability (`-Restore` on a fresh machine).
 
+### 4.0 Headless Stage 1 test sequence (run this first)
+
+The whole Stage 1 evidence chain runs without the GUI, so it is repeatable and CI-checkable. Run it in this order; each step feeds persisted evidence the next one reads. `Scripts/run-stage1-testing.ps1` runs all four and stops on the first failure.
+
+```powershell
+pwsh Scripts/run-stage1-testing.ps1 -Operator <your-id>
+```
+
+Or step by step (from the repo root, after `dotnet build AOI_PCB_Database.slnx -c Release`):
+
+```powershell
+dotnet run --project AOI_Monitor.Tools -c Release -- stage1-exit --dataset SampleData/DemoSet_Quick/images --manifest SampleData/DemoSet_Quick/customer_validation_manifest.csv --output TestResults/stage1/exit --operator <id> --priority maximize-defect-recall --allow-simulation
+```
+
+```powershell
+dotnet run --project AOI_Monitor.Tools -c Release -- benchmark --images SampleData/DemoSet_Quick/images --golden SampleData/DemoSet_Quick/golden/tbox_ref_top.png --output TestResults/stage1/bench --priority maximize-defect-recall
+```
+
+```powershell
+dotnet run --project AOI_Monitor.Tools -c Release -- record-build-evidence --operator <id> --test-results TestResults
+```
+
+```powershell
+dotnet run --project AOI_Monitor.Tools -c Release -- stage1-readiness --dataset SampleData/DemoSet_Quick/images --manifest SampleData/DemoSet_Quick/customer_validation_manifest.csv --output TestResults/stage1/readiness
+```
+
+`stage1-readiness` exit codes: `0` PASS, `1` CONDITIONAL, `2` FAIL, `3` usage error. `record-build-evidence` records the statuses **you** pass it — it does not run or infer the gates, because a tool asserting its own PASS is evidence of nothing. Run the gates first (`pwsh Scripts/run-quality-gates.ps1 -Configuration Release`) and pass the real outcome.
+
+#### Expected results on the shipped demo dataset
+
+Measured 2026-08-08 on `SampleData/DemoSet_Quick` (64 images: 24 OK, 40 NG across solder bridge / missing component / polarity error / height anomaly), Pixel Difference Prototype Engine `PIXEL_DIFF_0.2`, CPU. A tester should reproduce these; a material deviation is a finding, not noise.
+
+| Detection priority | Precision | Recall | False-call rate | Possible escapes |
+|---|---:|---:|---:|---:|
+| `minimize-false-positives` | 100 % | 50.0 % | 0 % | 10 |
+| `balanced` (default) | 100 % | 66.7 % | 0 % | 10 |
+| `maximize-defect-recall` | 100 % | 100 % | 0 % | 0 |
+
+Difference-score separation on this dataset: known-good boards 0.16-0.90 %, known-defect boards 7.2-34.4 % — roughly 8x, comfortably wider than any policy's review band. Recall counts NG verdicts only; REVIEW rows are excluded from the confusion matrix by design, which is why the stricter policies show lower recall while still flagging the boards for human review.
+
+`stage1-readiness` on this dataset, after the three preceding steps, is **PASS with 15/15 checks**. Anything less means an evidence step did not run or did not persist — read the per-check `Next:` line.
+
+These are synthetic-data workflow numbers. They demonstrate that the pipeline detects and reports correctly; they are **not** model accuracy evidence and never substitute for customer-dataset acceptance (§5).
+
 ### 4.1 Batch validation
 
 Run §5.3-5.4 with `Test Image Folder` = `SampleData/DemoSet_Quick/images`, `Ground Truth CSV` = `SampleData/DemoSet_Quick/customer_validation_manifest.csv`: `Run Dataset Preflight`, `Run Batch Inspection`; review accuracy/precision/recall, OK/NG/REVIEW counts, false calls, possible escapes, timing, rows, selected-image preview; use `Export CSV`, `Export Annotated Images`, or `Export Stage 1 Validation Package` (contents: §5.6).
@@ -334,6 +378,63 @@ Evidence plan for management/customer review, separating Stage 1 data validation
 **In-app 8-hour soak (Factory PoC profile)** - full-factory evidence, distinct from §8: select profile Full Factory Automation; prepare the image or camera source; select the Factory PoC soak-test profile; confirm duration 480 minutes and output-folder free space; start and monitor live progress (elapsed, estimated remaining, pass count, fail count, status); do not close the app unless cancelling; at completion export/retain HTML and JSON reports. Acceptance: completed 8-hour requested duration; not canceled; no critical iteration errors; iterations persisted to SQLite; HTML and JSON reports exported; p95/max/avg inspection time and memory start/end/max recorded; source kind clearly states simulated or real camera source. Full Factory Automation readiness does not accept a simulated source as real camera evidence.
 
 **Deliverables for management signoff.** Stage 1: validation package, dataset quality summary, validation report, validation CSV, breakdown CSV, export verification. Stage 2: Stage 1 plus camera and lighting acceptance reports. Stage 3: Stage 2 plus robot/e-stop acceptance report. Stage 4: Stage 3 plus MES queue/readiness report and REST/spool evidence. Full Factory Automation: Stage 4 plus 8-hour soak report and real hardware evidence where required. Signoff package: factory readiness summary HTML + JSON; package manifest; latest validation manifest; latest export verification summary; latest camera, lighting, robot, MES, soak evidence when available; README describing validated evidence, simulated evidence, unmet criteria, known limitations. Any No-Go category needs an owner, planned corrective action, and target date before pilot approval.
+
+## 10. Customer deviation statement and Stage 1 sign-off
+
+Hand this section to the customer with the Stage 1 validation package. It states, in customer-facing terms, every place the delivered software deliberately differs from the source specifications in `Docs/customer-specs/`, and why. Internal traceability for each row is the deviation register in `Docs/Customer_Spec_Gap_Audit.md` §15.
+
+Nothing here is a defect report. Each item is a deliberate engineering decision recorded before delivery; the purpose of the sign-off is to confirm the customer accepts it, or to convert it into scoped work.
+
+### 10.1 Deviations requiring customer acknowledgement
+
+| # | Specification says | Delivered instead | Why |
+|---|---|---|---|
+| DEV-01 | Stage 1 deliverable: "AI model (.pt or .h5)" | **ONNX** single-file model format. No model artifact ships until training on customer data completes. | `.pt` and `.h5` both carry executable pickle/HDF5 payloads that execute code on load. Loading a model file received over email or a shared drive would be arbitrary code execution on the inspection PC. ONNX is a data-only graph format with equivalent portability and is the industry norm for deployed inference. |
+| DEV-02 | TensorFlow / PyTorch engine with NVIDIA CUDA acceleration | **ONNX Runtime, CPU execution provider.** PyTorch is used offline for training only. | Measured Stage 1 frame-to-overlay is 12-14 ms p50-p95 on CPU against a 1000 ms budget — roughly 70x headroom. Adding a GPU dependency would raise per-station hardware cost and driver-support burden for no measurable benefit. GPU adoption is a tracked open decision, gated on Stage 2 live-camera timing evidence. |
+| DEV-03 | Five main GUI modules | **13 focused workflow windows.** Every specified function is reachable; the shell aliases the specification's vocabulary onto the same routes. | Per-page density is a hard constraint of the factory HMI design (1920x1080, >= 14 pt text, >= 120x40 primary buttons). The five specified modules would each become a crowded multi-purpose page. The mapping table is in `Docs/Customer_Spec_Gap_Audit.md` §3. |
+| DEV-04 | 12-column responsive grid | WPF star-sizing and adaptive panels, verified by a machine-enforced layout audit at 1920x1080 across 100 / 125 / 150 % DPI. | A 12-column grid is a web layout idiom with no WPF equivalent. The delivered substitute is checked automatically on every build (48 views x 3 DPI scales) rather than by inspection. |
+| DEV-05 | Font >= 14 pt | 14 **DIP** baseline (= 10.5 typographic pt at 100 % scaling). | Interpreted as "14 units in the platform's device-independent measure". **This is the one deviation where the specification reading is genuinely ambiguous and the delivered text is smaller than a literal reading requires.** Raising the floor to true 14 pt (18.67 DIP) is a scoped change if the customer wants the literal reading. |
+| DEV-06 | Buttons >= 120x40 px | Enforced for **primary operator actions**. Secondary and mini buttons are 96x34-104x38. | Applying 120x40 to every button, including inline row actions, would force scrolling on dense pages. |
+| DEV-07 | Auto-save after each board | Operator opt-in toggle, **default off**. | The delivered default is review-then-save, so an operator confirms a verdict before it enters the permanent record. Flipping the default is a one-line change if the customer prefers it. |
+| DEV-09 | "Exported reports verified for accuracy" | Report **integrity** verification: per-file and aggregate SHA-256, PNG/PDF signature checks, required CSV headers and JSON fields, package manifest reconciliation. | Verifies that exported artifacts are complete and unaltered. It does **not** re-derive exported values from the database, so it does not detect a value that was computed wrongly before export. A content cross-check is scoped, separate work. |
+| DEV-13 | Distinct "Short Circuit" defect class | Optically visible shorts are reported as **Solder Bridge**; the literal label `Short Circuit` normalizes onto it. | A short that an optical system can see *is* a solder bridge. Non-visible electrical shorts require ICT, which is outside every stage of the roadmap. (Excess Solder, previously also merged, is now its own class.) |
+
+### 10.2 Recorded differences not requiring sign-off
+
+Noted for completeness; each is equal to or stricter than the specification.
+
+| # | Item | Delivered |
+|---|---|---|
+| DEV-08 | Third verdict named "Warning" | Named `REVIEW`; the display accepts both. |
+| DEV-10 | "Within 1 second per image" | P95 frame-to-overlay budget with a zero-tolerance over-threshold count — stricter than a per-image average. |
+| DEV-11 | "8-hour continuous testing" | 8-hour PoC soak as the minimum; a 5-minute rehearsal is required first (§8). |
+| DEV-12 | MES via REST **or** OPC UA | REST-over-HTTP implemented; OPC UA is a named, unimplemented boundary. Both are specification-allowed. |
+| DEV-14 | Windows 10/11 **Industrial Edition** | Runs on generic Windows 10/11; Windows 11 IoT LTSC is the reference performance platform. |
+| DEV-15 | Defect list X/Y | Percent-normalized coordinates plus board-millimetre columns when a calibration profile is selected. |
+
+### 10.3 What Stage 1 sign-off does and does not cover
+
+**Covers:** uploaded-image inspection, defect overlays and confidence, batch validation against a labelled manifest, accuracy / precision / recall / false-call / possible-escape metrics, CSV and annotated-image export, report integrity verification, recipe and threshold governance, roles and audit, and local SQLite traceability.
+
+**Does not cover, and is not claimed by any Stage 1 artifact:** real camera or lighting hardware, 3D acquisition, side-view acquisition, robot handling, PLC or safety interlocks, production MES/ERP connectivity, and any full-factory automation claim. Stage 1 evidence generated from folder-based image sources is labelled as such in every report, and readiness gates refuse simulated evidence for later-stage claims.
+
+### 10.4 Sign-off
+
+By signing, the customer confirms they have reviewed §10.1 and accept the delivered behaviour, or have listed the items they want changed.
+
+```text
+Deviations accepted as delivered (list any exceptions): ______________________________________
+
+Customer representative  Name: ______________________  Role: ______________________
+
+                         Signature: _________________  Date: ______________
+
+Supplier representative  Name: ______________________  Role: ______________________
+
+                         Signature: _________________  Date: ______________
+
+Stage 1 validation package ID: ______________________  Readiness report status: ______________
+```
 
 ## Related documents
 

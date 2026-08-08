@@ -19,7 +19,7 @@ public sealed class CustomerValidationReportContext
     public string ModelSha256 { get; init; } = "Not available";
     public string ModelValidationStatus { get; init; } = "Not Tested";
     public string EngineName { get; init; } = "Pixel Difference Prototype Engine";
-    public string ModelVersion { get; init; } = "PIXEL_DIFF_0.1";
+    public string ModelVersion { get; init; } = PixelDifferenceInspectionEngine.EngineVersion;
     public string ModelFileName { get; init; } = "Not configured";
     public double ConfidenceThreshold { get; init; }
     public string DatasetFolder { get; init; } = "Not available";

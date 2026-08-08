@@ -48,7 +48,7 @@ public class LocalizationParityTests
         "TBOX_TOP",
         "POC-LOT",
         "Engineer01",
-        "PIXEL_DIFF_0.1",
+        "PIXEL_DIFF_0.2",
         "IMG_0241",
         "IMG_0114 / 96%",
         "IMG_0088 / 92%",

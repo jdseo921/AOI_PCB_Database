@@ -1,3 +1,5 @@
+using AOI_Monitor.Services;
+
 namespace AOI_Monitor.Models;
 
 public sealed class MachineInterfaceInspectionContract
@@ -13,7 +15,7 @@ public sealed class MachineInterfaceInspectionContract
     public string SourceFrameId { get; set; } = string.Empty;
     public string SourceKind { get; set; } = "File";
     public bool IsSimulatedSource { get; set; }
-    public string ModelVersion { get; set; } = "PIXEL_DIFF_0.1";
+    public string ModelVersion { get; set; } = PixelDifferenceInspectionEngine.EngineVersion;
     public string Policy { get; set; } = "Minimize False Positives";
     public string SampleImagePath { get; set; } = string.Empty;
     public string? GoldenImagePath { get; set; }

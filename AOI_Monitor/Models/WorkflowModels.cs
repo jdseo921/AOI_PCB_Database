@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Windows;
+using AOI_Monitor.Services;
 
 namespace AOI_Monitor.Models;
 
@@ -32,14 +33,26 @@ public class AnalysisResult
     public string ErrorMessage { get; set; } = string.Empty;
     public string OperatorId { get; set; } = "UNKNOWN";
     public string InspectionEngine { get; set; } = "Pixel Difference Prototype Engine";
+    /// <summary>
+    /// The decision statistic the verdict thresholds are compared against: the worst-region mean
+    /// absolute difference from golden, as a percentage of full scale (0-100).
+    /// </summary>
     public double DifferenceScore { get; set; }
+
+    /// <summary>
+    /// Whole-frame mean absolute difference from golden (0-100). Context only — a localized defect
+    /// is diluted by frame area here, which is why it is not the decision statistic. Useful for
+    /// spotting gross whole-board problems such as a wrong board or gross mis-registration.
+    /// </summary>
+    public double FrameMeanDifferenceScore { get; set; }
+
     public double MeanBrightness { get; set; }
     public double ReviewThreshold { get; set; }
     public double NgThreshold { get; set; }
     public double Confidence { get; set; }
     public double DecisionMargin { get; set; }
     public string DecisionReason { get; set; } = "Not enough data.";
-    public string ModelVersion { get; set; } = "PIXEL_DIFF_0.1";
+    public string ModelVersion { get; set; } = PixelDifferenceInspectionEngine.EngineVersion;
     public string ModelFilePath { get; set; } = string.Empty;
     public double ConfidenceThreshold { get; set; }
     public string ThresholdProfileId { get; set; } = string.Empty;

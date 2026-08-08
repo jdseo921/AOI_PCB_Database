@@ -227,7 +227,7 @@ public static class ExportVerificationService
         // Leading '#' lines are evidence-scope/identity comments (e.g. batch-soak passes
         // CSV); the header contract applies to the first non-comment line.
         var firstLine = File.ReadLines(path)
-            .FirstOrDefault(line => !line.StartsWith("#", StringComparison.Ordinal));
+            .FirstOrDefault(line => !line.StartsWith('#'));
         if (string.IsNullOrWhiteSpace(firstLine))
         {
             Add(result, ExportVerificationStatus.ERROR, $"CSV has no header: {Path.GetFileName(path)}.");

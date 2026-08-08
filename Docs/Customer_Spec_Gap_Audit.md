@@ -7,6 +7,16 @@ This audit maps every atomic requirement in the three customer specification doc
 honest implementation status. It is the Phase 1 deliverable of the Stage 1 readiness program
 and the working companion to `Docs/Requirements_Traceability_Matrix.md` (RTM).
 
+> **Remediation milestone M2 applied 2026-08-08 (Stage 1 test preparation).** Preparing the program
+> for Stage 1 testing surfaced a **critical detection defect**: the prototype engine judged on the
+> whole-frame mean difference and therefore returned OK for every localized defect — recall 0 % on
+> the shipped demo dataset (§12 D13). Fixed by scoring the worst region; engine version bumped to
+> `PIXEL_DIFF_0.2`. Demo-dataset recall is now 100 % at `maximize-defect-recall` with a measured
+> false-call rate of 0.0 % over 24 known-good images (a synthetic-dataset figure, not a customer
+> false-call claim), and the Stage 1 readiness gate reaches **PASS 15/15**. Also added: headless `stage1-readiness` and
+> `record-build-evidence` commands, `Scripts/run-stage1-testing.ps1`, and the customer deviation
+> statement (`Docs/VALIDATION.md` §10, closing the DEV-01 documentation gap). New findings D13-D16.
+>
 > **Remediation milestone M1 applied 2026-08-08.** The defect-classification conformance gap and
 > eight of the twelve §12 defects are closed. Changes: all 33 classification-table rows are now
 > taxonomy entries (32 first-class + `Short Circuit` as a documented alias), every entry carries
@@ -378,6 +388,10 @@ only 7 classes and would itself grade CONDITIONAL against the default taxonomy.
 | D9 | Architecture hygiene | **Resolved 2026-08-08 (M1).** `DefectDetectionCapability` is consulted at runtime in three places: `ValidateModelLabels` hardware-dependency CONDITIONALs, the Recipe Rules ROI-type picker (`InspectableCanonicalClasses`), and the `detection_capability` column of the taxonomy CSV export | `DefectTaxonomyService.cs`, `RecipeView.xaml.cs` |
 | D10 | Repo hygiene | **Open.** Stale duplicate worktree at `.claude/worktrees/vigorous-jones-098ec2/` (branch `claude/vigorous-jones-098ec2` at `4a87793`) mirrors the repo. Left in place deliberately — removing another session's worktree is the owner's call: `git worktree remove .claude/worktrees/vigorous-jones-098ec2` | `.claude/worktrees/` |
 | D11 | Minor gap | **Resolved 2026-08-08 (M1).** `GetExportHistory` accepts the shared `LogFilter`; date range and operator are applied with parameterized SQL. Board/result/role have no counterpart on an export row and are documented as ignored rather than silently excluding everything | `AoiDatabase.GetExportHistory`, `ReportsView.Readiness.cs` |
+| D13 | **Detection defect (critical)** | **Found and resolved 2026-08-08 (M2), during Stage 1 test preparation.** The Pixel Difference Prototype Engine's whole-board path judged on the whole-frame mean difference. A localized PCB defect is diluted by the frame-area / defect-area ratio, so the statistic could not reach the NG threshold: on the shipped demo dataset the engine returned OK for **all 40 known-defect boards (recall 0 %)** even though known-good boards scored 0.0025-0.014 and known-defect boards 0.33-1.28 — a 23x separation the decision rule discarded. Only full-frame defects were ever tested (`GrossDefectIsNotAlignedAway` blacks out half the image), which is why no test caught it. Decision statistic is now the worst-region mean; engine version `PIXEL_DIFF_0.1` → `PIXEL_DIFF_0.2`. Demo-dataset recall 0 % → 100 % at `maximize-defect-recall`, precision 100 %, measured false-call rate 0.0 % over 24 known-good images (synthetic-dataset figures only). Pinned by `PixelDifferenceLocalizedDefectTests` | `PixelDifferenceInspectionEngine.Compare` |
+| D14 | Usability (test kit) | **Resolved 2026-08-08 (M2).** The `--priority` option accepted different spellings in `benchmark` and `stage1-exit`, so a policy name copied between Stage 1 commands failed. Both now share `DetectionPriorityOption` | `AOI_Monitor.Tools` |
+| D15 | Evidence gap | **Resolved 2026-08-08 (M2).** The Stage 1 readiness gate and build/test evidence recording were GUI-only, so Stage 1 readiness could not be produced or checked headlessly. Added `stage1-readiness` and `record-build-evidence` commands plus `Scripts/run-stage1-testing.ps1` | `AOI_Monitor.Tools`, `Scripts/` |
+| D16 | Dataset/taxonomy | **Resolved 2026-08-08 (M2).** The demo manifest's `height_anomaly` label did not normalize, holding dataset preflight at CONDITIONAL. Added as an alias of Height Error | `DefectClassCatalog` |
 | D12 | Test gaps | **Mostly resolved 2026-08-08 (M1).** Added: per-ROI Height/Volume save→load→parse round-trip (`PerRoiHeightAndVolumeLimitsSurviveSaveLoadAndParse`); recipe-revision backup restored onto a clean storage root (`BackupCapturesAndRestoresRecipeRevisions`); overlay geometry, label text, verdict colour, and the Severity column (`DefectOverlayDrawsPerDefectBoxesInVerdictColourAndPopulatesTheDefectList`, `OverlayVerdictColourFollowsTheSpecColourCoding`). **Still open:** no successful-inference ONNX test — that needs a shipped or fixture model and is tracked with DEV-01 | tests |
 
 ## 13. Acceptance Criteria — §11 evidence state (audit item f)
@@ -410,13 +424,14 @@ only 7 classes and would itself grade CONDITIONAL against the default taxonomy.
 
 ## 15. Deviation Register (customer-sign-off items, audit item d)
 
-Deviations are deliberate and internally documented; **none currently has a customer-facing
-acknowledgment**. Recommended vehicle: a one-page customer deviation statement with sign-off
-lines (remediation M1).
+Deviations are deliberate and internally documented. **A customer-facing deviation statement with
+sign-off lines now exists at `Docs/VALIDATION.md` §10** (written 2026-08-08, milestone M2); it
+covers every row below in customer terms and separates the nine items needing acknowledgement from
+the six recorded-only differences. What remains is obtaining the customer's signature.
 
 | # | Spec says | Repo does | Standard ref | Sign-off needed |
 |---|---|---|---|---|
-| DEV-01 | Stage-1 deliverable "AI model (.pt or .h5)" | Single-file **ONNX** only (pickle-bearing formats security-banned); no model artifact ships until customer training completes | SD-01, D-03, VOL08 | **Yes — the one-line sign-off the spec deviation check demands** |
+| DEV-01 | Stage-1 deliverable "AI model (.pt or .h5)" | Single-file **ONNX** only (pickle-bearing formats security-banned); no model artifact ships until customer training completes | SD-01, D-03, VOL08 | **Statement written 2026-08-08 (M2)** — customer-facing deviation statement with sign-off lines is `Docs/VALIDATION.md` §10. Still needs the customer's signature. |
 | DEV-02 | TensorFlow/PyTorch engine + NVIDIA CUDA | ONNX Runtime, CPU EP baseline; PyTorch only in offline training pipeline; GPU EP a tracked open decision gated on Stage-2 latency evidence | SD-01/SD-12, D-01, OD-02 | Yes |
 | DEV-03 | Five main GUI modules | 13 focused workflow windows; spec vocabulary aliased; all functions reachable (mapping table §3) | VOL01 §5.3 | Yes (mapping annotation) |
 | DEV-04 | 12-column responsive grid | WPF star-sizing/WrapPanel + machine-enforced layout audit at 3 DPI scales | Milestone Review Gap 9 | Yes (already flagged by repo as awaiting sign-off) |

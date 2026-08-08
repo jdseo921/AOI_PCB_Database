@@ -37,7 +37,7 @@ public partial class AIModelTestView : UserControl, IAsyncNavigationPage, IDispo
     private string? _groundTruthCsvPath;
     private long? _currentRunId;
     private DateTime? _currentRunCreatedAtUtc;
-    private string _currentEngineDisplay = "Pixel Difference Prototype Engine / PIXEL_DIFF_0.1";
+    private string _currentEngineDisplay = $"Pixel Difference Prototype Engine / {PixelDifferenceInspectionEngine.EngineVersion}";
     private bool _currentRunUsedFormalManifest;
     private FalseCallReductionRun? _currentFalseCallRun;
     private DatasetQualitySummary? _currentDatasetQuality;

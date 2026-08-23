@@ -85,11 +85,14 @@
   <SolidColorBrush x:Key="HmiNoteBrush" Color="#172A39"/>
   <SolidColorBrush x:Key="HmiNoteBorderBrush" Color="#477CA5"/>
 
-  <sys:Double x:Key="HmiFontSizeBody" xmlns:sys="clr-namespace:System;assembly=mscorlib">14</sys:Double>
-  <sys:Double x:Key="HmiFontSizeLabel" xmlns:sys="clr-namespace:System;assembly=mscorlib">14</sys:Double>
-  <sys:Double x:Key="HmiFontSizeSmall" xmlns:sys="clr-namespace:System;assembly=mscorlib">14</sys:Double>
-  <sys:Double x:Key="HmiFontSizeSection" xmlns:sys="clr-namespace:System;assembly=mscorlib">16</sys:Double>
-  <sys:Double x:Key="HmiFontSizePageTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">20</sys:Double>
+  <!-- Typography floor: the customer spec requires operator text >= 14 pt. 14 pt = 18.67 DIP
+       at 96 DPI, and the HMI layout audit fails below 18.6667 (MinimumReadableFontDip). Raised
+       from 14 DIP (10.5 pt) on 2026-08-23; deviation DEV-05 is thereby closed, not signed off. -->
+  <sys:Double x:Key="HmiFontSizeBody" xmlns:sys="clr-namespace:System;assembly=mscorlib">18.67</sys:Double>
+  <sys:Double x:Key="HmiFontSizeLabel" xmlns:sys="clr-namespace:System;assembly=mscorlib">18.67</sys:Double>
+  <sys:Double x:Key="HmiFontSizeSmall" xmlns:sys="clr-namespace:System;assembly=mscorlib">18.67</sys:Double>
+  <sys:Double x:Key="HmiFontSizeSection" xmlns:sys="clr-namespace:System;assembly=mscorlib">20</sys:Double>
+  <sys:Double x:Key="HmiFontSizePageTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">22</sys:Double>
   <sys:Double x:Key="HmiButtonMinHeight" xmlns:sys="clr-namespace:System;assembly=mscorlib">40</sys:Double>
   <sys:Double x:Key="HmiButtonMinWidth" xmlns:sys="clr-namespace:System;assembly=mscorlib">120</sys:Double>
   <Thickness x:Key="HmiCardPadding">12</Thickness>
@@ -167,7 +170,7 @@
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
     <Setter Property="TextTrimming" Value="None"/>
-    <Setter Property="LineHeight" Value="20"/>
+    <Setter Property="LineHeight" Value="25"/>
   </Style>
 
   <Style x:Key="FactoryTrimmedTextWithTooltip" TargetType="TextBlock">
@@ -191,7 +194,7 @@
         <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
         <Setter Property="TextTrimming" Value="None"/>
-        <Setter Property="LineHeight" Value="19"/>
+        <Setter Property="LineHeight" Value="25"/>
       </Style>
     </Style.Resources>
   </Style>
@@ -202,7 +205,7 @@
     <Setter Property="FontWeight" Value="ExtraBold"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
     <Setter Property="TextTrimming" Value="None"/>
-    <Setter Property="LineHeight" Value="19"/>
+    <Setter Property="LineHeight" Value="25"/>
   </Style>
 
   <Style x:Key="HmiAdaptiveStatusValueText" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
@@ -264,7 +267,7 @@
     <Setter Property="FontWeight" Value="ExtraBold"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
     <Setter Property="TextTrimming" Value="None"/>
-    <Setter Property="LineHeight" Value="21"/>
+    <Setter Property="LineHeight" Value="25"/>
   </Style>
 
   <Style x:Key="HmiAdaptiveSectionHeaderBadge" TargetType="Border" BasedOn="{StaticResource HmiAdaptiveStatusChip}">
@@ -382,7 +385,7 @@
     <Setter Property="FontWeight" Value="ExtraBold"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
     <Setter Property="TextTrimming" Value="None"/>
-    <Setter Property="LineHeight" Value="18"/>
+    <Setter Property="LineHeight" Value="25"/>
   </Style>
 
   <Style x:Key="HmiShellNavSubtitleText" TargetType="TextBlock">
@@ -390,7 +393,7 @@
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeSmall}"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
     <Setter Property="TextTrimming" Value="None"/>
-    <Setter Property="LineHeight" Value="18"/>
+    <Setter Property="LineHeight" Value="25"/>
   </Style>
 
   <Style x:Key="HmiDataGridHeaderText" TargetType="TextBlock">
@@ -399,7 +402,7 @@
     <Setter Property="FontWeight" Value="ExtraBold"/>
     <Setter Property="TextWrapping" Value="NoWrap"/>
     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-    <Setter Property="LineHeight" Value="18"/>
+    <Setter Property="LineHeight" Value="25"/>
     <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
   </Style>
 
@@ -526,7 +529,7 @@
     <Setter Property="Foreground" Value="{DynamicResource HmiMutedTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
-    <Setter Property="LineHeight" Value="20"/>
+    <Setter Property="LineHeight" Value="25"/>
   </Style>
 
   <Style x:Key="HmiSectionHeaderText" TargetType="TextBlock">
@@ -679,7 +682,7 @@
   </Style>
   <Style x:Key="HmiStateTitleText" TargetType="TextBlock" BasedOn="{StaticResource HmiAdaptiveSectionHeaderTitle}"/>
   <Style x:Key="HmiStateMessageText" TargetType="TextBlock" BasedOn="{StaticResource HmiPageSubtitleText}">
-    <Setter Property="LineHeight" Value="20"/>
+    <Setter Property="LineHeight" Value="25"/>
   </Style>
   <Style x:Key="HmiStateNextActionText" TargetType="TextBlock" BasedOn="{StaticResource HmiTechnicalHintText}">
     <Setter Property="Foreground" Value="{DynamicResource HmiWarnBrush}"/>

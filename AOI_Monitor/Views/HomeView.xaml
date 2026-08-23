@@ -22,13 +22,13 @@
     </Style>
     <Style x:Key="HomeStatusLabel" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
       <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
       <Setter Property="TextWrapping" Value="NoWrap"/>
     </Style>
     <Style x:Key="HomeStatusValue" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="FontWeight" Value="ExtraBold"/>
       <Setter Property="MaxWidth" Value="220"/>
     </Style>
@@ -56,7 +56,7 @@
                      DockPanel.Dock="Right"
                      Text="Critical status: none"
                      Foreground="{DynamicResource TextBrush}"
-                     FontSize="14"
+                     FontSize="{StaticResource HmiFontSizeBody}"
                      FontWeight="ExtraBold"
                      VerticalAlignment="Center"
                      TextWrapping="NoWrap"
@@ -65,7 +65,7 @@
                      ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
           <TextBlock Text="Home"
                      Style="{StaticResource HmiPageTitleText}"
-                     FontSize="18"
+                     FontSize="{StaticResource HmiFontSizeSection}"
                      VerticalAlignment="Center"
                      TextWrapping="NoWrap"/>
         </DockPanel>
@@ -131,7 +131,7 @@
           <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="AOI Workflow Menus" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
+        <TextBlock Text="AOI Workflow Menus" Style="{StaticResource HmiSectionHeaderText}" FontSize="{StaticResource HmiFontSizeSection}"/>
 
         <ItemsControl x:Name="HomeModuleItems" Grid.Row="2" ItemsSource="{Binding NavPages}">
           <ItemsControl.ItemsPanel>
@@ -157,7 +157,7 @@
                           VerticalAlignment="Center">
                     <TextBlock Text="{Binding Number}"
                                Foreground="White"
-                               FontSize="14"
+                               FontSize="{StaticResource HmiFontSizeBody}"
                                FontWeight="ExtraBold"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
@@ -165,15 +165,15 @@
                   <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Title}"
                                Foreground="{DynamicResource TextBrush}"
-                               FontSize="15"
+                               FontSize="{StaticResource HmiFontSizeBody}"
                                FontWeight="ExtraBold"
                                TextWrapping="Wrap"
-                               LineHeight="18"/>
+                               LineHeight="25"/>
                     <TextBlock Text="{Binding Subtitle}"
                                Foreground="{DynamicResource MutedBrush}"
-                               FontSize="14"
+                               FontSize="{StaticResource HmiFontSizeBody}"
                                TextWrapping="Wrap"
-                               LineHeight="17"
+                               LineHeight="25"
                                Margin="0,3,0,0"/>
                   </StackPanel>
                 </Grid>
@@ -196,7 +196,7 @@
               <RowDefinition Height="5"/>
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <TextBlock Text="Current State" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
+            <TextBlock Text="Current State" Style="{StaticResource HmiSectionHeaderText}" FontSize="{StaticResource HmiFontSizeSection}"/>
             <Border Grid.Row="2" Style="{StaticResource FactoryCard}" Padding="10">
               <Grid>
                 <Grid.RowDefinitions>
@@ -224,7 +224,7 @@
                 <TextBlock x:Name="HomeRecipeText" Grid.Row="6" Grid.Column="1" Text="PIXEL_DIFF_0.2" Style="{StaticResource HmiAdaptiveFieldWrappedValueText}" FontWeight="Bold"/>
                 <Border x:Name="HomeVerdictBorder" Grid.Row="8" Grid.ColumnSpan="2" Background="#372914" BorderBrush="#987538" BorderThickness="2" Padding="8,5" Margin="0,8,0,0">
                   <DockPanel LastChildFill="True">
-                    <TextBlock Text="Verdict" Foreground="{DynamicResource MutedBrush}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="Verdict" Foreground="{DynamicResource MutedBrush}" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     <TextBlock x:Name="HomeVerdictText" Text="REVIEW" Foreground="#FFE0A7" FontSize="24" FontWeight="ExtraBold" HorizontalAlignment="Right" TextAlignment="Right"/>
                   </DockPanel>
                 </Border>
@@ -238,10 +238,10 @@
               <RowDefinition Height="5"/>
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <TextBlock Text="Evidence Boundary" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
+            <TextBlock Text="Evidence Boundary" Style="{StaticResource HmiSectionHeaderText}" FontSize="{StaticResource HmiFontSizeSection}"/>
             <Border Grid.Row="2" Style="{StaticResource HmiPlainLanguageNote}" Padding="10" VerticalAlignment="Stretch">
               <TextBlock Text="Stage 1 image-validation evidence is for review. Camera, lighting, robot, safety, and MES readiness still require Hardware Readiness evidence before any real factory-integration claim."
-                         Style="{StaticResource HmiPageSubtitleText}" LineHeight="19" VerticalAlignment="Center"/>
+                         Style="{StaticResource HmiPageSubtitleText}" LineHeight="25" VerticalAlignment="Center"/>
             </Border>
           </Grid>
         </Grid>

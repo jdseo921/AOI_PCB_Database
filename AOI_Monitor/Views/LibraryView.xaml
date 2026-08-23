@@ -21,7 +21,7 @@
     </Style>
     <Style x:Key="LibraryRiskChipText" TargetType="TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource HmiTextBodyBrush}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="FontWeight" Value="Bold"/>
       <Style.Triggers>
         <DataTrigger Binding="{Binding Risk}" Value="Possible Escape">
@@ -52,35 +52,35 @@
         <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
             <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
-              <TextBlock Text="Prototype Filters" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="14"/>
+              <TextBlock Text="Prototype Filters" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
             </Border>
-            <TextBlock Text="Database Filter Console" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+            <TextBlock Text="Database Filter Console" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
           </DockPanel>
         </Border>
         <StackPanel Grid.Row="1" Margin="8">
           <WrapPanel Style="{StaticResource HmiAdaptiveFilterBand}" Margin="0">
             <StackPanel Style="{StaticResource HmiAdaptiveFilterField}">
-              <TextBlock Text="Board Model" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,0,4"/>
+              <TextBlock Text="Board Model" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>TBOX-MAIN</ComboBoxItem></ComboBox>
             </StackPanel>
             <StackPanel Style="{StaticResource HmiAdaptiveFilterField}">
-              <TextBlock Text="Defect Type" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,0,4"/>
+              <TextBlock Text="Defect Type" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>All defect types</ComboBoxItem></ComboBox>
             </StackPanel>
             <StackPanel Style="{StaticResource HmiAdaptiveFilterField}">
-              <TextBlock Text="Risk Class" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,0,4"/>
+              <TextBlock Text="Risk Class" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>Possible Escape first</ComboBoxItem></ComboBox>
             </StackPanel>
             <StackPanel Style="{StaticResource HmiAdaptiveFilterField}">
-              <TextBlock Text="Review Status" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,0,4"/>
+              <TextBlock Text="Review Status" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>Pending / Verified</ComboBoxItem></ComboBox>
             </StackPanel>
             <StackPanel Style="{StaticResource HmiAdaptiveFilterField}">
-              <TextBlock Text="Recipe Version" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,0,4"/>
+              <TextBlock Text="Recipe Version" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>TBOX_TOP_V1.2</ComboBoxItem></ComboBox>
             </StackPanel>
             <StackPanel Style="{StaticResource HmiAdaptiveFilterField}">
-              <TextBlock Text="Image Link State" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,0,4"/>
+              <TextBlock Text="Image Link State" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
               <ComboBox SelectedIndex="0"><ComboBoxItem>Linked only</ComboBoxItem></ComboBox>
             </StackPanel>
           </WrapPanel>
@@ -95,7 +95,7 @@
           <TextBlock x:Name="ImportStatusText"
                      Text="Imported images are loaded from the local SQLite image table."
                      Foreground="{DynamicResource HmiTextLabelBrush}"
-                     FontSize="14"
+                     FontSize="{StaticResource HmiFontSizeBody}"
                      TextWrapping="Wrap"
                      Margin="0,6,0,0"/>
           <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
@@ -113,9 +113,9 @@
         <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
             <Border DockPanel.Dock="Right" x:Name="RecordsSourceChip" Style="{StaticResource Chip}" Padding="6,1">
-              <TextBlock x:Name="RecordsSourceText" Text="SQLite Records" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="14"/>
+              <TextBlock x:Name="RecordsSourceText" Text="SQLite Records" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
             </Border>
-            <TextBlock Text="Inspection Records" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+            <TextBlock Text="Inspection Records" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
           </DockPanel>
         </Border>
         <DataGrid Grid.Row="1"
@@ -155,9 +155,9 @@
         <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
             <Border DockPanel.Dock="Right" Style="{StaticResource ChipAmber}" Padding="6,1">
-              <TextBlock Text="Static Schema Reference" Foreground="{DynamicResource HmiWarnSoftBrush}" FontWeight="Bold" FontSize="14"/>
+              <TextBlock Text="Static Schema Reference" Foreground="{DynamicResource HmiWarnSoftBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
             </Border>
-            <TextBlock Text="Database Transparency" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+            <TextBlock Text="Database Transparency" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
           </DockPanel>
         </Border>
         <DataGrid Grid.Row="1" x:Name="SchemaGrid" MaxHeight="170" Style="{StaticResource HmiDenseTable}" MinWidth="720">

@@ -282,6 +282,12 @@ public sealed class UiRegressionSmokeTests : IDisposable
             if (string.IsNullOrWhiteSpace(textBlock.Text) || textBlock.ActualWidth <= 0 || textBlock.ActualHeight <= 0)
                 continue;
 
+            // Skip text that is not actually rendered - most importantly the item text inside
+            // closed ComboBox popups, which measures at popup-layout width and false-positives
+            // as clipped. The HMI layout audit applies the same visibility rule.
+            if (!textBlock.IsVisible)
+                continue;
+
             var desired = MeasureTextBlock(textBlock, textBlock.ActualWidth);
             var tooNarrow = textBlock.TextWrapping == TextWrapping.NoWrap && textBlock.TextTrimming == TextTrimming.None && desired.Width > textBlock.ActualWidth + 2;
             var tooShort = desired.Height > textBlock.ActualHeight + 3;

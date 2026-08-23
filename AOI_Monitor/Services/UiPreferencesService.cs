@@ -16,11 +16,16 @@ public enum UiLanguage
     Korean,
 }
 
+/// <summary>
+/// Standard is the single supported preset. The Compact (14 px) / Standard (15 px) /
+/// Large (17 px) window-default presets were retired 2026-08-23 when the typography floor
+/// rose to true 14 pt (18.67 DIP): every preset sat below the customer-spec floor, and
+/// per-station scaling is Windows DPI's job (the layout audit validates 100/125/150%).
+/// Legacy settings files carrying retired values normalize to Standard on load.
+/// </summary>
 public enum UiFontPreset
 {
-    Compact,
     Standard,
-    Large,
 }
 
 /// <summary>
@@ -350,9 +355,7 @@ public static class UiPreferencesService
         ["Display / Language"] = "화면 / 언어",
         ["Language"] = "언어",
         ["Font Size"] = "글자 크기",
-        ["Compact"] = "표준",
-        ["Standard"] = "크게",
-        ["Large"] = "매우 크게",
+        ["Standard - 14 pt operator floor"] = "표준 - 14pt 운영자 최소 크기",
         ["Program Assets"] = "프로그램 자산",
         ["Console Title"] = "콘솔 제목",
         ["Station Label"] = "스테이션 라벨",
@@ -628,12 +631,9 @@ public static class UiPreferencesService
         if (mainWindow.Content is FrameworkElement root)
             root.LayoutTransform = Transform.Identity;
 
-        mainWindow.FontSize = current.FontPreset switch
-        {
-            UiFontPreset.Compact => 14,
-            UiFontPreset.Large => 17,
-            _ => 15,
-        };
+        // Inherited default for any text without an explicit size: the operator floor.
+        _ = current.FontPreset;
+        mainWindow.FontSize = 18.67;
 
         var (width, height) = current.ResolutionPreset switch
         {

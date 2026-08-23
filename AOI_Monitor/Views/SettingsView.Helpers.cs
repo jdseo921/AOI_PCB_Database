@@ -263,14 +263,11 @@ public partial class SettingsView
 
         if (_isKorean)
         {
-            SetComboItemText(FontCombo, 0, "\uAE30\uBCF8 14px");
-            SetComboItemText(FontCombo, 1, "\uD45C\uC900 15px");
-            SetComboItemText(FontCombo, 2, "\uD06C\uAC8C 17px");
+            SetComboItemText(FontCombo, 0, "\uD45C\uC900 - 14pt \uC6B4\uC601\uC790 \uCD5C\uC18C \uD06C\uAE30");
             SetComboItemText(ResolutionCombo, 0, "1920 x 1080 \uCD5C\uC18C HMI");
             SetComboItemText(ResolutionCombo, 1, "2560 x 1440 \uC5D4\uC9C0\uB2C8\uC5B4\uB9C1 \uBAA8\uB2C8\uD130");
             SetComboItemText(ResolutionCombo, 2, "3840 x 2160 \uBCBD\uBA74 \uD45C\uC2DC");
             SetComboItemText(ThemeCombo, 0, "\uC0B0\uC5C5\uC6A9 \uB2E4\uD06C");
-            SetComboItemText(ThemeCombo, 1, "\uC0B0\uC5C5\uC6A9 \uB77C\uC774\uD2B8");
 
             SetComboItemText(DetectionPriorityCombo, 0, DetectionPriorityDisplay(Models.DetectionPriority.MinimizeFalsePositives, true));
             SetComboItemText(DetectionPriorityCombo, 1, DetectionPriorityDisplay(Models.DetectionPriority.Balanced, true));
@@ -278,9 +275,7 @@ public partial class SettingsView
         }
         else
         {
-            SetComboItemText(FontCombo, 0, "Compact 14 px base");
-            SetComboItemText(FontCombo, 1, "Standard 15 px base");
-            SetComboItemText(FontCombo, 2, "Large 17 px base");
+            SetComboItemText(FontCombo, 0, "Standard - 14 pt operator floor");
             SetComboItemText(ResolutionCombo, 0, "1920 x 1080 minimum HMI");
             SetComboItemText(ResolutionCombo, 1, "2560 x 1440 engineering monitor");
             SetComboItemText(ResolutionCombo, 2, "3840 x 2160 wall display");
@@ -312,12 +307,8 @@ public partial class SettingsView
     {
         var preferences = UiPreferencesService.Load();
         LangCombo.SelectedIndex = preferences.Language == UiLanguage.Korean ? 1 : 0;
-        FontCombo.SelectedIndex = preferences.FontPreset switch
-        {
-            UiFontPreset.Compact => 0,
-            UiFontPreset.Large => 2,
-            _ => 1,
-        };
+        _ = preferences.FontPreset;
+        FontCombo.SelectedIndex = 0;
         ResolutionCombo.SelectedIndex = preferences.ResolutionPreset switch
         {
             UiResolutionPreset.Qhd2560x1440 => 1,
@@ -339,12 +330,7 @@ public partial class SettingsView
         => new()
         {
             Language = LangCombo.SelectedIndex == 1 ? UiLanguage.Korean : UiLanguage.English,
-            FontPreset = FontCombo.SelectedIndex switch
-            {
-                0 => UiFontPreset.Compact,
-                2 => UiFontPreset.Large,
-                _ => UiFontPreset.Standard,
-            },
+            FontPreset = UiFontPreset.Standard,
             ResolutionPreset = ResolutionCombo.SelectedIndex switch
             {
                 1 => UiResolutionPreset.Qhd2560x1440,

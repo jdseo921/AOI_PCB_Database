@@ -497,8 +497,11 @@ public static class HmiLayoutAuditService
 
             if (IsCriticalText(textBlock) && textBlock.FontSize < MinimumReadableFontDip)
             {
-                issues.Add(CreateIssue(definition, dpiScale, "SmallCriticalText", Describe(textBlock), HmiLayoutIssueSeverity.Warn,
-                    $"Critical text is below 14 pt readable target. FontSize={textBlock.FontSize:N1} DIP."));
+                // Fail severity since 2026-08-23: the typography floor was raised to true 14 pt
+                // (18.67 DIP) across every shared style and literal, taking this rule from 948
+                // warnings to zero. It now blocks regressions instead of merely reporting them.
+                issues.Add(CreateIssue(definition, dpiScale, "SmallCriticalText", Describe(textBlock), HmiLayoutIssueSeverity.Fail,
+                    $"Critical text is below the 14 pt (18.67 DIP) operator floor. FontSize={textBlock.FontSize:N1} DIP."));
             }
 
             var desired = MeasureTextBlock(textBlock, textBlock.ActualWidth);
@@ -898,9 +901,18 @@ public static class HmiLayoutAuditService
             name.Contains("Verdict", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("ALARM", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("WARNING", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("NG", StringComparison.OrdinalIgnoreCase) ||
+            ContainsNgToken(text) ||
             text.Contains("FAIL", StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// True when the text carries the NG verdict as a standalone token. The previous substring
+    /// match flagged every word containing the "ng" bigram ("Settings", "Lighting", "Missing"),
+    /// which classified roughly a third of all page text as verdict-critical and made the
+    /// criticality-driven severities meaningless.
+    /// </summary>
+    private static bool ContainsNgToken(string text)
+        => System.Text.RegularExpressions.Regex.IsMatch(text ?? string.Empty, @"\bNG\b");
 
     private static bool IsTemplateInternal(FrameworkElement element)
         => element.TemplatedParent is not null ||
@@ -955,7 +967,7 @@ public static class HmiLayoutAuditService
             name.Contains("Summary", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("ALARM", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("WARNING", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("NG", StringComparison.OrdinalIgnoreCase) ||
+            ContainsNgToken(text) ||
             text.Contains("FAIL", StringComparison.OrdinalIgnoreCase);
     }
 

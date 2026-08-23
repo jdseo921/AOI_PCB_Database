@@ -47,12 +47,12 @@
             <TextBlock Text="Create Training Project" Style="{StaticResource HmiSectionHeaderText}"/>
             <TextBlock Text="{Binding CurrentProjectDisplay}" Style="{StaticResource HmiTechnicalHintText}" TextWrapping="Wrap" Margin="0,0,0,8"/>
             <TextBlock Text="Project Name" Style="{StaticResource FactoryFormFieldLabel}"/>
-            <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" FontSize="14" Margin="0,4,0,8"/>
+            <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,4,0,8"/>
             <TextBlock Text="Board Model" Style="{StaticResource FactoryFormFieldLabel}"/>
-            <TextBox Text="{Binding BoardModel, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" FontSize="14" Margin="0,4,0,8"/>
+            <TextBox Text="{Binding BoardModel, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,4,0,8"/>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Create Training Project" MinWidth="180" MinHeight="40" IsEnabled="{Binding CanCreateProject}" Click="OnCreateProjectClick"/>
             <Button Style="{StaticResource ActionBtn}" Content="Import Convention Folder" MinWidth="190" MinHeight="40" IsEnabled="{Binding CanCreateProject}" Click="OnImportProjectFolderClick" Margin="0,6,0,0"/>
-            <TextBlock Text="{Binding Guidance}" Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,8,0,0"/>
+            <TextBlock Text="{Binding Guidance}" Foreground="{DynamicResource HmiWarnBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"/>
           </StackPanel>
         </Border>
 
@@ -60,14 +60,14 @@
           <StackPanel>
             <TextBlock Text="Instruction Panel" Style="{StaticResource HmiSectionHeaderText}"/>
             <UniformGrid Columns="5" Margin="0,6,0,0">
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><TextBlock Text="Step 1: Upload reference/good PCB images." TextWrapping="Wrap" FontSize="14"/></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><TextBlock Text="Step 2: The program learns normal appearance." TextWrapping="Wrap" FontSize="14"/></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><TextBlock Text="Step 3: The program calibrates tolerance to reduce false calls." TextWrapping="Wrap" FontSize="14"/></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><TextBlock Text="Step 4: Run inspection on new images." TextWrapping="Wrap" FontSize="14"/></Border>
-              <Border Style="{StaticResource FieldBox}"><TextBlock Text="Step 5: Export report for review." TextWrapping="Wrap" FontSize="14"/></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><TextBlock Text="Step 1: Upload reference/good PCB images." TextWrapping="Wrap" FontSize="{StaticResource HmiFontSizeBody}"/></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><TextBlock Text="Step 2: The program learns normal appearance." TextWrapping="Wrap" FontSize="{StaticResource HmiFontSizeBody}"/></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><TextBlock Text="Step 3: The program calibrates tolerance to reduce false calls." TextWrapping="Wrap" FontSize="{StaticResource HmiFontSizeBody}"/></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><TextBlock Text="Step 4: Run inspection on new images." TextWrapping="Wrap" FontSize="{StaticResource HmiFontSizeBody}"/></Border>
+              <Border Style="{StaticResource FieldBox}"><TextBlock Text="Step 5: Export report for review." TextWrapping="Wrap" FontSize="{StaticResource HmiFontSizeBody}"/></Border>
             </UniformGrid>
             <TextBlock Text="No per-defect variables or training bounding boxes are required for this workflow."
-                       Foreground="{DynamicResource HmiSimulatedBrush}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                       Foreground="{DynamicResource HmiSimulatedBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"/>
           </StackPanel>
         </Border>
       </Grid>
@@ -90,10 +90,10 @@
                   <StackPanel>
                     <DockPanel>
                       <TextBlock DockPanel.Dock="Right" Text="{Binding ImageCount}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="20"/>
-                      <TextBlock Text="{Binding Title}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="16" TextWrapping="Wrap"/>
+                      <TextBlock Text="{Binding Title}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}" TextWrapping="Wrap"/>
                     </DockPanel>
-                    <TextBlock Text="{Binding Explanation}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,5,0,6"/>
-                    <TextBlock Text="{Binding LastFolder}" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" TextTrimming="CharacterEllipsis" ToolTip="{Binding LastFolder}" Margin="0,0,0,8"/>
+                    <TextBlock Text="{Binding Explanation}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,5,0,6"/>
+                    <TextBlock Text="{Binding LastFolder}" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextTrimming="CharacterEllipsis" ToolTip="{Binding LastFolder}" Margin="0,0,0,8"/>
                     <WrapPanel>
                       <Button Style="{StaticResource ActionBtnBlue}" Content="Add Images" MinWidth="120" MinHeight="40" IsEnabled="{Binding CanEdit}" Tag="{Binding Role}" Click="OnAddImagesClick" Margin="0,0,6,6"/>
                       <Button Style="{StaticResource ActionBtn}" Content="Import Folder" MinWidth="120" MinHeight="40" IsEnabled="{Binding CanEdit}" Tag="{Binding Role}" Click="OnImportRoleFolderClick" Margin="0,0,6,6"/>
@@ -118,11 +118,11 @@
           <StackPanel>
             <TextBlock Text="Visual Training Output" Style="{StaticResource HmiSectionHeaderText}"/>
             <TextBlock Text="{Binding CurrentModelDisplay}" Style="{StaticResource HmiTechnicalHintText}" TextWrapping="Wrap"/>
-            <TextBlock Text="{Binding ActiveInspectionModelDisplay}" Foreground="{DynamicResource HmiSimulatedBrush}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
+            <TextBlock Text="{Binding ActiveInspectionModelDisplay}" Foreground="{DynamicResource HmiSimulatedBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"/>
             <UniformGrid Columns="3" Margin="0,8,0,0">
               <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
                 <StackPanel>
-                  <TextBlock Text="Learned Reference Image" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14"/>
+                  <TextBlock Text="Learned Reference Image" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
                   <Border Background="#080A0C" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="1" Height="170" Margin="0,6,0,4">
                     <Image Source="{Binding LearnedReferencePath}" Stretch="Uniform"/>
                   </Border>
@@ -131,7 +131,7 @@
               </Border>
               <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0">
                 <StackPanel>
-                  <TextBlock Text="Learned Tolerance Map" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14"/>
+                  <TextBlock Text="Learned Tolerance Map" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
                   <Border Background="#080A0C" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="1" Height="170" Margin="0,6,0,4">
                     <Image Source="{Binding ToleranceMapPath}" Stretch="Uniform"/>
                   </Border>
@@ -140,7 +140,7 @@
               </Border>
               <Border Style="{StaticResource FieldBox}">
                 <StackPanel>
-                  <TextBlock Text="Anomaly Heatmap Preview" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14"/>
+                  <TextBlock Text="Anomaly Heatmap Preview" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
                   <Border Background="#080A0C" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="1" Height="170" Margin="0,6,0,4">
                     <Image Source="{Binding AnomalyHeatmapPath}" Stretch="Uniform"/>
                   </Border>
@@ -159,10 +159,10 @@
                 <DataTemplate>
                   <Border Style="{StaticResource TrainingTimelineChip}" Margin="0,0,0,6">
                     <DockPanel>
-                      <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" FontWeight="Bold" FontSize="14" Margin="8,0,0,0"/>
+                      <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Margin="8,0,0,0"/>
                       <StackPanel>
-                        <TextBlock Text="{Binding Label}" FontWeight="Bold" FontSize="14"/>
-                        <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Label}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
+                        <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                       </StackPanel>
                     </DockPanel>
                   </Border>
@@ -186,9 +186,9 @@
               <DataTemplate>
                 <Border Style="{StaticResource HmiKpiCard}" Width="250" MinHeight="98" Margin="0,0,8,8">
                   <StackPanel>
-                    <TextBlock Text="{Binding Label}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Label}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                     <TextBlock Text="{Binding Value}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="20" Margin="0,4,0,2"/>
-                    <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                   </StackPanel>
                 </Border>
               </DataTemplate>
@@ -196,9 +196,9 @@
           </ItemsControl>
           <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
             <StackPanel>
-              <TextBlock Text="{Binding FalseCallSummaryText}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
-              <TextBlock Text="{Binding PossibleEscapeSummaryText}" Foreground="{DynamicResource HmiWarnBrush}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
-              <TextBlock Text="{Binding RecommendedThresholdSummaryText}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
+              <TextBlock Text="{Binding FalseCallSummaryText}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
+              <TextBlock Text="{Binding PossibleEscapeSummaryText}" Foreground="{DynamicResource HmiWarnBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+              <TextBlock Text="{Binding RecommendedThresholdSummaryText}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"/>
             </StackPanel>
           </Border>
           <WrapPanel Margin="0,2,0,0">
@@ -218,7 +218,7 @@
             <StackPanel>
               <TextBlock Text="AI / Models > AI Training Setup > Manage Trained Data" Style="{StaticResource HmiSectionHeaderText}"/>
               <TextBlock Text="{Binding TrainedDataSummaryText}" Style="{StaticResource HmiTechnicalHintText}" TextWrapping="Wrap"/>
-              <TextBlock Text="{Binding ActiveTrainedDataModelDisplay}" Foreground="{DynamicResource HmiSimulatedBrush}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
+              <TextBlock Text="{Binding ActiveTrainedDataModelDisplay}" Foreground="{DynamicResource HmiSimulatedBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"/>
             </StackPanel>
           </DockPanel>
 
@@ -231,7 +231,7 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <Border Style="{StaticResource FieldBox}" Width="360" MinHeight="58" Margin="0,0,8,8">
-                  <TextBlock Text="{Binding}" Foreground="{DynamicResource HmiTextBrush}" FontSize="14" TextWrapping="Wrap"/>
+                  <TextBlock Text="{Binding}" Foreground="{DynamicResource HmiTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                 </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -249,13 +249,13 @@
                 <Border Style="{StaticResource FieldBox}" Width="430" MinHeight="234" Margin="0,0,8,8">
                   <StackPanel>
                     <DockPanel>
-                      <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Foreground="{DynamicResource HmiWarnBrush}" FontWeight="Bold" FontSize="14" Margin="8,0,0,0"/>
-                      <TextBlock Text="{Binding ProjectName}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="16" TextWrapping="Wrap"/>
+                      <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Foreground="{DynamicResource HmiWarnBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Margin="8,0,0,0"/>
+                      <TextBlock Text="{Binding ProjectName}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}" TextWrapping="Wrap"/>
                     </DockPanel>
                     <TextBlock Text="{Binding ProjectId}" Style="{StaticResource FactoryTrimmedTextWithTooltip}" Margin="0,4,0,0"/>
-                    <TextBlock Text="{Binding ImageGroupSummary}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,6,0,0"/>
-                    <TextBlock Text="{Binding MetricsSummary}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,6"/>
-                    <TextBox Text="{Binding RenameText, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" FontSize="14" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding ImageGroupSummary}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                    <TextBlock Text="{Binding MetricsSummary}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,6"/>
+                    <TextBox Text="{Binding RenameText, UpdateSourceTrigger=PropertyChanged}" MinHeight="40" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,6"/>
                     <WrapPanel>
                       <Button Style="{StaticResource ActionBtnBlue}" Content="Open Project" MinWidth="130" MinHeight="40" IsEnabled="{Binding DataContext.CanManageOpenProject, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding ProjectId}" Click="OnManageOpenProjectClick" Margin="0,0,6,6"/>
                       <Button Style="{StaticResource ActionBtn}" Content="Rename Project" MinWidth="145" MinHeight="40" IsEnabled="{Binding DataContext.CanManageRenameProject, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding}" Click="OnManageRenameProjectClick" Margin="0,0,6,6"/>
@@ -281,13 +281,13 @@
                 <Border Style="{StaticResource FieldBox}" Width="460" MinHeight="230" Margin="0,0,8,8">
                   <StackPanel>
                     <DockPanel>
-                      <TextBlock DockPanel.Dock="Right" Text="{Binding IsActive, StringFormat=Active: {0}}" Foreground="{DynamicResource HmiSimulatedBrush}" FontWeight="Bold" FontSize="14" Margin="8,0,0,0"/>
-                      <TextBlock Text="{Binding VersionDisplay}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="16" TextWrapping="Wrap"/>
+                      <TextBlock DockPanel.Dock="Right" Text="{Binding IsActive, StringFormat=Active: {0}}" Foreground="{DynamicResource HmiSimulatedBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Margin="8,0,0,0"/>
+                      <TextBlock Text="{Binding VersionDisplay}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}" TextWrapping="Wrap"/>
                     </DockPanel>
                     <TextBlock Text="{Binding ModelId}" Style="{StaticResource FactoryTrimmedTextWithTooltip}" Margin="0,4,0,0"/>
-                    <TextBlock Text="{Binding ProjectName}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                    <TextBlock Text="{Binding MetricsSummary}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,6,0,0"/>
-                    <TextBlock Text="{Binding ArtifactStatus}" Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    <TextBlock Text="{Binding ProjectName}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    <TextBlock Text="{Binding MetricsSummary}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                    <TextBlock Text="{Binding ArtifactStatus}" Foreground="{DynamicResource HmiWarnBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                     <TextBlock Text="{Binding ArtifactFolder}" Style="{StaticResource FactoryTrimmedTextWithTooltip}" Margin="0,4,0,8"/>
                     <WrapPanel>
                       <Button Style="{StaticResource ActionBtnAmber}" Content="Set Active" MinWidth="120" MinHeight="40" IsEnabled="{Binding DataContext.CanManageSetActiveModel, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding ModelId}" Click="OnManageSetActiveModelClick" Margin="0,0,6,6"/>
@@ -313,7 +313,7 @@
 
             <Border Grid.Column="0" Style="{StaticResource FieldBox}" MinHeight="180">
               <StackPanel>
-                <TextBlock Text="Calibration Runs" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="16"/>
+                <TextBlock Text="Calibration Runs" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/>
                 <ItemsControl ItemsSource="{Binding TrainedDataCalibrationRuns}" Margin="0,6,0,0">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -321,8 +321,8 @@
                         <StackPanel>
                           <TextBlock Text="{Binding CalibrationId}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
                           <TextBlock Text="{Binding ModelId}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
-                          <TextBlock Text="{Binding Summary}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap"/>
-                          <TextBlock Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" TextWrapping="Wrap">
+                          <TextBlock Text="{Binding Summary}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
+                          <TextBlock Foreground="{DynamicResource HmiWarnBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap">
                             <Run Text="False calls "/><Run Text="{Binding FalseCallRateDisplay}"/><Run Text=" / Possible escapes "/><Run Text="{Binding PossibleEscapeRateDisplay}"/>
                           </TextBlock>
                         </StackPanel>
@@ -335,15 +335,15 @@
 
             <Border Grid.Column="2" Style="{StaticResource FieldBox}" MinHeight="180">
               <StackPanel>
-                <TextBlock Text="Exported Reports" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="16"/>
+                <TextBlock Text="Exported Reports" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/>
                 <ItemsControl ItemsSource="{Binding TrainedDataExportedReports}" Margin="0,6,0,0">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
                       <Border BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,6" Margin="0,0,0,6">
                         <StackPanel>
-                          <TextBlock Text="{Binding ExportType}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                          <TextBlock Text="{Binding ExportType}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                           <TextBlock Text="{Binding FilePath}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
-                          <TextBlock Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap">
+                          <TextBlock Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap">
                             <Run Text="Status "/><Run Text="{Binding Status}"/><Run Text=" / Operator "/><Run Text="{Binding OperatorId}"/>
                           </TextBlock>
                         </StackPanel>
@@ -356,15 +356,15 @@
 
             <Border Grid.Column="4" Style="{StaticResource FieldBox}" MinHeight="180">
               <StackPanel>
-                <TextBlock Text="Version Comparison" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="16"/>
+                <TextBlock Text="Version Comparison" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/>
                 <ItemsControl ItemsSource="{Binding TrainedDataModelComparisons}" Margin="0,6,0,0">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
                       <Border BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,6" Margin="0,0,0,6">
                         <StackPanel>
-                          <TextBlock Text="{Binding VersionDisplay}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                          <TextBlock Text="{Binding VersionDisplay}" Foreground="{DynamicResource HmiTextBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                           <TextBlock Text="{Binding ModelId}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
-                          <TextBlock Text="{Binding ComparisonSummary}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap"/>
+                          <TextBlock Text="{Binding ComparisonSummary}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                         </StackPanel>
                       </Border>
                     </DataTemplate>
@@ -377,7 +377,7 @@
       </Border>
 
       <Border Style="{StaticResource Panel}" Padding="10">
-        <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
       </Border>
     </StackPanel>
   </ScrollViewer>

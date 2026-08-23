@@ -18,9 +18,9 @@
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <StackPanel>
-          <TextBlock Text="3D Profile Viewer" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+          <TextBlock Text="3D Profile Viewer" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
           <TextBlock Text="Sample Data Mode. CSV height-map review only. 3D Camera Not Connected."
-                     Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" FontWeight="Bold" Margin="0,3,0,0"/>
+                     Foreground="{DynamicResource HmiWarnBrush}" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold" Margin="0,3,0,0"/>
         </StackPanel>
         <StackPanel Grid.Column="1" HorizontalAlignment="Right">
           <WrapPanel HorizontalAlignment="Right">
@@ -31,11 +31,11 @@
               <ComboBoxItem Content="None" Tag="None"/>
             </ComboBox>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Load Height CSV" Margin="0,0,8,6" Click="OnLoadCsvClick"/>
-            <Border x:Name="ProfileSourceBadge" Style="{StaticResource HmiEvidenceSampleData}" VerticalAlignment="Center" Margin="0,0,6,6">
-              <TextBlock x:Name="ProfileSourceBadgeText" Text="Sample CSV" FontWeight="Bold" FontSize="14"/>
+            <Border x:Name="ProfileSourceBadge" Style="{StaticResource HmiEvidenceSampleData}" MinWidth="140" VerticalAlignment="Center" Margin="0,0,6,6">
+              <TextBlock x:Name="ProfileSourceBadgeText" Text="Sample CSV" FontWeight="Bold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}" FontSize="{StaticResource HmiFontSizeBody}"/>
             </Border>
             <Border x:Name="ProfileConnectionBadge" Style="{StaticResource HmiEvidenceNotConnected}" VerticalAlignment="Center" Margin="0,0,0,6">
-              <TextBlock x:Name="ProfileConnectionBadgeText" Text="Not Connected" FontWeight="Bold" FontSize="14"/>
+              <TextBlock x:Name="ProfileConnectionBadgeText" Text="Not Connected" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
             </Border>
           </WrapPanel>
           <WrapPanel HorizontalAlignment="Right">
@@ -65,8 +65,8 @@
               <Button x:Name="ResetViewButton" DockPanel.Dock="Right" Style="{StaticResource MiniBtn}" MinWidth="120"
                       Content="Reset View" Margin="8,0,0,0" VerticalAlignment="Center" Click="OnResetViewClick"
                       ToolTip="Reset the 3D surface rotation, zoom, and pan to the default view."/>
-              <TextBlock x:Name="MapStatusText" DockPanel.Dock="Right" Text="No CSV loaded" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" VerticalAlignment="Center" Margin="8,0,0,0"/>
-              <TextBlock Text="3D Surface Height Map" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14" VerticalAlignment="Center"/>
+              <TextBlock x:Name="MapStatusText" DockPanel.Dock="Right" Text="No CSV loaded" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+              <TextBlock Text="3D Surface Height Map" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}" VerticalAlignment="Center"/>
             </DockPanel>
           </Border>
           <Border Grid.Row="1" Margin="8" Background="#050607" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="1">
@@ -128,11 +128,11 @@
               </Border>
 
               <TextBlock x:Name="EmptyMapText" Text="Load a CSV with columns: x,y,height"
-                         Foreground="#7F8C95" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" IsHitTestVisible="False"/>
+                         Foreground="#7F8C95" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" IsHitTestVisible="False"/>
 
               <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,10"
                       Background="#B00B0E10" BorderBrush="#3A4650" BorderThickness="1" Padding="8,5" IsHitTestVisible="False">
-                <TextBlock Text="Drag: rotate   -   Wheel: zoom   -   Right-drag: pan" Foreground="#DCE5EB" FontSize="14"/>
+                <TextBlock Text="Drag: rotate   -   Wheel: zoom   -   Right-drag: pan" Foreground="#DCE5EB" FontSize="{StaticResource HmiFontSizeBody}"/>
               </Border>
 
               <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0" Width="212"
@@ -142,7 +142,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="150"/>
                   </Grid.RowDefinitions>
-                  <TextBlock Text="Top-Down 2D Map" Foreground="#9AA6AF" FontSize="14" FontWeight="Bold" Margin="0,0,0,4"/>
+                  <TextBlock Text="Top-Down 2D Map" Foreground="#9AA6AF" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold" Margin="0,0,0,4"/>
                   <Grid Grid.Row="1">
                     <Image x:Name="HeightMapImage" Stretch="Uniform"
                            MouseLeftButtonDown="OnHeightMapClick"
@@ -161,8 +161,8 @@
                     <RowDefinition Height="Auto"/>
                   </Grid.RowDefinitions>
                   <DockPanel>
-                    <TextBlock x:Name="LegendMaxText" DockPanel.Dock="Right" Text="--" Foreground="{DynamicResource HmiTextBodyBrush}" FontSize="14" FontWeight="Bold"/>
-                    <TextBlock Text="Height Scale" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14"/>
+                    <TextBlock x:Name="LegendMaxText" DockPanel.Dock="Right" Text="--" Foreground="{DynamicResource HmiTextBodyBrush}" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold"/>
+                    <TextBlock Text="Height Scale" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
                   </DockPanel>
                   <Rectangle Grid.Row="1" Height="10" RadiusX="1" RadiusY="1">
                     <Rectangle.Fill>
@@ -174,8 +174,8 @@
                     </Rectangle.Fill>
                   </Rectangle>
                   <DockPanel Grid.Row="2" Margin="0,4,0,0">
-                    <TextBlock x:Name="LegendMinText" Text="--" Foreground="{DynamicResource HmiTextBodyBrush}" FontSize="14" FontWeight="Bold"/>
-                    <TextBlock Text="low to high" HorizontalAlignment="Center" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" TextAlignment="Center"/>
+                    <TextBlock x:Name="LegendMinText" Text="--" Foreground="{DynamicResource HmiTextBodyBrush}" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold"/>
+                    <TextBlock Text="low to high" HorizontalAlignment="Center" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextAlignment="Center"/>
                   </DockPanel>
                 </Grid>
               </Border>
@@ -200,7 +200,7 @@
               <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Selected Defect Details" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+              <TextBlock Text="Selected Defect Details" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
             </Border>
             <Grid Grid.Row="1" Margin="8">
               <Grid.ColumnDefinitions>
@@ -245,8 +245,8 @@
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
               <DockPanel LastChildFill="True">
-                <TextBlock x:Name="DefectCountText" DockPanel.Dock="Right" Text="0 features" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" VerticalAlignment="Center"/>
-                <TextBlock Text="Detected Features" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14" VerticalAlignment="Center"/>
+                <TextBlock x:Name="DefectCountText" DockPanel.Dock="Right" Text="0 features" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" VerticalAlignment="Center"/>
+                <TextBlock Text="Detected Features" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}" VerticalAlignment="Center"/>
               </DockPanel>
             </Border>
             <DataGrid Grid.Row="1" x:Name="DefectListGrid" Margin="8" AutoGenerateColumns="False" IsReadOnly="True"
@@ -270,8 +270,8 @@
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
               <DockPanel LastChildFill="True">
-                <TextBlock x:Name="SliceRowText" DockPanel.Dock="Right" Text="--" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" VerticalAlignment="Center"/>
-                <TextBlock Text="Height Slice Profile" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14" VerticalAlignment="Center"/>
+                <TextBlock x:Name="SliceRowText" DockPanel.Dock="Right" Text="--" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" VerticalAlignment="Center"/>
+                <TextBlock Text="Height Slice Profile" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}" VerticalAlignment="Center"/>
               </DockPanel>
             </Border>
             <Canvas Grid.Row="1" x:Name="ProfileCanvas" Background="#050607" Margin="8" SizeChanged="OnProfileCanvasSizeChanged"/>

@@ -22,14 +22,14 @@
 
     <Style x:Key="SettingsLabel" TargetType="TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="TextWrapping" Value="Wrap"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
     <Style x:Key="SettingsValueText" TargetType="TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
 
@@ -38,7 +38,7 @@
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
       <Setter Property="MinHeight" Value="38"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
 
@@ -55,7 +55,7 @@
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="MinHeight" Value="34"/>
       <Setter Property="Padding" Value="8,5"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     </Style>
 
     <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
@@ -204,11 +204,9 @@
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="FontSizeLabelText" Text="Font Size" Style="{StaticResource SettingsLabel}"/>
-                    <ComboBox Grid.Column="1" x:Name="FontCombo" AutomationProperties.Name="Base font size" SelectedIndex="1" Style="{StaticResource SettingsCombo}"
-                              ToolTip="Base window font size in pixels. Page text that sets its own HMI size is not scaled by this preset.">
-                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Compact 14 px base</ComboBoxItem>
-                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Standard 15 px base</ComboBoxItem>
-                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Large 17 px base</ComboBoxItem>
+                    <ComboBox Grid.Column="1" x:Name="FontCombo" AutomationProperties.Name="Base font size" SelectedIndex="0" IsEnabled="False" Style="{StaticResource SettingsCombo}"
+                              ToolTip="Operator text is fixed at the customer-spec floor of 14 pt (18.67 px); the layout audit fails below it. Use Windows display scaling for per-station sizing - layouts are validated at 100/125/150% DPI.">
+                      <ComboBoxItem Style="{StaticResource SettingsComboItem}">Standard - 14 pt operator floor</ComboBoxItem>
                     </ComboBox>
                   </Grid>
 
@@ -264,7 +262,7 @@
 
                   <TextBlock x:Name="OperatingModePolicyText"
                              Text="Demo Mode allows sample data, demo role selection, and simulated sources."
-                             Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" TextWrapping="Wrap"/>
+                             Foreground="{DynamicResource HmiWarnBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                 </StackPanel>
               </Border>
             </StackPanel>
@@ -324,7 +322,7 @@
 
                   <TextBlock x:Name="ProgramAssetsPolicyText"
                              Text="Changes are staged until Apply. Cancel discards edits and restores the last saved asset settings."
-                             Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" TextWrapping="Wrap"/>
+                             Foreground="{DynamicResource HmiWarnBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                 </StackPanel>
               </Border>
 
@@ -355,7 +353,7 @@
                             Content="Apply Data Retention Policy" Click="OnApplyRetentionClick"/>
                   </WrapPanel>
                   <TextBlock x:Name="RetentionStatusText" Text="Retention policy: loading..." Foreground="{DynamicResource HmiTextLabelBrush}"
-                             FontSize="14" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                             FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                 </StackPanel>
               </Border>
 
@@ -488,13 +486,13 @@
 
                   <UniformGrid Columns="2" Margin="0,4,0,0">
                     <TextBlock Text="Runtime status" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="EngineRuntimeStatusText" Text="Pixel Difference Prototype Engine" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="EngineRuntimeStatusText" Text="Pixel Difference Prototype Engine" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="Saved version" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="EngineVersionText" Text="PIXEL_DIFF_0.2" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="EngineVersionText" Text="PIXEL_DIFF_0.2" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="Last model check" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="ModelCheckResultText" Text="Not Tested" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="ModelCheckResultText" Text="Not Tested" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="Checked at" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="ModelCheckTimestampText" Text="--" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="ModelCheckTimestampText" Text="--" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                   </UniformGrid>
                   <TextBlock x:Name="ModelCheckMessageText" Text="No model configuration test has been run." Style="{StaticResource HmiTechnicalHintText}" Margin="0,8,0,0"/>
                   <Button x:Name="TestModelBtn" Style="{StaticResource ActionBtnBlue}" Content="Test Model Configuration" Click="OnTestModelConfigurationClick" Margin="0,10,0,0" HorizontalAlignment="Left"/>
@@ -530,10 +528,10 @@
                   <TextBlock x:Name="TaxonomySummaryText" Text="Active taxonomy not loaded." Style="{StaticResource HmiTechnicalHintText}" Margin="0,6,0,8"/>
                   <WrapPanel>
                     <Button x:Name="ImportTaxonomyBtn" Style="{StaticResource MiniBtn}" Content="Import CSV" Margin="0,0,8,8" Click="OnImportTaxonomyClick"/>
-                    <Button x:Name="ExportTaxonomyBtn" Style="{StaticResource MiniBtn}" Content="Export CSV" Margin="0,0,0,8" Click="OnExportTaxonomyClick"/>
+                    <Button x:Name="ExportTaxonomyBtn" MinHeight="40" MinWidth="120" Style="{StaticResource MiniBtn}" Content="Export CSV" Margin="0,0,0,8" Click="OnExportTaxonomyClick"/>
                   </WrapPanel>
                   <TextBlock Text="Engineer/Admin only. Label aliases, customer display names, model label IDs, and MES defect codes are audited through the active taxonomy."
-                             Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" TextWrapping="Wrap"/>
+                             Foreground="{DynamicResource HmiWarnBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                 </StackPanel>
               </Border>
             </StackPanel>
@@ -556,9 +554,9 @@
                     <Button x:Name="RegisterModelBtn" Style="{StaticResource MiniBtnGreen}" Content="Register Model" Margin="0,0,8,8" Click="OnRegisterModelClick"/>
                     <Button x:Name="ValidateRegisteredModelBtn" Style="{StaticResource MiniBtn}" Content="Validate" Margin="0,0,8,8" Click="OnValidateRegisteredModelClick"/>
                     <Button x:Name="SetActiveModelBtn" Style="{StaticResource MiniBtnAmber}" Content="Set Active" Margin="0,0,8,8" Click="OnSetActiveModelClick"/>
-                    <Button x:Name="RunModelAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Run Model Acceptance" MinWidth="170" Margin="0,0,8,8" Click="OnRunModelAcceptanceClick" ToolTip="Acceptance means evidence review against configured criteria; it does not automatically approve production release."/>
+                    <Button x:Name="RunModelAcceptanceBtn" MinHeight="40" Style="{StaticResource MiniBtn}" Content="Run Model Acceptance" MinWidth="170" Margin="0,0,8,8" Click="OnRunModelAcceptanceClick" ToolTip="Acceptance means evidence review against configured criteria; it does not automatically approve production release."/>
                     <Button x:Name="CancelModelAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel Acceptance" MinWidth="150" Margin="0,0,8,8" Click="OnCancelModelAcceptanceClick" IsEnabled="False"/>
-                    <Button x:Name="ViewModelAcceptanceRunsBtn" Style="{StaticResource MiniBtn}" Content="View Acceptance Runs" MinWidth="170" Margin="0,0,8,8" Click="OnViewModelAcceptanceRunsClick"/>
+                    <Button x:Name="ViewModelAcceptanceRunsBtn" MinHeight="40" Style="{StaticResource MiniBtn}" Content="View Acceptance Runs" MinWidth="170" Margin="0,0,8,8" Click="OnViewModelAcceptanceRunsClick"/>
                     <Button x:Name="CreateModelReleasePackageBtn" Style="{StaticResource MiniBtnGreen}" Content="Create Model Release Package" MinWidth="220" Margin="0,0,8,8" Click="OnCreateModelReleasePackageClick"/>
                     <Button x:Name="PromoteProductionCandidateBtn" Style="{StaticResource MiniBtnAmber}" Content="Promote to Production Candidate" MinWidth="230" Margin="0,0,8,8" Click="OnPromoteProductionCandidateClick"/>
                     <Button x:Name="DeployModelBtn" Style="{StaticResource MiniBtnGreen}" Content="Deploy" Margin="0,0,8,8" Click="OnDeployModelClick"/>
@@ -720,19 +718,19 @@
 
                   <UniformGrid Columns="2">
                     <TextBlock Text="Source status" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="CameraSourceStatusText" Text="Not Connected" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource HmiNgBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="CameraSourceStatusText" Text="Not Connected" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiNgBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="Acceptance" Style="{StaticResource SettingsLabel}" ToolTip="Acceptance means evidence collected against configured criteria. It does not certify production readiness by itself."/>
-                    <TextBlock x:Name="CameraAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="CameraAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                   </UniformGrid>
 
                   <WrapPanel Margin="0,8,0,0">
                     <Button x:Name="TestCameraSourceBtn" Style="{StaticResource MiniBtn}" Content="Test Camera Source" MinWidth="150" Margin="0,0,8,8" Click="OnTestCameraSourceClick"/>
                     <Button x:Name="DiscoverCameraAdaptersBtn" Style="{StaticResource MiniBtn}" Content="Discover Adapters" MinWidth="160" Margin="0,0,8,8" Click="OnDiscoverCameraAdaptersClick"/>
                     <Button x:Name="DiscoverCamerasBtn" Style="{StaticResource MiniBtn}" Content="Discover Cameras" MinWidth="150" Margin="0,0,8,8" Click="OnDiscoverCamerasClick"/>
-                    <Button x:Name="RunCameraAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Camera Acceptance Test" MinWidth="210" Margin="0,0,8,8" Click="OnRunCameraAcceptanceClick"/>
+                    <Button x:Name="RunCameraAcceptanceBtn" MinHeight="40" Style="{StaticResource MiniBtnGreen}" Content="Run Camera Acceptance Test" MinWidth="210" Margin="0,0,8,8" Click="OnRunCameraAcceptanceClick"/>
                     <Button x:Name="CancelCameraAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,8,8" Click="OnCancelCameraAcceptanceClick" IsEnabled="False"/>
-                    <Button x:Name="ExportCameraAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" MinWidth="130" Margin="0,0,8,8" Click="OnExportCameraAcceptanceClick"/>
-                    <Button x:Name="ExportHardwareAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Hardware Acceptance Package" MinWidth="260" Margin="0,0,0,8" Click="OnExportHardwareAcceptanceClick" ToolTip="Exports camera, lighting, robot, and 3D acceptance evidence with simulated/mock limitations labeled."/>
+                    <Button x:Name="ExportCameraAcceptanceBtn" MinHeight="40" Style="{StaticResource MiniBtn}" Content="Export Report" MinWidth="130" Margin="0,0,8,8" Click="OnExportCameraAcceptanceClick"/>
+                    <Button x:Name="ExportHardwareAcceptanceBtn" MinHeight="40" Style="{StaticResource MiniBtn}" Content="Export Hardware Acceptance Package" MinWidth="260" Margin="0,0,0,8" Click="OnExportHardwareAcceptanceClick" ToolTip="Exports camera, lighting, robot, and 3D acceptance evidence with simulated/mock limitations labeled."/>
                   </WrapPanel>
                   <TextBlock x:Name="CameraDiagnosticsText" Text="Generic adapter configured is not the same as camera connected." Style="{StaticResource HmiTechnicalHintText}"/>
                 </StackPanel>
@@ -793,17 +791,17 @@
 
                   <UniformGrid Columns="2">
                     <TextBlock Text="Lighting status" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="LightingSettingsStatusText" Text="Lighting: Not Connected" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource HmiNgBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="LightingSettingsStatusText" Text="Lighting: Not Connected" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiNgBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="Sync acceptance" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="LightingAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="LightingAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                   </UniformGrid>
                   <WrapPanel Margin="0,8,0,0">
                     <Button x:Name="TestLightingBtn" Style="{StaticResource MiniBtn}" Content="Test Lighting" Margin="0,0,8,8" Click="OnTestLightingClick"/>
-                    <Button x:Name="RunLightingAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Lighting Sync Test" MinWidth="190" Margin="0,0,8,8" Click="OnRunLightingAcceptanceClick"/>
+                    <Button x:Name="RunLightingAcceptanceBtn" MinHeight="40" Style="{StaticResource MiniBtnGreen}" Content="Run Lighting Sync Test" MinWidth="190" Margin="0,0,8,8" Click="OnRunLightingAcceptanceClick"/>
                     <Button x:Name="CancelLightingAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,8,8" Click="OnCancelLightingAcceptanceClick" IsEnabled="False"/>
-                    <Button x:Name="ExportLightingAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" MinWidth="130" Margin="0,0,0,8" Click="OnExportLightingAcceptanceClick"/>
+                    <Button x:Name="ExportLightingAcceptanceBtn" MinHeight="40" Style="{StaticResource MiniBtn}" Content="Export Report" MinWidth="130" Margin="0,0,0,8" Click="OnExportLightingAcceptanceClick"/>
                   </WrapPanel>
-                  <TextBlock x:Name="LightingDiagnosticsText" Text="Simulated mode is not real hardware. TCP/serial commands are sent only when explicitly configured." Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="LightingDiagnosticsText" Text="Simulated mode is not real hardware. TCP/serial commands are sent only when explicitly configured." Foreground="{DynamicResource HmiWarnBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                 </StackPanel>
               </Border>
 
@@ -814,16 +812,16 @@
                              Style="{StaticResource HmiTechnicalHintText}" Margin="0,4,0,10"/>
                   <UniformGrid Columns="2">
                     <TextBlock Text="Robot acceptance" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="RobotAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="RobotAcceptanceStatusText" Text="Not validated" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="Evidence boundary" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock Text="Simulation is not production robot validation" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock Text="Simulation is not production robot validation" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiWarnBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                   </UniformGrid>
                   <WrapPanel Margin="0,8,0,0">
-                    <Button x:Name="RunRobotCellAcceptanceBtn" Style="{StaticResource MiniBtnGreen}" Content="Run Robot Cell Acceptance" MinWidth="210" Margin="0,0,8,8" Click="OnRunRobotCellAcceptanceClick"/>
+                    <Button x:Name="RunRobotCellAcceptanceBtn" MinHeight="40" Style="{StaticResource MiniBtnGreen}" Content="Run Robot Cell Acceptance" MinWidth="210" Margin="0,0,8,8" Click="OnRunRobotCellAcceptanceClick"/>
                     <Button x:Name="CancelRobotCellAcceptanceBtn" Style="{StaticResource MiniBtnAmber}" Content="Cancel" Margin="0,0,8,8" Click="OnCancelRobotCellAcceptanceClick" IsEnabled="False"/>
-                    <Button x:Name="ExportRobotCellAcceptanceBtn" Style="{StaticResource MiniBtn}" Content="Export Report" MinWidth="130" Margin="0,0,0,8" Click="OnExportRobotCellAcceptanceClick"/>
+                    <Button x:Name="ExportRobotCellAcceptanceBtn" MinHeight="40" Style="{StaticResource MiniBtn}" Content="Export Report" MinWidth="130" Margin="0,0,0,8" Click="OnExportRobotCellAcceptanceClick"/>
                   </WrapPanel>
-                  <TextBlock x:Name="RobotAcceptanceDiagnosticsText" Text="Robot/PLC controls default to Not Connected. Real Hardware is not connected from this screen. Simulated evidence never claims real hardware readiness or safety certification." Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="RobotAcceptanceDiagnosticsText" Text="Robot/PLC controls default to Not Connected. Real Hardware is not connected from this screen. Simulated evidence never claims real hardware readiness or safety certification." Foreground="{DynamicResource HmiWarnBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                 </StackPanel>
               </Border>
             </StackPanel>
@@ -914,13 +912,13 @@
                   <TextBox x:Name="MesRetryBackoffText" AutomationProperties.Name="MES retry backoff milliseconds" Grid.Column="5" MinHeight="34" Text="500"/>
                 </Grid>
 
-                <CheckBox x:Name="MesAutoUploadCheck" Content="Automatic upload when inspection result is saved" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,8"/>
+                <CheckBox x:Name="MesAutoUploadCheck" Content="Automatic upload when inspection result is saved" Foreground="{DynamicResource TextBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,8"/>
                 <Button x:Name="TestMesRestBtn" Style="{StaticResource MiniBtn}" Content="Test / Send Payload" MinWidth="160" Margin="0,0,0,8" Click="OnTestMesRestClick" HorizontalAlignment="Left"/>
                 <TextBlock Text="REST mode is an integration boundary, not MES validation. OPC UA is a Stage 4 adapter TODO. Secrets are redacted from logs/status."
-                           Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                           Foreground="{DynamicResource HmiWarnBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                 <UniformGrid Columns="2">
                   <TextBlock Text="MES status" Style="{StaticResource SettingsLabel}"/>
-                  <TextBlock x:Name="MesMockStatusText" Text="MES: Not Connected" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource HmiNgBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="MesMockStatusText" Text="MES: Not Connected" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiNgBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                 </UniformGrid>
                 <TextBlock x:Name="MesDiagnosticsText" Text="Default mode is Not Connected. Mock local writes JSON evidence only." Style="{StaticResource HmiTechnicalHintText}" Margin="0,8,0,0"/>
               </StackPanel>
@@ -963,10 +961,10 @@
                   <PasswordBox x:Name="CentralSyncSecretBox" AutomationProperties.Name="Central sync secret" Grid.Column="3" Style="{StaticResource SettingsPasswordBox}"/>
                 </Grid>
 
-                <CheckBox x:Name="CentralSyncIncludeImagesCheck" Content="Include image file references only when explicitly enabled" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,4"/>
-                <CheckBox x:Name="CentralSyncRedactOperatorCheck" Content="Redact operator identifiers from payloads" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,4"/>
-                <CheckBox x:Name="CentralSyncRedactImagePathsCheck" Content="Redact image and package paths from payloads" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,4"/>
-                <CheckBox x:Name="CentralSyncRedactEndpointCheck" Content="Redact endpoints/folders from exported reports" Foreground="{DynamicResource TextBrush}" FontSize="14" Margin="0,0,0,8"/>
+                <CheckBox x:Name="CentralSyncIncludeImagesCheck" Content="Include image file references only when explicitly enabled" Foreground="{DynamicResource TextBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
+                <CheckBox x:Name="CentralSyncRedactOperatorCheck" Content="Redact operator identifiers from payloads" Foreground="{DynamicResource TextBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
+                <CheckBox x:Name="CentralSyncRedactImagePathsCheck" Content="Redact image and package paths from payloads" Foreground="{DynamicResource TextBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
+                <CheckBox x:Name="CentralSyncRedactEndpointCheck" Content="Redact endpoints/folders from exported reports" Foreground="{DynamicResource TextBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,8"/>
                 <TextBlock x:Name="CentralSyncStatusText" Text="Central sync disabled. Local SQLite remains the offline source of truth." Style="{StaticResource HmiTechnicalHintText}"/>
               </StackPanel>
             </Border>
@@ -992,18 +990,18 @@
                   <WrapPanel>
                     <Button Style="{StaticResource MiniBtnGreen}" Content="Prepare" Margin="0,0,8,8" Click="OnStartTrainingClick"/>
                     <Button Style="{StaticResource MiniBtn}" Content="Validate List" MinWidth="130" Margin="0,0,8,8" Click="OnRunEpochClick"/>
-                    <Button Style="{StaticResource MiniBtnAmber}" Content="Stop" Margin="0,0,8,8" Click="OnStopTrainingClick"/>
+                    <Button Style="{StaticResource MiniBtnAmber}" Content="Stop" MinHeight="40" MinWidth="120" Margin="0,0,8,8" Click="OnStopTrainingClick"/>
                     <Button Style="{StaticResource MiniBtn}" Content="Open Folder" Margin="0,0,0,8" Click="OnOpenTrainingFolderClick"/>
                   </WrapPanel>
                   <UniformGrid Columns="2" Margin="0,4,0,0">
                     <TextBlock Text="Export status" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="TrainingStatusText" Text="IDLE" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TrainingStatusText" Text="IDLE" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="Queued samples" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="TrainingQueueText" Text="0" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TrainingQueueText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="List checks" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="TrainingEpochText" Text="0" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TrainingEpochText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                     <TextBlock Text="List quality" Style="{StaticResource SettingsLabel}"/>
-                    <TextBlock x:Name="TrainingValidationText" Text="--" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TrainingValidationText" Text="--" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" TextWrapping="Wrap"/>
                   </UniformGrid>
                 </StackPanel>
               </Border>
@@ -1011,7 +1009,7 @@
               <Border Style="{StaticResource SettingsPanel}">
                 <StackPanel>
                   <TextBlock Text="Localization" Style="{StaticResource HmiSectionHeaderText}"/>
-                  <TextBlock x:Name="LocalizationScopeText" TextWrapping="Wrap" LineHeight="20" FontSize="14"
+                  <TextBlock x:Name="LocalizationScopeText" TextWrapping="Wrap" LineHeight="25" FontSize="{StaticResource HmiFontSizeBody}"
                              Text="Language/font changes are applied after pressing Apply. Supported shell, page, table, and Settings labels update immediately; technical codes and evidence IDs remain English for traceability."/>
                 </StackPanel>
               </Border>
@@ -1044,7 +1042,7 @@
               <Border Style="{StaticResource SettingsPanel}">
                 <StackPanel>
                   <TextBlock Text="Configuration Policy" Style="{StaticResource HmiSectionHeaderText}"/>
-                  <TextBlock TextWrapping="Wrap" LineHeight="20" FontSize="14"
+                  <TextBlock TextWrapping="Wrap" LineHeight="25" FontSize="{StaticResource HmiFontSizeBody}"
                              Text="Training set export prepares local candidate files only. No model training, fine-tuning, or deployment is run from this prototype."/>
                 </StackPanel>
               </Border>

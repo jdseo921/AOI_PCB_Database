@@ -59,7 +59,7 @@
         <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
             <Border DockPanel.Dock="Right" Style="{StaticResource HmiEvidenceSampleData}" Padding="8,3">
-              <TextBlock Text="Prototype / sample evidence only" Foreground="{DynamicResource HmiWarnSoftBrush}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+              <TextBlock Text="Prototype / sample evidence only" Foreground="{DynamicResource HmiWarnSoftBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
             </Border>
             <TextBlock Text="Stage 1 Customer Validation" Style="{StaticResource HmiSectionHeaderText}"/>
           </DockPanel>
@@ -74,7 +74,7 @@
           </Grid.ColumnDefinitions>
 
           <StackPanel Grid.Column="0">
-            <TextBlock Text="Test Image Folder" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,0,4"/>
+            <TextBlock Text="Test Image Folder" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
             <Grid>
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
               <TextBox x:Name="FolderPathText" Style="{StaticResource ReadonlyInput}" Text="No folder selected" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
@@ -83,7 +83,7 @@
           </StackPanel>
 
           <StackPanel Grid.Column="2">
-            <TextBlock Text="Ground Truth CSV (optional)" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,0,4" ToolTip="Ground truth is the reviewed answer used to compare model output."/>
+            <TextBlock Text="Ground Truth CSV (optional)" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4" ToolTip="Ground truth is the reviewed answer used to compare model output."/>
             <Grid>
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="6"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
               <TextBox x:Name="GroundTruthPathText" Style="{StaticResource ReadonlyInput}" Text="No CSV selected" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
@@ -92,7 +92,7 @@
           </StackPanel>
 
           <StackPanel Grid.Column="4">
-            <TextBlock Text="Engine" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,0,4" ToolTip="Pixel Difference, ONNX, or Learned PCB Visual Model. Learned visual models are image-only Stage 1 evidence."/>
+            <TextBlock Text="Engine" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4" ToolTip="Pixel Difference, ONNX, or Learned PCB Visual Model. Learned visual models are image-only Stage 1 evidence."/>
             <TextBox x:Name="EngineText" Style="{StaticResource ReadonlyInput}" Text="Pixel Difference Prototype Engine" ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             <Button Style="{StaticResource ActionBtnBlue}" Content="Run Dataset Preflight" Margin="0,8,0,0" Click="OnRunDatasetPreflightClick" ToolTip="Checks image files, labels, golden images, and inspection-area metadata before running client validation."/>
             <Button Style="{StaticResource ActionBtn}" Content="Open Manifest Template" Margin="0,6,0,0" Click="OnOpenManifestTemplateClick"/>
@@ -107,56 +107,56 @@
       <UniformGrid Columns="4">
         <Border Style="{StaticResource HmiKpiCard}" Margin="0,0,6,0">
           <StackPanel>
-            <TextBlock Text="Accuracy" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/>
-            <TextBlock x:Name="AccuracyText" Text="--" FontWeight="Bold" FontSize="18"/>
+            <TextBlock Text="Accuracy" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
+            <TextBlock x:Name="AccuracyText" Text="--" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/>
           </StackPanel>
         </Border>
         <Border Style="{StaticResource HmiKpiCard}" Margin="0,0,6,0">
           <StackPanel>
-            <TextBlock Text="Precision" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/>
-            <TextBlock x:Name="PrecisionText" Text="--" FontWeight="Bold" FontSize="18"/>
+            <TextBlock Text="Precision" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
+            <TextBlock x:Name="PrecisionText" Text="--" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/>
           </StackPanel>
         </Border>
         <Border Style="{StaticResource HmiKpiCard}" Margin="0,0,6,0">
           <StackPanel>
-            <TextBlock Text="Recall" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/>
-            <TextBlock x:Name="RecallText" Text="--" FontWeight="Bold" FontSize="18"/>
+            <TextBlock Text="Recall" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
+            <TextBlock x:Name="RecallText" Text="--" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/>
           </StackPanel>
         </Border>
         <Border Style="{StaticResource HmiKpiCard}">
           <StackPanel>
-            <TextBlock Text="Good Boards Marked Defect" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" ToolTip="False Call: the system marked a good board as a defect."/>
-            <TextBlock x:Name="FalseCallRateText" Text="--" FontWeight="Bold" FontSize="18"/>
+            <TextBlock Text="Good Boards Marked Defect" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" ToolTip="False Call: the system marked a good board as a defect."/>
+            <TextBlock x:Name="FalseCallRateText" Text="--" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/>
           </StackPanel>
         </Border>
       </UniformGrid>
       <UniformGrid Columns="7" Margin="0,6,0,0">
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TP" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="TpText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TN" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="TnText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FP" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="FpText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FN" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="FnText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="OK" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="OkCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="NG" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="NgCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="REVIEW" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="ReviewCountText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TP" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="TpText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="TN" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="TnText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FP" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="FpText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="FN" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="FnText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="OK" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="OkCountText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="NG" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="NgCountText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="REVIEW" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="ReviewCountText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
       </UniformGrid>
       <UniformGrid Columns="4" Margin="0,6,0,0">
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Good Board Flagged" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" ToolTip="False Call: the system marked a good board as a defect."/><TextBlock x:Name="FalseCallText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Possible Missed Defect" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" ToolTip="Possible Escape: the system may have missed a real defect."/><TextBlock x:Name="PossibleEscapeText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Verified NG" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="VerifiedNgText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Unknown / Unlabeled" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="UnknownText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Good Board Flagged" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" ToolTip="False Call: the system marked a good board as a defect."/><TextBlock x:Name="FalseCallText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Possible Missed Defect" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" ToolTip="Possible Escape: the system may have missed a real defect."/><TextBlock x:Name="PossibleEscapeText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Verified NG" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="VerifiedNgText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Unknown / Unlabeled" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="UnknownText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
       </UniformGrid>
       <UniformGrid Columns="4" Margin="0,6,0,0">
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Avg Time / Image" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="AverageTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Max Time" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="MaxTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Min Time" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="MinTimeText" Text="--" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
-        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Over 1 Second" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock x:Name="OverOneSecondText" Text="0" FontWeight="Bold" FontSize="16"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Avg Time / Image" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="AverageTimeText" Text="--" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Max Time" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="MaxTimeText" Text="--" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Min Time" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="MinTimeText" Text="--" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
+        <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="Over 1 Second" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock x:Name="OverOneSecondText" Text="0" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeSection}"/></StackPanel></Border>
       </UniformGrid>
       <Border Style="{StaticResource FieldBox}" Margin="0,6,0,0">
         <StackPanel>
-          <TextBlock Text="Dataset Check" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/>
-          <TextBlock x:Name="DatasetQualityText" Text="--" FontWeight="Bold" FontSize="14"/>
-          <TextBlock x:Name="DatasetPreflightText" Text="Preflight: not run" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" TextWrapping="Wrap"/>
-          <TextBlock x:Name="DatasetQualityWarningsText" Text="" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" TextWrapping="Wrap"/>
+          <TextBlock Text="Dataset Check" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
+          <TextBlock x:Name="DatasetQualityText" Text="--" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
+          <TextBlock x:Name="DatasetPreflightText" Text="Preflight: not run" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
+          <TextBlock x:Name="DatasetQualityWarningsText" Text="" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
           <Grid Margin="0,6,0,0">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*"/>
@@ -164,11 +164,11 @@
               <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
-              <TextBlock Text="Blocking Failures" Foreground="{DynamicResource HmiNgSoftBrush}" FontWeight="Bold" FontSize="14" Margin="0,0,0,3"/>
+              <TextBlock Text="Blocking Failures" Foreground="{DynamicResource HmiNgSoftBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,3"/>
               <ListBox x:Name="PreflightFailuresList" Height="62" Background="{DynamicResource HmiSurfaceBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" Foreground="{DynamicResource HmiNgSoftBrush}"/>
             </StackPanel>
             <StackPanel Grid.Column="2">
-              <TextBlock Text="Warnings" Foreground="{DynamicResource HmiWarnBrush}" FontWeight="Bold" FontSize="14" Margin="0,0,0,3"/>
+              <TextBlock Text="Warnings" Foreground="{DynamicResource HmiWarnBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,3"/>
               <ListBox x:Name="PreflightWarningsList" Height="62" Background="{DynamicResource HmiSurfaceBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" Foreground="{DynamicResource HmiWarnSoftBrush}"/>
             </StackPanel>
           </Grid>
@@ -192,7 +192,7 @@
               <TextBlock Text="Good-Board Flags / Review Labor" Style="{StaticResource HmiSectionHeaderText}"/>
               <TextBlock Text="Shows where changing the review threshold may reduce unnecessary operator review without hiding likely defects."
                          Style="{StaticResource HmiTechnicalHintText}"/>
-              <TextBlock x:Name="FalseCallRecommendationText" Text="Run a batch, then analyze threshold candidates." Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14"/>
+              <TextBlock x:Name="FalseCallRecommendationText" Text="Run a batch, then analyze threshold candidates." Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
             </StackPanel>
           </DockPanel>
           <DataGrid Grid.Row="1" x:Name="FalseCallGrid" Margin="0,6,0,0" AutoGenerateColumns="False" HeadersVisibility="Column" CanUserAddRows="False" IsReadOnly="True" Style="{StaticResource HmiDenseTable}" MinWidth="0" ToolTip="Threshold candidates show the tradeoff between good boards marked defect, possible missed defects, and manual review time.">
@@ -276,8 +276,8 @@
         <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
-            <TextBlock x:Name="RunSummaryText" DockPanel.Dock="Right" Text="No batch run loaded" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14"/>
-            <TextBlock Text="Batch Results" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+            <TextBlock x:Name="RunSummaryText" DockPanel.Dock="Right" Text="No batch run loaded" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
+            <TextBlock Text="Batch Results" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
           </DockPanel>
         </Border>
         <DataGrid Grid.Row="1" x:Name="ResultsGrid" RowStyle="{StaticResource BatchResultRow}" SelectionChanged="OnResultSelectionChanged" Style="{StaticResource HmiDenseTable}" MinWidth="0" ToolTip="AI means inspection result. GT means ground truth.">
@@ -291,7 +291,7 @@
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>
                   <Border Style="{StaticResource ResultStatusChipBorder}" HorizontalAlignment="Left" Margin="0,1,0,1">
-                    <TextBlock Text="{Binding PassFail}" FontWeight="Bold" FontSize="14"/>
+                    <TextBlock Text="{Binding PassFail}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
                   </Border>
                 </DataTemplate>
               </DataGridTemplateColumn.CellTemplate>
@@ -311,7 +311,7 @@
       <DockPanel Margin="8">
         <StackPanel VerticalAlignment="Center">
           <TextBlock x:Name="StatusText" Text="Select a folder to run Stage 1 validation." Foreground="{DynamicResource HmiTextLabelBrush}"/>
-          <TextBlock x:Name="ReportPathText" Text="Report: not generated" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
+          <TextBlock x:Name="ReportPathText" Text="Report: not generated" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/>
         </StackPanel>
         <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
           <ProgressBar x:Name="WorkProgressBar" Width="140" Height="12" Minimum="0" Maximum="100" Value="0" Margin="0,0,8,0" VerticalAlignment="Center"/>

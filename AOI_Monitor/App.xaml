@@ -32,7 +32,7 @@
     <Style TargetType="TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="FontFamily" Value="Segoe UI"/>
-      <Setter Property="FontSize"   Value="14"/>
+      <Setter Property="FontSize"   Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="TextWrapping" Value="Wrap"/>
       <Setter Property="TextTrimming" Value="None"/>
     </Style>
@@ -47,7 +47,7 @@
       <Setter Property="MinHeight"     Value="36"/>
       <Setter Property="MinWidth"      Value="96"/>
       <Setter Property="FontFamily"    Value="Segoe UI"/>
-      <Setter Property="FontSize"      Value="14"/>
+      <Setter Property="FontSize"      Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="Cursor"        Value="Hand"/>
       <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
       <Setter Property="Template">
@@ -88,7 +88,7 @@
 
     <!-- Mini buttons -->
     <Style x:Key="MiniBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-      <Setter Property="FontSize" Value="14"/><Setter Property="MinHeight" Value="34"/><Setter Property="MinWidth" Value="96"/><Setter Property="Padding" Value="10,5"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/><Setter Property="MinHeight" Value="34"/><Setter Property="MinWidth" Value="96"/><Setter Property="Padding" Value="10,5"/>
     </Style>
     <Style x:Key="MiniBtnGreen" TargetType="Button" BasedOn="{StaticResource MiniBtn}">
       <Setter Property="BorderBrush" Value="#3C7F4D"/><Setter Property="Background" Value="#14351D"/><Setter Property="Foreground" Value="#C1FFCB"/>
@@ -102,7 +102,7 @@
 
     <!-- Action buttons -->
     <Style x:Key="ActionBtn" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-      <Setter Property="MinHeight" Value="40"/><Setter Property="MinWidth" Value="120"/><Setter Property="Padding" Value="14,7"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="14"/>
+      <Setter Property="MinHeight" Value="40"/><Setter Property="MinWidth" Value="120"/><Setter Property="Padding" Value="14,7"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="BorderBrush" Value="#5A646D"/><Setter Property="Background" Value="#222A30"/><Setter Property="Foreground" Value="#E8EEF2"/>
     </Style>
     <Style x:Key="ActionBtnGreen" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
@@ -132,7 +132,7 @@
       <Setter Property="Padding"       Value="0"/>
       <Setter Property="Cursor"        Value="Hand"/>
       <Setter Property="FontFamily"    Value="Segoe UI"/>
-      <Setter Property="FontSize"      Value="14"/>
+      <Setter Property="FontSize"      Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
       <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
       <Setter Property="Template">
@@ -168,7 +168,7 @@
       <Setter Property="Padding"       Value="8,5"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="FontFamily"    Value="Segoe UI"/>
-      <Setter Property="FontSize"      Value="14"/>
+      <Setter Property="FontSize"      Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="ToolTip"       Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
       <Setter Property="Template">
         <Setter.Value>
@@ -217,7 +217,7 @@
       <Setter Property="Padding"       Value="8,5"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="FontFamily"    Value="Segoe UI"/>
-      <Setter Property="FontSize"      Value="14"/>
+      <Setter Property="FontSize"      Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="PasswordBox">
@@ -251,6 +251,15 @@
 
     <!-- Combo boxes -->
     <Style TargetType="ComboBox">
+      <Style.Resources>
+        <!-- The app-wide implicit TextBlock style wraps text; a combo's selection box must
+             never wrap (it clips vertically at the 14 pt floor). Trim with a tooltip-free
+             ellipsis instead - combos carry their own dropdown for the full value. -->
+        <Style TargetType="TextBlock">
+          <Setter Property="TextWrapping" Value="NoWrap"/>
+          <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+      </Style.Resources>
       <Setter Property="Background"    Value="{DynamicResource CellBg}"/>
       <Setter Property="BorderBrush"   Value="{DynamicResource LineBrush}"/>
       <Setter Property="BorderThickness" Value="1"/>
@@ -258,7 +267,7 @@
       <Setter Property="MinHeight"     Value="34"/>
       <Setter Property="Padding"       Value="8,5"/>
       <Setter Property="FontFamily"    Value="Segoe UI"/>
-      <Setter Property="FontSize"      Value="14"/>
+      <Setter Property="FontSize"      Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="MaxDropDownHeight" Value="360"/>
       <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=SelectionBoxItem}"/>
       <Setter Property="Template">
@@ -398,7 +407,7 @@
       <Setter Property="BorderThickness"         Value="1"/>
       <Setter Property="Foreground"              Value="{DynamicResource TextBrush}"/>
       <Setter Property="FontFamily"              Value="Segoe UI"/>
-      <Setter Property="FontSize"                Value="14"/>
+      <Setter Property="FontSize"                Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="RowBackground"           Value="{DynamicResource CellBg}"/>
       <Setter Property="AlternatingRowBackground" Value="{DynamicResource Cell2Bg}"/>
       <Setter Property="GridLinesVisibility"     Value="All"/>

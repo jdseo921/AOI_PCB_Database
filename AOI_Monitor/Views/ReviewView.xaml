@@ -22,7 +22,7 @@
     </Style>
     <Style x:Key="RiskChipText" TargetType="TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource HmiTextBodyBrush}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="FontWeight" Value="Bold"/>
       <Style.Triggers>
         <DataTrigger Binding="{Binding Risk}" Value="Escape">
@@ -62,9 +62,9 @@
           <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
               <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
-                <TextBlock Text="Demo Data" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="14"/>
+                <TextBlock Text="Demo Data" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
               </Border>
-              <TextBlock Text="Prioritized Review Queue" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+              <TextBlock Text="Prioritized Review Queue" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
             </DockPanel>
           </Border>
           <DataGrid Grid.Row="1"
@@ -101,15 +101,15 @@
           <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
               <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
-                <TextBlock Text="Demo Data" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="14"/>
+                <TextBlock Text="Demo Data" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
               </Border>
-              <TextBlock Text="Closest Matching Defect Images" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+              <TextBlock Text="Closest Matching Defect Images" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
             </DockPanel>
           </Border>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="6">
               <TextBlock Text="Default: closest known false-negative cases first"
-                         Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,0,4"/>
+                         Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,4"/>
               <!-- Sim card 1 -->
               <Border Background="#141A1E" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="1" Padding="6" Margin="{StaticResource HmiRowGap}">
                 <Grid>
@@ -118,11 +118,11 @@
                     <Rectangle Width="20" Height="14" Stroke="#F13B3F" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                   </Border>
                   <StackPanel Grid.Column="1" Margin="7,0,0,0">
-                    <TextBlock Text="IMG_0114 / 96%" FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="14"/>
-                    <TextBlock Text="Solder Bridge" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" Margin="0,2,0,0"/>
-                    <TextBlock Text="RefDes: U107" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" Margin="0,2,0,0"/>
+                    <TextBlock Text="IMG_0114 / 96%" FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
+                    <TextBlock Text="Solder Bridge" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,2,0,0"/>
+                    <TextBlock Text="RefDes: U107" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,2,0,0"/>
                     <Border Style="{StaticResource ChipRed}" HorizontalAlignment="Left">
-                      <TextBlock Text="False Negative History" Foreground="{DynamicResource HmiNgSoftBrush}" FontSize="14" FontWeight="Bold"/>
+                      <TextBlock Text="False Negative History" Foreground="{DynamicResource HmiNgSoftBrush}" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold"/>
                     </Border>
                   </StackPanel>
                 </Grid>
@@ -135,11 +135,11 @@
                     <Rectangle Width="20" Height="14" Stroke="#F13B3F" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                   </Border>
                   <StackPanel Grid.Column="1" Margin="7,0,0,0">
-                    <TextBlock Text="IMG_0088 / 92%" FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="14"/>
-                    <TextBlock Text="Solder Bridge" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" Margin="0,2,0,0"/>
-                    <TextBlock Text="RefDes: U109" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="14" Margin="0,2,0,0"/>
+                    <TextBlock Text="IMG_0088 / 92%" FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
+                    <TextBlock Text="Solder Bridge" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,2,0,0"/>
+                    <TextBlock Text="RefDes: U109" Foreground="{DynamicResource HmiMutedTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,2,0,0"/>
                     <Border Style="{StaticResource ChipRed}" HorizontalAlignment="Left">
-                      <TextBlock Text="False Negative History" Foreground="{DynamicResource HmiNgSoftBrush}" FontSize="14" FontWeight="Bold"/>
+                      <TextBlock Text="False Negative History" Foreground="{DynamicResource HmiNgSoftBrush}" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold"/>
                     </Border>
                   </StackPanel>
                 </Grid>
@@ -163,9 +163,9 @@
         <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
             <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
-              <TextBlock Text="Demo Board Illustration" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="14"/>
+              <TextBlock Text="Demo Board Illustration" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
             </Border>
-            <TextBlock Text="Current Sample Image" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+            <TextBlock Text="Current Sample Image" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
           </DockPanel>
         </Border>
 
@@ -208,27 +208,27 @@
             <!-- U101: board 12%=47, 18%=47 of 390x260 → canvas 102,79 -->
             <Border Canvas.Left="102" Canvas.Top="79" Width="120" Height="70"
                     Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1">
-              <TextBlock Text="U101" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/>
+              <TextBlock Text="U101" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/>
             </Border>
             <!-- CN8: right 15%→canvas 295,79 -->
             <Border Canvas.Left="295" Canvas.Top="79" Width="92" Height="58"
                     Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1">
-              <TextBlock Text="CN8" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/>
+              <TextBlock Text="CN8" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/>
             </Border>
             <!-- U107 (center, has defect): board left 32%=125 top 42%=109 → canvas 180,141 -->
             <Border Canvas.Left="180" Canvas.Top="141" Width="168" Height="82"
                     Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1">
-              <TextBlock Text="U107" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/>
+              <TextBlock Text="U107" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/>
             </Border>
             <!-- SH1 -->
             <Border Canvas.Left="238" Canvas.Top="178" Width="142" Height="64"
                     Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1">
-              <TextBlock Text="SH1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/>
+              <TextBlock Text="SH1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/>
             </Border>
             <!-- D12 -->
             <Border Canvas.Left="110" Canvas.Top="183" Width="88" Height="52"
                     Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1">
-              <TextBlock Text="D12" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/>
+              <TextBlock Text="D12" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/>
             </Border>
 
             <!-- ROI box (dashed amber) around U107 area -->
@@ -241,7 +241,7 @@
               <Rectangle Width="62" Height="44" Stroke="#F13B3F" StrokeThickness="2" Fill="Transparent"
                          Effect="{x:Null}"/>
               <Border Canvas.Left="-2" Canvas.Top="-20" Background="#F13B3F" Padding="5,2">
-                <TextBlock Text="U107 BRIDGE" Foreground="White" FontSize="14" FontWeight="ExtraBold"/>
+                <TextBlock Text="U107 BRIDGE" Foreground="White" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="ExtraBold"/>
               </Border>
             </Canvas>
 
@@ -256,26 +256,26 @@
         <UniformGrid Grid.Row="3" Columns="4" Margin="8" Rows="1">
           <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiButtonGap}">
             <StackPanel>
-              <TextBlock Text="Sample ID"   Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="IMG_0241"    FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="14"/>
+              <TextBlock Text="Sample ID"   Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="IMG_0241"    FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
             </StackPanel>
           </Border>
           <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiButtonGap}">
             <StackPanel>
-              <TextBlock Text="Board"       Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="TBOX-MAIN"   FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="14"/>
+              <TextBlock Text="Board"       Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="TBOX-MAIN"   FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
             </StackPanel>
           </Border>
           <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiButtonGap}">
             <StackPanel>
-              <TextBlock Text="RefDes"      Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="U107"        FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="14"/>
+              <TextBlock Text="RefDes"      Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="U107"        FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
             </StackPanel>
           </Border>
           <Border Style="{StaticResource FieldBox}">
             <StackPanel>
-              <TextBlock Text="FOV"         Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="TOP-03"      FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="14"/>
+              <TextBlock Text="FOV"         Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="TOP-03"      FontWeight="Bold" Foreground="{DynamicResource HmiTextBrush}" FontSize="{StaticResource HmiFontSizeBody}"/>
             </StackPanel>
           </Border>
         </UniformGrid>
@@ -297,44 +297,44 @@
           <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
               <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
-                <TextBlock Text="Demo Metadata" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="14"/>
+                <TextBlock Text="Demo Metadata" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
               </Border>
-              <TextBlock Text="Sample Metadata" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+              <TextBlock Text="Sample Metadata" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
             </DockPanel>
           </Border>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
           <UniformGrid Columns="2" Margin="8" Rows="4">
             <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiFieldGap}">
-              <StackPanel><TextBlock Text="Sample ID" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="IMG_0241" FontWeight="Bold" FontSize="14" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/></StackPanel>
+              <StackPanel><TextBlock Text="Sample ID" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="IMG_0241" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/></StackPanel>
             </Border>
             <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-              <StackPanel><TextBlock Text="Board" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="TBOX-MAIN" FontWeight="Bold" FontSize="14" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/></StackPanel>
+              <StackPanel><TextBlock Text="Board" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="TBOX-MAIN" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/></StackPanel>
             </Border>
             <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiFieldGap}">
-              <StackPanel><TextBlock Text="RefDes" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="U107" FontWeight="Bold" FontSize="14"/></StackPanel>
+              <StackPanel><TextBlock Text="RefDes" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="U107" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/></StackPanel>
             </Border>
             <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-              <StackPanel><TextBlock Text="FOV" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="TOP-03" FontWeight="Bold" FontSize="14"/></StackPanel>
+              <StackPanel><TextBlock Text="FOV" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="TOP-03" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/></StackPanel>
             </Border>
             <Border Style="{StaticResource FieldBox}" Margin="{StaticResource HmiFieldGap}">
-              <StackPanel><TextBlock Text="Inspection Result" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="OK" FontWeight="Bold" FontSize="14"/></StackPanel>
+              <StackPanel><TextBlock Text="Inspection Result" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="OK" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/></StackPanel>
             </Border>
             <Border Style="{StaticResource FieldBox}" Margin="0,0,0,8">
-              <StackPanel><TextBlock Text="Ground Truth" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="NG" FontWeight="Bold" Foreground="{DynamicResource HmiNgStrongBrush}" FontSize="14"/></StackPanel>
+              <StackPanel><TextBlock Text="Ground Truth" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="NG" FontWeight="Bold" Foreground="{DynamicResource HmiNgStrongBrush}" FontSize="{StaticResource HmiFontSizeBody}"/></StackPanel>
             </Border>
             <Border Style="{StaticResource FieldBox}" Margin="0,0,8,0">
-              <StackPanel><TextBlock Text="Risk" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="Possible Escape" FontWeight="Bold" Foreground="{DynamicResource HmiNgStrongBrush}" FontSize="14"/></StackPanel>
+              <StackPanel><TextBlock Text="Risk" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="Possible Escape" FontWeight="Bold" Foreground="{DynamicResource HmiNgStrongBrush}" FontSize="{StaticResource HmiFontSizeBody}"/></StackPanel>
             </Border>
             <Border Style="{StaticResource FieldBox}" Margin="0">
-              <StackPanel><TextBlock Text="Engine" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/>
-              <TextBlock Text="Pixel Difference Prototype Engine 0.1" FontWeight="Bold" FontSize="14" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/></StackPanel>
+              <StackPanel><TextBlock Text="Engine" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,0,0,2"/>
+              <TextBlock Text="Pixel Difference Prototype Engine 0.1" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" Style="{StaticResource FactoryTrimmedTextWithTooltip}"/></StackPanel>
             </Border>
           </UniformGrid>
           </ScrollViewer>
@@ -346,10 +346,10 @@
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
-            <TextBlock Text="Disposition Controls" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+            <TextBlock Text="Disposition Controls" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
           </Border>
           <StackPanel Grid.Row="1" Margin="8">
-            <TextBlock Text="Keyboard: 1 Confirm NG · 2 False Call · 3 Possible Escape · 4 Hold" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" TextWrapping="Wrap" Margin="{StaticResource HmiRowGap}"/>
+            <TextBlock Text="Keyboard: 1 Confirm NG · 2 False Call · 3 Possible Escape · 4 Hold" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap" Margin="{StaticResource HmiRowGap}"/>
             <Button Style="{StaticResource ActionBtnRed}" Content="Confirm NG (1)" Margin="{StaticResource HmiRowGap}" Click="OnConfirmNgClick"/>
             <Button Style="{StaticResource ActionBtnAmber}" Content="Mark False Call (2)" Margin="{StaticResource HmiRowGap}" Click="OnFalseCallClick"/>
             <Button Style="{StaticResource ActionBtnRed}" Content="Mark Possible Escape (3)" Margin="{StaticResource HmiRowGap}" Click="OnPossibleEscapeClick"/>

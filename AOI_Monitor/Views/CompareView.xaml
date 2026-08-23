@@ -21,7 +21,7 @@
     </Style>
     <Style x:Key="CompareResultChipText" TargetType="TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource HmiTextBodyBrush}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="FontWeight" Value="Bold"/>
       <Style.Triggers>
         <DataTrigger Binding="{Binding Judgement}" Value="NG">
@@ -37,14 +37,14 @@
     </Style>
     <Style x:Key="CompareFooterLabelText" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
       <Setter Property="Foreground" Value="{DynamicResource HmiTextDimBrush}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="Margin" Value="0,0,0,2"/>
     </Style>
     <Style x:Key="CompareFooterValueText" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
       <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="FontWeight" Value="Bold"/>
-      <Setter Property="LineHeight" Value="18"/>
+      <Setter Property="LineHeight" Value="25"/>
     </Style>
   </UserControl.Resources>
   <ScrollViewer Style="{StaticResource FactoryScrollablePage}">
@@ -77,7 +77,7 @@
               <TextBlock x:Name="DefectSubtitleText"
                          Text="IMG_0241 / AI OK / GT NG"
                          Foreground="{DynamicResource HmiTextLabelBrush}"
-                         FontSize="14"
+                         FontSize="{StaticResource HmiFontSizeBody}"
                          VerticalAlignment="Center"
                          TextWrapping="NoWrap"
                          TextTrimming="CharacterEllipsis"
@@ -85,9 +85,9 @@
                          ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             </StackPanel>
             <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <TextBlock Text="Defect Sample" FontWeight="ExtraBold" Foreground="{DynamicResource HmiTextBrush}" FontSize="14" VerticalAlignment="Center"/>
+              <TextBlock Text="Defect Sample" FontWeight="ExtraBold" Foreground="{DynamicResource HmiTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" VerticalAlignment="Center"/>
               <Border Style="{StaticResource ChipPurple}" Margin="8,0,0,0">
-                <TextBlock Text="Demo Board" Foreground="#F1D8FF" FontSize="14" FontWeight="Bold"/>
+                <TextBlock Text="Demo Board" Foreground="#F1D8FF" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold"/>
               </Border>
             </WrapPanel>
           </DockPanel>
@@ -112,25 +112,25 @@
                 </DrawingBrush>
               </Border.Background>
             </Border>
-            <Border Canvas.Left="87"  Canvas.Top="68"  Width="120" Height="70" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="U101" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
-            <Border Canvas.Left="280" Canvas.Top="68"  Width="92"  Height="58" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="CN8" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
-            <Border Canvas.Left="165" Canvas.Top="142" Width="168" Height="82" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="U107" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
-            <Border Canvas.Left="220" Canvas.Top="180" Width="142" Height="64" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="SH1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
-            <Border Canvas.Left="95"  Canvas.Top="185" Width="88"  Height="52" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="D12" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
+            <Border Canvas.Left="87"  Canvas.Top="68"  Width="120" Height="70" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="U101" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
+            <Border Canvas.Left="280" Canvas.Top="68"  Width="92"  Height="58" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="CN8" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
+            <Border Canvas.Left="165" Canvas.Top="142" Width="168" Height="82" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="U107" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
+            <Border Canvas.Left="220" Canvas.Top="180" Width="142" Height="64" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="SH1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
+            <Border Canvas.Left="95"  Canvas.Top="185" Width="88"  Height="52" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="D12" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
             <!-- ROI -->
             <Rectangle Canvas.Left="153" Canvas.Top="133" Width="202" Height="108" Stroke="#E1A334" StrokeThickness="1.5" Fill="Transparent" StrokeDashArray="4 3"/>
             <!-- Defect box -->
             <Canvas Canvas.Left="232" Canvas.Top="153" Width="62" Height="46">
               <Rectangle Width="62" Height="46" Stroke="#F13B3F" StrokeThickness="2" Fill="Transparent"/>
               <Border Canvas.Left="-2" Canvas.Top="-21" Background="#F13B3F" Padding="5,2">
-                <TextBlock Text="U107 BRIDGE" Foreground="White" FontSize="14" FontWeight="ExtraBold"/>
+                <TextBlock Text="U107 BRIDGE" Foreground="White" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="ExtraBold"/>
               </Border>
             </Canvas>
             <!-- Diff box -->
             <Canvas Canvas.Left="222" Canvas.Top="148" Width="76" Height="58">
               <Rectangle Width="76" Height="58" Stroke="#E1A334" StrokeThickness="2" Fill="Transparent"/>
               <Border Canvas.Left="-2" Canvas.Top="-21" Background="#E1A334" Padding="5,2">
-                <TextBlock Text="DIFF" Foreground="#111111" FontSize="14" FontWeight="ExtraBold"/>
+                <TextBlock Text="DIFF" Foreground="#111111" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="ExtraBold"/>
               </Border>
             </Canvas>
             <Line X1="0" Y1="173" X2="500" Y2="173" Stroke="#3C6480" StrokeThickness="1" Opacity="0.5"/>
@@ -165,7 +165,7 @@
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
           <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
-            <TextBlock Text="Alignment / Difference Control" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
+            <TextBlock Text="Alignment / Difference Control" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
           </Border>
           <Grid Grid.Row="1" Margin="8">
             <Grid.RowDefinitions>
@@ -187,24 +187,24 @@
             <Border Grid.Row="1" Background="#13191D" BorderBrush="{DynamicResource HmiBorderMidBrush}" BorderThickness="1" MinHeight="78" Padding="8" Margin="0,0,0,6">
               <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" TextBlock.TextAlignment="Center">
                 <TextBlock x:Name="DiffScoreText" Text="87%" FontSize="32" FontWeight="ExtraBold" Foreground="{DynamicResource HmiTextBrush}" TextAlignment="Center"/>
-                <TextBlock Text="Difference Score" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" TextAlignment="Center"/>
-                <TextBlock x:Name="DiffSummaryText" Text="ROI mismatch vs golden" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" TextAlignment="Center"/>
+                <TextBlock Text="Difference Score" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextAlignment="Center"/>
+                <TextBlock x:Name="DiffSummaryText" Text="ROI mismatch vs golden" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" TextAlignment="Center"/>
               </StackPanel>
             </Border>
             <Border Grid.Row="2" x:Name="LearnedArtifactsPanel" Background="#13191D" BorderBrush="{DynamicResource HmiBorderMidBrush}" BorderThickness="1" MinHeight="118" Padding="8" Margin="0,0,0,6" Visibility="Collapsed">
               <StackPanel>
-                <TextBlock x:Name="LearnedCompareEvidenceText" Text="Learned PCB Visual Model evidence unavailable." Foreground="{DynamicResource HmiSimulatedBrush}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                <TextBlock x:Name="LearnedCompareEvidenceText" Text="Learned PCB Visual Model evidence unavailable." Foreground="{DynamicResource HmiSimulatedBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/>
                 <UniformGrid Columns="2" Height="78" Margin="0,6,0,0">
                   <Border Background="#080A0C" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="1" Margin="0,0,5,0">
                     <Grid>
                       <Image x:Name="LearnedToleranceImage" Stretch="Uniform"/>
-                      <TextBlock Text="Tolerance Map" Foreground="#DCE5EB" FontSize="14" FontWeight="Bold" Margin="6" VerticalAlignment="Bottom"/>
+                      <TextBlock Text="Tolerance Map" Foreground="#DCE5EB" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold" Margin="6" VerticalAlignment="Bottom"/>
                     </Grid>
                   </Border>
                   <Border Background="#080A0C" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="1">
                     <Grid>
                       <Image x:Name="LearnedAnomalyMapImage" Stretch="Uniform"/>
-                      <TextBlock Text="Anomaly Threshold Map" Foreground="#DCE5EB" FontSize="14" FontWeight="Bold" Margin="6" VerticalAlignment="Bottom"/>
+                      <TextBlock Text="Anomaly Threshold Map" Foreground="#DCE5EB" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold" Margin="6" VerticalAlignment="Bottom"/>
                     </Grid>
                   </Border>
                 </UniformGrid>
@@ -212,10 +212,10 @@
             </Border>
             <!-- Sync controls -->
             <UniformGrid Grid.Row="3" Columns="2" Rows="2">
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5"><StackPanel><TextBlock Text="01" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock Text="Lock board orientation" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5"><StackPanel><TextBlock Text="02" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock Text="Equalize brightness" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0"><StackPanel><TextBlock Text="03" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock Text="Normalize ROI scale" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="04" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14"/><TextBlock Text="Highlight unmatched solder area" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,5,5"><StackPanel><TextBlock Text="01" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock Text="Lock board orientation" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,0,5"><StackPanel><TextBlock Text="02" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock Text="Equalize brightness" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,5,0"><StackPanel><TextBlock Text="03" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock Text="Normalize ROI scale" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}"><StackPanel><TextBlock Text="04" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="{StaticResource HmiFontSizeBody}"/><TextBlock Text="Highlight unmatched solder area" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}" TextWrapping="Wrap"/></StackPanel></Border>
             </UniformGrid>
           </Grid>
         </Grid>
@@ -228,9 +228,9 @@
           <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
               <Border x:Name="FindingsSourceChip" DockPanel.Dock="Right" Style="{StaticResource Chip}" Background="#2A1740" BorderBrush="#8F5FD1">
-                <TextBlock x:Name="FindingsSourceText" Text="Demo Data" Foreground="#F1D8FF" FontSize="14" FontWeight="Bold"/>
+                <TextBlock x:Name="FindingsSourceText" Text="Demo Data" Foreground="#F1D8FF" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold"/>
               </Border>
-              <TextBlock Text="Comparison Findings" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14" VerticalAlignment="Center"/>
+              <TextBlock Text="Comparison Findings" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}" VerticalAlignment="Center"/>
             </DockPanel>
           </Border>
           <DataGrid Grid.Row="1"
@@ -278,7 +278,7 @@
               <TextBlock x:Name="GoldenSubtitleText"
                          Text="IMG_GOLD_0241 / verified OK"
                          Foreground="{DynamicResource HmiTextLabelBrush}"
-                         FontSize="14"
+                         FontSize="{StaticResource HmiFontSizeBody}"
                          VerticalAlignment="Center"
                          TextWrapping="NoWrap"
                          TextTrimming="CharacterEllipsis"
@@ -286,9 +286,9 @@
                          ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
             </StackPanel>
             <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <TextBlock Text="Golden Reference" FontWeight="ExtraBold" Foreground="{DynamicResource HmiTextBrush}" FontSize="14" VerticalAlignment="Center"/>
+              <TextBlock Text="Golden Reference" FontWeight="ExtraBold" Foreground="{DynamicResource HmiTextBrush}" FontSize="{StaticResource HmiFontSizeBody}" VerticalAlignment="Center"/>
               <Border Style="{StaticResource ChipPurple}" Margin="8,0,0,0">
-                <TextBlock Text="Demo Board" Foreground="#F1D8FF" FontSize="14" FontWeight="Bold"/>
+                <TextBlock Text="Demo Board" Foreground="#F1D8FF" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold"/>
               </Border>
             </WrapPanel>
           </DockPanel>
@@ -313,11 +313,11 @@
                 </DrawingBrush>
               </Border.Background>
             </Border>
-            <Border Canvas.Left="87"  Canvas.Top="68"  Width="120" Height="70" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="U101" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
-            <Border Canvas.Left="280" Canvas.Top="68"  Width="92"  Height="58" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="CN8" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
-            <Border Canvas.Left="165" Canvas.Top="142" Width="168" Height="82" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="U107" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
-            <Border Canvas.Left="220" Canvas.Top="180" Width="142" Height="64" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="SH1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
-            <Border Canvas.Left="95"  Canvas.Top="185" Width="88"  Height="52" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="D12" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
+            <Border Canvas.Left="87"  Canvas.Top="68"  Width="120" Height="70" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="U101" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
+            <Border Canvas.Left="280" Canvas.Top="68"  Width="92"  Height="58" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="CN8" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
+            <Border Canvas.Left="165" Canvas.Top="142" Width="168" Height="82" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="U107" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
+            <Border Canvas.Left="220" Canvas.Top="180" Width="142" Height="64" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="SH1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
+            <Border Canvas.Left="95"  Canvas.Top="185" Width="88"  Height="52" Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiBorderStrongBrush}" BorderThickness="1"><TextBlock Text="D12" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="{StaticResource HmiFontSizeBody}" Foreground="{DynamicResource HmiTextBodyBrush}"/></Border>
             <!-- Golden ROI (dashed purple: demo illustration, not validated evidence) -->
             <Rectangle Canvas.Left="153" Canvas.Top="133" Width="202" Height="108" Stroke="#C084FC" StrokeThickness="1.5" Fill="#14C084FC" StrokeDashArray="4 3"/>
             <Rectangle Canvas.Left="232" Canvas.Top="153" Width="62"  Height="46"  Stroke="#C084FC" StrokeThickness="1.5" Fill="#14C084FC" StrokeDashArray="4 3"/>

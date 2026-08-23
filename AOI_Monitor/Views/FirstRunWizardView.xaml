@@ -19,7 +19,7 @@
     </Style>
     <Style x:Key="FieldLabel" TargetType="TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource HmiTextLabelBrush}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
   </Window.Resources>
@@ -42,11 +42,11 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
-          <TextBlock x:Name="StepTitleText" Text="Storage Root" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="15"/>
-          <TextBlock x:Name="StepCounterText" Grid.Column="1" Text="Step 1 / 6" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" VerticalAlignment="Top" Margin="16,2,0,0"/>
+          <TextBlock x:Name="StepTitleText" Text="Storage Root" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="{StaticResource HmiFontSizeBody}"/>
+          <TextBlock x:Name="StepCounterText" Grid.Column="1" Text="Step 1 / 6" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="{StaticResource HmiFontSizeBody}" VerticalAlignment="Top" Margin="16,2,0,0"/>
           <TextBlock x:Name="StepSubtitleText" Grid.Row="1" Grid.ColumnSpan="2"
                      Text="Confirm where local SQLite, image vault, exports, and settings are stored."
-                     Foreground="{DynamicResource HmiTextBodyBrush}" FontSize="14" Margin="0,8,0,0"
+                     Foreground="{DynamicResource HmiTextBodyBrush}" FontSize="{StaticResource HmiFontSizeBody}" Margin="0,8,0,0"
                      TextWrapping="Wrap"/>
         </Grid>
       </Border>
@@ -72,7 +72,7 @@
         <Grid>
           <Grid x:Name="StepStorage">
             <StackPanel>
-              <TextBlock Text="Storage root" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="14"/>
+              <TextBlock Text="Storage root" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
               <TextBlock Text="This folder is used for the local SQLite database, image vault, model registry, diagnostics, and export packages."
                          Foreground="{DynamicResource HmiTextLabelBrush}" TextWrapping="Wrap" Margin="0,4,0,12"/>
               <Grid>
@@ -114,7 +114,7 @@
 
           <Grid x:Name="StepCamera" Visibility="Collapsed">
             <StackPanel>
-              <TextBlock Text="Camera source" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="14"/>
+              <TextBlock Text="Camera source" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
               <TextBlock Text="Stage 1 can run without real camera hardware. Folder Simulation is best for evaluator demos with sample images."
                          Foreground="{DynamicResource HmiTextLabelBrush}" TextWrapping="Wrap" Margin="0,4,0,12"/>
               <Grid Margin="0,0,0,10">
@@ -138,7 +138,7 @@
 
           <Grid x:Name="StepEngine" Visibility="Collapsed">
             <StackPanel>
-              <TextBlock Text="Inspection engine" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="14"/>
+              <TextBlock Text="Inspection engine" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
               <TextBlock Text="Pixel Difference is the stable Stage 1 demonstration path. ONNX requires model configuration. Learned PCB Visual Model uses image-only Stage 1 learning evidence."
                          Foreground="{DynamicResource HmiTextLabelBrush}" TextWrapping="Wrap" Margin="0,4,0,12"/>
               <Grid>
@@ -157,8 +157,8 @@
 
           <Grid x:Name="StepWorkflow" Visibility="Collapsed">
             <StackPanel>
-              <TextBlock Text="Stage 1 demo workflow" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="14"/>
-              <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource HmiTextBodyBrush}" LineHeight="20" Margin="0,8,0,0"><Run Text="1. Verify readiness indicators: Database, Image Vault, Inspection Engine."/><LineBreak/><Run Text="2. Import or select sample/golden images."/><LineBreak/><Run Text="3. Run Golden Compare or Main Inspection with Pixel Difference."/><LineBreak/><Run Text="4. Confirm overlay and defect list evidence."/><LineBreak/><Run Text="5. Save result, record disposition, and export CSV/customer evidence from Log &amp; Export."/></TextBlock>
+              <TextBlock Text="Stage 1 demo workflow" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
+              <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource HmiTextBodyBrush}" LineHeight="25" Margin="0,8,0,0"><Run Text="1. Verify readiness indicators: Database, Image Vault, Inspection Engine."/><LineBreak/><Run Text="2. Import or select sample/golden images."/><LineBreak/><Run Text="3. Run Golden Compare or Main Inspection with Pixel Difference."/><LineBreak/><Run Text="4. Confirm overlay and defect list evidence."/><LineBreak/><Run Text="5. Save result, record disposition, and export CSV/customer evidence from Log &amp; Export."/></TextBlock>
               <TextBlock Text="Docs: README storage-root notes, Settings / Guide, Installation Notes, AI Model Test validation report."
                          Foreground="{DynamicResource HmiTextLabelBrush}" TextWrapping="Wrap" Margin="0,14,0,0"/>
             </StackPanel>
@@ -166,7 +166,7 @@
 
           <Grid x:Name="StepFinish" Visibility="Collapsed">
             <StackPanel>
-              <TextBlock Text="Ready for evaluator handoff" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="14"/>
+              <TextBlock Text="Ready for evaluator handoff" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="{StaticResource HmiFontSizeBody}"/>
               <TextBlock x:Name="FinishSummaryText" Text="Run diagnostics and press Finish to save first-run completion." Foreground="{DynamicResource HmiTextLabelBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
               <TextBlock Text="Optional integrations such as camera, lighting, robot, and MES may remain Not Connected for Stage 1. They are reported as warnings, not blockers."
                          Foreground="{DynamicResource HmiWarnBrush}" TextWrapping="Wrap" Margin="0,12,0,0"/>

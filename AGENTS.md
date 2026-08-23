@@ -63,7 +63,7 @@ Do not move business rules into XAML/code-behind when a service or model boundar
 19. Add or update tests for meaningful behavior changes.
 20. UI work is not done until text clipping, resizing, long strings, empty data, error states, small windows, and high-DPI assumptions are checked.
 21. Do not use fixed-size or absolute layouts for normal UI. Use WPF Grid, DockPanel, WrapPanel, star sizing, scrolling, trimming-with-tooltip, and adaptive structure.
-22. Primary actions must stay readable, consistently placed, and at least 120x40. Operator text must remain at least 14 pt equivalent.
+22. Primary actions must stay readable, consistently placed, and at least 120x40. Operator text must remain at least a true 14 pt (18.67 DIP); the HMI layout audit fails below it.
 23. Dense pages must scroll or decompose into tabs/subviews. Do not squeeze more controls into already crowded pages.
 24. Simulated, mock, demo, sample-data, boundary-only, not-connected, and not-validated states must be visibly labeled and must never be presented as production readiness.
 25. Codex must not claim completion unless it lists changed files, architecture impact, tests added/updated, checks run, known limitations, UI layout cases checked, performance implications, and migration implications.
@@ -75,7 +75,7 @@ Use shared resources in `AOI_Monitor/Styles/FactoryHmiLayout.xaml` and `AOI_Moni
 Keep these design principles intact:
 
 - Minimum operator display target is 1920x1080.
-- Operator-facing text must remain at least 14 pt equivalent.
+- Operator-facing text must remain at least a true 14 pt (18.67 DIP).
 - Primary action buttons must be at least 120x40.
 - High contrast is mandatory in dark and light themes.
 - Green means validated OK/pass/ready/connected/running-normal only.

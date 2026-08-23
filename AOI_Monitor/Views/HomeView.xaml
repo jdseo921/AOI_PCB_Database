@@ -52,17 +52,9 @@
           <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <DockPanel LastChildFill="True">
-          <TextBlock x:Name="HomeAlarmSummaryText"
-                     DockPanel.Dock="Right"
-                     Text="Critical status: none"
-                     Foreground="{DynamicResource TextBrush}"
-                     FontSize="{StaticResource HmiFontSizeBody}"
-                     FontWeight="ExtraBold"
-                     VerticalAlignment="Center"
-                     TextWrapping="NoWrap"
-                     TextTrimming="CharacterEllipsis"
-                     MaxWidth="330"
-                     ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+          <!-- The alarm summary that used to sit here duplicated the always-visible topbar
+               Alarms control (DESIGN.md forbids duplicated status panels); the topbar chip is
+               the single source now. -->
           <TextBlock Text="Home"
                      Style="{StaticResource HmiPageTitleText}"
                      FontSize="{StaticResource HmiFontSizeSection}"
@@ -142,6 +134,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate>
               <Button Style="{StaticResource HomeModuleButton}"
+                      AutomationProperties.Name="{Binding Title}"
                       IsEnabled="{Binding IsEnabled}"
                       Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                       CommandParameter="{Binding Key}">

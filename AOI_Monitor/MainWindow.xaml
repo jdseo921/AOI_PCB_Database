@@ -111,6 +111,7 @@
             </StackPanel>
           </Border>
           <Button x:Name="ActiveAlarmsButton"
+                  AutomationProperties.Name="Active alarms"
                   Style="{StaticResource MiniBtn}"
                   MinWidth="238"
                   MinHeight="34"

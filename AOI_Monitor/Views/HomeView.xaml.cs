@@ -136,18 +136,6 @@ public partial class HomeView : UserControl
                 SetVerdict(StatusKind.Warning, "#FFE0A7");
         }
 
-        var activeAlarms = AlarmEventService.GetEvents(new AlarmEventQuery
-        {
-            ActiveOnly = true,
-            SortOrder = AlarmSortOrder.SeverityDescending,
-        });
-        var critical = activeAlarms.Count(alarm => alarm.Severity == AlarmSeverity.Critical);
-        var alarmLevel = activeAlarms.Count(alarm => alarm.Severity == AlarmSeverity.Alarm);
-        var warnings = activeAlarms.Count(alarm => alarm.Severity == AlarmSeverity.Warning);
-        HomeAlarmSummaryText.Text = activeAlarms.Count == 0
-            ? "Critical status: none"
-            : $"Critical status: {critical} critical / {alarmLevel} alarm / {warnings} warning";
-        HomeAlarmSummaryText.Foreground = Brush(critical > 0 || alarmLevel > 0 ? "#FFBFC1" : warnings > 0 ? "#FFE0A7" : "#DCE5EB");
     }
 
     private static void SetIntegrationStatus(Border border, TextBlock textBlock, IIntegrationEndpoint endpoint)

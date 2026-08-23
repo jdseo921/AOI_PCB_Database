@@ -12,6 +12,12 @@ public class NavPage : ViewModelBase
     private string _subtitle = "";
     public string Key { get; set; } = "";
     public string Number { get; set; } = "";
+
+    /// <summary>
+    /// UIA item containers announce ToString(); without this override every workflow tile row
+    /// read as "AOI_Monitor.ViewModels.NavPage" to assistive tech and UI automation.
+    /// </summary>
+    public override string ToString() => string.IsNullOrWhiteSpace(Title) ? Key : Title;
     public string Title
     {
         get => _title;

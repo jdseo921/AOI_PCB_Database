@@ -355,6 +355,7 @@ public static class UiPreferencesService
         ["Display / Language"] = "화면 / 언어",
         ["Language"] = "언어",
         ["Font Size"] = "글자 크기",
+        ["Inspection stage indicators (read-only):"] = "\uAC80\uC0AC \uB2E8\uACC4 \uD45C\uC2DC\uAE30(\uC77D\uAE30 \uC804\uC6A9):",
         ["Standard - 14 pt operator floor"] = "표준 - 14pt 운영자 최소 크기",
         ["Program Assets"] = "프로그램 자산",
         ["Console Title"] = "콘솔 제목",

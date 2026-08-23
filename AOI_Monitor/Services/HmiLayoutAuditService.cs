@@ -249,7 +249,7 @@ public static class HmiLayoutAuditService
             new("shell-hardware-readiness", "Shell - Hardware Readiness", () => CreateShellRoute("pilot"), false, ShellRequiredControls),
             new("shell-system-settings", "Shell - System Settings", () => CreateShellRoute("settings"), false, ShellRequiredControls),
             new("image-viewer-window", "Image Viewer Window", () => CreateImageViewerRoute(), false, new[] { "ViewerTitleText", "ViewerCriticalText", "ViewerScrollHost", "ImageViewportHost", "ViewerImage", "FitImageButton", "ActualSizeButton", "ZoomOutButton", "ZoomInButton", "SaveImageButton", "CloseViewerButton" }),
-            new("home", "AOI Defect Console Home", () => new HomeView { DataContext = new MainViewModel() }, true, new[] { "HomeModuleItems", "HomeDatabaseStatusText", "HomeEngineStatusText", "HomeCameraStatusText", "HomeMesStatusText", "HomeVerdictText", "HomeAlarmSummaryText" }),
+            new("home", "AOI Defect Console Home", () => new HomeView { DataContext = new MainViewModel() }, true, new[] { "HomeModuleItems", "HomeDatabaseStatusText", "HomeEngineStatusText", "HomeCameraStatusText", "HomeMesStatusText", "HomeVerdictText" }),
             new("board-image-library", "Board & Image Library", () => new LibraryView(), false, new[] { "RecordsGrid", "SchemaGrid", "ImportStatusText", "CancelImportButton" }),
             new("main-inspection", "Main Inspection", () => new MonitorView(), false, new[] { "StartInspectionButton", "StopInspectionButton", "NextBoardButton", "SaveResultButton", "OpenInspectionImageViewerButton", "InspectionImageViewport", "DefectGrid", "CalibrationProfileCombo" }),
             new("golden-compare", "Golden Template Compare", () => new CompareView(), false, new[] { "FindingsGrid", "DiffScoreText", "OpenDefectImageViewerButton", "OpenGoldenImageViewerButton", "DefectImageViewport", "GoldenImageViewport", "DefectCanvasViewbox", "GoldenCanvasViewbox" }),
@@ -540,7 +540,32 @@ public static class HmiLayoutAuditService
                 issues.Add(CreateIssue(definition, dpiScale, "ClippedButton", target, HmiLayoutIssueSeverity.Fail,
                     $"Button content may be clipped. Desired={desired.Width:N0}x{desired.Height:N0}; actual={button.ActualWidth:N0}x{button.ActualHeight:N0}."));
             }
+
+            // A button whose content is a panel exposes no UIA name unless one is set
+            // explicitly, so assistive tech and UI automation announce it as an anonymous
+            // button. Mirrors WPF's name derivation: an explicit AutomationProperties.Name,
+            // plain string content, or a directly hosted TextBlock all count; anything else
+            // needs the explicit property.
+            if (string.IsNullOrWhiteSpace(GetEffectiveAutomationName(button)))
+            {
+                issues.Add(CreateIssue(definition, dpiScale, "UnnamedInteractiveControl", target, HmiLayoutIssueSeverity.Fail,
+                    "Button exposes no accessible name (AutomationProperties.Name is empty and the content is not plain text)."));
+            }
         }
+    }
+
+    private static string GetEffectiveAutomationName(Button button)
+    {
+        var explicitName = System.Windows.Automation.AutomationProperties.GetName(button);
+        if (!string.IsNullOrWhiteSpace(explicitName))
+            return explicitName;
+
+        return button.Content switch
+        {
+            string text => text,
+            TextBlock textBlock => textBlock.Text ?? string.Empty,
+            _ => string.Empty,
+        };
     }
 
     private static void AddLongTextIssues(HmiViewAuditDefinition definition, FrameworkElement root, double dpiScale, ICollection<HmiLayoutIssue> issues)

@@ -1389,20 +1389,32 @@ public partial class MainWindow : Window, IDisposable
 
         var mode = OperatingModeSettingsService.Load();
         var mesMode = MesIntegrationSettingsService.Load().Mode;
-        var hasSimulatedSource =
-            mode == OperatingMode.Demo ||
-            WorkflowState.Instance.AuthenticationMode == AuthenticationMode.DemoLocalRoleSelector ||
-            CameraSourceFactory.ActiveSource.ConnectionStatus == CameraSourceStatus.Simulated ||
-            IntegrationBoundaryRegistry.LightingController.Status == IntegrationConnectionStatus.Simulated ||
-            IntegrationBoundaryRegistry.RobotController.Status == IntegrationConnectionStatus.Simulated ||
-            IntegrationBoundaryRegistry.MesClient.Status == IntegrationConnectionStatus.Simulated ||
-            IntegrationBoundaryRegistry.TraceabilityUploader.Status == IntegrationConnectionStatus.Simulated ||
-            mesMode == MesIntegrationMode.MockRest;
+
+        // Name the simulated boundaries instead of a generic banner: "DEMO / SIM ACTIVE"
+        // duplicated the purple Demo Mode chip beside it (DESIGN.md forbids duplicated status),
+        // and a named list is more useful evidence. Boundary tokens stay English for
+        // traceability, like other technical codes.
+        var simulatedBoundaries = new List<string>();
+        if (WorkflowState.Instance.AuthenticationMode == AuthenticationMode.DemoLocalRoleSelector)
+            simulatedBoundaries.Add("auth");
+        if (CameraSourceFactory.ActiveSource.ConnectionStatus == CameraSourceStatus.Simulated)
+            simulatedBoundaries.Add("camera");
+        if (IntegrationBoundaryRegistry.LightingController.Status == IntegrationConnectionStatus.Simulated)
+            simulatedBoundaries.Add("lighting");
+        if (IntegrationBoundaryRegistry.RobotController.Status == IntegrationConnectionStatus.Simulated)
+            simulatedBoundaries.Add("robot");
+        if (IntegrationBoundaryRegistry.MesClient.Status == IntegrationConnectionStatus.Simulated || mesMode == MesIntegrationMode.MockRest)
+            simulatedBoundaries.Add("MES");
+        if (IntegrationBoundaryRegistry.TraceabilityUploader.Status == IntegrationConnectionStatus.Simulated)
+            simulatedBoundaries.Add("trace");
+
+        var hasSimulatedSource = mode == OperatingMode.Demo || simulatedBoundaries.Count > 0;
 
         SimulationWarningBanner.Visibility = hasSimulatedSource ? Visibility.Visible : Visibility.Collapsed;
-        SimulationWarningBannerText.Text = mode == OperatingMode.Demo
-            ? UiPreferencesService.Text("DEMO / SIM ACTIVE", "\uB370\uBAA8 / \uC2DC\uBBAC \uD65C\uC131")
-            : UiPreferencesService.Text("SIM / MOCK ACTIVE", "\uC2DC\uBBAC / \uBAA9 \uD65C\uC131");
+        var simLabel = UiPreferencesService.Text("SIM ACTIVE", "\uC2DC\uBBAC \uD65C\uC131");
+        SimulationWarningBannerText.Text = simulatedBoundaries.Count > 0
+            ? $"{simLabel}: {string.Join(", ", simulatedBoundaries)}"
+            : simLabel;
         SimulationWarningBanner.ToolTip = UiPreferencesService.Text(
             "Simulated or mock sources are active. Do not treat these results as production release evidence without review.",
             "\uC2DC\uBBAC\uB808\uC774\uC158 \uB610\uB294 \uBAA9 \uC18C\uC2A4\uAC00 \uD65C\uC131\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uAC80\uD1A0 \uC5C6\uC774 \uC0DD\uC0B0 \uCD9C\uC2DC \uC99D\uBE59\uC73C\uB85C \uC0AC\uC6A9\uD558\uC9C0 \uB9C8\uC2ED\uC2DC\uC624.");

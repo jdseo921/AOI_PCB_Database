@@ -42,20 +42,29 @@
           <TextBlock Text="Main Inspection" Style="{StaticResource HmiSectionHeaderText}"/>
           <TextBlock Text="Load a board image, review the marked defects, then save the result. Purple panels mean the action is simulated or mock-only."
                      Style="{StaticResource HmiPageSubtitleText}" Margin="0,3,0,0"/>
-          <UniformGrid Columns="5" Rows="1" Margin="0,8,0,0">
-            <Border Style="{StaticResource HmiStatusInfo}" Margin="0,0,6,0">
+          <TextBlock Text="Inspection stage indicators (read-only):"
+                     Foreground="{DynamicResource HmiTextLabelBrush}"
+                     FontSize="{StaticResource HmiFontSizeBody}"
+                     Margin="0,8,0,3"/>
+          <UniformGrid Columns="5" Rows="1">
+            <Border Style="{StaticResource HmiStatusInfo}" Margin="0,0,6,0"
+                    ToolTip="Status indicator, not a button. Fiducial alignment runs automatically inside golden compare; blue = informational stage.">
               <TextBlock Text="Fiducial alignment" Foreground="#D7F0FF" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold" TextWrapping="Wrap"/>
             </Border>
-            <Border Style="{StaticResource HmiStatusInfo}" Margin="0,0,6,0">
+            <Border Style="{StaticResource HmiStatusInfo}" Margin="0,0,6,0"
+                    ToolTip="Status indicator, not a button. The golden reference image is selected in Board &amp; Images or Golden Compare; blue = informational stage.">
               <TextBlock Text="Golden template" Foreground="#D7F0FF" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold" TextWrapping="Wrap"/>
             </Border>
-            <Border Style="{StaticResource HmiStatusInfo}" Margin="0,0,6,0">
+            <Border Style="{StaticResource HmiStatusInfo}" Margin="0,0,6,0"
+                    ToolTip="Status indicator, not a button. ROI masks come from the saved recipe (Recipe Rules); blue = informational stage.">
               <TextBlock Text="ROI masks" Foreground="#D7F0FF" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold" TextWrapping="Wrap"/>
             </Border>
-            <Border Style="{StaticResource HmiStatusWarning}" Margin="0,0,6,0">
+            <Border Style="{StaticResource HmiStatusWarning}" Margin="0,0,6,0"
+                    ToolTip="Status indicator, not a button. Tolerance rules are configured in Recipe Rules; amber = review the configuration before trusting verdicts.">
               <TextBlock Text="Tolerance rules" Foreground="#FFE0A7" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold" TextWrapping="Wrap"/>
             </Border>
-            <Border Style="{StaticResource HmiStatusWarning}">
+            <Border Style="{StaticResource HmiStatusWarning}"
+                    ToolTip="Status indicator, not a button. Lighting control is a Stage 2 hardware boundary; amber = not validated in Stage 1.">
               <TextBlock Text="Lighting boundary" Foreground="#FFE0A7" FontSize="{StaticResource HmiFontSizeBody}" FontWeight="Bold" TextWrapping="Wrap"/>
             </Border>
           </UniformGrid>

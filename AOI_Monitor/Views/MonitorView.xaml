@@ -1,18 +1,18 @@
 <UserControl x:Class="AOI_Monitor.Views.MonitorView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="#0B0E10"
+             Background="{DynamicResource HmiBgBrush}"
              PreviewKeyDown="OnMonitorPreviewKeyDown">
   <UserControl.Resources>
     <Style x:Key="MonitorStatusLabel" TargetType="TextBlock">
-      <Setter Property="Foreground" Value="#9AA6AF"/>
+      <Setter Property="Foreground" Value="{DynamicResource HmiTextLabelBrush}"/>
       <Setter Property="FontSize" Value="14"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
       <Setter Property="TextWrapping" Value="Wrap"/>
       <Setter Property="Margin" Value="0,4,10,4"/>
     </Style>
     <Style x:Key="MonitorStatusValue" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
-      <Setter Property="Foreground" Value="#DCE5EB"/>
+      <Setter Property="Foreground" Value="{DynamicResource HmiTextBodyBrush}"/>
       <Setter Property="FontWeight" Value="Bold"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
       <Setter Property="Margin" Value="0,4,0,4"/>
@@ -84,23 +84,23 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
-          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
               <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock x:Name="ImageStatusText" Text="No image loaded" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock x:Name="ImageStatusText" Text="No image loaded" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <Button x:Name="OpenInspectionImageViewerButton"
                         Style="{StaticResource MiniBtn}"
                         Content="Large Image"
                         MinWidth="112"
                         Click="OnOpenImageViewerClick"/>
               </StackPanel>
-              <TextBlock Text="Image / Simulated Live Feed" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+              <TextBlock Text="Image / Simulated Live Feed" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
             </DockPanel>
           </Border>
 
           <WrapPanel Grid.Row="1" Margin="8">
             <StackPanel Orientation="Horizontal" Margin="{StaticResource HmiButtonGap}">
-              <TextBlock Text="View" Foreground="#9AA6AF" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0"/>
+              <TextBlock Text="View" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0"/>
               <ComboBox x:Name="ViewSelector" Width="110" SelectedIndex="0" AutomationProperties.Name="Inspection view" SelectionChanged="OnViewSelectionChanged">
                 <ComboBoxItem Content="Top" Tag="Top"/>
                 <ComboBoxItem Content="Side" Tag="Side"/>
@@ -108,12 +108,12 @@
               </ComboBox>
             </StackPanel>
             <CheckBox x:Name="OverlayCheck" Content="Defect overlay layer" IsChecked="True"
-                      VerticalAlignment="Center" Foreground="#DCE5EB" Checked="OnOverlayChanged" Unchecked="OnOverlayChanged"
+                      VerticalAlignment="Center" Foreground="{DynamicResource HmiTextBodyBrush}" Checked="OnOverlayChanged" Unchecked="OnOverlayChanged"
                       Margin="{StaticResource HmiButtonGap}"/>
             <Button Style="{StaticResource MiniBtn}" Content="Top Folder" Margin="{StaticResource HmiButtonGap}" Click="OnSelectTopFolderClick"/>
             <Button Style="{StaticResource MiniBtn}" Content="Side Folder" Margin="{StaticResource HmiButtonGap}" Click="OnSelectSideFolderClick"/>
             <Button Style="{StaticResource MiniBtn}" Content="Bottom Folder" Margin="{StaticResource HmiButtonGap}" Click="OnSelectBottomFolderClick"/>
-            <CheckBox x:Name="AutoSaveCheck" Content="Auto-save" Foreground="#DCE5EB" VerticalAlignment="Center" Margin="0,0,0,6"/>
+            <CheckBox x:Name="AutoSaveCheck" Content="Auto-save" Foreground="{DynamicResource HmiTextBodyBrush}" VerticalAlignment="Center" Margin="0,0,0,6"/>
           </WrapPanel>
 
           <UniformGrid Grid.Row="2" Columns="4" Margin="8,0,8,8">
@@ -134,13 +134,13 @@
                 <TextBlock Text="Simulation only. No real robot, handler, PLC, or safety hardware is connected."
                            Foreground="#E5CAFF" FontSize="14" TextWrapping="Wrap" Margin="0,2,0,0"/>
                 <WrapPanel Margin="0,5,0,0">
-                  <TextBlock x:Name="RobotSimStatusText" Text="Ready: simulation only" Foreground="#DCE5EB" FontWeight="Bold" FontSize="14" Margin="0,0,14,0" TextWrapping="Wrap"/>
-                  <TextBlock x:Name="RobotBoardStateText" Text="No simulated board loaded" Foreground="#9AA6AF" FontSize="14" Margin="0,0,14,0" TextWrapping="Wrap"/>
-                  <TextBlock x:Name="RobotCycleModeText" Text="No real robot connected" Foreground="#9AA6AF" FontSize="14" Margin="0,0,14,0" TextWrapping="Wrap"/>
-                  <TextBlock x:Name="RobotCycleTimeText" Text="Last cycle --" Foreground="#9AA6AF" FontSize="14" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="RobotSimStatusText" Text="Ready: simulation only" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="Bold" FontSize="14" Margin="0,0,14,0" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="RobotBoardStateText" Text="No simulated board loaded" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,14,0" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="RobotCycleModeText" Text="No real robot connected" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" Margin="0,0,14,0" TextWrapping="Wrap"/>
+                  <TextBlock x:Name="RobotCycleTimeText" Text="Last cycle --" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" TextWrapping="Wrap"/>
                 </WrapPanel>
-                <TextBlock x:Name="RobotAcceptanceStatusText" Text="Robot acceptance: not validated" Foreground="#E1A334" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                <TextBlock x:Name="RobotFaultText" Text="Fault: none" Foreground="#9AA6AF" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                <TextBlock x:Name="RobotAcceptanceStatusText" Text="Robot acceptance: not validated" Foreground="{DynamicResource HmiWarnBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                <TextBlock x:Name="RobotFaultText" Text="Fault: none" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,4,0,0"/>
               </StackPanel>
               <WrapPanel Grid.Row="1" HorizontalAlignment="Left" Margin="0,8,0,0">
                 <Button x:Name="RobotLoadButton" Style="{StaticResource MiniBtn}" Content="Load" Margin="{StaticResource HmiButtonGap}" Click="OnRobotLoadClick" ToolTip="Simulated handler load step only."/>
@@ -156,10 +156,10 @@
             </Grid>
           </Border>
 
-          <Border x:Name="InspectionImageViewport" Grid.Row="4" Margin="8,0,8,8" MinHeight="320" MaxHeight="620" Background="#050607" BorderBrush="#343D44" BorderThickness="1">
+          <Border x:Name="InspectionImageViewport" Grid.Row="4" Margin="8,0,8,8" MinHeight="320" MaxHeight="620" Background="#050607" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="1">
             <Grid ClipToBounds="True">
               <TextBlock x:Name="EmptyImageText" Text="Select a folder or load an image from Image Library, then press Start / Next Board."
-                         Foreground="#68757D" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
+                         Foreground="#7F8C95" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
                          HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"/>
               <Viewbox Stretch="Uniform">
                 <Grid x:Name="ImageOverlayRoot" Width="1000" Height="700">
@@ -185,8 +185,8 @@
               <RowDefinition Height="Auto" MinHeight="32"/>
               <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Board / Status" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+            <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
+              <TextBlock Text="Board / Status" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
             </Border>
             <Grid Grid.Row="1" Margin="8">
               <Grid.ColumnDefinitions>
@@ -221,7 +221,7 @@
               <TextBlock Grid.Row="5" Text="Model Version" Style="{StaticResource MonitorStatusLabel}"/>
               <TextBlock Grid.Row="5" Grid.Column="1" x:Name="ModelVersionText" Text="PIXEL_DIFF_0.2" Style="{StaticResource MonitorStatusWrappedValue}"/>
               <TextBlock Grid.Row="6" Text="Learned Evidence" Style="{StaticResource MonitorStatusLabel}"/>
-              <TextBlock Grid.Row="6" Grid.Column="1" x:Name="LearnedModelEvidenceText" Text="Learned visual model: not active." Style="{StaticResource MonitorStatusWrappedValue}" Foreground="#C084FC"/>
+              <TextBlock Grid.Row="6" Grid.Column="1" x:Name="LearnedModelEvidenceText" Text="Learned visual model: not active." Style="{StaticResource MonitorStatusWrappedValue}" Foreground="{DynamicResource HmiSimulatedBrush}"/>
               <TextBlock Grid.Row="7" Text="2D Cal Profile" Style="{StaticResource MonitorStatusLabel}"/>
               <ComboBox Grid.Row="7" Grid.Column="1" x:Name="CalibrationProfileCombo" MinHeight="34"
                         AutomationProperties.Name="2D calibration profile"
@@ -236,9 +236,9 @@
               <TextBlock Grid.Row="8" Text="Camera" Style="{StaticResource MonitorStatusLabel}"/>
               <TextBlock Grid.Row="8" Grid.Column="1" x:Name="CameraSourceText" Text="No Camera Connected" Style="{StaticResource MonitorStatusWrappedValue}"/>
               <TextBlock Grid.Row="9" Text="Frame" Style="{StaticResource MonitorStatusLabel}"/>
-              <TextBlock Grid.Row="9" Grid.Column="1" x:Name="CameraFrameMetadataText" Text="No frame" Style="{StaticResource MonitorStatusWrappedValue}" Foreground="#9AA6AF" FontWeight="Normal"/>
+              <TextBlock Grid.Row="9" Grid.Column="1" x:Name="CameraFrameMetadataText" Text="No frame" Style="{StaticResource MonitorStatusWrappedValue}" Foreground="{DynamicResource HmiTextLabelBrush}" FontWeight="Normal"/>
               <TextBlock Grid.Row="10" Text="Lighting" Style="{StaticResource MonitorStatusLabel}"/>
-              <TextBlock Grid.Row="10" Grid.Column="1" x:Name="LightingSyncText" Text="Lighting: Not Connected" Style="{StaticResource MonitorStatusWrappedValue}" Foreground="#9AA6AF" FontWeight="Normal"/>
+              <TextBlock Grid.Row="10" Grid.Column="1" x:Name="LightingSyncText" Text="Lighting: Not Connected" Style="{StaticResource MonitorStatusWrappedValue}" Foreground="{DynamicResource HmiTextLabelBrush}" FontWeight="Normal"/>
               <TextBlock Grid.Row="11" Text="Timing" Style="{StaticResource MonitorStatusLabel}"/>
               <TextBlock Grid.Row="11" Grid.Column="1" x:Name="TimingText" Text="--" Style="{StaticResource MonitorStatusValue}"/>
               <TextBlock Grid.Row="12" Text="Result" Style="{StaticResource MonitorStatusLabel}"/>
@@ -255,8 +255,8 @@
               <RowDefinition Height="Auto" MinHeight="32"/>
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-              <TextBlock Text="Defect List" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+            <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
+              <TextBlock Text="Defect List" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
             </Border>
             <DataGrid Grid.Row="1"
                       x:Name="DefectGrid"
@@ -293,10 +293,10 @@
           <RowDefinition Height="Auto" MinHeight="32"/>
           <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+        <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
           <DockPanel>
-            <TextBlock x:Name="ModeText" DockPanel.Dock="Right" Text="STOPPED" Foreground="#E1A334" FontWeight="Bold" FontSize="14"/>
-            <TextBlock Text="Alarm / Event Log" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+            <TextBlock x:Name="ModeText" DockPanel.Dock="Right" Text="STOPPED" Foreground="{DynamicResource HmiWarnBrush}" FontWeight="Bold" FontSize="14"/>
+            <TextBlock Text="Alarm / Event Log" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
           </DockPanel>
         </Border>
         <DataGrid Grid.Row="1" x:Name="AlarmGrid" AutomationProperties.Name="Alarm and event log" AutoGenerateColumns="False" Style="{StaticResource HmiTable}" MaxHeight="300">

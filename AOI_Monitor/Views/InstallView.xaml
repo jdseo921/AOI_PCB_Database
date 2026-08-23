@@ -1,9 +1,16 @@
 <UserControl x:Class="AOI_Monitor.Views.InstallView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="#0B0E10">
+             Background="{DynamicResource HmiBgBrush}">
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="8">
+    <!-- Fill the viewport: the runtime-notes table absorbs spare height (audit
+         TrailingVoidPercent was 53.8% at 1080p before this). -->
+    <Grid Margin="8" MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
     <Grid Margin="0,0,0,8">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="300"/>
@@ -13,8 +20,8 @@
       <Border Grid.Column="0" Style="{StaticResource Panel}">
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-            <TextBlock Text="Prototype Runtime Notes" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+          <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
+            <TextBlock Text="Prototype Runtime Notes" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
           <DataGrid Grid.Row="1" x:Name="RuntimeGrid">
             <DataGrid.Columns>
@@ -35,25 +42,25 @@
       <Border Grid.Column="2" Style="{StaticResource Panel}">
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-            <TextBlock Text="GUI Role" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+          <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
+            <TextBlock Text="GUI Role" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
           <UniformGrid Grid.Row="1" Columns="1" Margin="8" Rows="4">
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="Current Runtime"       Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/><TextBlock Text="Local WPF App"        FontWeight="Bold" FontSize="14"/></StackPanel></Border>
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="Visible GUI"         Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/><TextBlock Text="Review Console"   FontWeight="Bold" FontSize="14"/></StackPanel></Border>
-            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="Default Module"        Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/><TextBlock Text="Main Inspection"            FontWeight="Bold" FontSize="14"/></StackPanel></Border>
-            <Border Style="{StaticResource FieldBox}" Margin="0"><StackPanel><TextBlock Text="Stage 2+"  Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/><TextBlock Text="Hardware/MES planned"     FontWeight="Bold" FontSize="14"/></StackPanel></Border>
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="Current Runtime"       Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/><TextBlock Text="Local WPF App"        FontWeight="Bold" FontSize="14"/></StackPanel></Border>
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="Visible GUI"         Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/><TextBlock Text="Review Console"   FontWeight="Bold" FontSize="14"/></StackPanel></Border>
+            <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="Default Module"        Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/><TextBlock Text="Main Inspection"            FontWeight="Bold" FontSize="14"/></StackPanel></Border>
+            <Border Style="{StaticResource FieldBox}" Margin="0"><StackPanel><TextBlock Text="Stage 2+"  Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/><TextBlock Text="Hardware/MES planned"     FontWeight="Bold" FontSize="14"/></StackPanel></Border>
           </UniformGrid>
         </Grid>
       </Border>
     </Grid>
 
     <!-- Installation boundary -->
-    <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
+    <Border Grid.Row="1" Style="{StaticResource Panel}" Margin="0,0,0,8">
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-          <TextBlock Text="Documentation Boundary" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+        <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
+          <TextBlock Text="Documentation Boundary" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
         </Border>
         <DataGrid Grid.Row="1" x:Name="BoundaryGrid" MaxHeight="140">
           <DataGrid.Columns>
@@ -65,11 +72,11 @@
     </Border>
 
     <!-- Bottom note -->
-    <Border Background="#14080A" BorderBrush="#4B2325" BorderThickness="1" Padding="7,10">
+    <Border Grid.Row="2" Background="#14080A" BorderBrush="#4B2325" BorderThickness="1" Padding="7,10">
       <TextBlock Text="Prototype note: this app runs local file-based review only; service deployment and hardware integration are planned."
-                 Foreground="#F27777" FontWeight="ExtraBold" TextAlignment="Center" FontSize="14"/>
+                 Foreground="{DynamicResource HmiNgBrush}" FontWeight="ExtraBold" TextAlignment="Center" FontSize="14"/>
     </Border>
-    </StackPanel>
+    </Grid>
   </ScrollViewer>
 </UserControl>
 

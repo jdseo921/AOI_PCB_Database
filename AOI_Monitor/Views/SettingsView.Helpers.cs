@@ -285,7 +285,6 @@ public partial class SettingsView
             SetComboItemText(ResolutionCombo, 1, "2560 x 1440 engineering monitor");
             SetComboItemText(ResolutionCombo, 2, "3840 x 2160 wall display");
             SetComboItemText(ThemeCombo, 0, "Industrial Dark");
-            SetComboItemText(ThemeCombo, 1, "Industrial Light");
 
             SetComboItemText(DetectionPriorityCombo, 0, "Minimize False Positives");
             SetComboItemText(DetectionPriorityCombo, 1, "Balanced");
@@ -325,7 +324,7 @@ public partial class SettingsView
             UiResolutionPreset.Uhd3840x2160 => 2,
             _ => 0,
         };
-        ThemeCombo.SelectedIndex = preferences.Theme == UiTheme.IndustrialLight ? 1 : 0;
+        ThemeCombo.SelectedIndex = 0;
         ConsoleTitleText.Text = preferences.ConsoleTitle;
         StationNameText.Text = preferences.StationDisplayName;
         StationSubtitleText.Text = preferences.StationSubtitle;
@@ -352,7 +351,7 @@ public partial class SettingsView
                 2 => UiResolutionPreset.Uhd3840x2160,
                 _ => UiResolutionPreset.FullHd1920x1080,
             },
-            Theme = ThemeCombo.SelectedIndex == 1 ? UiTheme.IndustrialLight : UiTheme.IndustrialDark,
+            Theme = UiTheme.IndustrialDark,
             ConsoleTitle = ConsoleTitleText.Text,
             StationDisplayName = StationNameText.Text,
             StationSubtitle = StationSubtitleText.Text,

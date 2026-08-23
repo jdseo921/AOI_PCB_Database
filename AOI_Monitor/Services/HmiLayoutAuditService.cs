@@ -43,6 +43,16 @@ public sealed class HmiLayoutViewResult
     public int IssueCount { get; init; }
     public int FailureCount { get; init; }
     public int WarningCount { get; init; }
+
+    /// <summary>Bottom edge (DIP) of the lowest visible content inside the viewport.</summary>
+    public double ContentBottom { get; init; }
+
+    /// <summary>
+    /// Share of the viewport height below the lowest visible content — the page's trailing
+    /// dead space at this resolution. Scrollable pages whose content exceeds the viewport
+    /// report 0.
+    /// </summary>
+    public double TrailingVoidPercent { get; init; }
 }
 
 public sealed class HmiLayoutIssue
@@ -124,6 +134,7 @@ public static class HmiLayoutAuditService
                 FrameworkElement? element = null;
                 var hasScrollViewer = false;
                 var elementCount = 0;
+                var contentBottom = 0.0;
 
                 try
                 {
@@ -132,6 +143,20 @@ public static class HmiLayoutAuditService
                     var descendants = Descendants(element).ToArray();
                     elementCount = descendants.Length + 1;
                     hasScrollViewer = descendants.OfType<ScrollViewer>().Any();
+                    contentBottom = MeasureContentBottom(element, options.Height);
+
+                    // Trailing dead space: exposed page background below the lowest panel or
+                    // control. The five worst offenders measured 19-59% before the 2026-08-23
+                    // layout pass; this rule keeps pages from regressing. The image viewer is
+                    // exempt because the audit harness opens it without an image, so its whole
+                    // viewport reads as empty here while at runtime it always hosts one.
+                    var voidPercent = options.Height <= 0 ? 0 : Math.Max(0, options.Height - contentBottom) / options.Height * 100.0;
+                    if (definition.Key != "image-viewer-window" && voidPercent > 20.0)
+                    {
+                        issues.Add(CreateIssue(definition, dpiScale, "TrailingDeadSpace", definition.Key,
+                            voidPercent > 35.0 ? HmiLayoutIssueSeverity.Fail : HmiLayoutIssueSeverity.Warn,
+                            $"Bottom {voidPercent:N1}% of the viewport is empty page background (content ends at {contentBottom:N0} of {options.Height:N0} DIP). Let a table, chart, or status band absorb the height."));
+                    }
 
                     if (definition.RequiresScrollViewer && !hasScrollViewer)
                     {
@@ -183,6 +208,8 @@ public static class HmiLayoutAuditService
                     IssueCount = issues.Count,
                     FailureCount = issues.Count(issue => issue.Severity == HmiLayoutIssueSeverity.Fail && !issue.Approved),
                     WarningCount = issues.Count(issue => issue.Severity == HmiLayoutIssueSeverity.Warn && !issue.Approved),
+                    ContentBottom = contentBottom,
+                    TrailingVoidPercent = options.Height <= 0 ? 0 : Math.Max(0, options.Height - contentBottom) / options.Height * 100.0,
                 });
             }
         }
@@ -945,6 +972,51 @@ public static class HmiLayoutAuditService
             text.Contains("message", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Bottom edge of the lowest visible, non-trivial content in the viewport. Backgrounds and
+    /// decorative containers stretch to the full page by design, so only content-bearing
+    /// elements count (text, buttons, inputs, tables, images, shapes). Content inside a
+    /// ScrollViewer is clamped to the viewport, and pages that fill or overflow the viewport
+    /// report a bottom equal to the viewport height (zero trailing void).
+    /// </summary>
+    private static double MeasureContentBottom(FrameworkElement root, double viewportHeight)
+    {
+        var bottom = 0.0;
+        foreach (var element in Descendants(root).OfType<FrameworkElement>())
+        {
+            if (IsTemplateInternal(element) || !IsEffectivelyVisible(element))
+                continue;
+            // Panels and image wells are content too: a card or viewport that stretches to the
+            // bottom edge is a designed surface, not dead space. Dead space is exposed *page*
+            // background below the lowest panel or control.
+            var isContentContainer = element is Border { Background: SolidColorBrush { Color.A: > 0 } } border &&
+                border.Background != Brushes.Transparent;
+            if (!isContentContainer &&
+                element is not (TextBlock or Button or Label or TextBox or ComboBox or DataGrid or CheckBox or Image or ProgressBar or ListBox or TabControl or DatePicker or System.Windows.Shapes.Shape))
+                continue;
+            if (element is TextBlock textBlock && string.IsNullOrWhiteSpace(textBlock.Text))
+                continue;
+            if (element.ActualWidth <= 0 || element.ActualHeight <= 0)
+                continue;
+
+            double elementBottom;
+            try
+            {
+                elementBottom = element.TransformToAncestor(root).Transform(new Point(0, element.ActualHeight)).Y;
+            }
+            catch (InvalidOperationException)
+            {
+                continue;
+            }
+
+            bottom = Math.Max(bottom, Math.Min(elementBottom, viewportHeight));
+            if (bottom >= viewportHeight)
+                return viewportHeight;
+        }
+
+        return bottom;
+    }
+
     private static void MeasureElement(FrameworkElement element, double width, double height)
     {
         if (element is Window { Content: FrameworkElement content })
@@ -1112,9 +1184,9 @@ public static class HmiLayoutAuditService
         sb.AppendLine("<style>body{font-family:Segoe UI,Arial,sans-serif;margin:24px;color:#17212b}table{border-collapse:collapse;width:100%;margin:14px 0}td,th{border:1px solid #cfd8df;padding:6px 8px;text-align:left;vertical-align:top}.Pass{color:#176b3a}.Fail{color:#a12626}.Warn{color:#8a5a00}.approved{color:#66727c}</style></head><body>");
         sb.AppendLine($"<h1>HMI Layout Audit <span class=\"{(report.Passed ? "Pass" : "Fail")}\">{(report.Passed ? "PASS" : "FAIL")}</span></h1>");
         sb.AppendLine($"<p>Generated UTC: {report.GeneratedAtUtc:O}<br>Window: {report.MinimumWindowWidth:N0}x{report.MinimumWindowHeight:N0}<br>DPI profiles: 100%, 125%, 150%</p>");
-        sb.AppendLine("<h2>Views</h2><table><tr><th>View</th><th>DPI</th><th>Scroll</th><th>Elements</th><th>Failures</th><th>Warnings</th></tr>");
+        sb.AppendLine("<h2>Views</h2><table><tr><th>View</th><th>DPI</th><th>Scroll</th><th>Elements</th><th>Dead space</th><th>Failures</th><th>Warnings</th></tr>");
         foreach (var view in report.Views)
-            sb.AppendLine($"<tr><td>{Escape(view.Name)}</td><td>{view.DpiScale:P0}</td><td>{(view.HasScrollViewer ? "Yes" : "No")}</td><td>{view.VisualElementCount}</td><td>{view.FailureCount}</td><td>{view.WarningCount}</td></tr>");
+            sb.AppendLine($"<tr><td>{Escape(view.Name)}</td><td>{view.DpiScale:P0}</td><td>{(view.HasScrollViewer ? "Yes" : "No")}</td><td>{view.VisualElementCount}</td><td>{view.TrailingVoidPercent:N1}%</td><td>{view.FailureCount}</td><td>{view.WarningCount}</td></tr>");
         sb.AppendLine("</table><h2>Issues</h2><table><tr><th>Status</th><th>View</th><th>DPI</th><th>Type</th><th>Target</th><th>Message</th></tr>");
         foreach (var issue in report.Issues)
         {

@@ -17,6 +17,7 @@ Scope: the shell (`AOI_Monitor/MainWindow.xaml`) and navigation; every page in `
 ## Layout Constraints And WPF Rules
 
 - Minimum display 1920x1080; critical actions visible at 125% Windows DPI; important actions reachable without resizing. No clipped, overlapped, or vanishing text at 100/125/150/200% DPI; resizing must not clip alarms, buttons, headers, grid columns, or export controls. Pages tolerate missing images, disconnected hardware, empty datasets, long strings, failed exports, unavailable services.
+- Pages fill the operator display: at 1920x1080 the exposed page background below the lowest panel or control (trailing dead space) must stay at or under 20% of the viewport — let a table, chart, tile grid, or status band absorb spare height instead. Machine-checked by the HMI layout audit (`TrailingDeadSpace`: Warn > 20%, Fail > 35%; per-view `TrailingVoidPercent` is reported in `hmi_layout_audit.json`/`.html`). The five worst pages measured 19-59% before the 2026-08-23 layout pass and now measure <= 0.9%.
 - Operator text at least 14 pt equivalent (tiny labels only as secondary hints; dashboards readable at operator distance). Primary buttons at least 120x40 px; icon-only commands get accessible names or tooltips; targets spaced against accidental activation.
 - Important text wraps or resizes, never clips or relies on hover. Long names, paths, model/station IDs, recipes, defect labels, endpoints/MES URLs, and translated-like strings wrap, scroll, or trim with tooltip; `TextBlock` wraps unless intentionally trimmed.
 - Dense pages use `ScrollViewer`, virtualized tables, tabs, or approved adaptive layout. Critical verdicts, alarms, machine/station states, images, mode/profile labels, and primary actions never hide below scroll-only areas.
@@ -60,7 +61,7 @@ Page-local styles only for structure that cannot live in the shared layer; promo
 
 ## Color And Status Semantics
 
-High contrast is mandatory (text, controls, tables, charts, alarms, overlays) in dark and light themes. Status vocabulary:
+Industrial Dark is the single supported theme (the light theme was removed 2026-08-23: it predated the token system, its worst measured text pairing was 1.05:1, and no station used it). High contrast is mandatory for text, controls, tables, charts, alarms, and overlays, and it is machine-checked: every themed foreground/surface pairing carries a WCAG contrast contract in `AOI_Monitor/Services/HmiThemePalette.cs`, enforced by `HmiThemePaletteTests` (the palette and the XAML token definitions are also drift-locked against each other). Theme colors live only in the `Hmi*` tokens of `AOI_Monitor/Styles/FactoryHmiLayout.xaml` and the App.xaml brushes; per-view color literals are reserved for self-contained status chips and constant-dark image wells. Status vocabulary:
 
 | Meaning | Preferred words | Color |
 | --- | --- | --- |

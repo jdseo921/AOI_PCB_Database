@@ -30,6 +30,61 @@
   <SolidColorBrush x:Key="HmiOfflineBrush" Color="{StaticResource HmiOfflineColor}"/>
   <SolidColorBrush x:Key="HmiSimulatedBrush" Color="{StaticResource HmiSimulatedColor}"/>
 
+  <!-- Extended neutral ramp + strong-NG tokens. Introduced when the ~770 per-view literal
+       colors were consolidated onto these tokens; values are the exact literals they replaced,
+       so the app renders as before. Services/HmiThemePalette.cs mirrors this table and
+       HmiThemePaletteTests machine-checks both the WCAG contrast contract and palette/XAML
+       agreement. Industrial Dark is the single supported theme. -->
+  <Color x:Key="HmiTextBodyColor">#DCE5EB</Color>
+  <Color x:Key="HmiTextLabelColor">#9AA6AF</Color>
+  <Color x:Key="HmiTextDimColor">#7F8C95</Color>
+  <Color x:Key="HmiNgStrongColor">#F13B3F</Color>
+  <Color x:Key="HmiRaisedColor">#20272B</Color>
+  <Color x:Key="HmiPanelBorderColor">#343D44</Color>
+  <Color x:Key="HmiBorderMidColor">#59636B</Color>
+  <Color x:Key="HmiBorderStrongColor">#8C9BA4</Color>
+
+  <SolidColorBrush x:Key="HmiTextBodyBrush" Color="{StaticResource HmiTextBodyColor}"/>
+  <SolidColorBrush x:Key="HmiTextLabelBrush" Color="{StaticResource HmiTextLabelColor}"/>
+  <SolidColorBrush x:Key="HmiTextDimBrush" Color="{StaticResource HmiTextDimColor}"/>
+  <SolidColorBrush x:Key="HmiNgStrongBrush" Color="{StaticResource HmiNgStrongColor}"/>
+  <SolidColorBrush x:Key="HmiRaisedBrush" Color="{StaticResource HmiRaisedColor}"/>
+  <SolidColorBrush x:Key="HmiPanelBorderBrush" Color="{StaticResource HmiPanelBorderColor}"/>
+  <SolidColorBrush x:Key="HmiBorderMidBrush" Color="{StaticResource HmiBorderMidColor}"/>
+  <SolidColorBrush x:Key="HmiBorderStrongBrush" Color="{StaticResource HmiBorderStrongColor}"/>
+
+  <!-- Soft status text (pale tint used on themed surfaces; chip-internal text keeps its
+       literal pair) and the table selection tint. -->
+  <Color x:Key="HmiWarnSoftColor">#FFE0A7</Color>
+  <Color x:Key="HmiNgSoftColor">#FFCDD0</Color>
+  <Color x:Key="HmiOkSoftColor">#C6FFD0</Color>
+  <Color x:Key="HmiInfoSoftColor">#CFEAFF</Color>
+  <Color x:Key="HmiSimulatedSoftColor">#F1D8FF</Color>
+  <Color x:Key="HmiSelectionColor">#273642</Color>
+
+  <SolidColorBrush x:Key="HmiWarnSoftBrush" Color="{StaticResource HmiWarnSoftColor}"/>
+  <SolidColorBrush x:Key="HmiNgSoftBrush" Color="{StaticResource HmiNgSoftColor}"/>
+  <SolidColorBrush x:Key="HmiOkSoftBrush" Color="{StaticResource HmiOkSoftColor}"/>
+  <SolidColorBrush x:Key="HmiInfoSoftBrush" Color="{StaticResource HmiInfoSoftColor}"/>
+  <SolidColorBrush x:Key="HmiSimulatedSoftBrush" Color="{StaticResource HmiSimulatedSoftColor}"/>
+  <SolidColorBrush x:Key="HmiSelectionBrush" Color="{StaticResource HmiSelectionColor}"/>
+
+  <!-- Shell chrome: brand top bar, footer strip, and flyout/overlay panels. -->
+  <Color x:Key="HmiChromeColor">#0D2438</Color>
+  <Color x:Key="HmiChromeAltColor">#081018</Color>
+  <Color x:Key="HmiFlyoutColor">#0C0F11</Color>
+  <Color x:Key="HmiFlyoutAltColor">#0F151A</Color>
+  <Color x:Key="HmiFlyoutBorderColor">#3A4249</Color>
+  <SolidColorBrush x:Key="HmiChromeBrush" Color="{StaticResource HmiChromeColor}"/>
+  <SolidColorBrush x:Key="HmiChromeAltBrush" Color="{StaticResource HmiChromeAltColor}"/>
+  <SolidColorBrush x:Key="HmiFlyoutBrush" Color="{StaticResource HmiFlyoutColor}"/>
+  <SolidColorBrush x:Key="HmiFlyoutAltBrush" Color="{StaticResource HmiFlyoutAltColor}"/>
+  <SolidColorBrush x:Key="HmiFlyoutBorderBrush" Color="{StaticResource HmiFlyoutBorderColor}"/>
+  <SolidColorBrush x:Key="HmiScrimBrush" Color="#EE151A1E"/>
+  <SolidColorBrush x:Key="HmiLoadingScrimBrush" Color="#CC050607"/>
+  <SolidColorBrush x:Key="HmiNoteBrush" Color="#172A39"/>
+  <SolidColorBrush x:Key="HmiNoteBorderBrush" Color="#477CA5"/>
+
   <sys:Double x:Key="HmiFontSizeBody" xmlns:sys="clr-namespace:System;assembly=mscorlib">14</sys:Double>
   <sys:Double x:Key="HmiFontSizeLabel" xmlns:sys="clr-namespace:System;assembly=mscorlib">14</sys:Double>
   <sys:Double x:Key="HmiFontSizeSmall" xmlns:sys="clr-namespace:System;assembly=mscorlib">14</sys:Double>
@@ -66,12 +121,12 @@
     <Setter Property="PanningMode" Value="VerticalOnly"/>
     <Setter Property="Focusable" Value="False"/>
     <Setter Property="Padding" Value="0"/>
-    <Setter Property="Background" Value="{StaticResource HmiBgBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiBgBrush}"/>
   </Style>
 
   <Style x:Key="FactoryCard" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
     <Setter Property="BorderThickness" Value="1"/>
     <Setter Property="Padding" Value="10"/>
     <Setter Property="MinHeight" Value="48"/>
@@ -79,7 +134,7 @@
   </Style>
 
   <Style x:Key="FactoryFormFieldLabel" TargetType="TextBlock">
-    <Setter Property="Foreground" Value="{StaticResource HmiMutedTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiMutedTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeLabel}"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
@@ -102,13 +157,13 @@
   </Style>
 
   <Style x:Key="HmiDarkContentSurface" TargetType="Border" BasedOn="{StaticResource FactoryCard}">
-    <Setter Property="Background" Value="{StaticResource HmiBgBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiBgBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
     <Setter Property="Padding" Value="0"/>
   </Style>
 
   <Style x:Key="FactoryWrappedText" TargetType="TextBlock">
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
     <Setter Property="TextTrimming" Value="None"/>
@@ -116,7 +171,7 @@
   </Style>
 
   <Style x:Key="FactoryTrimmedTextWithTooltip" TargetType="TextBlock">
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
     <Setter Property="TextWrapping" Value="NoWrap"/>
@@ -132,7 +187,7 @@
     <Setter Property="HorizontalAlignment" Value="Left"/>
     <Style.Resources>
       <Style TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
         <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
         <Setter Property="TextTrimming" Value="None"/>
@@ -142,7 +197,7 @@
   </Style>
 
   <Style x:Key="HmiAdaptiveStatusText" TargetType="TextBlock">
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="FontWeight" Value="ExtraBold"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
@@ -151,7 +206,7 @@
   </Style>
 
   <Style x:Key="HmiAdaptiveStatusValueText" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
-    <Setter Property="Foreground" Value="{StaticResource HmiMutedTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiMutedTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
     <Setter Property="MaxWidth" Value="240"/>
@@ -204,7 +259,7 @@
   </Style>
 
   <Style x:Key="HmiAdaptiveSectionHeaderTitle" TargetType="TextBlock">
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeSection}"/>
     <Setter Property="FontWeight" Value="ExtraBold"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
@@ -233,24 +288,24 @@
   </Style>
 
   <Style x:Key="HmiAdaptiveFieldValueText" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
   </Style>
 
   <Style x:Key="HmiAdaptiveFieldWrappedValueText" TargetType="TextBlock" BasedOn="{StaticResource FactoryWrappedText}">
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
   </Style>
 
   <Style x:Key="HmiFieldTextBox" TargetType="TextBox">
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
-    <Setter Property="CaretBrush" Value="{StaticResource HmiTextBrush}"/>
-    <Setter Property="SelectionBrush" Value="{StaticResource HmiInfoBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
+    <Setter Property="CaretBrush" Value="{DynamicResource HmiTextBrush}"/>
+    <Setter Property="SelectionBrush" Value="{DynamicResource HmiInfoBrush}"/>
     <Setter Property="MinHeight" Value="36"/>
     <Setter Property="MinWidth" Value="160"/>
     <Setter Property="Padding" Value="8,5"/>
@@ -260,9 +315,9 @@
   </Style>
 
   <Style x:Key="HmiFieldComboBox" TargetType="ComboBox">
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="MinHeight" Value="36"/>
     <Setter Property="MinWidth" Value="160"/>
     <Setter Property="Padding" Value="8,5"/>
@@ -272,9 +327,9 @@
   </Style>
 
   <Style x:Key="HmiFieldDatePicker" TargetType="DatePicker">
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="MinHeight" Value="36"/>
     <Setter Property="MinWidth" Value="165"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
@@ -282,12 +337,12 @@
   </Style>
 
   <Style x:Key="HmiFieldPasswordBox" TargetType="PasswordBox">
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
-    <Setter Property="CaretBrush" Value="{StaticResource HmiTextBrush}"/>
-    <Setter Property="SelectionBrush" Value="{StaticResource HmiInfoBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
+    <Setter Property="CaretBrush" Value="{DynamicResource HmiTextBrush}"/>
+    <Setter Property="SelectionBrush" Value="{DynamicResource HmiInfoBrush}"/>
     <Setter Property="MinHeight" Value="36"/>
     <Setter Property="MinWidth" Value="160"/>
     <Setter Property="Padding" Value="8,5"/>
@@ -296,7 +351,7 @@
   </Style>
 
   <Style x:Key="HmiShellTrimmedText" TargetType="TextBlock" BasedOn="{StaticResource FactoryTrimmedTextWithTooltip}">
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
   </Style>
@@ -331,7 +386,7 @@
   </Style>
 
   <Style x:Key="HmiShellNavSubtitleText" TargetType="TextBlock">
-    <Setter Property="Foreground" Value="{StaticResource HmiMutedTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiMutedTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeSmall}"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
     <Setter Property="TextTrimming" Value="None"/>
@@ -373,8 +428,8 @@
   </DataTemplate>
 
   <Style x:Key="HmiDataGridColumnHeader" TargetType="DataGridColumnHeader">
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceAltBrush}"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceAltBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontWeight" Value="ExtraBold"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="Padding" Value="8,6"/>
@@ -420,10 +475,10 @@
   <Style x:Key="FactoryTable" TargetType="DataGrid">
     <Setter Property="MinHeight" Value="120"/>
     <Setter Property="MinColumnWidth" Value="84"/>
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="RowBackground" Value="#151A1E"/>
     <Setter Property="AlternatingRowBackground" Value="#171D21"/>
     <Setter Property="GridLinesVisibility" Value="All"/>
@@ -461,28 +516,28 @@
   </Style>
 
   <Style x:Key="HmiPageTitleText" TargetType="TextBlock">
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizePageTitle}"/>
     <Setter Property="FontWeight" Value="ExtraBold"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
   </Style>
 
   <Style x:Key="HmiPageSubtitleText" TargetType="TextBlock">
-    <Setter Property="Foreground" Value="{StaticResource HmiMutedTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiMutedTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
     <Setter Property="LineHeight" Value="20"/>
   </Style>
 
   <Style x:Key="HmiSectionHeaderText" TargetType="TextBlock">
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeSection}"/>
     <Setter Property="FontWeight" Value="ExtraBold"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
   </Style>
 
   <Style x:Key="HmiTechnicalHintText" TargetType="TextBlock">
-    <Setter Property="Foreground" Value="{StaticResource HmiMutedTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiMutedTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeSmall}"/>
     <Setter Property="TextWrapping" Value="Wrap"/>
   </Style>
@@ -534,8 +589,8 @@
   </Style>
 
   <Style x:Key="HmiPlainLanguageNote" TargetType="Border" BasedOn="{StaticResource FactoryCard}">
-    <Setter Property="Background" Value="#172A39"/>
-    <Setter Property="BorderBrush" Value="#477CA5"/>
+    <Setter Property="Background" Value="{DynamicResource HmiNoteBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiNoteBorderBrush}"/>
   </Style>
 
   <Style x:Key="HmiTable" TargetType="DataGrid" BasedOn="{StaticResource FactoryTable}">
@@ -627,15 +682,15 @@
     <Setter Property="LineHeight" Value="20"/>
   </Style>
   <Style x:Key="HmiStateNextActionText" TargetType="TextBlock" BasedOn="{StaticResource HmiTechnicalHintText}">
-    <Setter Property="Foreground" Value="{StaticResource HmiWarnBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiWarnBrush}"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
   </Style>
 
   <Style TargetType="TabControl">
     <Setter Property="MinHeight" Value="160"/>
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="Padding" Value="0"/>
     <Setter Property="Template">
       <Setter.Value>
@@ -677,9 +732,9 @@
   <Style TargetType="TabItem">
     <Setter Property="MinHeight" Value="38"/>
     <Setter Property="Padding" Value="12,7"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiMutedTextBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiMutedTextBrush}"/>
     <Setter Property="Background" Value="#11171B"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
     <Setter Property="Template">
@@ -701,7 +756,7 @@
                 <Style TargetType="TextBlock">
                   <Setter Property="TextWrapping" Value="Wrap"/>
                   <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                  <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+                  <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
                   <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
                 </Style>
               </ContentPresenter.Resources>
@@ -709,18 +764,18 @@
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsSelected" Value="True">
-              <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-              <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource HmiInfoBrush}"/>
-              <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+              <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+              <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource HmiInfoBrush}"/>
+              <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
               <Setter Property="FontWeight" Value="ExtraBold"/>
             </Trigger>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource HmiSurfaceAltBrush}"/>
-              <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource HmiInfoBrush}"/>
+              <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource HmiSurfaceAltBrush}"/>
+              <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource HmiInfoBrush}"/>
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter TargetName="TabBorder" Property="Opacity" Value="0.5"/>
-              <Setter Property="Foreground" Value="{StaticResource HmiOfflineBrush}"/>
+              <Setter Property="Foreground" Value="{DynamicResource HmiOfflineBrush}"/>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -730,8 +785,8 @@
 
   <Style x:Key="HmiScrollBarButton" TargetType="RepeatButton">
     <Setter Property="Focusable" Value="False"/>
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
     <Setter Property="BorderThickness" Value="0"/>
     <Setter Property="Template">
       <Setter.Value>
@@ -763,11 +818,11 @@
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
               <Setter TargetName="ThumbBorder" Property="Background" Value="#5E6B76"/>
-              <Setter TargetName="ThumbBorder" Property="BorderBrush" Value="{StaticResource HmiInfoBrush}"/>
+              <Setter TargetName="ThumbBorder" Property="BorderBrush" Value="{DynamicResource HmiInfoBrush}"/>
             </Trigger>
             <Trigger Property="IsDragging" Value="True">
-              <Setter TargetName="ThumbBorder" Property="Background" Value="{StaticResource HmiInfoBrush}"/>
-              <Setter TargetName="ThumbBorder" Property="BorderBrush" Value="{StaticResource HmiInfoBrush}"/>
+              <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource HmiInfoBrush}"/>
+              <Setter TargetName="ThumbBorder" Property="BorderBrush" Value="{DynamicResource HmiInfoBrush}"/>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -776,8 +831,8 @@
   </Style>
 
   <Style x:Key="HmiScrollBar" TargetType="{x:Type ScrollBar}">
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
     <Setter Property="Width" Value="16"/>
     <Setter Property="MinWidth" Value="16"/>
     <Setter Property="Template">
@@ -846,9 +901,9 @@
   <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource HmiScrollBar}"/>
 
   <Style TargetType="CheckBox">
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="MinHeight" Value="34"/>
     <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -865,13 +920,13 @@
                     Height="18"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Center"
-                    Background="{StaticResource HmiSurfaceBrush}"
-                    BorderBrush="{StaticResource HmiBorderBrush}"
+                    Background="{DynamicResource HmiSurfaceBrush}"
+                    BorderBrush="{DynamicResource HmiBorderBrush}"
                     BorderThickness="1"/>
             <Path x:Name="CheckMark"
                   Grid.Column="0"
                   Data="M 3 8 L 7 12 L 15 3"
-                  Stroke="{StaticResource HmiOkBrush}"
+                  Stroke="{DynamicResource HmiOkBrush}"
                   StrokeThickness="2.4"
                   StrokeEndLineCap="Square"
                   StrokeStartLineCap="Square"
@@ -883,15 +938,15 @@
           </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsChecked" Value="True">
-              <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource HmiOkBrush}"/>
+              <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{DynamicResource HmiOkBrush}"/>
               <Setter TargetName="CheckBorder" Property="Background" Value="#123B20"/>
               <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
             </Trigger>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource HmiInfoBrush}"/>
+              <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{DynamicResource HmiInfoBrush}"/>
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
-              <Setter Property="Foreground" Value="{StaticResource HmiMutedTextBrush}"/>
+              <Setter Property="Foreground" Value="{DynamicResource HmiMutedTextBrush}"/>
               <Setter TargetName="CheckBorder" Property="Opacity" Value="0.65"/>
               <Setter TargetName="CheckMark" Property="Opacity" Value="0.65"/>
             </Trigger>
@@ -902,9 +957,9 @@
   </Style>
 
   <Style TargetType="DatePicker">
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="MinHeight" Value="36"/>
     <Setter Property="MinWidth" Value="165"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
@@ -912,9 +967,9 @@
   </Style>
 
   <Style TargetType="{x:Type primitives:DatePickerTextBox}">
-    <Setter Property="Background" Value="{StaticResource HmiSurfaceBrush}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource HmiBorderBrush}"/>
-    <Setter Property="Foreground" Value="{StaticResource HmiTextBrush}"/>
+    <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource HmiBorderBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource HmiTextBrush}"/>
     <Setter Property="FontSize" Value="{StaticResource HmiFontSizeBody}"/>
     <Setter Property="MinHeight" Value="34"/>
     <Setter Property="Padding" Value="8,5"/>

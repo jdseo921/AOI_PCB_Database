@@ -2,7 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="clr-namespace:AOI_Monitor.Controls"
-             Background="#0B0E10">
+             Background="{DynamicResource HmiBgBrush}">
   <UserControl.Resources>
     <Style x:Key="DbStatusChipBorder" TargetType="Border" BasedOn="{StaticResource Chip}">
       <Style.Triggers>
@@ -21,24 +21,30 @@
       </Style.Triggers>
     </Style>
     <Style x:Key="DbStatusChipText" TargetType="TextBlock">
-      <Setter Property="Foreground" Value="#DCE5EB"/>
+      <Setter Property="Foreground" Value="{DynamicResource HmiTextBodyBrush}"/>
       <Setter Property="FontSize" Value="14"/>
       <Setter Property="FontWeight" Value="Bold"/>
       <Style.Triggers>
         <DataTrigger Binding="{Binding Status}" Value="NG">
-          <Setter Property="Foreground" Value="#FFBFC1"/>
+          <Setter Property="Foreground" Value="{DynamicResource HmiNgSoftBrush}"/>
         </DataTrigger>
         <DataTrigger Binding="{Binding Status}" Value="WARN">
-          <Setter Property="Foreground" Value="#FFE0A7"/>
+          <Setter Property="Foreground" Value="{DynamicResource HmiWarnSoftBrush}"/>
         </DataTrigger>
         <DataTrigger Binding="{Binding Status}" Value="OK">
-          <Setter Property="Foreground" Value="#C6FFD0"/>
+          <Setter Property="Foreground" Value="{DynamicResource HmiOkSoftBrush}"/>
         </DataTrigger>
       </Style.Triggers>
     </Style>
   </UserControl.Resources>
   <ScrollViewer Style="{StaticResource FactoryScrollablePage}">
-  <StackPanel Margin="8">
+  <!-- Fill the viewport: the chart and DB-health table absorb spare height (audit
+       TrailingVoidPercent was 59.2% at 1080p before this). -->
+  <Grid Margin="8" MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
     <Grid Margin="0,0,0,8">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="410"/>
@@ -48,31 +54,36 @@
       <Border Grid.Column="0" Style="{StaticResource Panel}">
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
+          <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
             <DockPanel>
               <Border DockPanel.Dock="Right" Style="{StaticResource ChipPurple}" Padding="6,1">
-                <TextBlock Text="Demo Trend / Not Live Data" Foreground="#F1D8FF" FontWeight="Bold" FontSize="14"/>
+                <TextBlock Text="Demo Trend / Not Live Data" Foreground="{DynamicResource HmiSimulatedSoftBrush}" FontWeight="Bold" FontSize="14"/>
               </Border>
-              <TextBlock Text="SPC / SQLite Summary" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+              <TextBlock Text="SPC / SQLite Summary" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
             </DockPanel>
           </Border>
-          <StackPanel Grid.Row="1" Margin="8">
+          <Grid Grid.Row="1" Margin="8">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="*"/>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
             <c:LineChart/>
-            <WrapPanel Margin="0,6,0,0">
-              <StackPanel Orientation="Horizontal" Margin="0,0,12,0"><Rectangle Width="10" Height="3" Fill="#5CA0D3" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBlock Text="Yield" Foreground="#89959D" FontSize="14"/></StackPanel>
-              <StackPanel Orientation="Horizontal" Margin="0,0,12,0"><Rectangle Width="10" Height="3" Fill="#E1A334" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBlock Text="False Calls" Foreground="#89959D" FontSize="14"/></StackPanel>
-              <StackPanel Orientation="Horizontal"><Rectangle Width="10" Height="3" Fill="#F13B3F" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBlock Text="Escapes" Foreground="#89959D" FontSize="14"/></StackPanel>
+            <WrapPanel Grid.Row="1" Margin="0,6,0,0">
+              <StackPanel Orientation="Horizontal" Margin="0,0,12,0"><Rectangle Width="10" Height="3" Fill="#5CA0D3" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBlock Text="Yield" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Margin="0,0,12,0"><Rectangle Width="10" Height="3" Fill="#E1A334" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBlock Text="False Calls" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14"/></StackPanel>
+              <StackPanel Orientation="Horizontal"><Rectangle Width="10" Height="3" Fill="#F13B3F" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBlock Text="Escapes" Foreground="{DynamicResource HmiTextLabelBrush}" FontSize="14"/></StackPanel>
             </WrapPanel>
             <!-- Stats grid -->
-            <UniformGrid Columns="3" Margin="0,10,0,0" Rows="2">
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,6"><StackPanel><TextBlock Text="SQLite Inspections" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="InspectionCountText" Text="0" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,6"><StackPanel><TextBlock Text="OK / NG / REVIEW" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="VerdictBreakdownText" Text="0 / 0 / 0" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="SQLite Yield" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="YieldText" Text="--" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Review Events" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="ReviewEventCountText" Text="0" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Imported Images" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="ImportedImageCountText" Text="0" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
-              <Border Style="{StaticResource FieldBox}" Margin="0"><StackPanel><TextBlock Text="Broken Vault Links" Foreground="#7F8C95" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="BrokenImageLinksText" Text="0" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
+            <UniformGrid Grid.Row="2" Columns="3" Margin="0,10,0,0" Rows="2">
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,6"><StackPanel><TextBlock Text="SQLite Inspections" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="InspectionCountText" Text="0" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,6"><StackPanel><TextBlock Text="OK / NG / REVIEW" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="VerdictBreakdownText" Text="0 / 0 / 0" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,0,6"><StackPanel><TextBlock Text="SQLite Yield" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="YieldText" Text="--" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Review Events" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="ReviewEventCountText" Text="0" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0,0,6,0"><StackPanel><TextBlock Text="Imported Images" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="ImportedImageCountText" Text="0" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
+              <Border Style="{StaticResource FieldBox}" Margin="0"><StackPanel><TextBlock Text="Broken Vault Links" Foreground="{DynamicResource HmiTextDimBrush}" FontSize="14" Margin="0,0,0,2"/><TextBlock x:Name="BrokenImageLinksText" Text="0" FontWeight="Bold" FontSize="14"/></StackPanel></Border>
             </UniformGrid>
-          </StackPanel>
+          </Grid>
         </Grid>
       </Border>
 
@@ -80,8 +91,8 @@
       <Border Grid.Column="2" Style="{StaticResource Panel}">
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="32"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-          <Border Grid.Row="0" Background="#1A2024" BorderBrush="#343D44" BorderThickness="0,0,0,1" Padding="8,4">
-            <TextBlock Text="Database Health" Foreground="#DCE5EB" FontWeight="ExtraBold" FontSize="14"/>
+          <Border Grid.Row="0" Background="{DynamicResource HmiSurfaceAltBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="0,0,0,1" Padding="8,4">
+            <TextBlock Text="Database Health" Foreground="{DynamicResource HmiTextBodyBrush}" FontWeight="ExtraBold" FontSize="14"/>
           </Border>
           <DataGrid Grid.Row="1" x:Name="DbHealthGrid" Style="{StaticResource HmiTable}" MinWidth="340">
             <DataGrid.Columns>
@@ -110,11 +121,11 @@
     </Grid>
 
     <!-- Bottom alarm -->
-    <Border Background="#14080A" BorderBrush="#4B2325" BorderThickness="1" Padding="7,10">
+    <Border Grid.Row="1" Background="#14080A" BorderBrush="#4B2325" BorderThickness="1" Padding="7,10">
       <TextBlock x:Name="DatabaseWarningText" Text="SQLite summary loaded from local PoC database."
-                 Foreground="#F27777" FontWeight="ExtraBold" TextAlignment="Center" FontSize="14" TextWrapping="Wrap"/>
+                 Foreground="{DynamicResource HmiNgBrush}" FontWeight="ExtraBold" TextAlignment="Center" FontSize="14" TextWrapping="Wrap"/>
     </Border>
-  </StackPanel>
+  </Grid>
   </ScrollViewer>
 </UserControl>
 

@@ -35,11 +35,14 @@
   </UserControl.Resources>
 
   <ScrollViewer Style="{StaticResource FactoryScrollablePage}">
-    <Grid Margin="8">
+    <!-- Fill the viewport: the workflow tiles absorb the spare height (audit metric
+         TrailingVoidPercent held 37.6% dead space at 1080p before this). Small screens keep
+         scrolling because MinHeight never shrinks content below its natural size. -->
+    <Grid Margin="8" MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/>
         <RowDefinition Height="8"/>
-        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
       </Grid.RowDefinitions>
 
       <Grid Grid.Row="0">
@@ -123,7 +126,7 @@
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="6"/>
-          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
           <RowDefinition Height="12"/>
           <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -191,7 +194,7 @@
             <Grid.RowDefinitions>
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="5"/>
-              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <TextBlock Text="Current State" Style="{StaticResource HmiSectionHeaderText}" FontSize="16"/>
             <Border Grid.Row="2" Style="{StaticResource FactoryCard}" Padding="10">
@@ -204,7 +207,7 @@
                   <RowDefinition Height="Auto"/>
                   <RowDefinition Height="4"/>
                   <RowDefinition Height="Auto"/>
-                  <RowDefinition Height="8"/>
+                  <RowDefinition Height="*" MinHeight="8"/>
                   <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>

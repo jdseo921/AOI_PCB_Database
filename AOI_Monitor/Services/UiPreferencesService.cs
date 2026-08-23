@@ -23,10 +23,15 @@ public enum UiFontPreset
     Large,
 }
 
+/// <summary>
+/// Industrial Dark is the single supported theme. The light theme was removed 2026-08-23:
+/// it predated the token system, shipped with unreadable text (measured 1.05:1 worst case),
+/// and no station used it. Settings files that still carry the retired value fall back to
+/// dark on load. The dark palette's readability is machine-checked by HmiThemePaletteTests.
+/// </summary>
 public enum UiTheme
 {
     IndustrialDark,
-    IndustrialLight,
 }
 
 public enum UiResolutionPreset
@@ -321,7 +326,6 @@ public static class UiPreferencesService
         ["Resolution"] = "해상도",
         ["Theme"] = "테마",
         ["Industrial Dark"] = "산업용 다크",
-        ["Industrial Light"] = "산업용 라이트",
         ["1920 x 1080 minimum HMI"] = "1920 x 1080 최소 HMI",
         ["2560 x 1440 engineering monitor"] = "2560 x 1440 엔지니어링 모니터",
         ["3840 x 2160 wall display"] = "3840 x 2160 벽면 디스플레이",
@@ -659,24 +663,13 @@ public static class UiPreferencesService
 
     private static void ApplyThemeResources(UiTheme theme)
     {
-        var light = theme == UiTheme.IndustrialLight;
-        SetBrush("Bg", light ? "#EEF3F7" : "#0B0E10");
-        SetBrush("WindowBg", light ? "#F7FAFC" : "#121619");
-        SetBrush("FrameBg", light ? "#FFFFFF" : "#252C31");
-        SetBrush("Frame2Bg", light ? "#EDF3F7" : "#1B2024");
-        SetBrush("CellBg", light ? "#FFFFFF" : "#151A1E");
-        SetBrush("Cell2Bg", light ? "#F1F5F8" : "#1C2328");
-        SetBrush("LineBrush", light ? "#CBD5DF" : "#3D464D");
-        SetBrush("TextBrush", light ? "#0D1B2A" : "#D8DEE3");
-        SetBrush("MutedBrush", light ? "#526170" : "#8B969E");
-        SetBrush("DimBrush", light ? "#6B7A88" : "#667078");
-
-        SetBrush("HmiBgBrush", light ? "#EEF3F7" : "#0B0E10");
-        SetBrush("HmiSurfaceBrush", light ? "#FFFFFF" : "#151A1E");
-        SetBrush("HmiSurfaceAltBrush", light ? "#EDF3F7" : "#1B2024");
-        SetBrush("HmiBorderBrush", light ? "#CBD5DF" : "#3E474E");
-        SetBrush("HmiTextBrush", light ? "#0D1B2A" : "#E8EEF2");
-        SetBrush("HmiMutedTextBrush", light ? "#526170" : "#A8B2B9");
+        // Single-theme: the XAML token definitions (FactoryHmiLayout/App.xaml) are the source
+        // of truth and already carry the dark values, so no brush needs rewriting. Reasserting
+        // the palette here keeps a settings file that predates light-theme removal from leaving
+        // stale app-level overrides behind.
+        _ = theme;
+        foreach (var token in HmiThemePalette.Tokens)
+            SetBrush(token.Key, token.Dark);
     }
 
     private static void SetBrush(string key, string color)

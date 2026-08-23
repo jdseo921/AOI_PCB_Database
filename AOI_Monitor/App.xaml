@@ -30,7 +30,7 @@
 
     <!-- Base text -->
     <Style TargetType="TextBlock">
-      <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="FontFamily" Value="Segoe UI"/>
       <Setter Property="FontSize"   Value="14"/>
       <Setter Property="TextWrapping" Value="Wrap"/>
@@ -402,8 +402,8 @@
       <Setter Property="RowBackground"           Value="{DynamicResource CellBg}"/>
       <Setter Property="AlternatingRowBackground" Value="{DynamicResource Cell2Bg}"/>
       <Setter Property="GridLinesVisibility"     Value="All"/>
-      <Setter Property="HorizontalGridLinesBrush" Value="#343D44"/>
-      <Setter Property="VerticalGridLinesBrush"  Value="#343D44"/>
+      <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource HmiPanelBorderBrush}"/>
+      <Setter Property="VerticalGridLinesBrush"  Value="{DynamicResource HmiPanelBorderBrush}"/>
       <Setter Property="HeadersVisibility"       Value="Column"/>
       <Setter Property="AutoGenerateColumns"     Value="False"/>
       <Setter Property="CanUserAddRows"          Value="False"/>
@@ -423,7 +423,7 @@
       <Setter Property="Background" Value="Transparent"/>
       <Style.Triggers>
         <Trigger Property="IsSelected" Value="True">
-          <Setter Property="Background" Value="#273642"/>
+          <Setter Property="Background" Value="{DynamicResource HmiSelectionBrush}"/>
         </Trigger>
         <Trigger Property="IsMouseOver" Value="True">
           <Setter Property="Background" Value="{DynamicResource Cell2Bg}"/>
@@ -441,7 +441,7 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ProgressBar">
-            <Border Background="#262D32" BorderBrush="#343C42" BorderThickness="1">
+            <Border Background="{DynamicResource HmiRaisedBrush}" BorderBrush="{DynamicResource HmiPanelBorderBrush}" BorderThickness="1">
               <Border x:Name="PART_Indicator" HorizontalAlignment="Left" Background="{TemplateBinding Foreground}"/>
             </Border>
           </ControlTemplate>
@@ -457,13 +457,13 @@
 
     <!-- Scroll bars -->
     <Style TargetType="ScrollBar" BasedOn="{StaticResource HmiScrollBar}">
-      <Setter Property="Background" Value="#0F1316"/>
+      <Setter Property="Background" Value="{DynamicResource HmiSurfaceBrush}"/>
     </Style>
 
     <!-- Status chips -->
     <Style x:Key="Chip" TargetType="Border">
-      <Setter Property="Background"    Value="#20282E"/>
-      <Setter Property="BorderBrush"   Value="#51606B"/>
+      <Setter Property="Background"    Value="{DynamicResource HmiRaisedBrush}"/>
+      <Setter Property="BorderBrush"   Value="{DynamicResource HmiBorderMidBrush}"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="Padding"       Value="6,2"/>
     </Style>
@@ -485,16 +485,16 @@
 
     <!-- Field boxes -->
     <Style x:Key="FieldBox" TargetType="Border">
-      <Setter Property="Background"    Value="#151B1F"/>
-      <Setter Property="BorderBrush"   Value="#3A444B"/>
+      <Setter Property="Background"    Value="{DynamicResource HmiSurfaceBrush}"/>
+      <Setter Property="BorderBrush"   Value="{DynamicResource HmiPanelBorderBrush}"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="Padding"       Value="6"/>
     </Style>
 
     <!-- Panels -->
     <Style x:Key="Panel" TargetType="Border">
-      <Setter Property="Background"    Value="#151A1E"/>
-      <Setter Property="BorderBrush"   Value="#3E474E"/>
+      <Setter Property="Background"    Value="{DynamicResource HmiSurfaceBrush}"/>
+      <Setter Property="BorderBrush"   Value="{DynamicResource HmiBorderBrush}"/>
       <Setter Property="BorderThickness" Value="1"/>
     </Style>
 

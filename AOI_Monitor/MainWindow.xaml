@@ -353,7 +353,7 @@
             </Border>
       </Grid>
 
-      <Grid Grid.Row="2" Background="{DynamicResource HmiChromeAltBrush}" MinHeight="30">
+      <Grid Grid.Row="2" Background="{DynamicResource HmiChromeAltBrush}" MinHeight="34">
         <Border BorderBrush="#2E3D47" BorderThickness="0,1,0,0">
           <DockPanel Margin="10,0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" MaxWidth="560">

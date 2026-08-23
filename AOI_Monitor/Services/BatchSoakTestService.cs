@@ -519,10 +519,15 @@ public static class BatchSoakTestService
             context.TrendSamples,
             context.Options.MemorySlopeFailMegabytesPerHour,
             context.Options.MemoryGrowthFailFloorMegabytes);
-        if (trend.Exceeded && context.Clock.Elapsed < context.TrendWarmup)
+        if (context.Clock.Elapsed < context.TrendWarmup)
         {
-            // Same warm-up gate as the in-run check: a short run (e.g. --max-passes)
-            // spans minutes, so an MB/hour slope over it would be amplified noise.
+            // Same warm-up gate as the in-run check: a short run (e.g. --max-passes) spans
+            // minutes, so an MB/hour slope extrapolated from it is amplified noise in either
+            // direction. The annotation is applied whether or not the slope happened to look
+            // bad, because reporting a bare "within bounds" for a run too short to evaluate
+            // overstates the evidence exactly as much as failing on it would. A single GC
+            // inside the sampled window is enough to swing the slope by tens of thousands of
+            // MB/h when the window is milliseconds wide.
             trend = trend with
             {
                 Exceeded = false,

@@ -167,6 +167,39 @@ public sealed class BatchSoakTestServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ShortRunTrendIsInformationalEvenWhenTheSlopeLooksHealthy()
+    {
+        // Regression: the warm-up annotation used to be applied only when the slope happened to
+        // look bad. A run shorter than the warm-up gate has a sub-second x-range, so one GC inside
+        // the sampled window swings the slope by tens of thousands of MB/h in either direction.
+        // When it swung negative the run reported a bare "within bounds", which claimed a trend
+        // verdict the run was far too short to support - and made this suite fail only under load.
+        AoiDatabase.Initialize();
+        var imageFolder = WriteImages(1);
+
+        var result = await BatchSoakTestService.RunAsync(
+            new BatchSoakOptions
+            {
+                ImageFolder = imageFolder,
+                OutputFolder = Path.Combine(_root, "trend-warmup-healthy-output"),
+                OperatorId = "test-soak",
+                Duration = TimeSpan.FromHours(8),
+                DelayBetweenPasses = TimeSpan.Zero,
+                MaxPasses = 12,
+
+                // Thresholds a real run would never trip, so the slope is reported as healthy.
+                MemorySlopeFailMegabytesPerHour = double.MaxValue,
+                MemoryGrowthFailFloorMegabytes = double.MaxValue,
+            },
+            progress: null,
+            CancellationToken.None);
+
+        Assert.Equal("PASS", result.Status);
+        Assert.False(result.MemoryTrend.Exceeded);
+        Assert.Contains("Informational only", result.MemoryTrend.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StuckInspectionFailsRunWithStuckIterationReason()
     {
         AoiDatabase.Initialize();
